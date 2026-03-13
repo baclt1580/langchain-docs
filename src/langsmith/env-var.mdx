@@ -12,6 +12,12 @@ This environment variable should be set to `True` if the implementation of a gra
 
 Defaults to `False`.
 
+## `BG_JOB_MAX_RETRIES`
+
+Maximum number of times a background run will be retried after a retriable failure (e.g. transient database errors, server shutdown cancellations). When a run fails with a retriable error, it is placed back in the queue and resumed from the last checkpointed step. If the run exceeds the maximum number of retries, it is marked as failed.
+
+Defaults to `3`.
+
 ## `BG_JOB_SHUTDOWN_GRACE_PERIOD_SECS`
 
 Specifies, in seconds, how long the server will wait for background jobs to finish after the queue receives a shutdown signal. After this period, the server will force termination. Defaults to `180` seconds. The maximum value is `3600` seconds. Set this to ensure jobs have enough time to complete cleanly during shutdown. Added in `langgraph-api==0.2.16`.
