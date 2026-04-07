@@ -1,0 +1,197 @@
+---
+title: 将 Teams 与智能体集成
+description: 通过自带 Azure Bot 将 LangSmith Fleet 连接到 Microsoft Teams，使智能体能够在 Teams 中与用户通信。
+sidebarTitle: Microsoft Teams
+---
+
+通过 LangSmith Fleet，你可以通过注册自定义 Azure Bot 将智能体连接到 Microsoft Teams。连接后，你的智能体可以：
+
+- 接收 Teams 用户的消息，以消息内容启动新的运行。
+- 使用 Bot Framework 直接在 Teams 对话中回复。
+- 通过 Microsoft Graph API 工具访问 Teams 频道和消息。
+
+<Note>
+在频道对话中，仅当明确提及机器人时，它才会响应。在直接消息和群聊中，机器人会响应所有消息。
+</Note>
+
+## 先决条件
+
+- Fleet 中已有的智能体（请参阅[快速入门](/langsmith/fleet/quickstart)以创建）
+- 具有创建资源权限的 [Azure 账户](https://portal.azure.com)
+- 对 Microsoft Teams 工作区的管理员访问权限，或安装应用的权限
+
+## 创建 Azure Bot
+
+在 Fleet 中注册之前，你需要创建 Azure Bot 资源并获取其凭据。
+
+<Steps>
+  <Step title="创建 Azure Bot 资源">
+    1. 前往 [Azure 门户](https://portal.azure.com)。
+    1. 搜索 **Azure Bot** 并点击 **创建**。
+    1. 填写必填字段：
+       - **Bot 句柄**：机器人的唯一标识符。
+       - **订阅**：选择你的 Azure 订阅。
+       - **资源组**：创建新的或选择现有的。
+       - **应用类型**：选择 **多租户**。
+       - **创建类型**：选择 **创建新的 Microsoft 应用 ID**。
+    1. 点击 **查看 + 创建**，然后点击 **创建**。
+  </Step>
+
+  <Step title="获取应用凭据">
+    资源创建后：
+
+    1. 导航到你的机器人资源，点击左侧边栏中的 **配置**。
+    1. 复制 **Microsoft 应用 ID**。稍后你将需要它。
+    1. 点击应用 ID 旁边的 **管理密码**。
+    1. 点击 **新建客户端密码**，添加描述，然后点击 **添加**。
+    1. 立即复制新密码的 **值**——它只显示一次。
+
+    <Warning>
+    创建后立即复制客户端密码值。之后无法再次检索。如果丢失，必须创建新的。
+    </Warning>
+  </Step>
+
+  <Step title="配置消息传递终结点">
+    你将在 Fleet 中注册机器人后设置消息传递终结点。现在请跳过此字段——稍后你将返回此步骤。
+  </Step>
+</Steps>
+
+## 在 Fleet 中注册机器人
+
+<Steps>
+  <Step title="打开集成页面">
+    1. 在 [LangSmith UI](https://smith.langchain.com) 中导航到 **Fleet**。
+    1. 前往 **集成** 页面。
+    1. 点击 **添加 Teams 应用**。
+  </Step>
+
+  <Step title="输入凭据">
+    填写以下字段：
+
+    - **应用名称**：在 Fleet 中显示给机器人的名称。
+    - **Azure 应用 ID**：来自 Azure Bot 资源的 Microsoft 应用 ID。
+    - **Azure 应用密码**：你之前复制的客户端密码值。
+    - **Azure 租户 ID**（可选）：你的 Azure AD 租户 ID。对于多租户机器人，请保留默认值。
+
+    点击 **创建** 以注册机器人。
+  </Step>
+
+  <Step title="复制 Webhook URL">
+    注册后，Fleet 会显示一个 **webhook URL**。复制此 URL——你需要它来完成 Azure Bot 配置。
+  </Step>
+
+  <Step title="在 Azure 中设置消息传递终结点">
+    1. 返回 [Azure 门户](https://portal.azure.com) 中的 Azure Bot 资源。
+    1. 前往 **配置**。
+    1. 将来自 Fleet 的 webhook URL 粘贴到 **消息传递终结点** 字段。
+    1. 点击 **应用**。
+  </Step>
+</Steps>
+
+## 将机器人添加到 Teams
+
+<Steps>
+  <Step title="打开 Teams 频道">
+    1. 在 Azure 门户中，前往你的机器人资源。
+    1. 点击左侧边栏中的 **频道**。
+    1. 选择 **Microsoft Teams** 并点击 **应用**。
+    1. 同意服务条款。
+  </Step>
+
+  <Step title="在 Teams 中安装机器人">
+    1. 在 Teams 中，点击左侧边栏的 **应用**。
+    1. 点击 **管理你的应用**，然后点击 **上传应用**。
+    1. 上传引用你的 Azure 应用 ID 的 [Teams 应用清单](https://learn.microsoft.com/zh-cn/microsoftteams/platform/resources/schema/manifest-schema)，或使用 Azure Bot 频道页面上的 **在 Teams 中打开** 链接。
+    1. 将机器人添加到所需的团队或聊天。
+  </Step>
+</Steps>
+
+## 将机器人链接到智能体
+
+你可以从集成页面或智能体编辑器将 Teams 机器人链接到智能体。
+
+### 从集成页面链接
+
+1. 在 Fleet 的 **集成** 页面导航到 **Teams 应用** 部分。
+1. 选择要链接的机器人。
+1. 从下拉菜单中选择要链接的智能体。
+
+### 从智能体编辑器链接
+
+1. 在左侧导航栏的 **我的智能体** 中选择你的智能体。
+1. 点击 <Icon icon="pencil"/> **编辑智能体**。
+1. 滚动到 **频道** 部分。
+1. 点击 **Teams**。
+1. 从下拉菜单中选择要链接的 Teams 应用。
+
+## 添加 Teams 工具
+
+工具让你的智能体能够在 Teams 中执行操作。要响应消息并与 Teams 交互，请添加相关工具。
+
+<Tip>
+你也可以要求你的智能体自行添加这些工具。在智能体聊天中，尝试说：“添加 Teams 工具，以便你能响应消息。”
+</Tip>
+
+1. 在智能体编辑器中，滚动到 **工具** 部分。
+1. 点击 **+ 添加**。
+1. 搜索“Teams”并添加你需要的工具：
+   - **teams_bot_send_proactive_message** — 将消息发送回 Teams 对话
+   - **microsoft_teams_list_my_teams** — 列出经过身份验证的用户所属的团队
+   - **microsoft_teams_list_channels** — 列出团队中的频道
+   - **microsoft_teams_post_channel_message** — 向频道发布消息
+   - **microsoft_teams_read_channel_messages** — 读取频道中的最近消息
+1. 如果提示，点击 **连接** 以授权 Microsoft Graph 工具。
+1. 点击 **保存更改**。
+
+<Note>
+`teams_bot_send_proactive_message` 工具使用 Bot Framework 凭据，不需要单独的 OAuth 授权。其他 Teams 工具使用 Microsoft Graph API，可能需要 OAuth 同意。
+</Note>
+
+## 配置智能体行为（可选）
+
+你的智能体需要知道如何处理传入的 Teams 消息。通过在智能体聊天中直接提示来更新其指令：
+
+```
+更新你的指令以处理 Teams 触发器和 Teams 工具
+以实现双向通信
+```
+
+根据你的用例调整指令——例如，你可能希望智能体仅响应特定类型的问题，或者在回复前从特定来源提取信息。
+
+## 故障排除
+
+### 智能体不响应
+
+- 检查 Fleet 中的线程，查看是否有需要人工输入的审批。
+- 在频道对话中，确保你 **@提及** 机器人。未提及的频道消息将被忽略。
+- 检查 **动态** 选项卡中的错误。
+- 验证 Azure Bot 资源中的消息传递终结点是否与来自 Fleet 的 webhook URL 匹配。
+- 确保机器人在 Fleet 中的注册未暂停。
+
+### 注册期间出现无效凭据错误
+
+- 验证 **Azure 应用 ID** 和 **应用密码**（客户端密码）是否正确。
+- 确保客户端密码未过期。如果需要，在 Azure 中创建新的密码。
+- 检查 Azure 中机器人类型是否设置为 **多租户**。
+
+### 机器人在直接消息中有效，但在频道中无效
+
+- 在频道对话中，必须明确 **@提及** 机器人。
+- 确保机器人已添加到团队中，并且有权限读取频道中的消息。
+
+## 后续步骤
+
+<CardGroup cols={3}>
+
+  <Card title="添加更多工具" icon="puzzle" href="/langsmith/fleet/tools">
+    将更多服务连接到你的智能体
+  </Card>
+
+  <Card title="添加更多频道" icon="bolt" href="/langsmith/fleet/channels">
+    设置电子邮件、计划或 webhook 频道
+  </Card>
+
+  <Card title="使用模板" icon="layout-grid" href="/langsmith/fleet/templates">
+    从预构建的智能体模板开始
+  </Card>
+</CardGroup>

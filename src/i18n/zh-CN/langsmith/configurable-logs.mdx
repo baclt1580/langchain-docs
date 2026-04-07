@@ -1,0 +1,22 @@
+---
+title: 在服务器日志中包含 HTTP 头信息
+sidebarTitle: 记录请求头
+---
+
+默认情况下，出于隐私考虑，[Agent Server](/langsmith/agent-server) 不会在服务器日志中记录 HTTP 头信息。然而，记录请求 ID 和关联 ID 有助于您调试问题，并在分布式系统中追踪请求。您可以通过修改 [`langgraph.json`](/langsmith/application-structure#configuration-file) 文件中的 `logging_headers` 部分，选择为所有 API 调用启用请求头记录。
+
+```json
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "http": {
+    "logging_headers": {
+      "includes": ["request-id", "x-purchase-id", "*-trace-*"],
+      "excludes": ["authorization", "x-api-key", "x-organization-id", "x-user-id"]
+    }
+  }
+}
+```
+
+`includes` 和 `excludes` 列表接受精确的请求头名称，或使用 `*` 作为通配符（不区分大小写）来匹配任意数量字符的 glob 模式。出于安全考虑，不支持其他模式类型。
+
+请注意，排除规则优先于包含规则。例如，如果您包含了 `*-id` 但排除了 `x-user-id`，则 `x-user-id` 请求头将不会被记录。

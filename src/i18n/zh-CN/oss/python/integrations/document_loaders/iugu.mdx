@@ -1,0 +1,33 @@
+---
+title: "Iugu 集成"
+description: "使用 LangChain Python 与 Iugu 文档加载器集成。"
+---
+
+>[Iugu](https://www.iugu.com/) 是一家巴西的服务及软件即服务（SaaS）公司。它为电子商务网站和移动应用提供支付处理软件和应用程序接口。
+
+本笔记本介绍了如何从 `Iugu REST API` 加载数据，并将其转换为可被 LangChain 摄入的格式，同时包含向量化使用的示例。
+
+```python
+from langchain.indexes import VectorstoreIndexCreator
+from langchain_community.document_loaders import IuguLoader
+```
+
+Iugu API 需要一个访问令牌，该令牌可在 Iugu 仪表板中找到。
+
+此文档加载器还需要一个 `resource` 参数，用于定义要加载的数据类型。
+
+可用的资源包括：
+
+`文档` [文档](https://dev.iugu.com/reference/metadados)
+
+```python
+iugu_loader = IuguLoader("charges")
+```
+
+```python
+# 从加载器创建向量存储检索器
+# 更多详情请参阅 https://python.langchain.com/en/latest/modules/data_connection/getting_started.html
+
+index = VectorstoreIndexCreator().from_loaders([iugu_loader])
+iugu_doc_retriever = index.vectorstore.as_retriever()
+```

@@ -1,0 +1,241 @@
+---
+title: "Eden AI 集成"
+description: "使用 LangChain Python 与 Eden AI 聊天模型集成。"
+---
+
+Eden AI 正在通过整合顶尖的 AI 服务提供商来革新人工智能领域，使用户能够解锁无限可能，释放人工智能的真正潜力。作为一个全面且便捷的一站式平台，它让用户能够闪电般快速地将 AI 功能部署到生产环境，通过单一 API 轻松访问全方位的 AI 能力。（官网：[edenai.co/](https://edenai.co/)）
+
+本示例将介绍如何使用 LangChain 与 Eden AI 模型进行交互。
+
+-----------------------------------------------------------------------------------
+
+`EdenAI` 不仅仅局限于模型调用。它还为您提供了以下高级功能：
+
+- **多提供商支持**：访问由不同提供商提供的多样化语言模型，让您自由选择最适合您用例的模型。
+
+- **后备机制**：设置后备机制，确保即使主要提供商不可用，也能无缝切换至替代提供商，保障业务连续性。
+
+- **使用量追踪**：按项目和 API 密钥追踪使用统计信息。此功能让您能够有效监控和管理资源消耗。
+
+- **监控与可观测性**：`EdenAI` 在平台上提供全面的监控和可观测性工具。监控语言模型的性能，分析使用模式，并获取有价值的见解以优化您的应用程序。
+
+访问 EDENAI 的 API 需要一个 API 密钥，
+
+您可以通过注册账户 [app.edenai.run/user/register](https://app.edenai.run/user/register) 并前往此处 [app.edenai.run/admin/iam/api-keys](https://app.edenai.run/admin/iam/api-keys) 来获取。
+
+获取密钥后，我们需要将其设置为环境变量，运行以下命令：
+
+```bash
+export EDENAI_API_KEY="..."
+```
+
+您可以在 API 参考文档中找到更多详细信息：[docs.edenai.co/reference](https://docs.edenai.co/reference)
+
+如果您不想设置环境变量，也可以在初始化 EdenAI 聊天模型类时，通过 `edenai_api_key` 命名参数直接传入密钥。
+
+```python
+from langchain_community.chat_models.edenai import ChatEdenAI
+from langchain.messages import HumanMessage
+```
+
+```python
+chat = ChatEdenAI(
+    edenai_api_key="...", provider="openai", temperature=0.2, max_tokens=250
+)
+```
+
+```python
+messages = [HumanMessage(content="Hello !")]
+chat.invoke(messages)
+```
+
+```text
+AIMessage(content='Hello! How can I assist you today?')
+```
+
+```python
+await chat.ainvoke(messages)
+```
+
+```text
+AIMessage(content='Hello! How can I assist you today?')
+```
+
+## 流式传输与批处理
+
+`ChatEdenAI` 支持流式传输和批处理。下面是一个示例。
+
+```python
+for chunk in chat.stream(messages):
+    print(chunk.content, end="", flush=True)
+```
+
+```text
+Hello! How can I assist you today?
+```
+
+```python
+chat.batch([messages])
+```
+
+```text
+[AIMessage(content='Hello! How can I assist you today?')]
+```
+
+## 后备机制
+
+借助 Eden AI，您可以设置后备机制，确保即使主要提供商不可用，也能无缝切换至替代提供商，保障操作顺利进行。
+
+```python
+chat = ChatEdenAI(
+    edenai_api_key="...",
+    provider="openai",
+    temperature=0.2,
+    max_tokens=250,
+    fallback_providers="google",
+)
+```
+
+在此示例中，如果 OpenAI 遇到任何问题，您可以使用 Google 作为备用提供商。
+
+有关 Eden AI 的更多信息和详情，请查看此链接：[docs.edenai.co/docs/additional-parameters](https://docs.edenai.co/docs/additional-parameters)
+
+## 链式调用
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_template(
+    "What is a good name for a company that makes {product}?"
+)
+chain = prompt | chat
+```
+
+```python
+chain.invoke({"product": "healthy snacks"})
+```
+
+```text
+AIMessage(content='VitalBites')
+```
+
+## 工具
+
+### bind_tools()
+
+通过 `ChatEdenAI.bind_tools`，我们可以轻松地将 Pydantic 类、字典模式、LangChain 工具甚至函数作为工具传递给模型。
+
+```python
+from pydantic import BaseModel, Field
+
+llm = ChatEdenAI(provider="openai", temperature=0.2, max_tokens=500)
+
+
+class GetWeather(BaseModel):
+    """获取指定地点的当前天气"""
+
+    location: str = Field(description="城市和州，例如：San Francisco, CA")
+
+
+llm_with_tools = llm.bind_tools([GetWeather])
+```
+
+```python
+ai_msg = llm_with_tools.invoke(
+    "what is the weather like in San Francisco",
+)
+ai_msg
+```
+
+```text
+AIMessage(content='', response_metadata={'openai': {'status': 'success', 'generated_text': None, 'message': [{'role': 'user', 'message': 'what is the weather like in San Francisco', 'tools': [{'name': 'GetWeather', 'description': 'Get the current weather in a given location', 'parameters': {'type': 'object', 'properties': {'location': {'description': 'The city and state, e.g. San Francisco, CA', 'type': 'string'}}, 'required': ['location']}}], 'tool_calls': None}, {'role': 'assistant', 'message': None, 'tools': None, 'tool_calls': [{'id': 'call_tRpAO7KbQwgTjlka70mCQJdo', 'name': 'GetWeather', 'arguments': '{"location":"San Francisco"}'}]}], 'cost': 0.000194}}, id='run-5c44c01a-d7bb-4df6-835e-bda596080399-0', tool_calls=[{'name': 'GetWeather', 'args': {'location': 'San Francisco'}, 'id': 'call_tRpAO7KbQwgTjlka70mCQJdo'}])
+```
+
+```python
+ai_msg.tool_calls
+```
+
+```text
+[{'name': 'GetWeather',
+  'args': {'location': 'San Francisco'},
+  'id': 'call_tRpAO7KbQwgTjlka70mCQJdo'}]
+```
+
+### with_structured_output()
+
+BaseChatModel.with_structured_output 接口使得从聊天模型获取结构化输出变得容易。您可以使用 ChatEdenAI.with_structured_output（它在底层使用了工具调用功能），让模型更可靠地返回特定格式的输出：
+
+```python
+structured_llm = llm.with_structured_output(GetWeather)
+structured_llm.invoke(
+    "what is the weather like in San Francisco",
+)
+```
+
+```text
+GetWeather(location='San Francisco')
+```
+
+### 将工具结果传递给模型
+
+这是一个完整的使用工具的示例。将工具输出传递给模型，并从模型获取结果。
+
+```python
+from langchain.messages import HumanMessage, ToolMessage
+from langchain.tools import tool
+
+
+@tool
+def add(a: int, b: int) -> int:
+    """将 `a` 和 `b` 相加。
+
+    参数：
+        a: 第一个整数
+        b: 第二个整数
+    """
+    return a + b
+
+
+llm = ChatEdenAI(
+    provider="openai",
+    max_tokens=1000,
+    temperature=0.2,
+)
+
+llm_with_tools = llm.bind_tools([add], tool_choice="required")
+
+query = "What is 11 + 11?"
+
+messages = [HumanMessage(query)]
+ai_msg = llm_with_tools.invoke(messages)
+messages.append(ai_msg)
+
+tool_call = ai_msg.tool_calls[0]
+tool_output = add.invoke(tool_call["args"])
+
+# 这将我们工具的结果附加给模型
+messages.append(ToolMessage(tool_output, tool_call_id=tool_call["id"]))
+
+llm_with_tools.invoke(messages).content
+```
+
+```text
+'11 + 11 = 22'
+```
+
+### 流式传输
+
+Eden AI 目前不支持流式工具调用。尝试流式传输将产生单个最终消息。
+
+```python
+list(llm_with_tools.stream("What's 9 + 9"))
+```
+
+```text
+/home/eden/Projects/edenai-langchain/libs/community/langchain_community/chat_models/edenai.py:603: UserWarning: stream: Tool use is not yet supported in streaming mode.
+  warnings.warn("stream: Tool use is not yet supported in streaming mode.")
+```
+
+```json
+[AIMessageChunk(content='', id='run-fae32908-ec48-4ab2-ad96-bb0d0511754f', tool_calls=[{'name': 'add', 'args': {'a': 9, 'b': 9}, 'id': 'call_n0Tm7I9zERWa6UpxCAVCweLN'}], tool_call_chunks=[{'name': 'add', 'args': '{"a": 9, "b": 9}', 'id': 'call_n0Tm7I9zERWa6UpxCAVCweLN', 'index': 0}])]
+```

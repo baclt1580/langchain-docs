@@ -1,0 +1,26 @@
+---
+title: "AWS 中间件集成"
+description: "了解适用于 LangChain 代理的 Amazon Bedrock 提示词缓存中间件。"
+---
+
+适用于托管在 [Amazon Bedrock](https://aws.amazon.com/bedrock/) 上的模型的中间件。了解更多关于[中间件](/oss/langchain/middleware/overview)的信息。
+
+| 中间件 | 描述 |
+|------------|-------------|
+| [提示词缓存](#prompt-caching) | 通过缓存重复的提示词前缀来降低成本 |
+
+## 提示词缓存
+
+通过在 Amazon Bedrock 上缓存频繁重复使用的提示词前缀，减少推理延迟和输入令牌成本。这种模式适用于具有长系统提示、大量工具定义或重复文档上下文的多轮代理。
+
+支持的模型系列包括 Bedrock 上的 **Anthropic Claude** 和 **Amazon Nova**。
+
+<Info>
+    了解更多关于 [AWS Bedrock 提示词缓存](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)策略、支持的模型和区域限制的信息。
+</Info>
+
+### LangChain 代理
+
+为 `createAgent` 设置 Bedrock 缓存检查点的代理中间件已在 [`langchain-aws`](https://github.com/langchain-ai/langchain-aws/tree/main/libs/aws) Python 包（`langchain_aws.middleware.prompt_caching`）中实现。请参阅该仓库以获取安装、配置选项和可运行的示例。
+
+对于 TypeScript 中的 Bedrock 聊天模型，请从 [Bedrock 聊天模型集成](/oss/integrations/chat/bedrock) 和 [@langchain/aws](https://www.npmjs.com/package/@langchain/aws) 包开始。

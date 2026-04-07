@@ -1,0 +1,90 @@
+---
+title: "AWS Step Functions 工具包集成"
+description: "使用 LangChain JavaScript 集成 AWS Step Functions 工具包。"
+---
+
+**AWS Step Functions** 是一项可视化工作流服务，可帮助开发者使用 AWS 服务构建分布式应用程序、自动化流程、编排微服务以及创建数据和机器学习（ML）管道。
+
+通过在提供给 Agent 的工具列表中加入 `AWSSfn` 工具，您可以授予您的 Agent 调用在 AWS 云中运行的异步工作流的能力。
+
+当 Agent 使用 `AWSSfn` 工具时，它将提供一个 `string` 类型的参数，该参数随后会传递给此工具支持的操作之一。支持的操作包括：`StartExecution`、`DescribeExecution` 和 `SendTaskSuccess`。
+
+## 设置
+
+您需要安装 Node AWS Step Functions SDK：
+
+```bash npm
+npm install @aws-sdk/client-sfn
+```
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+### 关于凭证的说明：
+
+- 如果您尚未通过 AWS CLI 运行 [`aws configure`](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)，则必须向 AWSSfn 构造函数提供 `region`、`accessKeyId` 和 `secretAccessKey`。
+- 与这些凭证对应的 IAM 角色必须具有调用 Step Function 的权限。
+
+```typescript
+import { OpenAI } from "@langchain/openai";
+import {
+  AWSSfnToolkit,
+  createAWSSfnAgent,
+} from "@langchain/community/agents/toolkits/aws_sfn";
+
+const _EXAMPLE_STATE_MACHINE_ASL = `
+{
+  "Comment": "一个简单的 Amazon States Language 示例，用于定义新客户入职的状态机。",
+  "StartAt": "OnboardNewClient",
+  "States": {
+    "OnboardNewClient": {
+      "Type": "Pass",
+      "Result": "Client onboarded!",
+      "End": true
+    }
+  }
+}`;
+
+/**
+ * 此示例使用一个已部署的 AWS Step Function 状态机，其具有上述 Amazon State Language (ASL) 定义。
+ * 您可以通过在您的 AWS 环境中使用上述 ASL 配置一个状态机来测试，或者可以使用像 LocalStack 这样的工具
+ * 在本地模拟 AWS 服务。更多信息请参见 https://localstack.cloud/。
+ */
+export const run = async () => {
+  const model = new OpenAI({ temperature: 0 });
+  const toolkit = new AWSSfnToolkit({
+    name: "onboard-new-client-workflow",
+    description:
+      "新客户入职工作流。也可用于获取任何正在执行的工作流或状态机的状态。",
+    stateMachineArn:
+      "arn:aws:states:us-east-1:1234567890:stateMachine:my-state-machine", // 请根据您的状态机 ARN 相应更新
+    region: "<您的 Sfn 区域>",
+    accessKeyId: "<您的访问密钥 ID>",
+    secretAccessKey: "<您的秘密访问密钥>",
+  });
+  const executor = createAWSSfnAgent(model, toolkit);
+
+  const input = `将 john doe (john@example.com) 作为新客户入职。`;
+
+  console.log(`正在执行输入 "${input}"...`);
+
+  const result = await executor.invoke({ input });
+
+  console.log(`获得输出 ${result.output}`);
+
+  console.log(
+    `获得中间步骤 ${JSON.stringify(
+      result.intermediateSteps,
+      null,
+      2
+    )}`
+  );
+};
+```

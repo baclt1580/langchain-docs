@@ -1,0 +1,255 @@
+---
+title: 如何通过 REST API 上传在 LangSmith 外部运行的实验
+sidebarTitle: 上传在外部运行的实验
+---
+
+部分用户倾向于在 LangSmith 外部管理数据集和运行实验，但希望使用 LangSmith 界面查看结果。这可以通过我们的端点实现。
+
+本指南将展示如何使用 REST API 上传评估结果，以 Python 中的 `requests` 库为例。但相同原则适用于任何编程语言。
+
+## 请求体结构
+
+上传实验需要指定实验和数据集的相关高层信息，以及实验内各个示例和运行的具体数据。`results` 中的每个对象代表实验中的一个“行”——即单个数据集示例及其关联的运行。请注意，`dataset_id` 和 `dataset_name` 指的是您外部系统中的数据集标识符，将用于在单个数据集中分组外部实验。它们不应引用 LangSmith 中已存在的数据集（除非该数据集是通过此端点创建的）。
+
+您可以使用以下结构向 `/datasets/upload-experiment` 端点上传实验：
+
+```json
+{
+  "experiment_name": "字符串（必需）",
+  "experiment_description": "字符串（可选）",
+  "experiment_start_time": "日期时间（必需）",
+  "experiment_end_time": "日期时间（必需）",
+  "dataset_id": "UUID（可选 - 外部数据集 ID，用于将实验分组）",
+  "dataset_name": "字符串（可选 - 必须提供 dataset_id 或 dataset_name 之一）",
+  "dataset_description": "字符串（可选）",
+  "experiment_metadata": { // 对象（任意结构 - 可选）
+    "key": "value"
+  },
+  "summary_experiment_scores": [ // 汇总反馈对象列表（可选）
+    {
+      "key": "字符串（必需）",
+      "score": "数字（可选）",
+      "value": "字符串（可选）",
+      "comment": "字符串（可选）",
+      "feedback_source": { // 对象（可选）
+        "type": "字符串（必需）"
+      },
+      "feedback_config": { // 对象（可选）
+        "type": "字符串枚举：continuous、categorical 或 freeform",
+        "min": "数字（可选）",
+        "max": "数字（可选）",
+        "categories": [ // 反馈类别对象列表（可选）
+          {
+            "value": "数字（必需）",
+            "label": "字符串（可选）"
+          }
+        ]
+      },
+      "created_at": "日期时间（可选 - 默认为当前时间）",
+      "modified_at": "日期时间（可选 - 默认为当前时间）",
+      "correction": "对象或字符串（可选）"
+    }
+  ],
+  "results": [ // 实验行对象列表（必需）
+    {
+      "row_id": "UUID（必需）",
+      "inputs": { // 对象（必需 - 任意结构）。这将是
+        "key": "val" // 运行和数据集示例的共同输入。
+      },
+      "expected_outputs": { // 对象（可选 - 任意结构）。
+        "key": "val" // 这些将是数据集示例的输出。
+      },
+      "actual_outputs": { // 对象（可选 - 任意结构）。
+        "key": "val" // 这些将是运行的输出。
+      },
+      "evaluation_scores": [ // 运行的反馈对象列表（可选）
+        {
+          "key": "字符串（必需）",
+          "score": "数字（可选）",
+          "value": "字符串（可选）",
+          "comment": "字符串（可选）",
+          "feedback_source": { // 对象（可选）
+            "type": "字符串（必需）"
+          },
+          "feedback_config": { // 对象（可选）
+            "type": "字符串枚举：continuous、categorical 或 freeform",
+            "min": "数字（可选）",
+            "max": "数字（可选）",
+            "categories": [ // 反馈类别对象列表（可选）
+              {
+                "value": "数字（必需）",
+                "label": "字符串（可选）"
+              }
+            ]
+          },
+          "created_at": "日期时间（可选 - 默认为当前时间）",
+          "modified_at": "日期时间（可选 - 默认为当前时间）",
+          "correction": "对象或字符串（可选）"
+        }
+      ],
+      "start_time": "日期时间（必需）", // 运行的开始/结束时间将用于
+      "end_time": "日期时间（必需）", // 计算延迟。它们必须全部落在
+      "run_name": "字符串（可选）", // 实验的开始和结束时间之间。
+      "error": "字符串（可选）",
+      "run_metadata": { // 对象（任意结构 - 可选）
+        "key": "value"
+      }
+    }
+  ]
+}
+```
+
+响应 JSON 将是一个字典，包含 `experiment` 和 `dataset` 键，每个键都是一个对象，包含所创建实验和数据集的相关信息。
+
+## 注意事项
+
+您可以通过在多次调用中提供相同的 dataset_id 或 dataset_name，将多个实验上传到同一数据集。您的实验将在单个数据集下分组，并且您将能够[使用比较视图来比较实验之间的结果](/langsmith/compare-experiment-results)。
+
+请确保各个行的开始和结束时间都在实验的开始和结束时间之间。
+
+您必须提供 dataset_id 或 dataset_name 之一。如果仅提供 ID 且数据集尚不存在，我们将为您生成一个名称；反之，如果仅提供名称，我们将生成一个 ID。
+
+您不能将实验上传到非通过此端点创建的数据集。上传实验仅支持外部管理的数据集。
+
+## 示例请求
+
+以下是调用 `/datasets/upload-experiment` 的简单示例。这是一个基本示例，仅使用最重要的字段进行说明。
+
+```python
+import os
+import requests
+
+body = {
+    "experiment_name": "我的外部实验",
+    "experiment_description": "上传到 LangSmith 的实验",
+    "dataset_name": "my-external-dataset",
+    "summary_experiment_scores": [
+        {
+            "key": "summary_accuracy",
+            "score": 0.9,
+            "comment": "干得漂亮！"
+        }
+    ],
+    "results": [
+        {
+            "row_id": "<<uuid>>",
+            "inputs": {
+                "input": "你好，今天旧金山的天气怎么样？"
+            },
+            "expected_outputs": {
+                "output": "抱歉，我无法提供当前天气信息。"
+            },
+            "actual_outputs": {
+                "output": "天气局部多云，最高气温 65 度。"
+            },
+            "evaluation_scores": [
+                {
+                    "key": "hallucination",
+                    "score": 1,
+                    "comment": "聊天机器人编造了天气信息，而不是指出没有足够信息来回答问题。这是幻觉。"
+                }
+            ],
+            "start_time": "2024-08-03T00:12:39",
+            "end_time": "2024-08-03T00:12:41",
+            "run_name": "Chatbot"
+        },
+        {
+            "row_id": "<<uuid>>",
+            "inputs": {
+                "input": "你好，49 的平方根是多少？"
+            },
+            "expected_outputs": {
+                "output": "49 的平方根是 7。"
+            },
+            "actual_outputs": {
+                "output": "7。"
+            },
+            "evaluation_scores": [
+                {
+                    "key": "hallucination",
+                    "score": 0,
+                    "comment": "聊天机器人正确识别了答案。这不是幻觉。"
+                }
+            ],
+            "start_time": "2024-08-03T00:12:40",
+            "end_time": "2024-08-03T00:12:42",
+            "run_name": "Chatbot"
+        }
+    ],
+    "experiment_start_time": "2024-08-03T00:12:38",
+    "experiment_end_time": "2024-08-03T00:12:43"
+}
+
+resp = requests.post(
+    "https://api.smith.langchain.com/api/v1/datasets/upload-experiment", # 针对自托管安装或欧盟区域请相应更新
+    json=body,
+    headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+)
+
+print(resp.json())
+```
+
+以下是收到的响应：
+
+```json
+{
+  "dataset": {
+    "name": "my-external-dataset",
+    "description": null,
+    "created_at": "2024-08-03T00:36:23.289730+00:00",
+    "data_type": "kv",
+    "inputs_schema_definition": null,
+    "outputs_schema_definition": null,
+    "externally_managed": true,
+    "id": "<<uuid>>",
+    "tenant_id": "<<uuid>>",
+    "example_count": 0,
+    "session_count": 0,
+    "modified_at": "2024-08-03T00:36:23.289730+00:00",
+    "last_session_start_time": null
+  },
+  "experiment": {
+    "start_time": "2024-08-03T00:12:38",
+    "end_time": "2024-08-03T00:12:43+00:00",
+    "extra": null,
+    "name": "我的外部实验",
+    "description": "上传到 LangSmith 的实验",
+    "default_dataset_id": null,
+    "reference_dataset_id": "<<uuid>>",
+    "trace_tier": "longlived",
+    "id": "<<uuid>>",
+    "run_count": null,
+    "latency_p50": null,
+    "latency_p99": null,
+    "first_token_p50": null,
+    "first_token_p99": null,
+    "total_tokens": null,
+    "prompt_tokens": null,
+    "completion_tokens": null,
+    "total_cost": null,
+    "prompt_cost": null,
+    "completion_cost": null,
+    "tenant_id": "<<uuid>>",
+    "last_run_start_time": null,
+    "last_run_start_time_live": null,
+    "feedback_stats": null,
+    "session_feedback_stats": null,
+    "run_facets": null,
+    "error_rate": null,
+    "streaming_rate": null,
+    "test_run_number": 1
+  }
+}
+```
+
+请注意，实验结果中的延迟和反馈统计信息为 null，因为运行尚未有机会持久化，这可能需要几秒钟。如果您保存实验 ID 并在几秒钟后再次查询，您将看到所有统计信息（尽管 tokens/cost 仍为 null，因为我们在请求体中未要求此信息）。
+
+## 在界面中查看实验
+
+现在，登录界面并点击您新创建的数据集！您应该会看到一个实验：![已上传的实验表格](/langsmith/images/uploaded-dataset.png)
+
+您的示例已上传：![已上传的示例](/langsmith/images/uploaded-dataset-examples.png)
+
+点击您的实验将进入比较视图：![已上传实验的比较视图](/langsmith/images/uploaded-experiment.png)
+
+随着您向数据集上传更多实验，您将能够在比较视图中比较结果并轻松识别回归问题。

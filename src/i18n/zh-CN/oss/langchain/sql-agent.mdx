@@ -1,0 +1,816 @@
+---
+title: 构建 SQL 代理
+sidebarTitle: SQL 代理
+---
+
+import ChatModelTabsPy from '/snippets/chat-model-tabs.mdx';
+import ChatModelTabsJS from '/snippets/chat-model-tabs-js.mdx';
+
+## 概述
+
+在本教程中，你将学习如何使用 LangChain [代理](/oss/langchain/agents)构建一个能够回答关于 SQL 数据库问题的代理。
+
+从高层次来看，该代理将：
+
+<Steps>
+<Step title="从数据库中获取可用的表和模式" />
+<Step title="确定哪些表与问题相关" />
+<Step title="获取相关表的模式" />
+<Step title="根据问题和模式信息生成查询" />
+<Step title="使用 LLM 双重检查查询中的常见错误" />
+<Step title="执行查询并返回结果" />
+<Step title="纠正数据库引擎暴露的错误，直到查询成功" />
+<Step title="根据结果制定响应" />
+</Steps>
+
+<Warning>
+构建针对 SQL 数据库的问答系统需要执行模型生成的 SQL 查询。这样做存在固有风险。请确保你的数据库连接权限始终根据代理的需求尽可能缩小范围。这将减轻（尽管不能消除）构建模型驱动系统的风险。
+</Warning>
+
+### 概念
+
+我们将涵盖以下概念：
+
+- 用于从 SQL 数据库读取的[工具](/oss/langchain/tools)
+- LangChain [代理](/oss/langchain/agents)
+- [人工介入](/oss/langchain/human-in-the-loop)流程
+
+## 设置
+
+### 安装
+
+    :::python
+    <CodeGroup>
+    ```bash pip
+    pip install langchain  langgraph  langchain-community
+    ```
+    </CodeGroup>
+    :::
+    :::js
+    <CodeGroup>
+    ```bash npm
+    npm i langchain @langchain/core typeorm sqlite3 zod
+    ```
+    ```bash yarn
+    yarn add langchain @langchain/core typeorm sqlite3 zod
+    ```
+    ```bash pnpm
+    pnpm add langchain @langchain/core typeorm sqlite3 zod
+    ```
+    </CodeGroup>
+    :::
+
+### LangSmith
+
+设置 [LangSmith](https://smith.langchain.com) 以检查你的链或代理内部发生的情况。然后设置以下环境变量：
+
+    ```shell
+    export LANGSMITH_TRACING="true"
+    export LANGSMITH_API_KEY="..."
+    ```
+
+## 1. 选择 LLM
+
+:::python
+选择一个支持[工具调用](/oss/integrations/providers/overview)的模型：
+
+<ChatModelTabsPy />
+:::
+:::js
+
+选择一个支持[工具调用](/oss/integrations/providers/overview)的模型：
+<ChatModelTabsJS />
+:::
+
+下面示例中显示的输出使用了 OpenAI。
+
+## 2. 配置数据库
+
+你将为本教程创建一个 [SQLite 数据库](https://www.sqlitetutorial.net/sqlite-sample-database/)。SQLite 是一个轻量级数据库，易于设置和使用。我们将加载 `chinook` 数据库，这是一个代表数字媒体商店的示例数据库。
+
+为了方便起见，我们已将数据库 (`Chinook.db`) 托管在一个公共的 GCS 存储桶上。
+
+:::python
+```python
+import requests, pathlib
+
+url = "https://storage.googleapis.com/benchmarks-artifacts/chinook/Chinook.db"
+local_path = pathlib.Path("Chinook.db")
+
+if local_path.exists():
+    print(f"{local_path} 已存在，跳过下载。")
+else:
+    response = requests.get(url)
+    if response.status_code == 200:
+        local_path.write_bytes(response.content)
+        print(f"文件已下载并保存为 {local_path}")
+    else:
+        print(f"下载文件失败。状态码: {response.status_code}")
+```
+:::
+:::js
+```typescript
+import fs from "node:fs/promises";
+import path from "node:path";
+
+const url = "https://storage.googleapis.com/benchmarks-artifacts/chinook/Chinook.db";
+const localPath = path.resolve("Chinook.db");
+
+async function resolveDbPath() {
+  if (await fs.exists(localPath)) {
+    return localPath;
+  }
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`下载数据库失败。状态码: ${resp.status}`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  await fs.writeFile(localPath, buf);
+  return localPath;
+}
+```
+:::
+:::python
+我们将使用 `langchain_community` 包中提供的一个方便的 SQL 数据库包装器来与数据库交互。该包装器提供了一个简单的接口来执行 SQL 查询和获取结果：
+
+```python
+from langchain_community.utilities import SQLDatabase
+
+db = SQLDatabase.from_uri("sqlite:///Chinook.db")
+
+print(f"方言: {db.dialect}")
+print(f"可用表: {db.get_usable_table_names()}")
+print(f'示例输出: {db.run("SELECT * FROM Artist LIMIT 5;")}')
+```
+```
+方言: sqlite
+可用表: ['Album', 'Artist', 'Customer', 'Employee', 'Genre', 'Invoice', 'InvoiceLine', 'MediaType', 'Playlist', 'PlaylistTrack', 'Track']
+示例输出: [(1, 'AC/DC'), (2, 'Accept'), (3, 'Aerosmith'), (4, 'Alanis Morissette'), (5, 'Alice In Chains')]
+```
+:::
+
+## 3. 添加数据库交互工具
+:::python
+使用 `langchain_community` 包中提供的 `SQLDatabase` 包装器来与数据库交互。该包装器提供了一个简单的接口来执行 SQL 查询和获取结果：
+
+```python
+from langchain_community.agent_toolkits import SQLDatabaseToolkit
+
+toolkit = SQLDatabaseToolkit(db=db, llm=model)
+
+tools = toolkit.get_tools()
+
+for tool in tools:
+    print(f"{tool.name}: {tool.description}\n")
+```
+```
+sql_db_query: 此工具的输入是一个详细且正确的 SQL 查询，输出是数据库的结果。如果查询不正确，将返回错误消息。如果返回错误，请重写查询，检查查询，然后重试。如果遇到 Unknown column 'xxxx' in 'field list' 问题，请使用 sql_db_schema 查询正确的表字段。
+
+sql_db_schema: 此工具的输入是一个逗号分隔的表列表，输出是这些表的模式和示例行。请务必先调用 sql_db_list_tables 确保表确实存在！示例输入: table1, table2, table3
+
+sql_db_list_tables: 输入是一个空字符串，输出是数据库中逗号分隔的表列表。
+
+sql_db_query_checker: 使用此工具在执行查询前双重检查你的查询是否正确。在使用 sql_db_query 执行查询之前，请始终使用此工具！
+```
+:::
+:::js
+
+使用 `langchain/sql_db` 中提供的 `SqlDatabase` 包装器来与数据库交互。该包装器提供了一个简单的接口来执行 SQL 查询和获取结果：
+```typescript
+import { SqlDatabase } from "@langchain/classic/sql_db";
+import { DataSource } from "typeorm";
+
+let db: SqlDatabase | undefined;
+async function getDb() {
+  if (!db) {
+    const dbPath = await resolveDbFile();
+    const datasource = new DataSource({ type: "sqlite", database: dbPath });
+    db = await SqlDatabase.fromDataSourceParams({ appDataSource: datasource });
+  }
+  return db;
+}
+
+async function getSchema() {
+  const db = await getDb();
+  return await db.getTableInfo();
+}
+```
+:::
+
+:::python
+## 4. 使用 `create_agent`
+
+使用 @[`create_agent`] 以最少的代码构建一个 [ReAct 代理](https://arxiv.org/pdf/2210.03629)。代理将解释请求并生成 SQL 命令，然后由工具执行。如果命令有错误，错误消息将返回给模型。模型随后可以检查原始请求和新的错误消息，并生成新的命令。这可以持续进行，直到 LLM 成功生成命令或达到结束计数。这种向模型提供反馈（在本例中是错误消息）的模式非常强大。
+
+使用描述性的系统提示初始化代理以自定义其行为：
+
+```python
+system_prompt = """
+你是一个设计用于与 SQL 数据库交互的代理。
+给定一个输入问题，创建一个语法正确的 {dialect} 查询来运行，
+然后查看查询结果并返回答案。除非用户
+指定他们希望获取的具体示例数量，否则始终将你的
+查询限制为最多 {top_k} 个结果。
+
+你可以按相关列对结果进行排序，以返回数据库中
+最有趣的示例。切勿查询特定表的所有列，
+只询问给定问题相关的列。
+
+在执行查询之前，你必须双重检查你的查询。如果在执行
+查询时出现错误，请重写查询并重试。
+
+不要对数据库执行任何 DML 语句（INSERT、UPDATE、DELETE、DROP 等）。
+
+开始时，你应该始终查看数据库中的表，看看你可以查询什么。
+不要跳过此步骤。
+
+然后你应该查询最相关表的模式。
+""".format(
+    dialect=db.dialect,
+    top_k=5,
+)
+```
+
+现在，使用模型、工具和提示创建一个代理：
+
+```python
+from langchain.agents import create_agent
+
+
+agent = create_agent(
+    model,
+    tools,
+    system_prompt=system_prompt,
+)
+```
+
+## 5. 运行代理
+
+在示例查询上运行代理并观察其行为：
+
+```python
+question = "哪种流派的曲目平均长度最长？"
+
+for step in agent.stream(
+    {"messages": [{"role": "user", "content": question}]},
+    stream_mode="values",
+):
+    step["messages"][-1].pretty_print()
+```
+
+```
+================================ Human Message =================================
+
+哪种流派的曲目平均长度最长？
+================================== Ai Message ==================================
+工具调用:
+  sql_db_list_tables (call_BQsWg8P65apHc8BTJ1NPDvnM)
+ 调用 ID: call_BQsWg8P65apHc8BTJ1NPDvnM
+  参数:
+================================= Tool Message =================================
+名称: sql_db_list_tables
+
+Album, Artist, Customer, Employee, Genre, Invoice, InvoiceLine, MediaType, Playlist, PlaylistTrack, Track
+================================== Ai Message ==================================
+工具调用:
+  sql_db_schema (call_i89tjKECFSeERbuACYm4w0cU)
+ 调用 ID: call_i89tjKECFSeERbuACYm4w0cU
+  参数:
+    table_names: Track, Genre
+================================= Tool Message =================================
+名称: sql_db_schema
+
+
+CREATE TABLE "Genre" (
+	"GenreId" INTEGER NOT NULL,
+	"Name" NVARCHAR(120),
+	PRIMARY KEY ("GenreId")
+)
+
+/*
+Genre 表的 3 行:
+GenreId	Name
+1	Rock
+2	Jazz
+3	Metal
+*/
+
+
+CREATE TABLE "Track" (
+	"TrackId" INTEGER NOT NULL,
+	"Name" NVARCHAR(200) NOT NULL,
+	"AlbumId" INTEGER,
+	"MediaTypeId" INTEGER NOT NULL,
+	"GenreId" INTEGER,
+	"Composer" NVARCHAR(220),
+	"Milliseconds" INTEGER NOT NULL,
+	"Bytes" INTEGER,
+	"UnitPrice" NUMERIC(10, 2) NOT NULL,
+	PRIMARY KEY ("TrackId"),
+	FOREIGN KEY("MediaTypeId") REFERENCES "MediaType" ("MediaTypeId"),
+	FOREIGN KEY("GenreId") REFERENCES "Genre" ("GenreId"),
+	FOREIGN KEY("AlbumId") REFERENCES "Album" ("AlbumId")
+)
+
+/*
+Track 表的 3 行:
+TrackId	Name	AlbumId	MediaTypeId	GenreId	Composer	Milliseconds	Bytes	UnitPrice
+1	For Those About To Rock (We Salute You)	1	1	1	Angus Young, Malcolm Young, Brian Johnson	343719	11170334	0.99
+2	Balls to the Wall	2	2	1	U. Dirkschneider, W. Hoffmann, H. Frank, P. Baltes, S. Kaufmann, G. Hoffmann	342562	5510424	0.99
+3	Fast As a Shark	3	2	1	F. Baltes, S. Kaufman, U. Dirkscneider & W. Hoffman	230619	3990994	0.99
+*/
+================================== Ai Message ==================================
+工具调用:
+  sql_db_query_checker (call_G64yYm6R6UauiVPCXJZMA49b)
+ 调用 ID: call_G64yYm6R6UauiVPCXJZMA49b
+  参数:
+    query: SELECT Genre.Name, AVG(Track.Milliseconds) AS AverageLength FROM Track INNER JOIN Genre ON Track.GenreId = Genre.GenreId GROUP BY Genre.Name ORDER BY AverageLength DESC LIMIT 5;
+================================= Tool Message =================================
+名称: sql_db_query_checker
+
+SELECT Genre.Name, AVG(Track.Milliseconds) AS AverageLength FROM Track INNER JOIN Genre ON Track.GenreId = Genre.GenreId GROUP BY Genre.Name ORDER BY AverageLength DESC LIMIT 5;
+================================== Ai Message ==================================
+工具调用:
+  sql_db_query (call_AnO3SrhD0ODJBxh6dHMwvHwZ)
+ 调用 ID: call_AnO3SrhD0ODJBxh6dHMwvHwZ
+  参数:
+    query: SELECT Genre.Name, AVG(Track.Milliseconds) AS AverageLength FROM Track INNER JOIN Genre ON Track.GenreId = Genre.GenreId GROUP BY Genre.Name ORDER BY AverageLength DESC LIMIT 5;
+================================= Tool Message =================================
+名称: sql_db_query
+
+[('Sci Fi & Fantasy', 2911783.0384615385), ('Science Fiction', 2625549.076923077), ('Drama', 2575283.78125), ('TV Shows', 2145041.0215053763), ('Comedy', 1585263.705882353)]
+================================== Ai Message ==================================
+
+平均而言，曲目最长的流派是 "Sci Fi & Fantasy"，平均曲目长度约为 2,911,783 毫秒。其次是 "Science Fiction"、"Drama"、"TV Shows" 和 "Comedy"。
+```
+
+代理正确地编写了查询，检查了查询，并运行它以形成最终响应。
+
+<Note>
+    你可以在 [LangSmith 跟踪记录](https://smith.langchain.com/public/cd2ce887-388a-4bb1-a29d-48208ce50d15/r) 中检查上述运行的所有方面，包括采取的步骤、调用的工具、LLM 看到的提示等。
+</Note>
+
+### （可选）使用 Studio
+
+[Studio](/langsmith/studio) 提供了一个“客户端”循环以及内存，因此你可以将其作为聊天界面运行并查询数据库。你可以提出诸如“告诉我数据库的模式”或“显示前 5 名客户的发票”之类的问题。你将看到生成的 SQL 命令以及结果输出。如何开始的详细信息如下。
+<Accordion title="在 Studio 中运行你的代理">
+
+除了前面提到的包，你还需要：
+
+```shell
+pip install -U langgraph-cli[inmem]>=0.4.0
+```
+
+在你将运行的目录中，你需要一个包含以下内容的 `langgraph.json` 文件：
+
+```json
+{
+  "dependencies": ["."],
+  "graphs": {
+      "agent": "./sql_agent.py:agent",
+      "graph": "./sql_agent_langgraph.py:graph"
+  },
+  "env": ".env"
+}
+```
+
+创建一个文件 `sql_agent.py` 并插入以下内容：
+
+```python
+#sql_agent.py for studio
+import pathlib
+
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
+from langchain_community.agent_toolkits import SQLDatabaseToolkit
+from langchain_community.utilities import SQLDatabase
+import requests
+
+
+# 初始化 LLM
+model = init_chat_model("gpt-4.1")
+
+# 获取数据库，本地存储
+url = "https://storage.googleapis.com/benchmarks-artifacts/chinook/Chinook.db"
+local_path = pathlib.Path("Chinook.db")
+
+if local_path.exists():
+    print(f"{local_path} 已存在，跳过下载。")
+else:
+    response = requests.get(url)
+    if response.status_code == 200:
+        local_path.write_bytes(response.content)
+        print(f"文件已下载并保存为 {local_path}")
+    else:
+        print(f"下载文件失败。状态码: {response.status_code}")
+
+db = SQLDatabase.from_uri("sqlite:///Chinook.db")
+
+# 创建工具
+toolkit = SQLDatabaseToolkit(db=db, llm=model)
+
+tools = toolkit.get_tools()
+
+for tool in tools:
+    print(f"{tool.name}: {tool.description}\n")
+
+# 使用 create_agent
+system_prompt = """
+你是一个设计用于与 SQL 数据库交互的代理。
+给定一个输入问题，创建一个语法正确的 {dialect} 查询来运行，
+然后查看查询结果并返回答案。除非用户
+指定他们希望获取的具体示例数量，否则始终将你的
+查询限制为最多 {top_k} 个结果。
+
+你可以按相关列对结果进行排序，以返回数据库中
+最有趣的示例。切勿查询特定表的所有列，
+只询问给定问题相关的列。
+
+在执行查询之前，你必须双重检查你的查询。如果在执行
+查询时出现错误，请重写查询并重试。
+
+不要对数据库执行任何 DML 语句（INSERT、UPDATE、DELETE、DROP 等）。
+
+开始时，你应该始终查看数据库中的表，看看你可以查询什么。
+不要跳过此步骤。
+
+然后你应该查询最相关表的模式。
+""".format(
+    dialect=db.dialect,
+    top_k=5,
+)
+
+agent = create_agent(
+    model,
+    tools,
+    system_prompt=system_prompt,
+)
+```
+</Accordion>
+
+:::
+
+:::python
+## 6. 实现人工介入审查
+
+在执行代理的 SQL 查询之前，检查是否有任何意外操作或低效之处是明智的。
+
+LangChain 代理支持内置的[人工介入中间件](/oss/langchain/human-in-the-loop)，以增加对代理工具调用的监督。让我们配置代理，使其在调用 `sql_db_query` 工具时暂停以进行人工审查：
+
+```python
+from langchain.agents import create_agent
+from langchain.agents.middleware import HumanInTheLoopMiddleware # [!code highlight]
+from langgraph.checkpoint.memory import InMemorySaver # [!code highlight]
+
+
+agent = create_agent(
+    model,
+    tools,
+    system_prompt=system_prompt,
+    middleware=[ # [!code highlight]
+        HumanInTheLoopMiddleware( # [!code highlight]
+            interrupt_on={"sql_db_query": True}, # [!code highlight]
+            description_prefix="工具执行待批准", # [!code highlight]
+        ), # [!code highlight]
+    ], # [!code highlight]
+    checkpointer=InMemorySaver(), # [!code highlight]
+)
+```
+<Note>
+我们已向代理添加了一个[检查点](/oss/langchain/short-term-memory)，以允许暂停和恢复执行。有关详细信息以及可用的中间件配置，请参阅[人工介入指南](/oss/langchain/human-in-the-loop)。
+</Note>
+
+运行代理时，它现在将在执行 `sql_db_query` 工具之前暂停以进行审查：
+```python
+question = "哪种流派的曲目平均长度最长？"
+config = {"configurable": {"thread_id": "1"}} # [!code highlight]
+
+for step in agent.stream(
+    {"messages": [{"role": "user", "content": question}]},
+    config, # [!code highlight]
+    stream_mode="values",
+):
+    if "__interrupt__" in step: # [!code highlight]
+        print("已中断:") # [!code highlight]
+        interrupt = step["__interrupt__"][0] # [!code highlight]
+        for request in interrupt.value["action_requests"]: # [!code highlight]
+            print(request["description"]) # [!code highlight]
+    elif "messages" in step:
+        step["messages"][-1].pretty_print()
+    else:
+        pass
+```
+```
+...
+
+已中断:
+工具执行待批准
+
+工具: sql_db_query
+参数: {'query': 'SELECT g.Name AS Genre, AVG(t.Milliseconds) AS AvgTrackLength FROM Track t JOIN Genre g ON t.GenreId = g.GenreId GROUP BY g.Name ORDER BY AvgTrackLength DESC LIMIT 1;'}
+```
+我们可以恢复执行，在本例中接受查询，使用 [Command](/oss/langgraph/use-graph-api#combine-control-flow-and-state-updates-with-command)：
+```python
+from langgraph.types import Command # [!code highlight]
+
+for step in agent.stream(
+    Command(resume={"decisions": [{"type": "approve"}]}), # [!code highlight]
+    config,
+    stream_mode="values",
+):
+    if "messages" in step:
+        step["messages"][-1].pretty_print()
+    elif "__interrupt__" in step:
+        print("已中断:")
+        interrupt = step["__interrupt__"][0]
+        for request in interrupt.value["action_requests"]:
+            print(request["description"])
+    else:
+        pass
+```
+```
+================================== Ai Message ==================================
+工具调用:
+  sql_db_query (call_7oz86Epg7lYRqi9rQHbZPS1U)
+ 调用 ID: call_7oz86Epg7lYRqi9rQHbZPS1U
+  参数:
+    query: SELECT Genre.Name, AVG(Track.Milliseconds) AS AvgDuration FROM Track JOIN Genre ON Track.GenreId = Genre.GenreId GROUP BY Genre.Name ORDER BY AvgDuration DESC LIMIT 5;
+================================= Tool Message =================================
+名称: sql_db_query
+
+[('Sci Fi & Fantasy', 2911783.0384615385), ('Science Fiction', 2625549.076923077), ('Drama', 2575283.78125), ('TV Shows', 2145041.0215053763), ('Comedy', 1585263.705882353)]
+================================== Ai Message ==================================
+
+平均曲目长度最长的流派是 "Sci Fi & Fantasy"，平均持续时间约为 2,911,783 毫秒，其次是 "Science Fiction" 和 "Drama"。
+```
+
+有关详细信息，请参阅[人工介入指南](/oss/langchain/human-in-the-loop)。
+
+:::
+
+:::js
+## 4. 执行 SQL 查询
+
+在运行命令之前，在 `_safe_sql` 中进行检查以验证 LLM 生成的命令：
+
+```typescript
+
+const DENY_RE = /\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|REPLACE|TRUNCATE)\b/i;
+const HAS_LIMIT_TAIL_RE = /\blimit\b\s+\d+(\s*,\s*\d+)?\s*;?\s*$/i;
+
+function sanitizeSqlQuery(q) {
+  let query = String(q ?? "").trim();
+
+  // 阻止多条语句（允许一个可选的尾随 ;）
+  const semis = [...query].filter((c) => c === ";").length;
+  if (semis > 1 || (query.endsWith(";") && query.slice(0, -1).includes(";"))) {
+    throw new Error("不允许多条语句。")
+  }
+  query = query.replace(/;+\s*$/g, "").trim();
+
+  // 只读门控
+  if (!query.toLowerCase().startsWith("select")) {
+    throw new Error("只允许 SELECT 语句")
+  }
+  if (DENY_RE.test(query)) {
+    throw new Error("检测到 DML/DDL。只允许只读查询。")
+  }
+
+  // 仅当不存在时才附加 LIMIT
+  if (!HAS_LIMIT_TAIL_RE.test(query)) {
+    query += " LIMIT 5";
+  }
+  return query;
+}
+
+```
+
+然后，使用 `SQLDatabase` 的 `run` 方法通过 `execute_sql` 工具执行命令：
+
+```typescript
+import { tool } from "langchain"
+import * as z from "zod";
+
+const executeSql = tool(
+  async ({ query }) => {
+    const q = sanitizeSqlQuery(query);
+    try {
+      const result = await db.run(q);
+      return typeof result === "string" ? result : JSON.stringify(result, null, 2);
+    } catch (e) {
+      throw new Error(e?.message ?? String(e))
+    }
+  },
+  {
+    name: "execute_sql",
+    description: "执行一个只读的 SQLite SELECT 查询并返回结果。",
+    schema: z.object({
+      query: z.string().describe("要执行的 SQLite SELECT 查询（只读）。"),
+    }),
+  }
+);
+
+```
+
+## 5. 使用 `createAgent`
+
+使用 `createAgent` 以最少的代码构建一个 [ReAct 代理](https://arxiv.org/pdf/2210.03629)。代理将解释请求并生成 SQL 命令。工具将检查命令的安全性，然后尝试执行命令。如果命令有错误，错误消息将返回给模型。模型随后可以检查原始请求和新的错误消息，并生成新的命令。这可以持续进行，直到 LLM 成功生成命令或达到结束计数。这种向模型提供反馈（在本例中是错误消息）的模式非常强大。
+
+使用描述性的系统提示初始化代理以自定义其行为：
+
+```typescript
+import { SystemMessage } from "langchain";
+
+const getSystemPrompt = async () => new SystemMessage(`你是一个谨慎的 SQLite 分析师。
+
+权威模式（不要编造列/表）:
+${await getSchema()}
+
+规则:
+- 逐步思考。
+- 当你需要数据时，使用一个 SELECT 查询调用工具 \`execute_sql\`。
+- 只读；不允许 INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/REPLACE/TRUNCATE。
+- 除非用户明确要求，否则限制为 5 行。
+- 如果工具返回 'Error:'，请修改 SQL 并重试。
+- 将尝试次数限制为 5 次。
+- 如果 5 次尝试后仍未成功，请向用户返回一条说明。
+- 优先使用显式列列表；避免使用 SELECT *。
+`);
+```
+
+现在，使用模型、工具和提示创建一个代理：
+
+```typescript
+import { createAgent } from "langchain";
+
+const agent = createAgent({
+  model: "gpt-5",
+  tools: [executeSql],
+  systemPrompt: getSystemPrompt,
+});
+
+```
+
+## 6. 运行代理
+
+在示例查询上运行代理并观察其行为：
+
+```typescript
+const question = "哪种流派的曲目平均长度最长？";
+const stream = await agent.stream(
+  { messages: [{ role: "user", content: question }] },
+  { streamMode: "values" }
+);
+for await (const step of stream) {
+  const message = step.messages.at(-1);
+  console.log(`${message.role}: ${JSON.stringify(message.content, null, 2)}`);
+}
+```
+
+```
+human: 哪种流派的曲目平均长度最长？
+ai:
+tool: [{"Genre":"Sci Fi & Fantasy","AvgMilliseconds":2911783.0384615385}]
+ai: Sci Fi & Fantasy — 平均曲目长度 ≈ 48.5 分钟（约 2,911,783 毫秒）。
+```
+
+代理正确地编写了查询，检查了查询，并运行它以形成最终响应。
+
+<Note>
+    你可以在 [LangSmith 跟踪记录](https://smith.langchain.com/public/653d218b-af67-4854-95ca-6abecb9b2520/r) 中检查上述运行的所有方面，包括采取的步骤、调用的工具、LLM 看到的提示等。
+</Note>
+
+#### （可选）使用 Studio
+
+[Studio](/langsmith/studio) 提供了一个“客户端”循环以及内存，因此你可以将其作为聊天界面运行并查询数据库。你可以提出诸如“告诉我数据库的模式”或“显示前 5 名客户的发票”之类的问题。你将看到生成的 SQL 命令以及结果输出。如何开始的详细信息如下。
+<Accordion title="在 Studio 中运行你的代理">
+
+除了前面提到的包，你还需要：
+
+```shell
+npm i -g @langchain/langgraph-cli@latest
+```
+
+在你将运行的目录中，你需要一个包含以下内容的 `langgraph.json` 文件：
+
+```json
+{
+  "dependencies": ["."],
+  "graphs": {
+      "agent": "./sqlAgent.ts:agent",
+      "graph": "./sqlAgentLanggraph.ts:graph"
+  },
+  "env": ".env"
+}
+```
+
+```typescript
+import fs from "node:fs/promises";
+import path from "node:path";
+import { SqlDatabase } from "@langchain/classic/sql_db";
+import { DataSource } from "typeorm";
+import { SystemMessage, createAgent, tool } from "langchain"
+import * as z from "zod";
+
+const url = "https://storage.googleapis.com/benchmarks-artifacts/chinook/Chinook.db";
+const localPath = path.resolve("Chinook.db");
+
+async function resolveDbPath() {
+  if (await fs.exists(localPath)) {
+    return localPath;
+  }
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`下载数据库失败。状态码: ${resp.status}`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  await fs.writeFile(localPath, buf);
+  return localPath;
+}
+
+let db: SqlDatabase | undefined;
+async function getDb() {
+  if (!db) {
+    const dbPath = await resolveDbPath();
+    const datasource = new DataSource({ type: "sqlite", database: dbPath });
+    db = await SqlDatabase.fromDataSourceParams({ appDataSource: datasource });
+  }
+  return db;
+}
+
+async function getSchema() {
+  const db = await getDb();
+  return await db.getTableInfo();
+}
+
+const DENY_RE = /\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|REPLACE|TRUNCATE)\b/i;
+const HAS_LIMIT_TAIL_RE = /\blimit\b\s+\d+(\s*,\s*\d+)?\s*;?\s*$/i;
+
+function sanitizeSqlQuery(q) {
+  let query = String(q ?? "").trim();
+
+  // 阻止多条语句（允许一个可选的尾随 ;）
+  const semis = [...query].filter((c) => c === ";").length;
+  if (semis > 1 || (query.endsWith(";") && query.slice(0, -1).includes(";"))) {
+    throw new Error("不允许多条语句。")
+  }
+  query = query.replace(/;+\s*$/g, "").trim();
+
+  // 只读门控
+  if (!query.toLowerCase().startsWith("select")) {
+    throw new Error("只允许 SELECT 语句")
+  }
+  if (DENY_RE.test(query)) {
+    throw new Error("检测到 DML/DDL。只允许只读查询。")
+  }
+
+  // 仅当不存在时才附加 LIMIT
+  if (!HAS_LIMIT_TAIL_RE.test(query)) {
+    query += " LIMIT 5";
+  }
+  return query;
+}
+
+const executeSql = tool(
+  async ({ query }) => {
+    const q = sanitizeSqlQuery(query);
+    try {
+      const result = await db.run(q);
+      return typeof result === "string" ? result : JSON.stringify(result, null, 2);
+    } catch (e) {
+      throw new Error(e?.message ?? String(e))
+    }
+  },
+  {
+    name: "execute_sql",
+    description: "执行一个只读的 SQLite SELECT 查询并返回结果。",
+    schema: z.object({
+      query: z.string().describe("要执行的 SQLite SELECT 查询（只读）。"),
+    }),
+  }
+);
+
+const getSystemPrompt = async () => new SystemMessage(`你是一个谨慎的 SQLite 分析师。
+
+权威模式（不要编造列/表）:
+${await getSchema()}
+
+规则:
+- 逐步思考。
+- 当你需要数据时，使用一个 SELECT 查询调用工具 \`execute_sql\`。
+- 只读；不允许 INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/REPLACE/TRUNCATE。
+- 除非用户明确要求，否则限制为 5 行。
+- 如果工具返回 'Error:'，请修改 SQL 并重试。
+- 将尝试次数限制为 5 次。
+- 如果 5 次尝试后仍未成功，请向用户返回一条说明。
+- 优先使用显式列列表；避免使用 SELECT *。
+`);
+
+export const agent = createAgent({
+  model: "gpt-5",
+  tools: [executeSql],
+  systemPrompt: getSystemPrompt,
+});
+```
+</Accordion>
+:::
+
+## 后续步骤
+
+要进行更深入的定制，请查看[本教程](/oss/langgraph/sql-agent)，了解如何使用 LangGraph 原语直接实现 SQL 代理。

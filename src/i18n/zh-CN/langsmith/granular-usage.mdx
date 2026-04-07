@@ -1,0 +1,246 @@
+---
+title: 细粒度计费用量
+sidebarTitle: 细粒度用量
+description: 按工作区、项目、用户或API密钥获取详细的追踪用量数据。
+---
+
+<Note>
+对于 LangSmith Cloud，细粒度计费用量数据收集始于 2026 年 1 月 5 日。此日期之前的用量数据不可用。
+
+对于自托管实例，数据收集在通过以下环境变量启用该功能后开始，或者在[升级到默认启用该功能的版本](/langsmith/self-hosted-changelog#langsmith-0-13-12)后开始。
+
+```env
+DEFAULT_ORG_FEATURE_ENABLE_GRANULAR_USAGE_REPORTING=true
+GRANULAR_USAGE_TABLE_ENABLED=true
+```
+</Note>
+
+LangSmith 提供了细粒度计费用量 API，允许您按工作区、项目、用户或 API 密钥获取详细的追踪用量数据。这使您可以：
+
+- 跟踪不同团队或工作区的用量
+- 识别哪些用户或 API 密钥消耗了最多的追踪
+- 分析一段时间内的用量模式
+- 导出用量数据用于内部报告
+
+## 先决条件
+
+- 您必须拥有 [`organization:read` 权限](/langsmith/organization-workspace-operations) 才能访问细粒度用量数据。
+- 您只能查看您拥有读取权限的工作区的用量。
+
+## 在 UI 中查看
+
+您也可以在 [LangSmith UI](https://smith.langchain.com) 中查看细粒度用量数据：
+
+1. 导航到 **设置** > **账单与用量**
+2. 选择 **细粒度用量** 标签页
+3. 使用控件进行以下操作：
+   - 选择时间范围：
+      - 最近 7 天、30 天、3 个月、6 个月、1 年，或自定义
+   - 选择聚合级别（每日、每周或每月）
+   - 按工作区、项目、用户或 API 密钥分组
+   - 筛选到特定工作区
+4. 点击 **导出 CSV** 以下载数据
+
+## API 端点
+
+### 获取细粒度用量数据
+
+通过灵活的分组选项检索细粒度用量数据。
+
+```
+GET /api/v1/orgs/current/billing/granular-usage
+```
+
+#### 查询参数
+
+| 参数 | 类型 | 必填 | 描述 |
+|-----------|------|----------|-------------|
+| `start_time` | datetime | 是 | 时间范围的开始时间（ISO 8601 格式） |
+| `end_time` | datetime | 是 | 时间范围的结束时间（必须在 start_time 之后） |
+| `workspace_ids` | UUID 数组 | 是 | 将结果筛选到特定工作区 |
+| `group_by` | string | 否 | 分组依据的维度。可选值：`workspace`、`project`、`user`、`api_key`。默认值：`workspace` |
+
+#### 响应
+
+```json
+{
+  "stride": {
+    "days": 1,
+    "hours": 0
+  },
+  "usage": [
+    {
+      "time_bucket": "2026-01-15T00:00:00Z",
+      "dimensions": {
+        "workspace_id": "uuid",
+        "workspace_name": "My Workspace"
+      },
+      "traces": 1500
+    }
+  ]
+}
+```
+
+`stride` 字段表示用于聚合的时间桶大小，根据请求的时间范围计算：
+
+| 时间范围 | 聚合方式 | 步长 |
+|------------|-------------|--------|
+| 小于 1 天 | 每小时 | `hours: 1` |
+| 1-31 天 | 每日 | `days: 1` |
+| 32-93 天（约 3 个月） | 每周 | `days: 7` |
+| 94-366 天（约 1 年） | 每月 | `days: 30` |
+| 超过 366 天 | 每年 | `days: 365` |
+
+#### 示例：按工作区获取用量
+
+<CodeGroup>
+```python Python
+import httpx
+from datetime import datetime, timedelta, timezone
+
+client = httpx.Client(
+    base_url="https://api.smith.langchain.com",
+    headers={"x-api-key": "<your-api-key>"}
+)
+
+end_time = datetime.now(timezone.utc)
+start_time = end_time - timedelta(days=30)
+
+response = client.get(
+    "/api/v1/orgs/current/billing/granular-usage",
+    params={
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "workspace_ids": ["<workspace-id>"],
+        "group_by": "workspace"
+    }
+)
+
+data = response.json()
+for record in data["usage"]:
+    print(f"{record['time_bucket']}: {record['traces']} traces")
+```
+
+```typescript TypeScript
+const response = await fetch(
+  `https://api.smith.langchain.com/api/v1/orgs/current/billing/granular-usage?` +
+  new URLSearchParams({
+    start_time: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    end_time: new Date().toISOString(),
+    workspace_ids: "<workspace-id>",
+    group_by: "workspace"
+  }),
+  {
+    headers: {
+      "x-api-key": "<your-api-key>"
+    }
+  }
+);
+
+const data = await response.json();
+for (const record of data.usage) {
+  console.log(`${record.time_bucket}: ${record.traces} traces`);
+}
+```
+
+```bash cURL
+curl -X GET "https://api.smith.langchain.com/api/v1/orgs/current/billing/granular-usage?\
+start_time=2026-01-01T00:00:00Z&\
+end_time=2026-01-15T00:00:00Z&\
+workspace_ids=<workspace-id>&\
+group_by=workspace" \
+  -H "x-api-key: <your-api-key>"
+```
+</CodeGroup>
+
+#### 示例：按用户获取用量
+
+<CodeGroup>
+```python Python
+response = client.get(
+    "/api/v1/orgs/current/billing/granular-usage",
+    params={
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "workspace_ids": ["<workspace-id>"],
+        "group_by": "user"
+    }
+)
+
+data = response.json()
+for record in data["usage"]:
+    user_email = record["dimensions"].get("user_email", "Unknown")
+    print(f"{user_email}: {record['traces']} traces")
+```
+</CodeGroup>
+
+### 将用量导出为 CSV
+
+将细粒度用量数据导出为可下载的 CSV 文件。
+
+```
+GET /api/v1/orgs/current/billing/granular-usage/export
+```
+
+此端点接受与细粒度用量端点相同的查询参数，并返回一个 CSV 文件。
+
+CSV 始终包含所有列，但只有与所选 `group_by` 选项相关的列会被填充：
+
+| 列 | 描述 |
+|--------|-------------|
+| 时间桶开始时间 | 时间桶的开始时间 |
+| 时间桶结束时间 | 时间桶的结束时间 |
+| 工作区 ID | 工作区的 UUID（按工作区分组时） |
+| 工作区名称 | 工作区的名称（按工作区分组时） |
+| 项目 ID | 项目的 UUID（按项目分组时） |
+| 项目名称 | 项目的名称（按项目分组时） |
+| 用户 ID | 用户的 UUID（按用户分组时） |
+| 用户邮箱 | 用户的邮箱（按用户分组时） |
+| API 密钥短键 | 短键标识符（按 API 密钥分组时） |
+| 追踪数 | 时间桶内的追踪数量 |
+
+#### 示例：导出为 CSV
+
+<CodeGroup>
+```python Python
+response = client.get(
+    "/api/v1/orgs/current/billing/granular-usage/export",
+    params={
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "workspace_ids": ["<workspace-id>"],
+        "group_by": "workspace"
+    }
+)
+
+# 保存到文件
+with open("usage_report.csv", "wb") as f:
+    f.write(response.content)
+```
+
+```bash cURL
+curl -X GET "https://api.smith.langchain.com/api/v1/orgs/current/billing/granular-usage/export?\
+start_time=2026-01-01T00:00:00Z&\
+end_time=2026-01-15T00:00:00Z&\
+workspace_ids=<workspace-id>&\
+group_by=workspace" \
+  -H "x-api-key: <your-api-key>" \
+  -o usage_report.csv
+```
+</CodeGroup>
+
+## 分组选项
+
+`group_by` 参数决定了用量数据的聚合方式：
+
+| 值 | 描述 | 返回的维度 |
+|-------|-------------|---------------------|
+| `workspace` | 按工作区分组 | `workspace_id`, `workspace_name` |
+| `project` | 按项目分组 | `project_id`, `project_name` |
+| `user` | 按用户分组 | `user_id`, `user_email` |
+| `api_key` | 按 API 密钥分组 | `api_key_short_key` |
+
+## 相关资源
+
+- [管理账户账单](/langsmith/billing)
+- [组织与工作区操作](/langsmith/organization-workspace-operations)

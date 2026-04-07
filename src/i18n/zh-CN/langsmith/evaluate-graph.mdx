@@ -1,0 +1,396 @@
+---
+title: 如何评估图
+sidebarTitle: 评估图
+---
+
+<Info>
+[langgraph](https://langchain-ai.github.io/langgraph/)
+</Info>
+
+`langgraph` 是一个用于构建有状态、多参与者 LLM 应用程序的库，用于创建智能体和多智能体工作流。评估 `langgraph` 图可能具有挑战性，因为单次调用可能涉及多次 LLM 调用，并且执行哪些 LLM 调用可能取决于先前调用的输出。在本指南中，我们将重点介绍如何将图和图节点传递给 `evaluate()` / `aevaluate()` 的机制。关于构建智能体时的评估技术和最佳实践，请前往 [langgraph 文档](https://langchain-ai.github.io/langgraph/tutorials/#evaluation)。
+
+## 端到端评估
+
+最常见的评估类型是端到端评估，即我们希望针对每个示例输入评估图的最终输出。
+
+### 定义图
+
+让我们先构建一个简单的 ReACT 智能体：
+
+```python
+from typing import Annotated, Literal, TypedDict
+from langchain.chat_models import init_chat_model
+from langchain.tools import tool
+from langgraph.prebuilt import ToolNode
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+
+class State(TypedDict):
+    # 消息的类型为 "list"。注解中的 'add_messages' 函数
+    # 定义了应如何更新此状态键
+    # （在这种情况下，它会将消息追加到列表中，而不是覆盖它们）
+    messages: Annotated[list, add_messages]
+
+# 定义智能体要使用的工具
+@tool
+def search(query: str) -> str:
+    """调用以浏览网页。"""
+    # 这是一个占位符，但不要告诉 LLM...
+    if "sf" in query.lower() or "san francisco" in query.lower():
+        return "It's 60 degrees and foggy."
+    return "It's 90 degrees and sunny."
+
+tools = [search]
+tool_node = ToolNode(tools)
+model = init_chat_model("claude-sonnet-4-6").bind_tools(tools)
+
+# 定义决定是否继续的函数
+def should_continue(state: State) -> Literal["tools", END]:
+    messages = state['messages']
+    last_message = messages[-1]
+
+    # 如果 LLM 进行了工具调用，则路由到 "tools" 节点
+    if last_message.tool_calls:
+        return "tools"
+
+    # 否则，我们停止（回复用户）
+    return END
+
+# 定义调用模型的函数
+def call_model(state: State):
+    messages = state['messages']
+    response = model.invoke(messages)
+
+    # 我们返回一个列表，因为这将被添加到现有列表中
+    return {"messages": [response]}
+
+# 定义一个新图
+workflow = StateGraph(State)
+
+# 定义我们将循环使用的两个节点
+workflow.add_node("agent", call_model)
+workflow.add_node("tools", tool_node)
+
+# 将入口点设置为 'agent'
+# 这意味着首先调用此节点
+workflow.add_edge(START, "agent")
+
+# 现在添加一个条件边
+workflow.add_conditional_edges(
+    # 首先，我们定义起始节点。我们使用 'agent'。
+    # 这意味着这是在调用 'agent' 节点后采取的边。
+    "agent",
+    # 接下来，我们传入将决定下一个调用哪个节点的函数。
+    should_continue,
+)
+
+# 现在添加一条从 'tools' 到 'agent' 的普通边。
+# 这意味着在调用 'tools' 之后，接下来调用 'agent' 节点。
+workflow.add_edge("tools", 'agent')
+
+# 最后，编译它！
+# 这将其编译成一个 LangChain Runnable，
+# 意味着你可以像使用任何其他 runnable 一样使用它。
+# 注意，我们在编译图时（可选地）传递了内存
+app = workflow.compile()
+```
+
+### 创建数据集
+
+让我们创建一个简单的问题和预期响应数据集：
+
+```python
+from langsmith import Client
+
+questions = [
+    "what's the weather in sf",
+    "whats the weather in san fran",
+    "whats the weather in tangier"
+]
+
+answers = [
+    "It's 60 degrees and foggy.",
+    "It's 60 degrees and foggy.",
+    "It's 90 degrees and sunny.",
+]
+
+ls_client = Client()
+dataset = ls_client.create_dataset(
+    "weather agent",
+    inputs=[{"question": q} for q in questions],
+    outputs=[{"answers": a} for a in answers],
+)
+```
+
+### 创建评估器
+
+以及一个简单的评估器：
+
+需要 `langsmith>=0.2.0`
+
+```python
+judge_llm = init_chat_model("gpt-4.1")
+
+async def correct(outputs: dict, reference_outputs: dict) -> bool:
+    instructions = (
+        "Given an actual answer and an expected answer, determine whether"
+        " the actual answer contains all of the information in the"
+        " expected answer. Respond with 'CORRECT' if the actual answer"
+        " does contain all of the expected information and 'INCORRECT'"
+        " otherwise. Do not include anything else in your response."
+    )
+    # 我们的图输出一个 State 字典，在这种情况下意味着
+    # 我们将有一个 'messages' 键，最后一条消息应该是
+    # 我们的实际答案。
+    actual_answer = outputs["messages"][-1].content
+    expected_answer = reference_outputs["answer"]
+    user_msg = (
+        f"ACTUAL ANSWER: {actual_answer}"
+        f"\n\nEXPECTED ANSWER: {expected_answer}"
+    )
+    response = await judge_llm.ainvoke(
+        [
+            {"role": "system", "content": instructions},
+            {"role": "user", "content": user_msg}
+        ]
+    )
+    return response.content.upper() == "CORRECT"
+```
+
+### 运行评估
+
+现在我们可以运行评估并查看结果。我们只需要包装我们的图函数，使其能够接受示例中存储的输入格式：
+
+<Note>
+如果你的所有图节点都定义为同步函数，那么你可以使用 `evaluate` 或 `aevaluate`。如果你的任何节点定义为异步，则需要使用 `aevaluate`。
+</Note>
+
+需要 `langsmith>=0.2.0`
+
+```python
+from langsmith import aevaluate
+
+def example_to_state(inputs: dict) -> dict:
+  return {"messages": [{"role": "user", "content": inputs['question']}]}
+
+# 我们在这里使用 LCEL 声明式语法。
+# 记住，langgraph 图也是 langchain runnable。
+target = example_to_state | app
+
+experiment_results = await aevaluate(
+    target,
+    data="weather agent",
+    evaluators=[correct],
+    max_concurrency=4,  # 可选
+    experiment_prefix="claude-3.5-baseline",  # 可选
+)
+```
+
+## 评估中间步骤
+
+通常，不仅评估智能体的最终输出，还评估其采取的中间步骤是很有价值的。`langgraph` 的好处在于，图的输出是一个状态对象，通常已经包含了有关所采取的中间步骤的信息。通常，我们只需查看状态中的消息就可以评估我们感兴趣的内容。例如，我们可以查看消息来断言模型在第一步调用了 'search' 工具。
+
+需要 `langsmith>=0.2.0`
+
+```python
+def right_tool(outputs: dict) -> bool:
+    tool_calls = outputs["messages"][1].tool_calls
+    return bool(tool_calls and tool_calls[0]["name"] == "search")
+
+experiment_results = await aevaluate(
+    target,
+    data="weather agent",
+    evaluators=[correct, right_tool],
+    max_concurrency=4,  # 可选
+    experiment_prefix="claude-3.5-baseline",  # 可选
+)
+```
+
+如果我们需要访问不在状态中的中间步骤信息，我们可以查看 Run 对象。它包含所有节点输入和输出的完整跟踪：
+
+<Check>
+有关可以传递给自定义评估器的参数，请参阅此[操作指南](/langsmith/code-evaluator-ui)。
+</Check>
+
+```python
+from langsmith.schemas import Run, Example
+
+def right_tool_from_run(run: Run, example: Example) -> dict:
+    # 获取文档和答案
+    first_model_run = next(run for run in root_run.child_runs if run.name == "agent")
+    tool_calls = first_model_run.outputs["messages"][-1].tool_calls
+    right_tool = bool(tool_calls and tool_calls[0]["name"] == "search")
+    return {"key": "right_tool", "value": right_tool}
+
+experiment_results = await aevaluate(
+    target,
+    data="weather agent",
+    evaluators=[correct, right_tool_from_run],
+    max_concurrency=4,  # 可选
+    experiment_prefix="claude-3.5-baseline",  # 可选
+)
+```
+
+## 运行和评估单个节点
+
+有时，为了节省时间和成本，你希望直接评估单个节点。`langgraph` 使这变得容易。在这种情况下，我们甚至可以继续使用我们一直在使用的评估器。
+
+```python
+node_target = example_to_state | app.nodes["agent"]
+
+node_experiment_results = await aevaluate(
+    node_target,
+    data="weather agent",
+    evaluators=[right_tool_from_run],
+    max_concurrency=4,  # 可选
+    experiment_prefix="claude-3.5-model-node",  # 可选
+)
+```
+
+## 相关
+
+* [`langgraph` 评估文档](https://langchain-ai.github.io/langgraph/tutorials/#evaluation)
+
+## 参考代码
+
+<Accordion title="点击查看整合后的代码片段">
+
+```python
+from typing import Annotated, Literal, TypedDict
+from langchain.chat_models import init_chat_model
+from langchain.tools import tool
+from langgraph.prebuilt import ToolNode
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langsmith import Client, aevaluate
+
+# 定义图
+class State(TypedDict):
+    # 消息的类型为 "list"。注解中的 'add_messages' 函数
+    # 定义了应如何更新此状态键
+    # （在这种情况下，它会将消息追加到列表中，而不是覆盖它们）
+    messages: Annotated[list, add_messages]
+
+# 定义智能体要使用的工具
+@tool
+def search(query: str) -> str:
+    """调用以浏览网页。"""
+    # 这是一个占位符，但不要告诉 LLM...
+    if "sf" in query.lower() or "san francisco" in query.lower():
+        return "It's 60 degrees and foggy."
+    return "It's 90 degrees and sunny."
+
+tools = [search]
+tool_node = ToolNode(tools)
+model = init_chat_model("claude-sonnet-4-6").bind_tools(tools)
+
+# 定义决定是否继续的函数
+def should_continue(state: State) -> Literal["tools", END]:
+    messages = state['messages']
+    last_message = messages[-1]
+
+    # 如果 LLM 进行了工具调用，则路由到 "tools" 节点
+    if last_message.tool_calls:
+        return "tools"
+
+    # 否则，我们停止（回复用户）
+    return END
+
+# 定义调用模型的函数
+def call_model(state: State):
+    messages = state['messages']
+    response = model.invoke(messages)
+    # 我们返回一个列表，因为这将被添加到现有列表中
+    return {"messages": [response]}
+
+# 定义一个新图
+workflow = StateGraph(State)
+
+# 定义我们将循环使用的两个节点
+workflow.add_node("agent", call_model)
+workflow.add_node("tools", tool_node)
+
+# 将入口点设置为 'agent'
+# 这意味着首先调用此节点
+workflow.add_edge(START, "agent")
+
+# 现在添加一个条件边
+workflow.add_conditional_edges(
+    # 首先，我们定义起始节点。我们使用 'agent'。
+    # 这意味着这是在调用 'agent' 节点后采取的边。
+    "agent",
+    # 接下来，我们传入将决定下一个调用哪个节点的函数。
+    should_continue,
+)
+
+# 现在添加一条从 'tools' 到 'agent' 的普通边。
+# 这意味着在调用 'tools' 之后，接下来调用 'agent' 节点。
+workflow.add_edge("tools", 'agent')
+
+# 最后，编译它！
+# 这将其编译成一个 LangChain Runnable，
+# 意味着你可以像使用任何其他 runnable 一样使用它。
+# 注意，我们在编译图时（可选地）传递了内存
+app = workflow.compile()
+
+questions = [
+    "what's the weather in sf",
+    "whats the weather in san fran",
+    "whats the weather in tangier"
+]
+
+answers = [
+    "It's 60 degrees and foggy.",
+    "It's 60 degrees and foggy.",
+    "It's 90 degrees and sunny.",
+]
+
+# 创建数据集
+ls_client = Client()
+dataset = ls_client.create_dataset(
+    "weather agent",
+    inputs=[{"question": q} for q in questions],
+    outputs=[{"answers": a} for a in answers],
+)
+
+# 定义评估器
+async def correct(outputs: dict, reference_outputs: dict) -> bool:
+    instructions = (
+        "Given an actual answer and an expected answer, determine whether"
+        " the actual answer contains all of the information in the"
+        " expected answer. Respond with 'CORRECT' if the actual answer"
+        " does contain all of the expected information and 'INCORRECT'"
+        " otherwise. Do not include anything else in your response."
+    )
+    # 我们的图输出一个 State 字典，在这种情况下意味着
+    # 我们将有一个 'messages' 键，最后一条消息应该是
+    # 我们的实际答案。
+    actual_answer = outputs["messages"][-1].content
+    expected_answer = reference_outputs["answer"]
+    user_msg = (
+        f"ACTUAL ANSWER: {actual_answer}"
+        f"\n\nEXPECTED ANSWER: {expected_answer}"
+    )
+    response = await judge_llm.ainvoke(
+        [
+            {"role": "system", "content": instructions},
+            {"role": "user", "content": user_msg}
+        ]
+    )
+    return response.content.upper() == "CORRECT"
+
+def right_tool(outputs: dict) -> bool:
+    tool_calls = outputs["messages"][1].tool_calls
+    return bool(tool_calls and tool_calls[0]["name"] == "search")
+
+# 运行评估
+experiment_results = await aevaluate(
+    target,
+    data="weather agent",
+    evaluators=[correct, right_tool],
+    max_concurrency=4,  # 可选
+    experiment_prefix="claude-3.5-baseline",  # 可选
+)
+```
+
+</Accordion>

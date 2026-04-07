@@ -1,0 +1,279 @@
+---
+title: "FaissStore 集成"
+description: "使用 LangChain JavaScript 集成 FaissStore。"
+---
+
+<Tip>
+**兼容性**：仅适用于 Node.js。
+</Tip>
+
+[Faiss](https://github.com/facebookresearch/faiss) 是一个用于高效相似性搜索和稠密向量聚类的库。
+
+LangChain.js 支持将 Faiss 用作本地运行的向量存储，并可保存到文件。它还提供了从 [LangChain Python 实现](https://python.langchain.com/docs/integrations/vectorstores/faiss#saving-and-loading) 读取已保存文件的能力。
+
+本指南提供了快速入门 Faiss [向量存储](/oss/integrations/vectorstores) 的概述。有关所有 `FaissStore` 功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/faiss/FaissStore)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [PY 支持](https://python.langchain.com/docs/integrations/vectorstores/faiss) | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`FaissStore`](https://reference.langchain.com/javascript/langchain-community/vectorstores/faiss/FaissStore) | [`@langchain/community`](https://npmjs.com/@langchain/community) | ✅ |  ![NPM - 版本](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+## 设置
+
+要使用 Faiss 向量存储，您需要安装 `@langchain/community` 集成包以及作为对等依赖项的 [`faiss-node`](https://github.com/ewfian/faiss-node) 包。
+
+本指南还将使用 [OpenAI 嵌入](/oss/integrations/embeddings/openai)，这需要您安装 `@langchain/openai` 集成包。您也可以使用 [其他支持的嵌入模型](/oss/integrations/embeddings)。
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community faiss-node @langchain/openai @langchain/core
+```
+```bash yarn
+yarn add @langchain/community faiss-node @langchain/openai @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/community faiss-node @langchain/openai @langchain/core
+```
+</CodeGroup>
+
+### 凭证
+
+由于 Faiss 在本地运行，您无需任何凭证即可使用它。
+
+如果您在本指南中使用 OpenAI 嵌入，您还需要设置您的 OpenAI 密钥：
+
+```typescript
+OPENAI_API_KEY = "YOUR_API_KEY";
+```
+
+如果您希望获得模型调用的自动追踪，您也可以通过取消注释以下内容来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```typescript
+// LANGSMITH_TRACING="true"
+// LANGSMITH_API_KEY="your-api-key"
+```
+
+## 实例化
+
+```typescript
+import { FaissStore } from "@langchain/community/vectorstores/faiss";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const embeddings = new OpenAIEmbeddings({
+  model: "text-embedding-3-small",
+});
+
+const vectorStore = new FaissStore(embeddings, {});
+```
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```typescript
+import type { Document } from "@langchain/core/documents";
+
+const document1: Document = {
+  pageContent: "细胞的动力源是线粒体",
+  metadata: { source: "https://example.com" }
+};
+
+const document2: Document = {
+  pageContent: "建筑物由砖块构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document3: Document = {
+  pageContent: "线粒体由脂质构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document4: Document = {
+  pageContent: "2024 年奥运会在巴黎举行",
+  metadata: { source: "https://example.com" }
+}
+
+const documents = [document1, document2, document3, document4];
+
+await vectorStore.addDocuments(documents, { ids: ["1", "2", "3", "4"] });
+```
+
+```python
+[ '1', '2', '3', '4' ]
+```
+
+### 从向量存储删除项目
+
+```typescript
+await vectorStore.delete({ ids: ["4"] });
+```
+
+## 查询向量存储
+
+一旦您的向量存储创建完成并添加了相关文档，您很可能希望在运行链或代理时查询它。
+
+### 直接查询
+
+执行简单的相似性搜索可以按如下方式进行：
+
+```typescript
+const similaritySearchResults = await vectorStore.similaritySearch("生物学", 2);
+
+for (const doc of similaritySearchResults) {
+  console.log(`* ${doc.pageContent} [${JSON.stringify(doc.metadata, null)}]`);
+}
+```
+
+```text
+* 细胞的动力源是线粒体 [{"source":"https://example.com"}]
+* 线粒体由脂质构成 [{"source":"https://example.com"}]
+```
+
+目前不支持按元数据过滤。
+
+如果您想执行相似性搜索并获取相应的分数，可以运行：
+
+```typescript
+const similaritySearchWithScoreResults = await vectorStore.similaritySearchWithScore("生物学", 2);
+
+for (const [doc, score] of similaritySearchWithScoreResults) {
+  console.log(`* [SIM=${score.toFixed(3)}] ${doc.pageContent} [${JSON.stringify(doc.metadata)}]`);
+}
+```
+
+```text
+* [SIM=1.671] 细胞的动力源是线粒体 [{"source":"https://example.com"}]
+* [SIM=1.705] 线粒体由脂质构成 [{"source":"https://example.com"}]
+```
+
+### 通过转换为检索器进行查询
+
+您还可以将向量存储转换为 [检索器](/oss/langchain/retrieval)，以便在链中更轻松地使用。
+
+```typescript
+const retriever = vectorStore.asRetriever({
+  k: 2,
+});
+await retriever.invoke("生物学");
+```
+
+```javascript
+[
+  {
+    pageContent: '细胞的动力源是线粒体',
+    metadata: { source: 'https://example.com' }
+  },
+  {
+    pageContent: '线粒体由脂质构成',
+    metadata: { source: 'https://example.com' }
+  }
+]
+```
+
+### 用于检索增强生成
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [使用 LangChain 构建 RAG 应用](/oss/langchain/rag)。
+- [代理式 RAG](/oss/langgraph/agentic-rag)
+- [检索文档](/oss/langchain/retrieval)
+
+## 合并索引
+
+Faiss 还支持合并现有索引：
+
+```typescript
+// 创建初始向量存储
+const initialStore = await FaissStore.fromTexts(
+  ["Hello world", "Bye bye", "hello nice world"],
+  [{ id: 2 }, { id: 1 }, { id: 3 }],
+  new OpenAIEmbeddings()
+);
+
+// 从文本创建另一个向量存储
+const newStore = await FaissStore.fromTexts(
+  ["Some text"],
+  [{ id: 1 }],
+  new OpenAIEmbeddings()
+);
+
+// 将第一个向量存储合并到 vectorStore2
+await newStore.mergeFrom(initialStore);
+
+// 您也可以从另一个 FaissStore 索引创建新的向量存储
+const newStore2 = await FaissStore.fromIndex(
+  newStore,
+  new OpenAIEmbeddings()
+);
+
+await newStore2.similaritySearch("Bye bye", 1);
+```
+
+## 将索引保存到文件并重新加载
+
+要将索引持久化到磁盘，请使用 `.save` 和静态 `.load` 方法：
+
+```typescript
+// 通过任何方法创建向量存储，这里以从文本创建为例
+const persistentStore = await FaissStore.fromTexts(
+  ["Hello world", "Bye bye", "hello nice world"],
+  [{ id: 2 }, { id: 1 }, { id: 3 }],
+  new OpenAIEmbeddings()
+);
+
+// 将向量存储保存到目录
+const directory = "your/directory/here";
+
+await persistentStore.save(directory);
+
+// 从同一目录加载向量存储
+const loadedVectorStore = await FaissStore.load(
+  directory,
+  new OpenAIEmbeddings()
+);
+
+// vectorStore 和 loadedVectorStore 是相同的
+const result = await loadedVectorStore.similaritySearch("hello world", 1);
+console.log(result);
+```
+
+## 从 Python 读取已保存的文件
+
+要启用从 [LangChain Python 实现](https://python.langchain.com/docs/integrations/vectorstores/faiss#saving-and-loading) 读取已保存文件的能力，您需要安装 [`pickleparser`](https://github.com/ewfian/pickleparser) 包。
+
+<CodeGroup>
+```bash npm
+npm install pickleparser
+```
+```bash yarn
+yarn add pickleparser
+```
+```bash pnpm
+pnpm add pickleparser
+```
+</CodeGroup>
+
+然后您可以使用 `.loadFromPython` 静态方法：
+
+```typescript
+// 从 Python 保存的数据目录
+const directoryWithSavedPythonStore = "your/directory/here";
+
+// 从目录加载向量存储
+const pythonLoadedStore = await FaissStore.loadFromPython(
+  directoryWithSavedPythonStore,
+  new OpenAIEmbeddings()
+);
+
+// 搜索最相似的文档
+await pythonLoadedStore.similaritySearch("test", 2);
+```
+
+---
+
+## API 参考
+
+有关所有 `FaissStore` 功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/faiss/FaissStore)

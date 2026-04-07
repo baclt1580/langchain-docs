@@ -1,0 +1,54 @@
+---
+title: "Connery 动作集成"
+description: "使用 LangChain JavaScript 与 Connery 动作工具进行集成。"
+---
+
+```typescript
+import { ConneryService } from "@langchain/community/tools/connery";
+import { ChatOpenAI } from "@langchain/openai";
+import { initializeAgentExecutorWithOptions } from "@langchain/classic/agents";
+
+// 指定你的 Connery Runner 凭据。
+process.env.CONNERY_RUNNER_URL = "";
+process.env.CONNERY_RUNNER_API_KEY = "";
+
+// 指定 OpenAI API 密钥。
+process.env.OPENAI_API_KEY = "";
+
+// 指定你的邮箱地址以接收下方示例中的邮件。
+const recepientEmail = "test@example.com";
+
+// 通过 ID 从 Connery Runner 获取 SendEmail 动作。
+const conneryService = new ConneryService();
+const sendEmailAction = await conneryService.getAction(
+  "CABC80BB79C15067CA983495324AE709"
+);
+
+// 手动运行动作。
+const manualRunResult = await sendEmailAction.invoke({
+  recipient: recepientEmail,
+  subject: "测试邮件",
+  body: "这是一封通过 Connery 发送的测试邮件。",
+});
+console.log(manualRunResult);
+
+// 使用 OpenAI Functions 代理运行动作。
+const llm = new ChatOpenAI({ model: "gpt-4.1-mini", temperature: 0 });
+const agent = await initializeAgentExecutorWithOptions([sendEmailAction], llm, {
+  agentType: "openai-functions",
+  verbose: true,
+});
+const agentRunResult = await agent.invoke({
+  input: `向 ${recepientEmail} 发送一封邮件，告知我开会将会迟到。`,
+});
+console.log(agentRunResult);
+```
+
+<Info>
+Connery Action 是一个结构化工具，因此你只能在支持结构化工具的代理中使用它。
+</Info>
+
+## 相关链接
+
+- 工具 [概念指南](/oss/langchain/tools)
+- 工具 [操作指南](/oss/langchain/tools)

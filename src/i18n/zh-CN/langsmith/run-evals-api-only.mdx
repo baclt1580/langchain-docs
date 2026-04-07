@@ -1,0 +1,352 @@
+---
+title: 如何使用 REST API
+sidebarTitle: 使用 API
+---
+
+[Python](https://reference.langchain.com/python/langsmith/) 和 [TypeScript](https://reference.langchain.com/javascript/modules/langsmith.html) SDK 是在 LangSmith 中运行[评估](/langsmith/evaluation-concepts)的推荐方式。它们包含了优化和功能，以提升性能和可靠性。
+
+如果你无法使用 SDK——例如，如果你在使用其他语言或在受限环境中工作——你可以直接使用 REST API。本指南演示了如何使用 [REST API](https://api.smith.langchain.com/redoc) 配合 Python 的 [`requests`](https://requests.readthedocs.io/) 库来运行评估，但相同的原则适用于任何语言。
+
+在深入阅读本内容之前，建议先阅读以下内容：
+- [评估 LLM 应用](/langsmith/evaluate-llm-application)。
+- [LangSmith API 参考](https://api.smith.langchain.com/redoc)：本指南中使用的所有端点的完整 API 文档。
+
+## 创建数据集
+
+对于此示例，我们使用 Python SDK 快速创建一个[数据集](/langsmith/evaluation-concepts#datasets)。要通过 API 或 UI 创建数据集，请参考[管理数据集](/langsmith/manage-datasets-in-application)。
+
+```python
+import os
+import requests
+
+from datetime import datetime
+from langsmith import Client
+from openai import OpenAI
+from uuid import uuid4
+
+client = Client()
+oa_client = OpenAI()
+
+# 创建数据集
+examples = [
+    {
+        "inputs": {"text": "Shut up, idiot"},
+        "outputs": {"label": "Toxic"},
+    },
+    {
+        "inputs": {"text": "You're a wonderful person"},
+        "outputs": {"label": "Not toxic"},
+    },
+    {
+        "inputs": {"text": "This is the worst thing ever"},
+        "outputs": {"label": "Toxic"},
+    },
+    {
+        "inputs": {"text": "I had a great day today"},
+        "outputs": {"label": "Not toxic"},
+    },
+    {
+        "inputs": {"text": "Nobody likes you"},
+        "outputs": {"label": "Toxic"},
+    },
+    {
+        "inputs": {"text": "This is unacceptable. I want to speak to the manager."},
+        "outputs": {"label": "Not toxic"},
+    },
+]
+
+dataset_name = "Toxic Queries - API Example"
+dataset = client.create_dataset(dataset_name=dataset_name)
+client.create_examples(dataset_id=dataset.id, examples=examples)
+```
+
+## 运行单个实验
+
+要通过 API 运行实验，你需要：
+
+1. 从数据集中获取示例。
+1. 创建一个实验（在 API 中也称为“会话”）。
+1. 为每个示例创建引用该示例和实验的运行。
+1. 通过设置 `end_time` 来关闭实验。
+
+首先，使用 `/examples` 端点拉取你希望在实验中使用的所有示例：
+
+```python
+# 选择一个数据集 ID。这里我们使用上面创建的数据集。
+# API 参考：https://api.smith.langchain.com/redoc#tag/examples/operation/read_examples_api_v1_examples_get
+dataset_id = dataset.id
+params = { "dataset": dataset_id }
+
+resp = requests.get(
+    "https://api.smith.langchain.com/api/v1/examples",
+    params=params,
+    headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+)
+
+examples = resp.json()
+```
+from langsmith import uuid7
+
+接下来，定义一个函数，该函数将在单个示例上运行你的模型，并将结果记录到 LangSmith。直接使用 API 时，你需要负责：
+
+- 通过 POST 到 `/runs` 并设置 `reference_example_id` 和 `session_id` 来创建运行对象。
+- 跟踪运行之间的父子关系（例如，包含子“llm”运行的父“chain”运行）。
+- 通过 PATCH 到 `/runs/{run_id}` 来更新运行的输出。
+
+```python
+os.environ["OPENAI_API_KEY"] = "sk-..."
+
+def run_completion_on_example(example, model_name, experiment_id):
+    """在示例列表上运行补全。"""
+    # 这里我们使用 OpenAI API，但你可以使用任何你喜欢的模型
+
+    def _post_run(run_id, name, run_type, inputs, parent_id=None):
+        """向 API 发布新运行的函数。
+        API 参考：https://api.smith.langchain.com/redoc#tag/run/operation/create_run_api_v1_runs_post
+        """
+        data = {
+            "id": run_id.hex,
+            "name": name,
+            "run_type": run_type,
+            "inputs": inputs,
+            "start_time": datetime.utcnow().isoformat(),
+            "reference_example_id": example["id"],
+            "session_id": experiment_id,
+        }
+        if parent_id:
+            data["parent_run_id"] = parent_id.hex
+        resp = requests.post(
+            "https://api.smith.langchain.com/api/v1/runs", # 对于自托管安装或欧盟区域，请适当更新
+            json=data,
+            headers=headers
+        )
+        resp.raise_for_status()
+
+    def _patch_run(run_id, outputs):
+        """用输出修补运行的函数。
+        API 参考：https://api.smith.langchain.com/redoc#tag/run/operation/update_run_api_v1_runs__run_id__patch
+        """
+        resp = requests.patch(
+            f"https://api.smith.langchain.com/api/v1/runs/{run_id}",
+            json={
+                "outputs": outputs,
+                "end_time": datetime.utcnow().isoformat(),
+            },
+            headers=headers,
+        )
+        resp.raise_for_status()
+
+    # 在请求头中发送你的 API 密钥
+    headers = {"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+
+    text = example["inputs"]["text"]
+
+    messages = [
+        {
+            "role": "system",
+            "content": "请审查下面的用户查询，并确定它是否包含任何形式的毒性行为，例如侮辱、威胁或高度负面的评论。如果包含，请回复 'Toxic'；如果不包含，请回复 'Not toxic'。",
+        },
+        {"role": "user", "content": text},
+    ]
+
+
+    # 创建父运行
+    parent_run_id = uuid7()
+    _post_run(parent_run_id, "LLM Pipeline", "chain", {"text": text})
+
+    # 创建子运行
+    child_run_id = uuid7()
+    _post_run(child_run_id, "OpenAI Call", "llm", {"messages": messages}, parent_run_id)
+
+    # 生成补全
+    chat_completion = oa_client.chat.completions.create(model=model_name, messages=messages)
+    output_text = chat_completion.choices[0].message.content
+
+    # 结束运行
+    _patch_run(child_run_id, {
+    "messages": messages,
+        "output": output_text,
+        "model": model_name
+    })
+
+    _patch_run(parent_run_id, {"label": output_text})
+```
+
+现在创建实验并在所有示例上运行补全。在 API 中，“实验”表示为一个会话（或“追踪器会话”），它通过 `reference_dataset_id` 引用一个数据集。与常规追踪的关键区别在于，实验中的运行必须有一个 `reference_example_id`，将每个运行链接到数据集中的特定示例。
+
+```python
+# 使用 /sessions 端点创建一个新实验
+# 实验是一组运行的集合，引用了所使用的数据集
+# API 参考：https://api.smith.langchain.com/redoc#tag/tracer-sessions/operation/create_tracer_session_api_v1_sessions_post
+
+model_names = ("gpt-3.5-turbo", "gpt-4.1-mini")
+experiment_ids = []
+for model_name in model_names:
+    resp = requests.post(
+        "https://api.smith.langchain.com/api/v1/sessions",
+        json={
+            "start_time": datetime.utcnow().isoformat(),
+            "reference_dataset_id": str(dataset_id),
+            "description": "实验的可选描述",
+            "name": f"Toxicity detection - API Example - {model_name} - {str(uuid4())[0:8]}",  # 实验的名称
+            "extra": {
+                "metadata": {"foo": "bar"},  # 可选元数据
+            },
+        },
+        headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+    )
+
+    experiment = resp.json()
+    experiment_ids.append(experiment["id"])
+
+    # 在所有示例上运行补全
+    for example in examples:
+        run_completion_on_example(example, model_name, experiment["id"])
+
+    # 发出一个 PATCH 请求，通过更新 end_time 来“结束”实验
+    requests.patch(
+        f"https://api.smith.langchain.com/api/v1/sessions/{experiment['id']}",
+        json={"end_time": datetime.utcnow().isoformat()},
+        headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+    )
+```
+
+### 添加评估反馈
+
+运行[实验](/langsmith/evaluation-concepts#experiment)后，你通常希望通过添加反馈分数来评估结果。这允许你跟踪诸如正确性、准确性或任何自定义评估标准等指标。
+
+在此示例中，评估检查每个模型的输出是否与数据集中的预期标签匹配。代码发布一个“正确性”分数（正确为 1.0，错误为 0.0），以跟踪每个模型对有毒与非有毒文本分类的准确性。
+
+以下代码将反馈添加到[单个实验示例](#run-a-single-experiment)中的运行：
+
+```python
+# 从其中一个实验中获取运行
+# API 参考：https://api.smith.langchain.com/redoc#tag/run/operation/query_runs_api_v1_runs_query_post
+experiment_id = experiment_ids[0]  # 评估第一个实验
+
+runs_resp = requests.post(
+    "https://api.smith.langchain.com/api/v1/runs/query",
+    headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]},
+    json={
+        "session": [experiment_id],
+        "is_root": True,  # 仅获取根运行
+        "select": ["id", "reference_example_id", "outputs"],
+    }
+)
+
+runs = runs_resp.json()["runs"]
+
+# 通过将输出与期望值进行比较来评估每个运行
+for run in runs:
+    # 从原始示例中获取期望输出
+    example_id = run["reference_example_id"]
+    expected_output = next(
+        ex["outputs"]["label"]
+        for ex in examples
+        if ex["id"] == example_id
+    )
+
+    # 将模型输出与期望输出进行比较
+    actual_output = run["outputs"].get("label", "")
+    is_correct = expected_output.lower() == actual_output.lower()
+
+    # 发布反馈分数
+    # API 参考：https://api.smith.langchain.com/redoc#tag/feedback/operation/create_feedback_api_v1_feedback_post
+    feedback = {
+        "run_id": str(run["id"]),
+        "key": "correctness",  # 你的评估指标名称
+        "score": 1.0 if is_correct else 0.0,
+        "comment": f"期望: {expected_output}, 得到: {actual_output}",  # 可选
+    }
+
+    resp = requests.post(
+        "https://api.smith.langchain.com/api/v1/feedback",
+        json=feedback,
+        headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+    )
+    resp.raise_for_status()
+```
+
+你可以添加多个具有不同键的反馈分数来跟踪各种指标。例如，你可以同时添加“正确性”分数和“toxicity_detected”分数。
+
+## 运行成对实验
+
+接下来，我们将演示如何运行成对实验。在成对实验中，你将两个示例相互比较。
+
+更多信息，请查看[如何运行成对评估](/langsmith/evaluate-pairwise)。
+
+```python
+# 比较实验允许你对两个或更多实验的输出进行偏好排序
+# API 参考：https://api.smith.langchain.com/redoc#tag/datasets/operation/create_comparative_experiment_api_v1_datasets_comparative_post
+resp = requests.post(
+    "https://api.smith.langchain.com/api/v1/datasets/comparative",
+    json={
+        "experiment_ids": experiment_ids,
+        "name": "Toxicity detection - API Example - Comparative - " + str(uuid4())[0:8],
+        "description": "比较实验的可选描述",
+        "extra": {
+            "metadata": {"foo": "bar"},  # 可选元数据
+        },
+        "reference_dataset_id": str(dataset_id),
+    },
+    headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+)
+
+comparative_experiment = resp.json()
+comparative_experiment_id = comparative_experiment["id"]
+
+# 你可以遍历属于比较实验的实验中的运行，并对输出进行偏好排序
+
+# 获取比较实验
+resp = requests.get(
+    f"https://api.smith.langchain.com/api/v1/datasets/{str(dataset_id)}/comparative",
+    params={"id": comparative_experiment_id},
+    headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+)
+
+comparative_experiment = resp.json()[0]
+experiment_ids = [info["id"] for info in comparative_experiment["experiments_info"]]
+
+from collections import defaultdict
+example_id_to_runs_map = defaultdict(list)
+
+# API 参考：https://api.smith.langchain.com/redoc#tag/run/operation/query_runs_api_v1_runs_query_post
+runs = requests.post(
+    f"https://api.smith.langchain.com/api/v1/runs/query",
+    headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]},
+    json={
+        "session": experiment_ids,
+        "is_root": True, # 仅获取包含最终输出的根运行（跨度）
+        "select": ["id", "reference_example_id", "outputs"],
+    }
+).json()
+runs = runs["runs"]
+for run in runs:
+    example_id = run["reference_example_id"]
+    example_id_to_runs_map[example_id].append(run)
+
+for example_id, runs in example_id_to_runs_map.items():
+    print(f"示例 ID: {example_id}")
+    # 对输出进行偏好排序，这里我们总是偏好第一个输出
+    # 实际上，你可以使用 LLM 来对输出进行排序
+    feedback_group_id = uuid4()
+
+    # 为每个运行发布反馈分数，第一个运行是首选的
+    # API 参考：https://api.smith.langchain.com/redoc#tag/feedback/operation/create_feedback_api_v1_feedback_post
+    # 我们将使用反馈组 ID 将反馈分数与同一组关联
+    for i, run in enumerate(runs):
+        print(f"运行 ID: {run['id']}")
+        feedback = {
+            "score": 1 if i == 0 else 0,
+            "run_id": str(run["id"]),
+            "key": "ranked_preference",
+            "feedback_group_id": str(feedback_group_id),
+            "comparative_experiment_id": comparative_experiment_id,
+        }
+        resp = requests.post(
+            "https://api.smith.langchain.com/api/v1/feedback",
+            json=feedback,
+            headers={"x-api-key": os.environ["LANGSMITH_API_KEY"]}
+        )
+        resp.raise_for_status()
+```

@@ -1,0 +1,78 @@
+---
+title: "NotionAPI 集成"
+description: "使用 LangChain JavaScript 集成 NotionAPI 文档加载器。"
+---
+
+本指南将引导您完成使用 Notion API 从 Notion 页面和数据库加载文档所需的步骤。
+
+## 概述
+
+Notion 是一个多功能生产力平台，将笔记记录、任务管理和数据组织工具整合到一个界面中。
+
+该文档加载器能够获取完整的 Notion 页面和数据库，并将其转换为 LangChain 文档，以便集成到您的项目中。
+
+## 设置
+
+1. 首先需要安装官方的 Notion 客户端和 [notion-to-md](https://www.npmjs.com/package/notion-to-md) 包作为对等依赖项：
+
+```bash npm
+npm install @langchain/community @langchain/core @notionhq/client notion-to-md
+```
+
+2. 创建一个 [Notion 集成](https://www.notion.so/my-integrations)并安全记录内部集成密钥（也称为 `NOTION_INTEGRATION_TOKEN`）。
+3. 在您的页面或数据库上添加与新集成的连接。为此，请打开您的 Notion 页面，转到右上角的设置图标，向下滚动到 `添加连接` 并选择您的新集成。
+4. 获取要加载的页面或数据库的 `PAGE_ID` 或 `DATABASE_ID`。
+
+> URL 路径中的 32 位十六进制字符代表 `ID`。例如：
+
+> PAGE_ID：[https://www.notion.so/skarard/LangChain-Notion-API-`b34ca03f219c4420a6046fc4bdfdf7b4`](https://www.notion.so/skarard/LangChain-Notion-API-b34ca03f219c4420a6046fc4bdfdf7b4)
+
+> DATABASE_ID：[https://www.notion.so/skarard/`c393f19c3903440da0d34bf9c6c12ff2`?v=9c70a0f4e174498aa0f9021e0a9d52de](https://www.notion.so/skarard/c393f19c3903440da0d34bf9c6c12ff2?v=9c70a0f4e174498aa0f9021e0a9d52de)
+
+> 正则表达式：`/(?<!=)[0-9a-f]{32}/`
+
+## 使用示例
+
+```typescript
+import { NotionAPILoader } from "@langchain/community/document_loaders/web/notionapi";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+
+// 加载页面（包括所有子页面作为独立文档）
+const pageLoader = new NotionAPILoader({
+  clientOptions: {
+    auth: "<NOTION_INTEGRATION_TOKEN>",
+  },
+  id: "<PAGE_ID>",
+  type: "page",
+});
+
+const splitter = new RecursiveCharacterTextSplitter();
+
+// 加载文档
+const pageDocs = await pageLoader.load();
+// 使用文本分割器分割文档
+const splitDocs = await splitter.splitDocuments(pageDocs);
+
+console.log({ splitDocs });
+
+// 加载数据库（每行作为独立文档，所有属性作为元数据）
+const dbLoader = new NotionAPILoader({
+  clientOptions: {
+    auth: "<NOTION_INTEGRATION_TOKEN>",
+  },
+  id: "<DATABASE_ID>",
+  type: "database",
+  onDocumentLoaded: (current, total, currentTitle) => {
+    console.log(`已加载页面：${currentTitle} (${current}/${total})`);
+  },
+  callerOptions: {
+    maxConcurrency: 64, // 默认值
+  },
+  propertiesAsHeader: true, // 将页面属性的 front matter 头部信息添加到页面内容前
+});
+
+// 数据库行内容通常少于 1000 个字符，因此不会分割为多个文档
+const dbDocs = await dbLoader.load();
+
+console.log({ dbDocs });
+```

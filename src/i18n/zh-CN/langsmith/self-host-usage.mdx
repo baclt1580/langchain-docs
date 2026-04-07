@@ -1,0 +1,64 @@
+---
+title: 与自托管 LangSmith 实例交互
+sidebarTitle: 与安装实例交互
+---
+
+本指南将引导您完成使用自托管 LangSmith 实例的过程。
+
+<Info>
+本指南假设您已经部署了自托管的 LangSmith 实例。如果尚未部署，请参考 [Kubernetes 部署指南](/langsmith/kubernetes) 或 [Docker 部署指南](/langsmith/docker)。
+</Info>
+
+### 配置要与 LangSmith 一起使用的应用程序
+
+LangSmith 提供了一个统一的 API，用于与 hub 和 LangSmith 后端交互。
+
+1. 部署实例后，您可以通过 `http(s)://<主机地址>` 访问 LangSmith 用户界面。
+2. LangSmith API 将在 `http(s)://<主机地址>/api/v1` 提供。
+3. LangSmith 控制平面将在 `http(s)://<主机地址>/api-host` 提供。
+
+要使用您实例的 API，您需要在应用程序中设置以下环境变量：
+
+```bash
+LANGSMITH_ENDPOINT=http://<主机地址>/api/v1
+LANGSMITH_API_KEY=foo # 如果使用 OAuth，请设置为合法的 API 密钥
+```
+
+您也可以直接在 LangSmith SDK 客户端中配置这些变量：
+
+```python
+import langsmith
+langsmith_client = langsmith.Client(
+    api_key='<api_key>',
+    api_url='http(s)://<主机地址>/api/v1',
+)
+```
+
+设置完成后，您应该能够运行代码并在自托管实例中查看结果。我们建议您按照 [*快速入门指南*](https://docs.smith.langchain.com/#quick-start) 进行操作，以熟悉如何使用 LangSmith。
+
+### 自签名证书
+
+如果您为自托管 LangSmith 实例使用自签名证书，这可能会带来问题，因为 Python 自带一组受信任的证书，其中可能不包含您的自签名证书。要解决此问题，您可能需要使用类似 `truststore` 的工具将系统证书加载到 Python 环境中。
+
+您可以按以下步骤操作：
+
+1. 使用 pip 安装 truststore（或根据您使用的包管理器选择类似方式）
+
+然后使用以下代码加载系统证书：
+
+```python
+import truststore
+truststore.inject_into_ssl()
+# 其余代码
+import langsmith
+langsmith_client = langsmith.Client(
+    api_key='<api_key>',
+    api_url='http(s)://<主机地址>/api/v1',
+)
+```
+
+---
+
+## API 参考
+
+要访问 API 参考，请在浏览器中导航至 `http://<主机地址>/api/docs`。

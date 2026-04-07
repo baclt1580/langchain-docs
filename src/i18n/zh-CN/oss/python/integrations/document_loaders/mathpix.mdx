@@ -1,0 +1,90 @@
+---
+title: "MathpixPDFLoader 集成"
+description: "使用 LangChain Python 集成 MathpixPDFLoader 文档加载器。"
+---
+
+灵感来源于 Daniel Gross 的代码片段：[https://gist.github.com/danielgross/3ab4104e14faccc12b49200843adab21](https://gist.github.com/danielgross/3ab4104e14faccc12b49200843adab21)
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地支持 | 可序列化 | JS 支持 |
+| :--- | :--- | :---: | :---: | :---: |
+| [`MathPixPDFLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/pdf/MathpixPDFLoader) | [`langchain-community`](https://reference.langchain.com/python/langchain-community) | ✅ | ❌ | ❌ |
+
+### 加载器特性
+
+| 来源 | 文档惰性加载 | 原生异步支持 |
+| :---: | :---: | :---: |
+| `MathPixPDFLoader` | ✅ | ❌ |
+
+## 设置
+
+### 凭证
+
+注册 Mathpix 并[创建 API 密钥](https://mathpix.com/docs/ocr/creating-an-api-key)，以在环境中设置 `MATHPIX_API_KEY` 变量。
+
+```python
+import getpass
+import os
+
+if "MATHPIX_API_KEY" not in os.environ:
+    os.environ["MATHPIX_API_KEY"] = getpass.getpass("请输入您的 Mathpix API 密钥：")
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("请输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+安装 **langchain-community**。
+
+```python
+pip install -qU langchain-community
+```
+
+## 初始化
+
+现在我们可以初始化加载器了：
+
+```python
+from langchain_community.document_loaders import MathpixPDFLoader
+
+file_path = "./example_data/layout-parser-paper.pdf"
+loader = MathpixPDFLoader(file_path)
+```
+
+## 加载
+
+```python
+docs = loader.load()
+docs[0]
+```
+
+```python
+print(docs[0].metadata)
+```
+
+## 惰性加载
+
+```python
+page = []
+for doc in loader.lazy_load():
+    page.append(doc)
+    if len(page) >= 10:
+        # 执行一些分页操作，例如：
+        # index.upsert(page)
+
+        page = []
+```
+
+---
+
+## API 参考
+
+有关 `MathpixPDFLoader` 所有功能和配置的详细文档，请访问 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/pdf/MathpixPDFLoader)

@@ -1,0 +1,93 @@
+---
+title: "Typeorm 集成"
+description: "使用 LangChain JavaScript 与 Typeorm 向量存储集成。"
+---
+
+为了在通用 PostgreSQL 数据库中启用向量搜索，LangChain.js 支持使用 [TypeORM](https://typeorm.io/) 配合 [`pgvector`](https://github.com/pgvector/pgvector) Postgres 扩展。
+
+## 设置
+
+要使用 TypeORM，你需要安装 `typeorm` 和 `pg` 包：
+
+```bash npm
+npm install typeorm
+```
+```bash npm
+npm install pg
+```
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+### 使用 `docker-compose` 设置 `pgvector` 自托管实例
+
+`pgvector` 提供了一个预构建的 Docker 镜像，可用于快速设置自托管的 Postgres 实例。
+创建一个名为 `docker-compose.yml` 的文件：
+
+```yml docker-compose.yml
+services:
+  db:
+    image: ankane/pgvector
+    ports:
+      - 5432:5432
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=ChangeMe
+      - POSTGRES_USER=myuser
+      - POSTGRES_DB=api
+```
+
+然后在同一目录下运行 `docker compose up` 以启动容器。
+
+你可以在[官方仓库](https://github.com/pgvector/pgvector)中找到有关如何设置 `pgvector` 的更多信息。
+
+## 使用
+
+```typescript
+import { DataSourceOptions } from "typeorm";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { TypeORMVectorStore } from "@langchain/community/vectorstores/typeorm";
+
+// 首先，按照以下设置说明操作：
+// https://js.langchain.com/docs/modules/indexes/vector_stores/integrations/typeorm
+
+export const run = async () => {
+  const args = {
+    postgresConnectionOptions: {
+      type: "postgres",
+      host: "localhost",
+      port: 5432,
+      username: "myuser",
+      password: "ChangeMe",
+      database: "api",
+    } as DataSourceOptions,
+  };
+
+  const typeormVectorStore = await TypeORMVectorStore.fromDataSource(
+    new OpenAIEmbeddings(),
+    args
+  );
+
+  await typeormVectorStore.ensureTableInDatabase();
+
+  await typeormVectorStore.addDocuments([
+    { pageContent: "what's this", metadata: { a: 2 } },
+    { pageContent: "Cat drinks milk", metadata: { a: 1 } },
+  ]);
+
+  const results = await typeormVectorStore.similaritySearch("hello", 2);
+
+  console.log(results);
+};
+```
+
+## 相关
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

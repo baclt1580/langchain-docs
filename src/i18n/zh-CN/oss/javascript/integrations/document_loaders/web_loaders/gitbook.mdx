@@ -1,0 +1,38 @@
+---
+title: "Gitbook 集成"
+description: "使用 LangChain JavaScript 集成 Gitbook 文档加载器。"
+---
+
+本示例演示如何使用 Cheerio 从任意 GitBook 加载数据。每个页面将创建一个文档。
+
+## 安装
+
+```bash npm
+npm install @langchain/community @langchain/core cheerio
+```
+
+## 从单个 GitBook 页面加载
+
+```typescript
+import { GitbookLoader } from "@langchain/community/document_loaders/web/gitbook";
+
+const loader = new GitbookLoader(
+  "https://docs.gitbook.com/product-tour/navigation"
+);
+
+const docs = await loader.load();
+```
+
+## 从指定 GitBook 的所有路径加载
+
+要使此功能正常工作，GitbookLoader 需要使用根路径（本例中为 https://docs.gitbook.com）进行初始化，并将 `shouldLoadAllPaths` 设置为 `true`。
+
+```typescript
+import { GitbookLoader } from "@langchain/community/document_loaders/web/gitbook";
+
+const loader = new GitbookLoader("https://docs.gitbook.com", {
+  shouldLoadAllPaths: true,
+});
+
+const docs = await loader.load();
+```

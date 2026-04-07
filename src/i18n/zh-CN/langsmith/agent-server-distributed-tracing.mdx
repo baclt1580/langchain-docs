@@ -1,0 +1,123 @@
+---
+title: 使用 Agent Server 进行分布式追踪
+sidebarTitle: 分布式追踪
+description: 当您从另一个服务调用已部署的 Agent Server 时，可以传播追踪上下文，使整个请求在 LangSmith 中显示为单个统一的追踪。这利用了 LangSmith 的 [分布式追踪](/langsmith/distributed-tracing) 功能，该功能通过 HTTP 头传播上下文。
+
+## 工作原理
+
+分布式追踪通过上下文传播头来链接跨服务的运行：
+
+1. **客户端** 从当前运行推断追踪上下文，并将其作为 HTTP 头发送。
+2. **服务器** 读取这些头，并将它们作为 `langsmith-trace` 和 `langsmith-project` 可配置值添加到运行的配置和元数据中。您可以选择在您的代理被使用时，使用这些值来设置给定运行的追踪上下文。
+
+使用的头包括：
+- `langsmith-trace`：包含追踪的点分顺序。
+- `baggage`：指定 LangSmith 项目以及其他可选的标签和元数据。
+
+要启用分布式追踪，客户端和服务器都需要选择加入。
+
+## 配置服务器
+
+要接受分布式追踪上下文，您的图必须从配置中读取追踪头并设置追踪上下文。这些头通过 `configurable` 字段作为 `langsmith-trace` 和 `langsmith-project` 传递。
+
+```python
+import contextlib
+import langsmith as ls
+from langgraph.graph import StateGraph, MessagesState
+
+# 定义您的图
+builder = StateGraph(MessagesState)
+# ... 添加节点和边 ...
+my_graph = builder.compile()
+
+@contextlib.contextmanager
+async def graph(config):
+    configurable = config.get("configurable", {})
+    parent_trace = configurable.get("langsmith-trace")
+    parent_project = configurable.get("langsmith-project")
+    # 如果您还想包含来自客户端的元数据和标签
+    metadata = configurable.get("langsmith-metadata")
+    tags = configurable.get("langsmith-tags")
+    with ls.tracing_context(parent=parent_trace, project_name=parent_project, metadata=metadata, tags=tags):
+        yield my_graph
+```
+
+在您的 `langgraph.json` 中导出这个 `graph` 函数：
+
+```json
+{
+  "graphs": {
+    "agent": "./src/agent.py:graph"
+  }
+}
+```
+
+## 从客户端连接
+
+<Tabs>
+<Tab title="RemoteGraph">
+
+初始化 @[`RemoteGraph`] 时设置 `distributed_tracing=True`。这会在所有请求上自动传播追踪头。
+
+```python
+from langgraph.graph import StateGraph
+from langgraph.pregel.remote import RemoteGraph
+
+remote_graph = RemoteGraph(
+    "agent",
+    url="<DEPLOYMENT_URL>",
+    distributed_tracing=True,  # 启用追踪传播
+)
+
+def subgraph_node(query: str):
+    # 追踪上下文会自动传播
+    return remote_graph.invoke({
+        "messages": [{"role": "user", "content": query}]
+    })['messages'][-1]['content']
+
+# RemoteGraph 在某个正在进行的任务的上下文中被调用。
+# 这可以是一个父 LangGraph 代理、使用 `@ls.traceable` 追踪的代码，
+# 或任何其他已检测的代码。
+graph = (
+        StateGraph(str)
+            .add_node(subgraph_node)
+            .add_edge("__start__", "subgraph_node")
+            .compile()
+)
+# 远程图的执行将作为此追踪的子级出现
+result = graph.invoke("What's the weather in SF?")
+```
+
+</Tab>
+<Tab title="SDK">
+
+如果您直接使用 [LangGraph SDK](/langsmith/reference)，请使用 `run_tree.to_headers()` 手动传播追踪头：
+
+```python
+from langgraph_sdk import get_client
+import langsmith as ls
+
+client = get_client(url="<DEPLOYMENT_URL>")
+
+with ls.trace("call_remote_agent", inputs={"query": query}) as rt:
+    headers = rt.to_headers()
+    async for chunk in client.runs.stream(
+        thread_id=None,
+        assistant_id="agent",
+        input={"messages": [{"role": "user", "content": query}]},
+        stream_mode="values",
+        headers=headers,  # 传递追踪头
+    ):
+        pass
+    return chunk
+
+result = await call_remote_agent("What's the weather in SF?")
+```
+
+</Tab>
+</Tabs>
+
+## 相关链接
+
+- [分布式追踪](/langsmith/distributed-tracing)：通用分布式追踪概念和模式
+- [RemoteGraph](/langsmith/use-remote-graph)：使用 RemoteGraph 与部署进行交互的完整指南

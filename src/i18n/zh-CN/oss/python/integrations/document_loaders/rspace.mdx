@@ -1,0 +1,58 @@
+---
+title: "Rspace 集成"
+description: "使用 LangChain Python 与 Rspace 文档加载器集成。"
+---
+
+本笔记本展示了如何使用 Rspace 文档加载器，将研究笔记和文档从 Rspace 电子实验笔记本导入到 LangChain 流程中。
+
+首先，您需要一个 Rspace 账户和一个 API 密钥。
+
+您可以在 [https://community.researchspace.com](https://community.researchspace.com) 上注册一个免费账户，或使用您所在机构的 Rspace。
+
+您可以从账户的个人资料页面获取 Rspace API 令牌。
+
+```python
+pip install -qU  rspace_client
+```
+
+最好将您的 Rspace API 密钥存储为环境变量。
+
+        RSPACE_API_KEY=&lt;YOUR_KEY&gt;
+
+您还需要设置 Rspace 安装的 URL，例如：
+
+        RSPACE_URL=https://community.researchspace.com
+
+如果您使用这些确切的环境变量名称，它们将被自动检测到。
+
+```python
+from langchain_community.document_loaders.rspace import RSpaceLoader
+```
+
+您可以从 Rspace 导入多种类型的项目：
+
+* 单个 Rspace 结构化或基础文档。这将一对一映射为一个 LangChain 文档。
+* 一个文件夹或笔记本。笔记本或文件夹内的所有文档都将作为 LangChain 文档导入。
+* 如果您在 Rspace 图库中有 PDF 文件，这些文件也可以单独导入。在底层，将使用 LangChain 的 PDF 加载器，这会将每个 PDF 页面创建为一个 LangChain 文档。
+
+```python
+## 将这些 ID 替换为您自己的研究笔记中的 ID。
+## 请确保使用全局 ID（带有两个字符的前缀）。这有助于加载器知道应向 Rspace API 发起哪些调用。
+
+rspace_ids = ["NB1932027", "FL1921314", "SD1932029", "GL1932384"]
+for rs_id in rspace_ids:
+    loader = RSpaceLoader(global_id=rs_id)
+    docs = loader.load()
+    for doc in docs:
+        ## 名称和 ID 被添加到 'source' 元数据属性中。
+        print(doc.metadata)
+        print(doc.page_content[:500])
+```
+
+如果您不想使用上述环境变量，可以将它们直接传递给 RSpaceLoader。
+
+```python
+loader = RSpaceLoader(
+    global_id=rs_id, api_key="MY_API_KEY", url="https://my.researchspace.com"
+)
+```

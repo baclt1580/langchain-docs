@@ -1,0 +1,50 @@
+---
+title: "Airtable 集成"
+description: "使用 LangChain Python 集成 Airtable 文档加载器。"
+---
+
+```python
+pip install -qU  pyairtable
+```
+
+```python
+from langchain_community.document_loaders import AirtableLoader
+```
+
+* 按照 [Airtable API 密钥文档](https://support.airtable.com/docs/creating-and-using-api-keys-and-access-tokens) 获取你的 API 密钥。
+* 按照 [Airtable Web API 介绍](https://airtable.com/developers/web/api/introduction) 获取你的 Base ID。
+* 根据 [查找 Airtable Base ID 和 Table ID 的指南](https://www.highviewapps.com/kb/where-can-i-find-the-airtable-base-id-and-table-id/#:~:text=Both%20the%20Airtable%20Base%20ID,URL%20that%20begins%20with%20tbl) 从表格 URL 中获取你的 Table ID。
+
+```python
+api_key = "xxx"
+base_id = "xxx"
+table_id = "xxx"
+view = "xxx"  # 可选
+```
+
+```python
+loader = AirtableLoader(api_key, table_id, base_id, view=view)
+docs = loader.load()
+```
+
+将每个表格行作为 `dict` 返回。
+
+```python
+len(docs)
+```
+
+```text
+3
+```
+
+```python
+eval(docs[0].page_content)
+```
+
+```text
+{'id': 'recF3GbGZCuh9sXIQ',
+ 'createdTime': '2023-06-09T04:47:21.000Z',
+ 'fields': {'Priority': 'High',
+  'Status': 'In progress',
+  'Name': 'Document Splitters'}}
+```

@@ -1,0 +1,446 @@
+---
+title: 人机协同
+description: 通过基于中断的人工审核添加审批工作流
+---
+
+并非所有智能体操作都应在无监督状态下运行。当智能体即将发送邮件、删除记录、执行金融交易或进行任何不可逆操作时，需要先由人工审核并批准该操作。人机协同（HITL）模式允许您的智能体暂停执行，向用户展示待处理的操作，并在获得明确批准后才继续执行。
+
+import { PatternEmbed } from "/snippets/pattern-embed.jsx"
+
+<PatternEmbed pattern="human-in-the-loop" />
+
+## 中断机制的工作原理
+
+LangGraph 智能体支持**中断**——智能体将控制权交还给客户端的显式暂停点。当智能体触发中断时：
+
+1. 智能体停止执行并发出中断负载
+2. `useStream` 钩子通过 `stream.interrupt` 暴露中断信息
+3. 您的 UI 渲染包含批准/拒绝/编辑选项的审核卡片
+4. 用户做出决定
+5. 您的代码调用 `stream.submit()` 并附带继续执行的指令
+6. 智能体从中断处继续执行
+
+## 为人机协同配置 useStream
+
+:::python
+
+定义与智能体状态模式匹配的 TypeScript 接口，并将其作为类型参数传递给 `useStream`，以便以类型安全的方式访问状态值。在以下示例中，将 `typeof myAgent` 替换为您的接口名称：
+
+```ts
+import type { BaseMessage } from "@langchain/core/messages";
+
+interface AgentState {
+  messages: BaseMessage[];
+}
+```
+
+:::
+
+:::js
+
+导入您的智能体，并将 `typeof myAgent` 作为类型参数传递给 `useStream`，以便以类型安全的方式访问状态值：
+
+```ts
+import type { myAgent } from "./agent";
+```
+
+:::
+
+<CodeGroup>
+```tsx React
+import { useStream } from "@langchain/react";
+
+const AGENT_URL = "http://localhost:2024";
+
+export function Chat() {
+  const stream = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "human_in_the_loop",
+  });
+
+  const interrupt = stream.interrupt;
+
+  return (
+    <div>
+      {stream.messages.map((msg) => (
+        <Message key={msg.id} message={msg} />
+      ))}
+      {interrupt && (
+        <ApprovalCard
+          interrupt={interrupt}
+          onRespond={(response) =>
+            stream.submit(null, { command: { resume: response } })
+          }
+        />
+      )}
+    </div>
+  );
+}
+```
+
+```vue Vue
+<script setup lang="ts">
+import { useStream } from "@langchain/vue";
+
+const AGENT_URL = "http://localhost:2024";
+
+const stream = useStream<typeof myAgent>({
+  apiUrl: AGENT_URL,
+  assistantId: "human_in_the_loop",
+});
+
+function handleRespond(response: HITLResponse) {
+  stream.submit(null, { command: { resume: response } });
+}
+</script>
+
+<template>
+  <div>
+    <Message
+      v-for="msg in stream.messages.value"
+      :key="msg.id"
+      :message="msg"
+    />
+    <ApprovalCard
+      v-if="stream.interrupt.value"
+      :interrupt="stream.interrupt.value"
+      @respond="handleRespond"
+    />
+  </div>
+</template>
+```
+
+```svelte Svelte
+<script lang="ts">
+  import { useStream } from "@langchain/svelte";
+
+  const AGENT_URL = "http://localhost:2024";
+
+  const { messages, interrupt, submit } = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "human_in_the_loop",
+  });
+
+  function handleRespond(response: HITLResponse) {
+    submit(null, { command: { resume: response } });
+  }
+</script>
+
+<div>
+  {#each $messages as msg (msg.id)}
+    <Message message={msg} />
+  {/each}
+
+  {#if $interrupt}
+    <ApprovalCard interrupt={$interrupt} onRespond={handleRespond} />
+  {/if}
+</div>
+```
+
+```ts Angular
+import { Component } from "@angular/core";
+import { useStream } from "@langchain/angular";
+import type { HITLResponse } from "langchain";
+
+const AGENT_URL = "http://localhost:2024";
+
+@Component({
+  selector: "app-chat",
+  template: `
+    @for (msg of stream.messages(); track msg.id) {
+      <app-message [message]="msg" />
+    }
+    @if (stream.interrupt()) {
+      <app-approval-card
+        [interrupt]="stream.interrupt()"
+        (respond)="handleRespond($event)"
+      />
+    }
+  `,
+})
+export class ChatComponent {
+  stream = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "human_in_the_loop",
+  });
+
+  handleRespond(response: HITLResponse) {
+    this.stream.submit(null, { command: { resume: response } });
+  }
+}
+```
+</CodeGroup>
+
+## 中断负载
+
+当智能体暂停时，`stream.interrupt` 包含一个具有以下结构的 `HITLRequest`：
+
+```ts
+interface HITLRequest {
+  actionRequests: ActionRequest[];
+  reviewConfigs: ReviewConfig[];
+}
+
+interface ActionRequest {
+  action: string;
+  args: Record<string, unknown>;
+  description?: string;
+}
+
+interface ReviewConfig {
+  allowedDecisions: ("approve" | "reject" | "edit")[];
+}
+```
+
+| 属性 | 描述 |
+| --- | --- |
+| `actionRequests` | 智能体希望执行的待处理操作数组 |
+| `actionRequests[].action` | 操作名称（例如 `"send_email"`、`"delete_record"`） |
+| `actionRequests[].args` | 操作的结构化参数 |
+| `actionRequests[].description` | 可选的人类可读描述，说明该操作的作用 |
+| `reviewConfigs` | 控制允许哪些决策的每个操作配置 |
+| `reviewConfigs[].allowedDecisions` | 显示哪些按钮：`"approve"`、`"reject"`、`"edit"` |
+
+## 决策类型
+
+人机协同模式支持三种决策类型：
+
+### 批准
+
+用户确认操作应按原样进行：
+
+```ts
+const response: HITLResponse = {
+  decision: "approve",
+};
+
+stream.submit(null, { command: { resume: response } });
+```
+
+### 拒绝
+
+用户拒绝该操作，并可选择提供原因：
+
+```ts
+const response: HITLResponse = {
+  decision: "reject",
+  reason: "邮件语气过于强硬，请修改。",
+};
+
+stream.submit(null, { command: { resume: response } });
+```
+
+<Note>
+当操作被拒绝时，智能体会收到拒绝原因，并可以决定如何继续。它可能会重新措辞、询问澄清问题，或完全放弃该操作。
+</Note>
+
+### 编辑
+
+用户在批准前修改操作的参数：
+
+```ts
+const response: HITLResponse = {
+  decision: "edit",
+  args: {
+    ...originalArgs,
+    subject: "更新后的主题行",
+    body: "使用更柔和语言修改后的邮件正文。",
+  },
+};
+
+stream.submit(null, { command: { resume: response } });
+```
+
+## 构建 ApprovalCard
+
+这是一个处理所有三种决策类型的完整审核卡片组件：
+
+```tsx
+function ApprovalCard({
+  interrupt,
+  onRespond,
+}: {
+  interrupt: { value: HITLRequest };
+  onRespond: (response: HITLResponse) => void;
+}) {
+  const request = interrupt.value;
+  const [editedArgs, setEditedArgs] = useState(
+    request.actionRequests[0]?.args ?? {}
+  );
+  const [rejectReason, setRejectReason] = useState("");
+  const [mode, setMode] = useState<"review" | "edit" | "reject">("review");
+
+  const action = request.actionRequests[0];
+  const config = request.reviewConfigs[0];
+
+  if (!action || !config) return null;
+
+  return (
+    <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
+      <h3 className="font-semibold text-amber-800">需要操作审核</h3>
+      <p className="mt-1 text-sm text-amber-700">
+        {action.description ?? `智能体希望执行：${action.action}`}
+      </p>
+
+      <div className="mt-3 rounded bg-white p-3 font-mono text-sm">
+        <pre>{JSON.stringify(action.args, null, 2)}</pre>
+      </div>
+
+      {mode === "review" && (
+        <div className="mt-4 flex gap-2">
+          {config.allowedDecisions.includes("approve") && (
+            <button
+              className="rounded bg-green-600 px-4 py-2 text-white"
+              onClick={() => onRespond({ decision: "approve" })}
+            >
+              批准
+            </button>
+          )}
+          {config.allowedDecisions.includes("reject") && (
+            <button
+              className="rounded bg-red-600 px-4 py-2 text-white"
+              onClick={() => setMode("reject")}
+            >
+              拒绝
+            </button>
+          )}
+          {config.allowedDecisions.includes("edit") && (
+            <button
+              className="rounded bg-blue-600 px-4 py-2 text-white"
+              onClick={() => setMode("edit")}
+            >
+              编辑
+            </button>
+          )}
+        </div>
+      )}
+
+      {mode === "reject" && (
+        <div className="mt-4 space-y-2">
+          <textarea
+            className="w-full rounded border p-2"
+            placeholder="拒绝原因..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+          <button
+            className="rounded bg-red-600 px-4 py-2 text-white"
+            onClick={() =>
+              onRespond({ decision: "reject", reason: rejectReason })
+            }
+          >
+            确认拒绝
+          </button>
+        </div>
+      )}
+
+      {mode === "edit" && (
+        <div className="mt-4 space-y-2">
+          <textarea
+            className="w-full rounded border p-2 font-mono text-sm"
+            value={JSON.stringify(editedArgs, null, 2)}
+            onChange={(e) => {
+              try {
+                setEditedArgs(JSON.parse(e.target.value));
+              } catch {
+                // 编辑时允许无效 JSON
+              }
+            }}
+          />
+          <button
+            className="rounded bg-blue-600 px-4 py-2 text-white"
+            onClick={() =>
+              onRespond({ decision: "edit", args: editedArgs })
+            }
+          >
+            提交编辑
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## 恢复流程
+
+用户做出决策后，完整流程如下：
+
+1. 调用 `stream.submit(null, { command: { resume: hitlResponse } })`
+2. `useStream` 钩子将恢复命令发送到 LangGraph 后端
+3. 智能体接收 `HITLResponse` 并继续执行
+4. 如果批准，工具将使用原始（或编辑后的）参数运行
+5. 如果拒绝，智能体接收原因并决定下一步操作
+6. 当智能体恢复流式传输时，`interrupt` 属性重置为 `null`
+
+<Tip>
+您可以在单个智能体运行中链接多个人机协同检查点。例如，智能体可能先请求批准进行搜索，然后在发送包含结果的邮件前再次请求批准。每个中断都是独立处理的。
+</Tip>
+
+## 常见用例
+
+| 用例 | 操作 | 审核配置 |
+| --- | --- | --- |
+| 邮件发送 | `send_email` | `["approve", "reject", "edit"]` |
+| 数据库写入 | `update_record` | `["approve", "reject"]` |
+| 金融交易 | `transfer_funds` | `["approve", "reject"]` |
+| 文件删除 | `delete_files` | `["approve", "reject"]` |
+| 调用外部服务的 API | `call_api` | `["approve", "reject", "edit"]` |
+
+## 处理多个待处理操作
+
+当智能体希望同时执行多个操作时，中断可能包含多个 `actionRequests`。为每个操作渲染卡片，并在恢复前收集所有决策：
+
+```tsx
+function MultiActionReview({
+  interrupt,
+  onRespond,
+}: {
+  interrupt: { value: HITLRequest };
+  onRespond: (responses: HITLResponse[]) => void;
+}) {
+  const [decisions, setDecisions] = useState<Record<number, HITLResponse>>({});
+  const request = interrupt.value;
+
+  const allDecided =
+    Object.keys(decisions).length === request.actionRequests.length;
+
+  return (
+    <div className="space-y-4">
+      {request.actionRequests.map((action, i) => (
+        <SingleActionCard
+          key={i}
+          action={action}
+          config={request.reviewConfigs[i]}
+          onDecide={(response) =>
+            setDecisions((prev) => ({ ...prev, [i]: response }))
+          }
+        />
+      ))}
+      {allDecided && (
+        <button
+          className="rounded bg-green-600 px-4 py-2 text-white"
+          onClick={() =>
+            onRespond(
+              request.actionRequests.map((_, i) => decisions[i])
+            )
+          }
+        >
+          提交所有决策
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+## 最佳实践
+
+实现人机协同工作流时，请牢记以下准则：
+
+- **显示清晰的上下文**。始终显示智能体想要执行*什么*以及*为什么*。包含操作描述和完整参数。
+- **使批准成为最便捷的路径**。如果操作看起来正确，批准应该只需一次点击。将多步骤流程保留给拒绝/编辑操作。
+- **验证编辑后的参数**。当用户编辑操作参数时，在发送前验证 JSON 结构。对格式错误的输入显示内联错误。
+- **保持中断状态持久化**。如果用户刷新页面，中断应仍然可见。`useStream` 通过线程的检查点处理此问题。
+- **记录所有决策**。为了审计追踪，记录每个批准/拒绝/编辑决策，包括时间戳和做出决策的用户。
+- **合理设置超时**。长时间运行的智能体不应无限期地阻塞等待人工审核。考虑显示智能体已等待的时间。

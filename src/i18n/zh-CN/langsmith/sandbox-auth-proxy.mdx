@@ -1,0 +1,185 @@
+---
+title: 沙盒认证代理
+sidebarTitle: 认证代理
+description: 将凭据注入沙盒发出的出站 API 请求中，无需硬编码密钥。
+---
+
+import SandboxPreview from "/snippets/langsmith/sandbox-preview-warning.mdx";
+
+<SandboxPreview />
+
+认证代理允许沙盒代码调用外部 API（如 OpenAI、Anthropic、GitHub 等），而无需硬编码凭据。在沙盒上配置后，代理边车会自动使用您工作区的密钥，将认证头部注入匹配的出站请求中。
+
+<Warning>
+在创建引用这些密钥的沙盒之前，您必须在 LangSmith [工作区](/langsmith/administration-overview#workspaces) 设置中配置您的密钥（例如 `OPENAI_API_KEY`）。
+</Warning>
+
+## 配置认证代理规则
+
+创建沙盒时添加 `proxy_config`。每条规则指定：
+
+| 字段 | 描述 |
+|-------|-------------|
+| `match_hosts` | 要拦截的主机（支持通配符，如 `*.github.com`） |
+| `match_paths` | 要匹配的路径（空 = 所有路径） |
+| `headers` | 要注入的头部，每个头部包含 `name`、`type` 和 `value` |
+| `no_proxy` | 完全绕过代理的主机（例如 `localhost`） |
+
+### 头部类型
+
+每个头部都有一个 `type`，用于控制其值的存储和显示方式：
+
+| 类型 | 描述 |
+|------|-------------|
+| `workspace_secret` | 使用 `{KEY}` 语法引用工作区密钥。在推送时解析。 |
+| `plaintext` | 值按原样存储和返回。用于非敏感头部。 |
+| `opaque` | 仅写入。值在静态时加密，且永远不会通过 API 返回。 |
+
+## 单一 API 示例
+
+创建一个沙盒，自动将 OpenAI API 密钥注入出站请求：
+
+```bash
+curl -X POST "$LANGSMITH_ENDPOINT/api/v2/sandboxes/boxes" \
+  -H "x-api-key: $LANGSMITH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_name": "python-sandbox",
+    "name": "openai-sandbox",
+    "wait_for_ready": true,
+    "proxy_config": {
+      "rules": [
+        {
+          "name": "openai-api",
+          "match_hosts": ["api.openai.com"],
+          "headers": [
+            {
+              "name": "Authorization",
+              "type": "workspace_secret",
+              "value": "Bearer {OPENAI_API_KEY}"
+            }
+          ]
+        }
+      ]
+    }
+  }'
+```
+
+现在，沙盒无需设置 API 密钥即可调用 OpenAI——代理会自动注入密钥。
+
+## 多 API 示例
+
+添加多条规则，同时为多个服务进行认证：
+
+```bash
+curl -X POST "$LANGSMITH_ENDPOINT/api/v2/sandboxes/boxes" \
+  -H "x-api-key: $LANGSMITH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_name": "python-sandbox",
+    "name": "multi-api-sandbox",
+    "wait_for_ready": true,
+    "proxy_config": {
+      "rules": [
+        {
+          "name": "openai-api",
+          "match_hosts": ["api.openai.com"],
+          "headers": [
+            {
+              "name": "Authorization",
+              "type": "workspace_secret",
+              "value": "Bearer {OPENAI_API_KEY}"
+            }
+          ]
+        },
+        {
+          "name": "anthropic-api",
+          "match_hosts": ["api.anthropic.com"],
+          "headers": [
+            {
+              "name": "x-api-key",
+              "type": "workspace_secret",
+              "value": "{ANTHROPIC_API_KEY}"
+            },
+            {
+              "name": "anthropic-version",
+              "type": "plaintext",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        {
+          "name": "github-api",
+          "match_hosts": ["api.github.com"],
+          "match_paths": ["/repos/*", "/user"],
+          "headers": [
+            {
+              "name": "Authorization",
+              "type": "workspace_secret",
+              "value": "Bearer {GITHUB_TOKEN}"
+            }
+          ]
+        }
+      ],
+      "no_proxy": ["localhost", "127.0.0.1"]
+    }
+  }'
+```
+
+## 通过 SDK 配置
+
+<CodeGroup>
+
+```python Python
+from langsmith.sandbox import SandboxClient
+
+client = SandboxClient()
+
+client.create_sandbox(
+    template_name="python-sandbox",
+    name="openai-sandbox",
+    proxy_config={
+        "rules": [
+            {
+                "name": "openai-api",
+                "match_hosts": ["api.openai.com"],
+                "headers": [
+                    {
+                        "name": "Authorization",
+                        "type": "workspace_secret",
+                        "value": "Bearer {OPENAI_API_KEY}",
+                    }
+                ],
+            }
+        ]
+    },
+)
+```
+
+```ts TypeScript
+import { SandboxClient } from "langsmith/experimental/sandbox";
+
+const client = new SandboxClient();
+
+await client.createSandbox({
+  templateName: "python-sandbox",
+  name: "openai-sandbox",
+  proxyConfig: {
+    rules: [
+      {
+        name: "openai-api",
+        matchHosts: ["api.openai.com"],
+        headers: [
+          {
+            name: "Authorization",
+            type: "workspace_secret",
+            value: "Bearer {OPENAI_API_KEY}",
+          },
+        ],
+      },
+    ],
+  },
+});
+```
+
+</CodeGroup>

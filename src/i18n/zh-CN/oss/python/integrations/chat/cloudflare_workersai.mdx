@@ -1,0 +1,180 @@
+---
+title: "ChatCloudflareWorkersAI 集成"
+description: "使用 LangChain Python 集成 ChatCloudflareWorkersAI 聊天模型。"
+---
+
+本文将帮助您开始使用 CloudflareWorkersAI 的[聊天模型](/oss/langchain/models)。有关 `ChatCloudflareWorkersAI` 所有功能和配置的详细文档，请参阅 [API 参考](https://python.langchain.com/docs/integrations/chat/cloudflare_workersai/)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/chat/cloudflare) | 下载量 | 版本 |
+| :--- | :--- |:------------:|:------------------------------------------------------------------------:| :---: | :---: |
+| [`ChatCloudflareWorkersAI`](https://python.langchain.com/docs/integrations/chat/cloudflare_workersai/) | [`langchain-cloudflare`](https://pypi.org/project/langchain-cloudflare/) |      ❌       |                                     ❌                                     | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-cloudflare?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-cloudflare?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/langchain/tools) | [结构化输出](/oss/langchain/structured-output) | [图像输入](/oss/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/langchain/streaming/) | 原生异步 | [令牌用量](/oss/langchain/models#token-usage) | [对数概率](/oss/langchain/models#log-probabilities) |
+|:-----------------------------------------:|:----------------------------------------------------:|:----------------------------------------------:|:-----------:|:-----------:|:-----------------------------------------------------:|:------------:|:------------------------------------------------------:|:----------------------------------:|
+|                     ✅                     |                          ✅                           |                       ❌                        |      ❌      |      ❌      |                           ❌                           |      ❌       |                             ✅                            |                 ❌                  |
+
+## 设置
+
+要访问 CloudflareWorkersAI 模型，您需要创建一个 CloudflareWorkersAI 账户，获取 API 密钥，并安装 `langchain-cloudflare` 集成包。
+
+### 凭证
+
+前往 [www.cloudflare.com/developer-platform/products/workers-ai/](https://www.cloudflare.com/developer-platform/products/workers-ai/) 注册 CloudflareWorkersAI 并生成 API 密钥。完成后，请设置 `CF_AI_API_KEY` 环境变量和 `CF_ACCOUNT_ID` 环境变量：
+
+```python
+import getpass
+import os
+
+if not os.getenv("CF_AI_API_KEY"):
+    os.environ["CF_AI_API_KEY"] = getpass.getpass(
+        "输入您的 CloudflareWorkersAI API 密钥："
+    )
+
+if not os.getenv("CF_ACCOUNT_ID"):
+    os.environ["CF_ACCOUNT_ID"] = getpass.getpass(
+        "输入您的 CloudflareWorkersAI 账户 ID："
+    )
+```
+
+如果您希望自动追踪模型调用，还可以通过取消注释以下代码来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+```
+
+### 安装
+
+LangChain CloudflareWorkersAI 集成位于 `langchain-cloudflare` 包中：
+
+```python
+pip install -qU langchain-cloudflare
+```
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+- 使用相关参数更新模型实例化。
+
+```python
+from langchain_cloudflare.chat_models import ChatCloudflareWorkersAI
+
+llm = ChatCloudflareWorkersAI(
+    model="@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    temperature=0,
+    max_tokens=1024,
+    # 其他参数...
+)
+```
+
+## 调用
+
+```python
+messages = [
+    (
+        "system",
+        "您是一个将英语翻译成法语的助手。请翻译用户的句子。",
+    ),
+    ("human", "I love programming."),
+]
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+```text
+AIMessage(content="J'adore la programmation.", additional_kwargs={}, response_metadata={'token_usage': {'prompt_tokens': 37, 'completion_tokens': 9, 'total_tokens': 46}, 'model_name': '@cf/meta/llama-3.3-70b-instruct-fp8-fast'}, id='run-995d1970-b6be-49f3-99ae-af4cdba02304-0', usage_metadata={'input_tokens': 37, 'output_tokens': 9, 'total_tokens': 46})
+```
+
+```python
+print(ai_msg.content)
+```
+
+```text
+J'adore la programmation.
+```
+
+## 结构化输出
+
+```python
+json_schema = {
+    "title": "joke",
+    "description": "讲给用户的笑话。",
+    "type": "object",
+    "properties": {
+        "setup": {
+            "type": "string",
+            "description": "笑话的铺垫部分",
+        },
+        "punchline": {
+            "type": "string",
+            "description": "笑话的包袱部分",
+        },
+        "rating": {
+            "type": "integer",
+            "description": "笑话的有趣程度，从 1 到 10",
+            "default": None,
+        },
+    },
+    "required": ["setup", "punchline"],
+}
+structured_llm = llm.with_structured_output(json_schema)
+
+structured_llm.invoke("讲一个关于猫的笑话")
+```
+
+```text
+{'setup': '为什么猫要加入乐队？',
+ 'punchline': '因为它想成为打击乐手（谐音：purr-cussionist）',
+ 'rating': '8'}
+```
+
+## 绑定工具
+
+```python
+from typing import List
+
+from langchain.tools import tool
+
+
+@tool
+def validate_user(user_id: int, addresses: List[str]) -> bool:
+    """使用历史地址验证用户。
+
+    参数：
+        user_id (int): 用户 ID。
+        addresses (List[str]): 之前的地址列表。
+    """
+    return True
+
+
+llm_with_tools = llm.bind_tools([validate_user])
+
+result = llm_with_tools.invoke(
+    "您能验证用户 123 吗？他们之前住在 "
+    "波士顿 MA 的 123 Fake St 和 "
+    "休斯顿 TX 的 234 Pretend Boulevard。"
+)
+result.tool_calls
+```
+
+```text
+[{'name': 'validate_user',
+  'args': {'user_id': '123',
+   'addresses': '["123 Fake St in Boston MA", "234 Pretend Boulevard in Houston TX"]'},
+  'id': '31ec7d6a-9ce5-471b-be64-8ea0492d1387',
+  'type': 'tool_call'}]
+```
+
+---
+
+## API 参考
+
+[developers.cloudflare.com/workers-ai/](https://developers.cloudflare.com/workers-ai/)
+[developers.cloudflare.com/agents/](https://developers.cloudflare.com/agents/)

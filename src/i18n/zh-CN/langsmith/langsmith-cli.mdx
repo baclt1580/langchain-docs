@@ -1,0 +1,155 @@
+---
+title: LangSmith CLI
+sidebarTitle: CLI
+icon: terminal-2
+description: 从终端查询和管理 LangSmith 项目、追踪、运行、数据集、评估器、实验和会话线程
+---
+
+LangSmith CLI 是一个快速、对智能体友好的命令行工具，可直接在终端中处理您的 LangSmith 数据和工作流。它专为人类和 AI 编码智能体设计，用于列出、筛选、检索和导出数据——默认提供可预测的 JSON 输出，并为人类提供美观的表格模式。
+
+<Callout icon="terminal" color="#4F46E5" iconType="regular">
+专为智能体和脚本构建：默认输出 JSON，支持清晰的 stdout/stderr 分离，并提供 `--yes` 标志用于非交互式使用。
+</Callout>
+
+## 安装
+
+使用以下方法之一进行安装：
+
+<CodeGroup>
+```bash 安装脚本（推荐）
+curl -sSL https://raw.githubusercontent.com/langchain-ai/langsmith-cli/main/scripts/install.sh | sh
+```
+
+```bash 安装到自定义目录
+INSTALL_DIR=$HOME/.local/bin \
+  curl -sSL https://raw.githubusercontent.com/langchain-ai/langsmith-cli/main/scripts/install.sh | sh
+```
+
+```bash GitHub Releases
+# 为您的平台下载最新的二进制文件
+# https://github.com/langchain-ai/langsmith-cli/releases
+```
+
+```bash Go install
+go install github.com/langchain-ai/langsmith-cli/cmd/langsmith@latest
+```
+</CodeGroup>
+
+## 认证
+
+将您的 [API 密钥](/langsmith/create-account-api-key) 设置为环境变量：
+
+```bash
+export LANGSMITH_API_KEY="lsv2_..."
+```
+
+可选默认设置：
+
+```bash
+export LANGSMITH_ENDPOINT="https://api.smith.langchain.com"  # 自托管/混合部署
+export LANGSMITH_PROJECT="my-default-project"                 # 查询的默认项目
+```
+
+或者在运行命令时通过标志传递：
+
+```bash
+langsmith --api-key lsv2_... trace list --project my-app
+```
+
+## 快速开始
+
+以下命令涵盖了核心资源类型——项目、追踪、运行、数据集、实验和会话线程：
+
+```bash
+# 列出追踪项目（会话）
+langsmith project list
+
+# 列出项目中的近期追踪
+langsmith trace list --project my-app --limit 5
+
+# 获取特定追踪的完整详情
+langsmith trace get <trace-id> --project my-app --full
+
+# 列出包含令牌计数的 LLM 运行
+langsmith run list --project my-app --run-type llm --include-metadata
+
+# 数据集和实验
+langsmith dataset list
+langsmith experiment list --dataset my-eval-set
+
+# 项目中的会话线程
+langsmith thread list --project my-chatbot
+```
+
+## 输出格式
+
+- 默认：JSON 输出到 stdout，便于管道传输和脚本处理
+- 美观表格：`--format pretty` 用于人类可读的表格和树状视图
+- 写入文件：`-o <路径>`
+
+```bash
+langsmith trace list --project my-app                  # JSON 数组输出到 stdout
+langsmith --format pretty trace list --project my-app  # 表格/树状视图
+langsmith trace list --project my-app -o traces.json   # 将 JSON 写入文件
+```
+
+## 命令概览
+
+CLI 按资源分组功能。每个命令都支持 `--limit`、`--last-n-minutes` 等筛选器。
+
+### project—列出追踪项目
+
+```bash
+langsmith project list                    # 默认限制：20
+langsmith project list --name-contains chatbot
+langsmith --format pretty project list
+```
+
+### trace—查询和导出追踪
+
+```bash
+langsmith trace list --project my-app --limit 50 --last-n-minutes 60
+langsmith trace list --project my-app --error --include-metadata
+langsmith trace get <trace-id> --project my-app --full
+langsmith trace export ./traces --project my-app --limit 20 --full
+```
+
+### run—查询单个运行
+
+```bash
+langsmith run list --project my-app --run-type llm
+langsmith run list --project my-app --run-type tool --name search
+langsmith run get <run-id> --full
+langsmith run export llm_calls.jsonl --project my-app --run-type llm --full
+```
+
+### thread—查询会话线程
+
+```bash
+langsmith thread list --project my-chatbot --last-n-minutes 120
+langsmith thread get <thread-id> --project my-chatbot --full
+```
+
+### dataset—管理评估数据集
+
+```bash
+langsmith dataset list --name-contains eval
+langsmith dataset get my-dataset
+langsmith dataset create --name my-eval-set --description "QA pairs for v2"
+langsmith dataset export my-dataset ./data.json --limit 500
+```
+
+### evaluator—管理评估器
+
+```bash
+langsmith evaluator list
+langsmith evaluator upload evals.py --name accuracy --function check_accuracy --dataset my-eval-set
+langsmith evaluator delete accuracy --yes
+```
+
+### experiment—结果和摘要
+
+```bash
+langsmith experiment list --dataset my-eval-set
+langsmith experiment get my-experiment-2024-01-15
+```

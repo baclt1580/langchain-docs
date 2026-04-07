@@ -1,0 +1,51 @@
+---
+title: "ChatYandexGPT 集成"
+description: "使用 LangChain Python 与 ChatYandexGPT 聊天模型集成。"
+---
+
+本笔记本介绍如何将 LangChain 与 [YandexGPT](https://cloud.yandex.com/en/services/yandexgpt) 聊天模型结合使用。
+
+使用前，请确保已安装 `yandexcloud` Python 包。
+
+```python
+pip install -qU  yandexcloud
+```
+
+首先，您需要[创建服务账号](https://cloud.yandex.com/en/docs/iam/operations/sa/create)，并为其分配 `ai.languageModels.user` 角色。
+
+接下来，您有两种身份验证选项：
+
+- [IAM 令牌](https://cloud.yandex.com/en/docs/iam/operations/iam-token/create-for-sa)。
+    您可以在构造函数参数 `iam_token` 或环境变量 `YC_IAM_TOKEN` 中指定令牌。
+
+- [API 密钥](https://cloud.yandex.com/en/docs/iam/operations/api-key/create)
+    您可以在构造函数参数 `api_key` 或环境变量 `YC_API_KEY` 中指定密钥。
+
+要指定模型，可以使用 `model_uri` 参数，更多详情请参阅[文档](https://cloud.yandex.com/en/docs/yandexgpt/concepts/models#yandexgpt-generation)。
+
+默认情况下，系统会使用参数 `folder_id` 或环境变量 `YC_FOLDER_ID` 指定的文件夹中的最新版 `yandexgpt-lite`。
+
+```python
+from langchain_community.chat_models import ChatYandexGPT
+from langchain.messages import HumanMessage, SystemMessage
+```
+
+```python
+chat_model = ChatYandexGPT()
+```
+
+```python
+answer = chat_model.invoke(
+    [
+        SystemMessage(
+            content="你是一个将英语翻译成法语的助手。"
+        ),
+        HumanMessage(content="I love programming."),
+    ]
+)
+answer
+```
+
+```text
+AIMessage(content='Je adore le programmement.')
+```

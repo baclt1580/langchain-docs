@@ -1,0 +1,85 @@
+---
+title: "Google Routes 集成"
+description: "使用 LangChain JavaScript 与 Google Routes 工具集成。"
+---
+
+Google Routes 工具允许您的智能体利用 Google Routes API 来查找两个或多个目的地之间的路线。您可以获取步行、公共交通、汽车、摩托车和自行车的路线。
+
+## 设置
+
+您需要从 [Google 此处](https://developers.google.com/maps/documentation/places/web-service/overview) 获取 API 密钥，并 [启用 Routes API](https://console.cloud.google.com/apis/library/routes.googleapis.com)。然后，将您的 API 密钥设置为 `process.env.GOOGLE_ROUTES_API_KEY` 或作为 `apiKey` 构造函数参数传入。
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅 [此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+```typescript
+import { GoogleRoutesAPI } from "@langchain/community/tools/google_routes";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatOpenAI } from "@langchain/openai";
+import { AgentExecutor, createToolCallingAgent } from "@langchain/classic/agents";
+
+export async function run() {
+  const tools = [new GoogleRoutesAPI()];
+
+  const llm = new ChatOpenAI({
+    model: "gpt-3.5-turbo-0125",
+  });
+
+  const prompt = ChatPromptTemplate.fromMessages([
+    ["system", "您是一个有用的助手"],
+    ["placeholder", "{chat_history}"],
+    ["human", "{input}"],
+    ["placeholder", "{agent_scratchpad}"],
+  ]);
+
+  const agent = await createToolCallingAgent({
+    llm,
+    tools,
+    prompt,
+  });
+
+  const agentExecutor = new AgentExecutor({
+    agent,
+    tools,
+  });
+
+  const result = await agentExecutor.invoke({
+    input: "如何乘坐公共交通从埃菲尔铁塔到卢浮宫博物馆？",
+  });
+
+  console.log(result);
+
+  /* {
+    input: '如何乘坐公共交通从埃菲尔铁塔到卢浮宫博物馆？',
+    output: '要乘坐公共交通从埃菲尔铁塔前往卢浮宫博物馆，以下是路线信息：\n' +
+      '\n' +
+      '- 出发地：埃菲尔铁塔\n' +
+      '- 目的地：卢浮宫博物馆\n' +
+      '- 距离：4.1 公里\n' +
+      '- 时长：18 分钟\n' +
+      '- 公共交通票价：€2.15\n' +
+      '\n' +
+      '出行指引：\n' +
+      "1. 步行至 Pont d'Iéna\n" +
+      '2. 乘坐 72 路公交车前往 Gare de Lyon - Maison de La RATP\n' +
+      '3. 步行至目的地\n' +
+      '\n' +
+      '出发时间：22:03\n' +
+      '到达时间：22:15\n' +
+      '\n' +
+      '请按照这些指引从埃菲尔铁塔前往卢浮宫博物馆。'
+  } */
+}
+```
+
+## 相关
+
+- 工具 [概念指南](/oss/langchain/tools)
+- 工具 [操作指南](/oss/langchain/tools)

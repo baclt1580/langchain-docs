@@ -1,0 +1,51 @@
+---
+title: 模板
+description: 通过精选的 Fleet 模板快速上手，并自定义工具、提示词和渠道。
+---
+
+LangSmith Fleet 包含[入门模板](https://www.langchain.com/templates)，可帮助您快速创建智能体。这些模板针对常见用例预置了指令、[工具](/langsmith/fleet/tools)和[渠道](/langsmith/fleet/essentials#channels)（如适用）。您可以直接使用模板，或以其为基础进行自定义。
+
+<Tip>
+如果您是 Fleet 的新用户，建议从分步[快速入门](/langsmith/fleet/quickstart)开始，使用模板构建您的第一个智能体。
+</Tip>
+
+## 功能特性
+
+模板是针对特定用例预配置的智能体。每个模板包含以下组件：
+
+### 预配置工具
+
+模板附带一套精选的[工具](/langsmith/fleet/essentials#tools)，使智能体能够执行特定操作。例如，邮件助手模板包含用于阅读、发送和组织邮件的工具。工具通过 OAuth 认证连接到外部服务，使您的智能体能够与 Gmail、Slack 或 Linear 等应用交互。完整列表请参阅[支持的工具](/langsmith/fleet/tools)。
+
+### 系统指令
+
+每个模板都包含一个**系统提示词**（也称为**指令**），用于定义智能体的行为模式、个性特点和能力范围。系统提示词指导智能体如何解读用户请求并使用其可用工具。您可以根据具体需求自定义这些指令。
+
+### 渠道（可选）
+
+部分模板包含[渠道](/langsmith/fleet/essentials#channels)，允许智能体自动响应外部事件。例如，Slack 机器人模板可能包含一个渠道，当有人在 Slack 对话中提及该智能体时自动激活。渠道支持超越聊天交互的主动式智能体行为。
+
+### 克隆与自定义
+
+模板可作为起点，您可以通过克隆来创建自己的智能体。克隆模板时，会生成一个独立副本，您可以自由定制而不会影响原始模板。您可以修改提示词、增删工具、关联不同渠道以及切换模型，使智能体完全符合您的需求。
+
+## 可用模板
+
+<CardGroup cols={2}>
+  <Card title="每日日程简报" icon="calendar">
+    每日扫描您的日历并提供简明简报的智能体，包含会议详情和重要背景信息。
+  </Card>
+  <Card title="邮件助手" icon="mail">
+    自动处理邮件分类的智能体，可标记重要邮件、起草并发送回复以及安排会议。
+  </Card>
+  <Card title="领英招聘助手" icon="users">
+    自动化招聘流程的智能体，可解析候选人要求、根据反馈调整并输出候选人列表。
+  </Card>
+  <Card title="社交媒体AI监测" icon="news">
+    追踪 X 列表和 Hacker News 热门 AI 讨论的智能体，每日通过 Slack 消息推送重要更新。
+  </Card>
+</CardGroup>
+
+<Info>
+更多信息请参阅[模板](https://www.langchain.com/templates)。
+</Info>

@@ -1,0 +1,118 @@
+---
+title: "SurrealDB 集成"
+description: "使用 LangChain Python 与 SurrealDB 文档加载器集成。"
+---
+
+>[SurrealDB](https://surrealdb.com/) 是一款专为现代应用设计的端到端云原生数据库，适用于 Web、移动、无服务器、Jamstack、后端和传统应用。借助 SurrealDB，您可以简化数据库和 API 基础设施，减少开发时间，并快速、经济高效地构建安全、高性能的应用程序。
+>
+>**SurrealDB 的主要特性包括：**
+>
+>* **减少开发时间：** SurrealDB 通过消除对大多数服务器端组件的需求，简化了您的数据库和 API 技术栈，使您能够更快、更经济地构建安全、高性能的应用程序。
+>* **实时协作的 API 后端服务：** SurrealDB 既可作为数据库，也可作为 API 后端服务，支持实时协作。
+>* **支持多种查询语言：** SurrealDB 支持从客户端设备进行 SQL 查询、GraphQL、ACID 事务、WebSocket 连接、结构化和非结构化数据、图查询、全文索引和地理空间查询。
+>* **细粒度访问控制：** SurrealDB 提供基于行级权限的访问控制，使您能够精确管理数据访问。
+>
+>查看 [特性](https://surrealdb.com/features)、最新 [版本](https://surrealdb.com/releases) 和 [文档](https://surrealdb.com/docs)。
+
+本笔记本展示了如何使用与 `SurrealDBLoader` 相关的功能。
+
+## 概述
+
+SurrealDB 文档加载器从 SurrealDB 数据库返回一个 LangChain 文档列表。
+
+文档加载器接受以下可选参数：
+
+* `dburl`：连接到 WebSocket 端点的连接字符串。默认值：`ws://localhost:8000/rpc`
+* `ns`：命名空间名称。默认值：`langchain`
+* `db`：数据库名称。默认值：`database`
+* `table`：表名称。默认值：`documents`
+* `db_user`：SurrealDB 凭据（如果需要）：数据库用户名。
+* `db_pass`：SurrealDB 凭据（如果需要）：数据库密码。
+* `filter_criteria`：用于构建 `WHERE` 子句以过滤表中结果的字典。
+
+输出的 @[`Document`] 采用以下形式：
+
+```
+Document(
+    page_content=<包含结果文档的 JSON 编码字符串>,
+    metadata={
+        'id': <文档 ID>,
+        'ns': <命名空间名称>,
+        'db': <数据库名称>,
+        'table': <表名称>,
+        ... <来自文档 metadata 属性的其他字段>
+    }
+)
+```
+
+## 设置
+
+取消注释以下单元格以安装 surrealdb 和 langchain。
+
+```python
+# pip install -qU  surrealdb langchain langchain-community
+```
+
+```python
+# 在 Jupyter notebook 中运行时添加此导入
+import nest_asyncio
+
+nest_asyncio.apply()
+```
+
+```python
+import json
+
+from langchain_community.document_loaders.surrealdb import SurrealDBLoader
+```
+
+```python
+loader = SurrealDBLoader(
+    dburl="ws://localhost:8000/rpc",
+    ns="langchain",
+    db="database",
+    table="documents",
+    db_user="root",
+    db_pass="root",
+    filter_criteria={},
+)
+docs = loader.load()
+len(docs)
+```
+
+```text
+42
+```
+
+```python
+doc = docs[-1]
+doc.metadata
+```
+
+```text
+{'id': 'documents:zzz434sa584xl3b4ohvk',
+ 'source': '../../how_to/state_of_the_union.txt',
+ 'ns': 'langchain',
+ 'db': 'database',
+ 'table': 'documents'}
+```
+
+```python
+len(doc.page_content)
+```
+
+```text
+18078
+```
+
+```python
+page_content = json.loads(doc.page_content)
+```
+
+```python
+page_content["text"]
+```
+
+```text
+'当我们使用纳税人的钱重建美国时——我们将购买美国货：购买美国产品以支持美国就业。\n\n联邦政府每年花费约 6000 亿美元来保障国家的安全与稳定。\n\n近一个世纪以来，法律中一直有一项规定，\n以确保纳税人的资金支持美国就业和企业。\n\n每届政府都说他们会这么做，但我们实际上正在这么做。\n\n我们将购买美国货，以确保从航空母舰的甲板到高速公路护栏的钢材都是美国制造的。\n\n但为了竞争未来的最佳工作岗位，我们还需要与中国和其他竞争对手创造公平的竞争环境。\n\n这就是为什么通过国会正在审议的《两党创新法案》如此重要，该法案将在新兴技术和美国制造业上进行创纪录的投资。\n\n让我举一个例子来说明为什么通过它如此重要。'
+```

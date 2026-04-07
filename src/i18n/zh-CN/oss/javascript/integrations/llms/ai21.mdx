@@ -1,0 +1,38 @@
+---
+title: "AI21 集成"
+description: "使用 LangChain JavaScript 与 AI21 大语言模型集成。"
+---
+
+您可以通过[在 AI21 官网上注册](https://www.ai21.com/)获取 API 密钥，开始使用 AI21Labs 的 Jurassic 系列模型，并查看所有可用的基础模型列表。
+
+以下是在 LangChain.js 中初始化实例的示例：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此章节](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+```typescript
+import { AI21 } from "@langchain/community/llms/ai21";
+
+const model = new AI21({
+  ai21ApiKey: "YOUR_AI21_API_KEY", // 或设置为 process.env.AI21_API_KEY
+});
+
+const res = await model.invoke(`将 "I love programming" 翻译成德语。`);
+
+console.log({ res });
+
+/*
+  {
+    res: "\nIch liebe das Programmieren."
+  }
+ */
+```
+
+## 相关链接
+
+- [模型指南](/oss/langchain/models)

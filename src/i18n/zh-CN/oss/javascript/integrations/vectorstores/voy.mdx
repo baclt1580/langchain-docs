@@ -1,0 +1,76 @@
+---
+title: "Voy 集成"
+description: "使用 LangChain JavaScript 与 Voy 向量存储进行集成。"
+---
+
+[Voy](https://github.com/tantaraio/voy) 是一个用 Rust 编写的 WASM 向量相似性搜索引擎。
+它支持非 Node 环境，如浏览器。您可以将 Voy 作为向量存储与 LangChain.js 一起使用。
+
+### 安装 voy
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai voy-search @langchain/community @langchain/core
+```
+
+## 使用方法
+
+```typescript
+import { VoyVectorStore } from "@langchain/community/vectorstores/voy";
+import { Voy as VoyClient } from "voy-search";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Document } from "@langchain/core/documents";
+
+// 使用库创建 Voy 客户端。
+const voyClient = new VoyClient();
+// 创建嵌入
+const embeddings = new OpenAIEmbeddings();
+// 创建 Voy 存储。
+const store = new VoyVectorStore(voyClient, embeddings);
+
+// 添加两个带有元数据的文档。
+await store.addDocuments([
+  new Document({
+    pageContent: "生活对你怎么样？",
+    metadata: {
+      foo: "Mike",
+    },
+  }),
+  new Document({
+    pageContent: "而我却把它当成了个人恩怨...",
+    metadata: {
+      foo: "Testing",
+    },
+  }),
+]);
+
+const model = new OpenAIEmbeddings();
+const query = await model.embedQuery("而我却把它当成了个人恩怨");
+
+// 执行相似性搜索。
+const resultsWithScore = await store.similaritySearchVectorWithScore(query, 1);
+
+// 打印结果。
+console.log(JSON.stringify(resultsWithScore, null, 2));
+/*
+  [
+    [
+      {
+        "pageContent": "而我却把它当成了个人恩怨...",
+        "metadata": {
+          "foo": "Testing"
+        }
+      },
+      0
+    ]
+  ]
+*/
+```
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

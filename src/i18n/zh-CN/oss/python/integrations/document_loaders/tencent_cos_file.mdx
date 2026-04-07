@@ -1,0 +1,32 @@
+---
+title: "腾讯云 COS 文件集成"
+description: "使用 LangChain Python 集成腾讯云 COS 文件文档加载器。"
+---
+
+>[腾讯云对象存储（COS）](https://www.tencentcloud.com/products/cos) 是一种分布式存储服务，允许您通过 HTTP/HTTPS 协议从任何位置存储任意数量的数据。
+>`COS` 对数据结构或格式没有限制。它也没有存储桶大小限制和分区管理，几乎适用于任何用例，例如数据分发、数据处理和数据湖。
+>`COS` 提供基于 Web 的控制台、多语言 SDK 和 API、命令行工具以及图形化工具。它与 Amazon S3 API 兼容良好，使您能够快速访问社区工具和插件。
+
+本文介绍如何从 `腾讯云 COS 文件` 加载文档对象。
+
+```python
+pip install -qU  cos-python-sdk-v5
+```
+
+```python
+from langchain_community.document_loaders import TencentCOSFileLoader
+from qcloud_cos import CosConfig
+```
+
+```python
+conf = CosConfig(
+    Region="您的 COS 地域",
+    SecretId="您的 COS SecretId",
+    SecretKey="您的 COS SecretKey",
+)
+loader = TencentCOSFileLoader(conf=conf, bucket="您的 COS 存储桶", key="fake.docx")
+```
+
+```python
+loader.load()
+```

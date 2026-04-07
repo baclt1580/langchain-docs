@@ -12,6 +12,7 @@ from pathlib import Path
 
 from pipeline.commands.build import build_command
 from pipeline.commands.dev import dev_command
+from pipeline.commands.translate import translate_command
 from pipeline.tools.docusaurus_parser import convert_docusaurus_to_mintlify
 from pipeline.tools.links import drop_suffix_from_links, move_file_with_link_updates
 from pipeline.tools.notebook.convert import convert_notebook
@@ -268,6 +269,42 @@ def main() -> None:
         help="Watch for file changes",
     )
     build_parser.set_defaults(func=build_command)
+
+    # Translate command
+    translate_parser = subparsers.add_parser(
+        "translate",
+        help="Translate Markdown/MDX docs into src/i18n/<language>/",
+    )
+    translate_parser.add_argument(
+        "path",
+        nargs="?",
+        type=Path,
+        default=Path("src"),
+        help="Source file or directory to translate (default: src)",
+    )
+    translate_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force retranslation even when source hashes are unchanged",
+    )
+    translate_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be translated without writing files",
+    )
+    translate_parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Translate at most N files (0 = no limit)",
+    )
+    translate_parser.add_argument(
+        "--env-file",
+        type=Path,
+        default=None,
+        help="Path to dotenv file (default: project-root/.env)",
+    )
+    translate_parser.set_defaults(func=translate_command)
 
     # Move command
     mv_parser = subparsers.add_parser(

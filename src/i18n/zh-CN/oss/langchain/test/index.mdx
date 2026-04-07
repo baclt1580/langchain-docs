@@ -1,0 +1,27 @@
+---
+title: 测试
+sidebarTitle: 概述
+description: 测试 LangChain 代理的策略，包括单元测试、集成测试和轨迹评估。
+---
+
+代理应用让 LLM 自主决定解决问题的后续步骤。这种灵活性很强大，但模型的黑盒特性使得难以预测对代理某一部分的调整会如何影响整体。要构建生产就绪的代理，全面的测试至关重要。
+
+测试代理有以下几种方法：
+
+- **单元测试**：使用内存模拟对象，隔离测试代理中小的、确定性的部分，以便快速、确定地断言确切行为。
+- **集成测试**：通过真实的网络调用测试代理，确认组件协同工作、凭据和模式匹配、以及延迟可接受。
+- **评估**：使用评估器来评估代理的执行轨迹，可以通过确定性匹配或 LLM 作为评判者。
+
+代理应用往往更依赖集成测试，因为它们将多个组件链接在一起，并且必须处理由于 LLM 的非确定性特性而导致的波动性。
+
+<CardGroup cols={1}>
+    <Card title="单元测试" icon="flask" href="/oss/langchain/test/unit-testing" arrow>
+        模拟聊天模型并使用内存持久化来测试代理逻辑，无需 API 调用。
+    </Card>
+    <Card title="集成测试" icon="plug" href="/oss/langchain/test/integration-testing" arrow>
+        使用真实的 LLM API 测试您的代理。组织测试、管理密钥、处理波动性并控制成本。
+    </Card>
+    <Card title="评估" icon="scale" href="/oss/langchain/test/evals" arrow>
+        通过确定性匹配或 LLM 作为评判者的评估器来评估代理轨迹。
+    </Card>
+</CardGroup>

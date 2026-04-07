@@ -1,0 +1,77 @@
+---
+title: LangSmith 可观测性
+sidebarTitle: 概述
+mode: wide
+---
+
+import HostingSetup from '/snippets/langsmith/platform-setup-note.mdx';
+
+以下部分将帮助您设置和使用追踪、监控与可观测性功能：
+
+<Callout icon="plug" color="#4F46E5" iconType="regular">
+LangSmith 可与众多框架和供应商协同工作。浏览[可用集成](/langsmith/integrations)，连接您的技术栈，包括 OpenAI、Anthropic、CrewAI、Vercel AI SDK、Pydantic AI 等。
+</Callout>
+
+<Columns cols={3}>
+  <Card
+    title="设置追踪"
+    icon="settings"
+    href="/langsmith/observability-quickstart"
+    arrow="true"
+  >
+    通过基础选项、框架集成或高级设置来配置追踪，实现全面控制。
+  </Card>
+
+  <Card
+    title="查看追踪记录"
+    icon="route"
+    href="/langsmith/filter-traces-in-application"
+    arrow="true"
+  >
+    通过 UI 或 API 访问和管理追踪记录，使用筛选、导出、共享和比较工具。
+  </Card>
+
+  <Card
+    title="监控性能"
+    icon="chart-area"
+    href="/langsmith/dashboards"
+    arrow="true"
+  >
+    创建仪表盘并设置告警，以跟踪性能并在问题出现时获得通知。
+  </Card>
+
+  <Card
+    title="配置自动化"
+    icon="robot"
+    href="/langsmith/rules"
+    arrow="true"
+  >
+    使用规则、Webhook 和在线评估来简化可观测性工作流。
+  </Card>
+
+  <Card
+    title="收集反馈"
+    icon="users"
+    href="/langsmith/attach-user-feedback"
+    arrow="true"
+  >
+    通过队列和内联标注来收集和管理对输出的标注。
+  </Card>
+
+  <Card
+    title="追踪 RAG 应用"
+    icon="notebook"
+    href="/langsmith/observability-llm-tutorial"
+    arrow="true"
+  >
+    按照分步教程，从头到尾追踪一个检索增强生成（RAG）应用。
+  </Card>
+</Columns>
+
+有关术语定义和核心概念，请参阅[可观测性概念](/langsmith/observability-concepts)。
+
+<Callout type="info" icon="feather">
+使用 LangSmith 的 AI 助手 **[Polly](/langsmith/polly)** 来分析追踪记录，并获取关于您应用性能的 AI 驱动洞察。
+</Callout>
+
+<HostingSetup/>

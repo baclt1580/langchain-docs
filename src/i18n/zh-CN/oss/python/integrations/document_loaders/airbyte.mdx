@@ -1,0 +1,162 @@
+---
+title: "AirbyteLoader 集成"
+description: "使用 LangChain Python 集成 AirbyteLoader 文档加载器。"
+---
+
+>[Airbyte](https://github.com/airbytehq/airbyte) 是一个数据集成平台，用于从 API、数据库和文件到数据仓库与数据湖的 ELT 管道。它拥有最大的 ELT 连接器目录，支持多种数据仓库和数据库。
+
+本文介绍如何将 Airbyte 中的任何数据源加载到 LangChain 文档中。
+
+## 安装
+
+要使用 `AirbyteLoader`，你需要安装 `langchain-airbyte` 集成包。
+
+```python
+pip install -qU langchain-airbyte
+```
+
+注意：目前 `airbyte` 库不支持 Pydantic v2。
+请降级到 Pydantic v1 以使用此包。
+
+注意：此包目前还需要 Python 3.10+。
+
+## 加载文档
+
+默认情况下，`AirbyteLoader` 会从数据流加载任何结构化数据，并输出 YAML 格式的文档。
+
+```python
+from langchain_airbyte import AirbyteLoader
+
+loader = AirbyteLoader(
+    source="source-faker",
+    stream="users",
+    config={"count": 10},
+)
+docs = loader.load()
+print(docs[0].page_content[:500])
+```
+
+```text
+\`\`\`yaml
+academic_degree: PhD
+address:
+  city: Lauderdale Lakes
+  country_code: FI
+  postal_code: '75466'
+  province: New Jersey
+  state: Hawaii
+  street_name: Stoneyford
+  street_number: '1112'
+age: 44
+blood_type: "O\u2212"
+created_at: '2004-04-02T13:05:27+00:00'
+email: bread2099+1@outlook.com
+gender: Fluid
+height: '1.62'
+id: 1
+language: Belarusian
+name: Moses
+nationality: Dutch
+occupation: Track Worker
+telephone: 1-467-194-2318
+title: M.Sc.Tech.
+updated_at: '2024-02-27T16:41:01+00:00'
+weight: 6
+```
+
+你也可以指定自定义提示模板来格式化文档：
+
+```python
+from langchain_core.prompts import PromptTemplate
+
+loader_templated = AirbyteLoader(
+    source="source-faker",
+    stream="users",
+    config={"count": 10},
+    template=PromptTemplate.from_template(
+        "我的名字是 {name}，身高 {height} 米。"
+    ),
+)
+docs_templated = loader_templated.load()
+print(docs_templated[0].page_content)
+```
+
+```text
+我的名字是 Verdie，身高 1.73 米。
+```
+
+## 惰性加载文档
+
+`AirbyteLoader` 的一个强大功能是能够从上游源加载大型文档。处理大型数据集时，默认的 `.load()` 行为可能较慢且占用大量内存。为了避免这种情况，你可以使用 `.lazy_load()` 方法以更高效的方式加载文档。
+
+```python
+import time
+
+loader = AirbyteLoader(
+    source="source-faker",
+    stream="users",
+    config={"count": 3},
+    template=PromptTemplate.from_template(
+        "我的名字是 {name}，身高 {height} 米。"
+    ),
+)
+
+start_time = time.time()
+my_iterator = loader.lazy_load()
+print(
+    f"仅调用惰性加载很快！耗时 {time.time() - start_time:.4f} 秒"
+)
+```
+
+```text
+仅调用惰性加载很快！耗时 0.0001 秒
+```
+
+你可以在文档生成时进行迭代：
+
+```python
+for doc in my_iterator:
+    print(doc.page_content)
+```
+
+```text
+我的名字是 Andera，身高 1.91 米。
+我的名字是 Jody，身高 1.85 米。
+我的名字是 Zonia，身高 1.53 米。
+```
+
+你也可以使用 `.alazy_load()` 异步惰性加载文档：
+
+```python
+loader = AirbyteLoader(
+    source="source-faker",
+    stream="users",
+    config={"count": 3},
+    template=PromptTemplate.from_template(
+        "我的名字是 {name}，身高 {height} 米。"
+    ),
+)
+
+my_async_iterator = loader.alazy_load()
+
+async for doc in my_async_iterator:
+    print(doc.page_content)
+```
+
+```text
+我的名字是 Carmelina，身高 1.74 米。
+我的名字是 Ali，身高 1.90 米。
+我的名字是 Rochell，身高 1.83 米。
+```
+
+## 配置
+
+`AirbyteLoader` 支持以下配置选项：
+
+- `source`（字符串，必需）：要加载的 Airbyte 源名称。
+- `stream`（字符串，必需）：要加载的数据流名称（Airbyte 源可以返回多个数据流）
+- `config`（字典，必需）：Airbyte 源的配置
+- `template`（PromptTemplate，可选）：用于格式化文档的自定义提示模板
+- `include_metadata`（布尔值，可选，默认为 True）：是否将所有字段作为元数据包含在输出文档中
+
+大部分配置都在 `config` 中，你可以在 [Airbyte 文档](https://docs.airbyte.com/integrations/) 中每个源的“配置字段参考”部分找到具体的配置选项。

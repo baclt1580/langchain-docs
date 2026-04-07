@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Docs for the project",
   "private": true,
+  "scripts": {
+    "translate": "uv run python -m pipeline.cli translate"
+  },
   "dependencies": {
     "@langchain/docs-sandbox": "^0.0.21"
   }

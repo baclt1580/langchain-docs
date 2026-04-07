@@ -1,0 +1,156 @@
+---
+title: 升级安装
+sidebarTitle: 升级安装
+---
+
+如需进行常规升级，请遵循以下说明。某些版本可能有特定的升级要求，这些将在更具体的升级指南中详细说明。
+
+<Warning>
+官方不支持降级操作。LangSmith 升级可能包含数据库迁移和其他不向后兼容的变更。如需回滚到先前版本，请联系[技术支持](mailto:support@langchain.dev)获取指导。
+</Warning>
+
+## Kubernetes(Helm)
+
+如果尚未添加仓库，请运行以下命令添加：
+
+```bash
+helm repo add langchain https://langchain-ai.github.io/helm/
+```
+
+更新本地 Helm 仓库
+
+```bash
+helm repo update
+```
+
+根据新版本的更新要求，更新您的 Helm 图表配置文件。这些变更将在新版本的发布说明中详细列出。
+
+运行以下命令升级图表（将版本号替换为您要升级的目标版本）：
+
+<Note>
+如果使用的命名空间不是默认命名空间，您需要在 `helm` 和 `kubectl` 命令中使用 `-n <命名空间>` 标志来指定命名空间。
+</Note>
+
+查找图表的最新版本。您可以在 [LangSmith Helm Chart GitHub 仓库](https://github.com/langchain-ai/helm/releases) 中查找，或运行以下命令：
+
+```bash
+helm search repo langchain/langsmith --versions
+```
+
+您将看到类似如下的输出：
+
+```bash
+langchain/langsmith     0.10.14         0.10.32         用于部署 langsmith 应用的 Helm 图表...
+langchain/langsmith     0.10.13         0.10.32         用于部署 langsmith 应用的 Helm 图表...
+langchain/langsmith     0.10.12         0.10.32         用于部署 langsmith 应用的 Helm 图表...
+langchain/langsmith     0.10.11         0.10.29         用于部署 langsmith 应用的 Helm 图表...
+langchain/langsmith     0.10.10         0.10.29         用于部署 langsmith 应用的 Helm 图表...
+langchain/langsmith     0.10.9          0.10.29         用于部署 langsmith 应用的 Helm 图表...
+```
+
+选择要升级的目标版本（通常建议选择最新版本）并记录版本号。
+
+```bash
+helm upgrade <发布名称> langchain/langsmith --version <版本号> --values <values文件路径> --wait --debug
+```
+
+验证升级是否成功：
+
+```bash
+helm status <发布名称>
+```
+
+所有 Pod 应处于 `Running` 状态。验证 clickhouse 是否正在运行，且两个 `migrations` 任务均已完成。
+
+```bash
+kubectl get pods
+NAME                                     READY   STATUS      RESTARTS   AGE
+langsmith-backend-95b6d54f5-gz48b        1/1     Running     0          15h
+langsmith-pg-migrations-d2z6k            0/1     Completed   0          5h48m
+langsmith-ch-migrations-gasvk            0/1     Completed   0          5h48m
+langsmith-clickhouse-0                   1/1     Running     0          26h
+langsmith-frontend-84687d9d45-6cg4r      1/1     Running     0          15h
+langsmith-hub-backend-66ffb75fb4-qg6kl   1/1     Running     0          15h
+langsmith-playground-85b444d8f7-pl589    1/1     Running     0          15h
+langsmith-queue-d58cb64f7-87d68          1/1     Running     0          15h
+```
+
+### 验证部署：
+
+1. 运行 `kubectl get services`
+
+   输出应类似如下：
+
+```bash
+NAME                         TYPE           CLUSTER-IP       EXTERNAL-IP     PORT(S)                      AGE
+kubernetes                   ClusterIP      172.20.0.1       <none>          443/TCP                      27d
+langsmith-backend            ClusterIP      172.20.22.34     <none>          1984/TCP                     21d
+langsmith-clickhouse         ClusterIP      172.20.117.62    <none>          8123/TCP,9000/TCP            21d
+langsmith-frontend           LoadBalancer   172.20.218.30    <external ip>   80:30093/TCP,443:31130/TCP   21d
+langsmith-platform-backend   ClusterIP      172.20.232.183   <none>          1986/TCP                     21d
+langsmith-playground         ClusterIP      172.20.167.132   <none>          3001/TCP                     21d
+langsmith-postgres           ClusterIP      172.20.59.63     <none>          5432/TCP                     21d
+langsmith-redis              ClusterIP      172.20.229.98    <none>          6379/TCP                     20d
+```
+
+2. 对 `langsmith-frontend` 服务的外部 IP 执行 curl 命令：
+
+   ```bash
+   curl <外部 IP>/api/info
+   {"version":"0.5.7","license_expiration_time":"2033-05-20T20:08:06","batch_ingest_config":{"scale_up_qsize_trigger":1000,"scale_up_nthreads_limit":16,"scale_down_nempty_trigger":4,"size_limit":100,"size_limit_bytes":20971520}}
+   ```
+
+检查版本号是否与您升级的目标版本一致。
+
+3. 在浏览器中访问 `langsmith-frontend` 服务的外部 IP
+
+   LangSmith 用户界面应正常显示/运行
+
+   ![LangSmith 用户界面](/langsmith/images/langsmith-ui.png)
+
+## Docker
+
+升级 Docker 版本的 LangSmith 比 Helm 版本稍复杂，可能需要短暂的停机时间。请遵循以下说明升级您的 Docker 版本 LangSmith。
+
+1. 将您的 `docker-compose.yml` 文件更新为最新版本使用的文件。您可以在 [LangSmith SDK GitHub 仓库](https://github.com/langchain-ai/langsmith-sdk/blob/main/python/langsmith/cli/docker-compose.yaml) 中找到该文件
+2. 根据新版本要求，在 `.env` 文件中添加任何必需的新环境变量。这些将在新版本的发布说明中详细列出
+3. 运行以下命令停止当前的 LangSmith 实例：
+
+```bash
+docker-compose down
+```
+
+4. 运行以下命令在后台启动新的 LangSmith 实例：
+
+```bash
+docker-compose up -d
+```
+
+如果一切运行成功，您应该看到所有 LangSmith 容器都在运行且状态健康。
+
+```bash
+CONTAINER ID   IMAGE                                  COMMAND                  CREATED        STATUS                        PORTS                                                      NAMES
+e1c8f01a4ffc   langchain/langsmith-frontend:0.5.7     "/entrypoint.sh ngin…"   10 hours ago   Up 40 seconds                 0.0.0.0:80->80/tcp, 8080/tcp                               cli-langchain-frontend-1
+39e1394846b9   langchain/langsmith-backend:0.5.7      "/bin/sh -c 'exec uv…"   10 hours ago   Up 40 seconds                 0.0.0.0:1984->1984/tcp                                     cli-langchain-backend-1
+f8688dd58f2f   langchain/langsmith-go-backend:0.5.7   "./smith-go"             10 hours ago   Up 40 seconds                 0.0.0.0:1986->1986/tcp                                     cli-langchain-platform-backend-1
+006f1303b04d   langchain/langsmith-backend:0.5.7      "saq app.workers.que…"   10 hours ago   Up 40 seconds                                                                            cli-langchain-queue-1
+73a90242ed3a   redis:7                                "docker-entrypoint.s…"   10 hours ago   Up About a minute (healthy)   0.0.0.0:63791->6379/tcp                                    cli-langchain-redis-1
+eecf75ca672b   postgres:14.7                          "docker-entrypoint.s…"   10 hours ago   Up About a minute (healthy)   0.0.0.0:5433->5432/tcp                                     cli-langchain-db-1
+3aa5652a864d   clickhouse/clickhouse-server:23.9      "/entrypoint.sh"         10 hours ago   Up About a minute (healthy)   9009/tcp, 0.0.0.0:8124->8123/tcp, 0.0.0.0:9001->9000/tcp   cli-langchain-clickhouse-1
+84edc329a37f   langchain/langsmith-playground:0.5.7   "docker-entrypoint.s…"   10 hours ago   Up About a minute             0.0.0.0:3001->3001/tcp                                     cli-langchain-playground-1
+```
+
+### 验证部署：
+
+1. 对 `cli-langchain-frontend-1` 容器的暴露端口执行 curl 命令：
+
+   ```bash
+   curl localhost:80/info
+   {"version":"0.5.7","license_expiration_time":"2033-05-20T20:08:06","batch_ingest_config":{"scale_up_qsize_trigger":1000,"scale_up_nthreads_limit":16,"scale_down_nempty_trigger":4,"size_limit":100,"size_limit_bytes":20971520}}
+   ```
+
+2. 在浏览器中访问 `cli-langchain-frontend-1` 容器的暴露端口
+
+LangSmith 用户界面应正常显示/运行
+
+![LangSmith 用户界面](/langsmith/images/langsmith-ui.png)

@@ -1,0 +1,179 @@
+---
+title: "Decodo 集成"
+description: "使用 LangChain JavaScript 与 Decodo 工具集成。"
+---
+
+[@decodo/langchain-ts](https://www.npmjs.com/package/@decodo/langchain-ts) 包使开发者能够在 LangChain 应用中同时使用 Decodo 的 Web 爬虫 API。
+
+该 Web 爬虫 API 具有以下特点：
+
+- **便捷的网络数据访问**：简化从网站和在线资源获取信息的过程。
+- **地理灵活性**：不受地域限制访问内容。
+- **可靠的爬取能力**：采用先进技术避免被检测和拦截。
+
+## 功能特性
+
+@decodo/langchain-ts 插件提供以下功能：
+
+- **网页爬取**：爬取任意 URL 并获取 Markdown 内容
+- **谷歌搜索**：搜索谷歌并获取结构化结果
+- **亚马逊搜索**：搜索亚马逊并获取结构化产品数据
+- **地理位置选择**：用于获取对位置敏感的内容
+- **JavaScript 渲染**：针对需要真实浏览器的目标网站
+- **Markdown 输出**：以节省 token 的方式连接大语言模型
+
+## 安装
+
+```bash
+npm install @decodo/langchain-ts
+```
+
+## 快速开始
+
+要使用本项目中的工具，您需要订阅 [Decodo 高级网页爬虫 API](https://help.decodo.com/docs/web-scraping-api-core-and-advanced-plans)。可在 [控制面板](https://dashboard.decodo.com/) 申请免费试用。
+
+## 示例
+
+以下是每个工具的智能体使用示例。
+
+### 通用工具
+
+```typescript
+import dotenv from "dotenv";
+import { ChatOpenAI } from "@langchain/openai";
+import { createAgent } from "@langchain/agents";
+import { DecodoUniversalTool } from "@decodo/langchain-ts";
+
+dotenv.config();
+
+const main = async () => {
+  const username = process.env.SCRAPER_API_USERNAME!;
+  const password = process.env.SCRAPER_API_PASSWORD!;
+
+  const decodoUniversalTool = new DecodoUniversalTool({ username, password });
+
+  const model = new ChatOpenAI({
+    model: "gpt-4.1-mini",
+  });
+
+  const agent = createAgent({
+    llm: model,
+    tools: [decodoUniversalTool],
+  });
+
+  const result = await agent.invoke({
+    messages: [
+      {
+        role: "user",
+        content:
+          "scrape the wikipedia NBA 2025 season page and tell me who won in 2025?",
+      },
+    ],
+  });
+
+  console.log(result.messages[result.messages.length - 1].content);
+};
+
+if (require.main === module) {
+  main();
+}
+```
+
+更多示例请查看 GitHub 上的 [@decodo/langchain-ts](https://github.com/Decodo/decodo-langchain-ts) 仓库。
+
+## 谷歌搜索
+
+```typescript
+const main = async () => {
+  const username = process.env.SCRAPER_API_USERNAME!;
+  const password = process.env.SCRAPER_API_PASSWORD!;
+
+  const decodoGoogleSearchTool = new DecodoGoogleSearchTool({
+    username,
+    password,
+  });
+
+  const model = new ChatOpenAI({
+    model: "gpt-5-mini",
+  });
+
+  const agent = createAgent({
+    llm: model,
+    tools: [decodoGoogleSearchTool],
+  });
+
+  const prompt =
+    "which mobile service provider appears first on Google in Germany?";
+
+  const result = await agent.invoke({
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  console.log(result.messages[result.messages.length - 1].content);
+};
+```
+
+## 亚马逊搜索
+
+```typescript
+const main = async () => {
+  const username = process.env.SCRAPER_API_USERNAME!;
+  const password = process.env.SCRAPER_API_PASSWORD!;
+
+  const decodoAmazonSearchTool = new DecodoAmazonSearchTool({
+    username,
+    password,
+  });
+
+  const model = new ChatOpenAI({
+    model: "gpt-5-mini",
+  });
+
+  const agent = createAgent({
+    llm: model,
+    tools: [decodoAmazonSearchTool],
+  });
+
+  const prompt =
+    "What is the cheapest laptop with a GeForce RTX 5080 on Amazon in France?";
+
+  const result = await agent.invoke({
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  console.log(result.messages[result.messages.length - 1].content);
+};
+```
+
+## 配置
+
+所有工具都接受 `DecodoConfig` 对象：
+
+```typescript
+type DecodoConfig = {
+  username: string; // 您的 Web Advanced 产品用户名
+  password: string; // 您的 Web Advanced 产品密码
+};
+```
+
+## API 参数
+
+可用参数列表请参阅 [爬虫 API 文档](https://help.decodo.com/docs/web-scraping-api-parameters)
+
+## 许可证
+
+MIT
+
+## 支持
+
+如需支持，请访问 [Decodo 文档](https://help.decodo.com/) 或在 GitHub 上提交问题。

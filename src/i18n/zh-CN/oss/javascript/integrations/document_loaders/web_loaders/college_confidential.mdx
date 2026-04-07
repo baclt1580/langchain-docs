@@ -1,0 +1,24 @@
+---
+title: "College Confidential 集成"
+description: "使用 LangChain JavaScript 集成 College Confidential 文档加载器。"
+---
+
+本示例演示了如何使用 Cheerio 从 College Confidential 网站加载数据。每个页面将创建一个文档。
+
+## 设置
+
+```bash npm
+npm install @langchain/community @langchain/core cheerio
+```
+
+## 使用方式
+
+```typescript
+import { CollegeConfidentialLoader } from "@langchain/community/document_loaders/web/college_confidential";
+
+const loader = new CollegeConfidentialLoader(
+  "https://www.collegeconfidential.com/colleges/brown-university/"
+);
+
+const docs = await loader.load();
+```

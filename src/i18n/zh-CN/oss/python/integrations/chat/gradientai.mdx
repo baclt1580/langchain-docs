@@ -1,0 +1,148 @@
+---
+title: "ChatGradient 集成"
+description: "使用 LangChain Python 与 ChatGradient 聊天模型集成。"
+---
+
+本文将帮助您开始在 DigitalOcean Gradient 上使用 `ChatGradient` [聊天模型](/oss/langchain/models)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |
+| [DigitalOcean Gradient](https://python.langchain.com/docs/api_reference/llms/langchain_gradient.llms.LangchainGradient/) | [`langchain-gradient`](https://python.langchain.com/docs/api_reference/langchain-gradient_api_reference/) | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-gradient?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-gradient?style=flat-square&label=%20) |
+
+## 设置
+
+langchain-gradient 使用 DigitalOcean Gradient 平台。
+
+在 DigitalOcean 上创建一个账户，从 Gradient 平台获取 `DIGITALOCEAN_INFERENCE_KEY` API 密钥，并安装 `langchain-gradient` 集成包。
+
+### 凭证
+
+前往 [DigitalOcean 登录](https://cloud.digitalocean.com/login)
+
+1.  注册/登录 DigitalOcean 云控制台
+2.  进入 Gradient 平台并导航到 Serverless Inference。
+3.  点击 Create model access key，输入名称，然后创建密钥。
+
+完成此操作后，设置 `DIGITALOCEAN_INFERENCE_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+if not os.getenv("DIGITALOCEAN_INFERENCE_KEY"):
+    os.environ["DIGITALOCEAN_INFERENCE_KEY"] = getpass.getpass(
+        "输入您的 DIGITALOCEAN_INFERENCE_KEY API 密钥: "
+    )
+```
+
+如果您希望自动追踪模型调用，也可以通过取消注释以下代码来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥: ")
+```
+
+### 安装
+
+DigitalOcean Gradient 集成位于 `langchain-gradient` 包中：
+
+```python
+pip install -qU langchain-gradient
+```
+
+## 实例化
+
+现在我们可以实例化我们的模型对象并生成聊天补全：
+
+```python
+from langchain_gradient import ChatGradient
+
+llm = ChatGradient(
+    model="llama3.3-70b-instruct",
+    # 其他参数...
+)
+```
+
+## 调用
+
+```python
+messages = [
+    (
+        "system",
+        "你是一位富有创造力的故事讲述者。请以引人入胜且富有想象力的方式续写你收到的任何故事开头。",
+    ),
+    (
+        "human",
+        "从前，在一个神秘森林边缘的村庄里，一个名叫米拉的年轻女孩发现了一块发光的石头……",
+    ),
+]
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+```text
+AIMessage(content="...那块石头被隐藏了数个世纪，藏在一棵古树盘根错节的树根之中。米拉的手指一触碰到石头，她就感到一股突如其来的能量涌遍全身，如同决堤的河流。那块刚才还黯淡无光、毫无生气的石头，此刻却脉动着柔和、空灵的光芒，仿佛被米拉的触摸唤醒了。\n\n米拉好奇地把石头在手中翻来覆去，从各个角度仔细端详。石头散发出的光芒在她周围的树木上投下诡异的阴影，让她感觉自己正站在一个秘密世界的门槛上。当她凝视石头深处时，她开始注意到那光芒并非随机的颜色，而是一种深邃、浓郁的蓝色，仿佛在召唤着她。\n\n米拉不假思索地感到一股强烈的冲动，想要追随石头那柔和的光芒，它似乎正引导她深入那片神秘的森林。树木在她头顶高耸，树枝在风中吱呀作响、摇曳摆动，仿佛它们也在催促她前进。空气中弥漫着野花的甜香和猫头鹰轻柔的鸣叫，营造出一种既令人兴奋又令人不安的迷人氛围。\n\n随着米拉深入森林，石头的光芒越来越亮，照亮了一条在日渐微弱的天光下几乎看不见的蜿蜒小径。这里的树木长得更高、更密集，形成了一条由枝叶构成的隧道，似乎正引导她前往一个隐藏的目的地。米拉的心因兴奋和一丝恐惧而怦怦直跳，她意识到自己正被吸引进一个既神奇又未知的世界。\n\n突然，树木分开，米拉发现自己站在一片空地的边缘，周围环绕着一圈高耸的蘑菇，它们散发着柔和的发光光芒。空气中充满了微弱的嗡嗡声，如同成千上万只蜜蜂的嗡鸣，而她手中的石头脉动着一种超凡脱俗的能量。在空地的中央矗立着一棵巨大的树，树干因岁月而扭曲多节，树枝像大自然自己的大教堂一样伸向星空。\n\n米拉感到一阵敬畏之情涌上心头，她走近那棵树，手中仍紧握着那块石头。她能感觉到森林的魔力在她体内脉动，召唤着她，将她拉近谜团的核心。当她伸手触摸树干时，石头的光芒骤然增强到耀眼的强度，照亮了一直隐藏在树干中的一扇门……", additional_kwargs={}, response_metadata={'finish_reason': 'stop'}, id='run--593a6940-4c76-413b-bed9-1fd94f91c6c1-0', usage_metadata={'input_tokens': 82, 'output_tokens': 555, 'total_tokens': 637})
+```
+
+```python
+print(ai_msg.content)
+```
+
+```text
+...那块石头被隐藏了数个世纪，藏在一棵古树盘根错节的树根之中。米拉的手指一触碰到石头，她就感到一股突如其来的能量涌遍全身，如同决堤的河流。那块刚才还黯淡无光、毫无生气的石头，此刻却脉动着柔和、空灵的光芒，仿佛被米拉的触摸唤醒了。
+
+米拉好奇地把石头在手中翻来覆去，从各个角度仔细端详。石头散发出的光芒在她周围的树木上投下诡异的阴影，让她感觉自己正站在一个秘密世界的门槛上。当她凝视石头深处时，她开始注意到那光芒并非随机的颜色，而是一种深邃、浓郁的蓝色，仿佛在召唤着她。
+
+米拉不假思索地感到一股强烈的冲动，想要追随石头那柔和的光芒，它似乎正引导她深入那片神秘的森林。树木在她头顶高耸，树枝在风中吱呀作响、摇曳摆动，仿佛它们也在催促她前进。空气中弥漫着野花的甜香和猫头鹰轻柔的鸣叫，营造出一种既令人兴奋又令人不安的迷人氛围。
+
+随着米拉深入森林，石头的光芒越来越亮，照亮了一条在日渐微弱的天光下几乎看不见的蜿蜒小径。这里的树木长得更高、更密集，形成了一条由枝叶构成的隧道，似乎正引导她前往一个隐藏的目的地。米拉的心因兴奋和一丝恐惧而怦怦直跳，她意识到自己正被吸引进一个既神奇又未知的世界。
+
+突然，树木分开，米拉发现自己站在一片空地的边缘，周围环绕着一圈高耸的蘑菇，它们散发着柔和的发光光芒。空气中充满了微弱的嗡嗡声，如同成千上万只蜜蜂的嗡鸣，而她手中的石头脉动着一种超凡脱俗的能量。在空地的中央矗立着一棵巨大的树，树干因岁月而扭曲多节，树枝像大自然自己的大教堂一样伸向星空。
+
+米拉感到一阵敬畏之情涌上心头，她走近那棵树，手中仍紧握着那块石头。她能感觉到森林的魔力在她体内脉动，召唤着她，将她拉近谜团的核心。当她伸手触摸树干时，石头的光芒骤然增强到耀眼的强度，照亮了一直隐藏在树干中的一扇门……
+```
+
+## 链式调用
+
+我们可以像这样将我们的模型与提示模板链接起来：
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate(
+    [
+        (
+            "system",
+            '你是一位知识渊博的助手。请仔细阅读提供的上下文并回答用户的问题。如果答案存在于上下文中，请引用相关句子。如果不存在，请回复"未在上下文中找到。"',
+        ),
+        ("human", "上下文: {context}\n问题: {question}"),
+    ]
+)
+
+chain = prompt | llm
+chain.invoke(
+    {
+        "context": (
+            "埃菲尔铁塔位于巴黎，于1889年建成。"
+            "它由古斯塔夫·埃菲尔的工程公司设计。"
+            "这座塔是世界上最知名的建筑之一。"
+            "自由女神像是法国赠送给美国的礼物。"
+        ),
+        "question": "谁设计了埃菲尔铁塔，它是什么时候建成的？",
+    }
+)
+```
+
+```text
+AIMessage(content='埃菲尔铁塔由古斯塔夫·埃菲尔的工程公司设计，并于1889年建成。（句子："它由古斯塔夫·埃菲尔的工程公司设计。这座塔是世界上最知名的建筑之一。…… 埃菲尔铁塔位于巴黎，于1889年建成。"）', additional_kwargs={}, response_metadata={'finish_reason': 'stop'}, id='run--c23ffab6-06ae-4130-87b1-d5b2e7744906-0', usage_metadata={'input_tokens': 153, 'output_tokens': 74, 'total_tokens': 227})
+```
+
+---
+
+## API 参考
+
+有关 `ChatGradient` 所有功能和配置的详细文档，请参阅 API 参考。

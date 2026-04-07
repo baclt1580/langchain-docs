@@ -1,0 +1,174 @@
+---
+title: 排查追踪嵌套问题
+sidebarTitle: 排查追踪嵌套问题
+---
+
+在使用 LangSmith SDK、LangGraph 和 LangChain 进行追踪时，追踪上下文应自动正确传播，以便在父追踪中执行的代码能在 UI 中按预期位置显示。
+
+如果您发现子运行跳转到了独立的追踪中（并显示在顶层），可能是由以下已知的“边缘情况”之一导致的。
+
+## Python
+
+以下概述了使用 Python 构建时导致追踪“分裂”的常见原因。
+
+### 使用 asyncio 的上下文传播
+
+在 Python 版本 < 3.11 中使用异步调用（尤其是流式调用）时，可能会遇到追踪嵌套问题。这是因为 Python 的 `asyncio` 仅在 3.11 版本中[才完全支持上下文传递](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)。
+
+#### 原因
+
+LangChain 和 LangSmith SDK 使用 [contextvars](https://docs.python.org/3/library/contextvars.html) 隐式传播追踪信息。在 Python 3.11 及以上版本中，这可以无缝工作。然而，在较早版本（3.8、3.9、3.10）中，`asyncio` 任务缺乏适当的 `contextvar` 支持，可能导致追踪断开。
+
+#### 解决方法
+
+1. **升级 Python 版本（推荐）** 如果可能，升级到 Python 3.11 或更高版本，以获得自动的上下文传播。
+
+2. **手动传播上下文** 如果无法升级，您需要手动传播追踪上下文。具体方法取决于您的设置：
+
+   a) **使用 LangGraph 或 LangChain** 将父级 `config` 传递给子调用：
+
+   ```python
+   import asyncio
+   from langchain_core.runnables import RunnableConfig, RunnableLambda
+
+   @RunnableLambda
+   async def my_child_runnable(
+       inputs: str,
+       # config 参数（如下方的 parent_runnable 中所示）是可选的
+   ):
+       yield "A"
+       yield "response"
+
+   @RunnableLambda
+   async def parent_runnable(inputs: str, config: RunnableConfig):
+       async for chunk in my_child_runnable.astream(inputs, config):
+           yield chunk
+
+   async def main():
+       return [val async for val in parent_runnable.astream("call")]
+
+   asyncio.run(main())
+   ```
+
+   b) **直接使用 LangSmith** 直接传递运行树：
+
+   ```python
+   import asyncio
+   import langsmith as ls
+
+   @ls.traceable
+   async def my_child_function(inputs: str):
+       yield "A"
+       yield "response"
+
+   @ls.traceable
+   async def parent_function(
+       inputs: str,
+       # 运行树可以通过装饰器自动填充
+       run_tree: ls.RunTree,
+   ):
+       async for chunk in my_child_function(inputs, langsmith_extra={"parent": run_tree}):
+           yield chunk
+
+   async def main():
+       return [val async for val in parent_function("call")]
+
+   asyncio.run(main())
+   ```
+
+   c) **将装饰代码与 LangGraph/LangChain 结合使用** 结合使用多种技术进行手动传递：
+
+   ```python
+   import asyncio
+   import langsmith as ls
+   from langchain_core.runnables import RunnableConfig, RunnableLambda
+
+   @RunnableLambda
+   async def my_child_runnable(inputs: str):
+       yield "A"
+       yield "response"
+
+   @ls.traceable
+   async def my_child_function(inputs: str, run_tree: ls.RunTree):
+       with ls.tracing_context(parent=run_tree):
+           async for chunk in my_child_runnable.astream(inputs):
+               yield chunk
+
+   @RunnableLambda
+   async def parent_runnable(inputs: str, config: RunnableConfig):
+       # 被 @traceable 装饰的函数在通过 "config" 传入时可以直接接受 RunnableConfig
+       async for chunk in my_child_function(inputs, langsmith_extra={"config": config}):
+           yield chunk
+
+   @ls.traceable
+   async def parent_function(inputs: str, run_tree: ls.RunTree):
+       # 您可以手动设置追踪上下文
+       with ls.tracing_context(parent=run_tree):
+           async for chunk in parent_runnable.astream(inputs):
+               yield chunk
+
+   async def main():
+       return [val async for val in parent_function("call")]
+
+   asyncio.run(main())
+   ```
+
+### 使用线程的上下文传播
+
+通常，在启动追踪后，可能希望在一个追踪内对子任务应用某种并行处理。Python 标准库的 `ThreadPoolExecutor` 默认会破坏追踪。
+
+#### 原因
+
+Python 的 contextvars 在新线程中初始为空。以下是两种保持追踪连续性的方法：
+
+#### 解决方法
+
+1. **使用 LangSmith 的 ContextThreadPoolExecutor**
+
+   LangSmith 提供了 `ContextThreadPoolExecutor`，可自动处理上下文传播：
+
+   ```python
+   from langsmith.utils import ContextThreadPoolExecutor
+   from langsmith import traceable
+
+   @traceable
+   def outer_func():
+       with ContextThreadPoolExecutor() as executor:
+           inputs = [1, 2]
+           r = list(executor.map(inner_func, inputs))
+
+   @traceable
+   def inner_func(x):
+       print(x)
+
+   outer_func()
+   ```
+
+2. **手动提供父运行树**
+
+   或者，您可以手动将父运行树传递给内部函数：
+
+   ```python
+   from langsmith import traceable, get_current_run_tree
+   from concurrent.futures import ThreadPoolExecutor
+
+   @traceable
+   def outer_func():
+       rt = get_current_run_tree()
+       with ThreadPoolExecutor() as executor:
+           r = list(
+               executor.map(
+                   lambda x: inner_func(x, langsmith_extra={"parent": rt}), [1, 2]
+               )
+           )
+
+   @traceable
+   def inner_func(x):
+       print(x)
+
+   outer_func()
+   ```
+
+   在这种方法中，我们使用 `get_current_run_tree()` 获取当前运行树，并通过 `langsmith_extra` 参数将其传递给内部函数。
+
+两种方法都能确保内部函数调用即使在单独线程中执行，也能正确聚合到初始追踪栈下。

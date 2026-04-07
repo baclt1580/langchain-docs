@@ -1,0 +1,46 @@
+---
+title: 工作空间设置
+description: 为 Fleet 使用的模型和工具添加所需的工作空间密钥。
+---
+
+本页面列出了在使用 LangSmith Fleet 前需要添加的工作空间密钥。请在 LangSmith 工作空间设置的“密钥”部分添加这些密钥。请将密钥值限定在工作空间范围内，避免将凭据放置在提示词或代码中。
+
+## 添加工作空间密钥
+
+在 [LangSmith UI](https://smith.langchain.com) 中，请确保您已将一个 LLM API 密钥设置为[工作空间密钥](/langsmith/set-up-hierarchy#configure-workspace-settings)（可以是 Anthropic 或 OpenAI 的 API 密钥）。
+
+1.  导航至 <Icon icon="settings" /> **设置**，然后切换到 **密钥** 标签页。
+1.  选择 **添加密钥**，输入 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY` 作为**名称**，并将您的 API 密钥作为**值**。
+1.  选择 **保存密钥**。
+
+<Note> 在 LangSmith UI 中添加工作空间密钥时，请确保密钥名称与您的模型提供商所期望的环境变量名称相匹配。</Note>
+
+## 密钥类型
+
+### 必需的模型密钥
+
+为了让 Fleet 能够向 LLM 发起 API 调用，您需要将 OpenAI 或 Anthropic 的 API 密钥设置为工作空间密钥。智能体图会从工作空间密钥中加载此密钥以进行推理。
+
+<Note icon="wand" iconType="regular">
+  Fleet 支持为每个智能体配置自定义模型。更多信息请参阅[自定义模型](/langsmith/fleet/essentials#custom-models)。
+</Note>
+
+### 智能体构建器专用密钥
+
+以 `FLEET_` 为前缀的密钥在 Fleet 内部具有比工作空间密钥更高的优先级。这样，您可以更好地追踪 Fleet 与使用相同密钥的 LangSmith 其他部分的使用情况。
+
+如果您同时拥有 `OPENAI_API_KEY` 和 `FLEET_OPENAI_API_KEY`，系统将使用 `FLEET_OPENAI_API_KEY` 密钥。
+
+### 可选工具密钥
+
+为您启用的任何工具添加相应的密钥。这些密钥会在运行时从工作空间密钥中读取。
+
+- `EXA_API_KEY`：Exa 搜索工具（通用网页和 LinkedIn 个人资料搜索）所必需。
+- `TAVILY_API_KEY`：Tavily 网页搜索所必需。
+- `TWITTER_API_KEY` 和 `TWITTER_API_KEY_SECRET`：Twitter/X 读取操作（仅应用持有者）所必需。发帖/媒体上传功能未启用。
+
+### MCP 服务器配置
+
+Fleet 可以从一个或多个远程[模型上下文协议 (MCP)](https://modelcontextprotocol.io/) 服务器拉取工具。请在您的[工作空间](/langsmith/administration-overview#workspaces)设置中配置 MCP 服务器和请求头。Fleet 会自动发现工具，并在调用它们时应用已配置的请求头。
+
+更多信息，请参阅[远程 MCP 服务器](/langsmith/fleet/remote-mcp-servers)页面。

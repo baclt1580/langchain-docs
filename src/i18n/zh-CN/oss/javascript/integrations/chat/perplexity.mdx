@@ -1,0 +1,131 @@
+---
+title: "ChatPerplexity 集成"
+description: "使用 LangChain JavaScript 集成 ChatPerplexity 聊天模型。"
+---
+
+本指南将帮助您开始使用 Perplexity [聊天模型](/oss/langchain/models)。有关 `ChatPerplexity` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/chat_models/perplexity/ChatPerplexity)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | [Python 支持](https://python.langchain.com/docs/integrations/chat/perplexity/) | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| [`ChatPerplexity`](https://reference.langchain.com/javascript/langchain-community/chat_models/perplexity/ChatPerplexity) | [`@langchain/community`](https://npmjs.com/@langchain/community) | beta | ✅ | ![NPM - Downloads](https://img.shields.io/npm/dm/@langchain/community?style=flat-square&label=%20&) | ![NPM - Version](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+### 模型功能
+
+请参阅下表标题中的链接，了解如何使用特定功能的指南。
+
+| [工具调用](/oss/langchain/tools) | [结构化输出](/oss/langchain/structured-output) | [图像输入](/oss/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/langchain/streaming/) | [令牌使用量](/oss/langchain/models#token-usage) | [对数概率](/oss/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: |
+| ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+
+请注意，截至撰写时，Perplexity 仅在某些使用层级上支持结构化输出。
+
+## 设置
+
+要访问 Perplexity 模型，您需要创建一个 Perplexity 账户，获取 API 密钥，并安装 `@langchain/community` 集成包。
+
+### 凭证
+
+前往 [https://perplexity.ai](https://perplexity.ai) 注册 Perplexity 并生成 API 密钥。完成后，设置 `PERPLEXITY_API_KEY` 环境变量：
+
+```bash
+export PERPLEXITY_API_KEY="your-api-key"
+```
+
+如果您希望自动追踪模型调用，还可以通过取消注释以下行来设置 [LangSmith](/langsmith/home) API 密钥：
+
+```bash
+# export LANGSMITH_TRACING="true"
+# export LANGSMITH_API_KEY="your-api-key"
+```
+
+### 安装
+
+LangChain Perplexity 集成位于 `@langchain/community` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/core
+```
+```bash yarn
+yarn add @langchain/community @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/core
+```
+</CodeGroup>
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+```typescript
+import { ChatPerplexity } from "@langchain/community/chat_models/perplexity"
+
+const llm = new ChatPerplexity({
+  model: "sonar",
+  temperature: 0,
+  maxTokens: undefined,
+  timeout: undefined,
+  maxRetries: 2,
+  // 其他参数...
+})
+```
+
+## 调用
+
+```typescript
+const aiMsg = await llm.invoke([
+  {
+    role: "system",
+    content: "你是一个将英语翻译成法语的助手。请翻译用户的句子。",
+  },
+  {
+    role: "user",
+    content: "I love programming.",
+  },
+])
+aiMsg
+```
+
+```text
+AIMessage {
+  "id": "run-71853938-aa30-4861-9019-f12323c09f9a",
+  "content": "J'adore la programmation.",
+  "additional_kwargs": {
+    "citations": [
+      "https://careersatagoda.com/blog/why-we-love-programming/",
+      "https://henrikwarne.com/2012/06/02/why-i-love-coding/",
+      "https://forum.freecodecamp.org/t/i-love-programming-but/497502",
+      "https://ilovecoding.org",
+      "https://thecodinglove.com"
+    ]
+  },
+  "response_metadata": {
+    "tokenUsage": {
+      "promptTokens": 20,
+      "completionTokens": 9,
+      "totalTokens": 29
+    }
+  },
+  "tool_calls": [],
+  "invalid_tool_calls": []
+}
+```
+
+```typescript
+console.log(aiMsg.content)
+```
+
+```text
+J'adore la programmation.
+```
+
+---
+
+## API 参考
+
+有关 `ChatPerplexity` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/chat_models/perplexity/ChatPerplexity)。

@@ -1,0 +1,105 @@
+---
+title: "Milvus 集成"
+description: "使用 LangChain JavaScript 与 Milvus 向量存储进行集成。"
+---
+
+[Milvus](https://milvus.io/) 是一个专为嵌入相似性搜索和 AI 应用构建的向量数据库。
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+## 设置步骤
+
+1. 在您的计算机上使用 Docker 运行 Milvus 实例 [文档](https://milvus.io/docs/v2.1.x/install_standalone-docker.md)
+2. 安装 Milvus Node.js SDK。
+
+   ```bash npm
+   npm install -S @zilliz/milvus2-sdk-node
+   ```
+3. 在运行代码前设置 Milvus 的环境变量
+
+   3.1 OpenAI
+
+   ```bash
+   export OPENAI_API_KEY=您的_OPENAI_API_密钥
+   export MILVUS_URL=您的_MILVUS_URL # 例如 http://localhost:19530
+   ```
+
+   3.2 Azure OpenAI
+
+   ```bash
+   export AZURE_OPENAI_API_KEY=您的_AZURE_OPENAI_API_密钥
+   export AZURE_OPENAI_API_INSTANCE_NAME=您的_AZURE_OPENAI_实例名称
+   export AZURE_OPENAI_API_DEPLOYMENT_NAME=您的_AZURE_OPENAI_部署名称
+   export AZURE_OPENAI_API_COMPLETIONS_DEPLOYMENT_NAME=您的_AZURE_OPENAI_补全部署名称
+   export AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME=您的_AZURE_OPENAI_嵌入部署名称
+   export AZURE_OPENAI_API_VERSION=您的_AZURE_OPENAI_API_版本
+   export AZURE_OPENAI_BASE_PATH=您的_AZURE_OPENAI_基础路径
+   export MILVUS_URL=您的_MILVUS_URL # 例如 http://localhost:19530
+   ```
+
+## 索引与查询文档
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此章节](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/core
+```
+```typescript
+import { Milvus } from "@langchain/classic/vectorstores/milvus";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+// 来自《哥德尔、埃舍尔、巴赫》的文本示例
+const vectorStore = await Milvus.fromTexts(
+  [
+    "乌龟：迷宫？迷宫？难道我们是在那个可怕牛头怪 notorious Little\
+            Harmonic Labyrinth 里吗？",
+    "阿喀琉斯：哎呀！那是什么？",
+    "乌龟：据说——虽然我个人从不相信——一个牛头怪\
+            创造了一个微小的迷宫，坐在迷宫中央的坑里，\
+            等待无辜的受害者在它可怕的复杂结构中迷路。\
+            然后，当他们晕头转向地走到中心时，它就会大笑，\
+            笑得那么厉害，以至于把他们笑死！",
+    "阿喀琉斯：哦，不！",
+    "乌龟：但这只是个神话。勇敢点，阿喀琉斯。",
+  ],
+  [{ id: 2 }, { id: 1 }, { id: 3 }, { id: 4 }, { id: 5 }],
+  new OpenAIEmbeddings(),
+  {
+    collectionName: "goldel_escher_bach",
+  }
+);
+
+// 或者也可以从文档创建
+const vectorStore = await Milvus.fromDocuments(docs, new OpenAIEmbeddings(), {
+  collectionName: "goldel_escher_bach",
+});
+
+const response = await vectorStore.similaritySearch("害怕", 2);
+```
+
+## 从现有集合查询文档
+
+```typescript
+import { Milvus } from "@langchain/classic/vectorstores/milvus";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const vectorStore = await Milvus.fromExistingCollection(
+  new OpenAIEmbeddings(),
+  {
+    collectionName: "goldel_escher_bach",
+  }
+);
+
+const response = await vectorStore.similaritySearch("害怕", 2);
+```
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

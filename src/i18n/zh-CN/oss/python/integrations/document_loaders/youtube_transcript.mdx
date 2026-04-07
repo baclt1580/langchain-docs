@@ -1,0 +1,117 @@
+---
+title: "YouTube 字幕集成"
+description: "使用 LangChain Python 集成 YouTube 字幕文档加载器。"
+---
+
+>[YouTube](https://www.youtube.com/) 是一个由 Google 创建的在线视频分享和社交媒体平台。
+
+本笔记本介绍了如何从 `YouTube 字幕` 加载文档。
+
+```python
+from langchain_community.document_loaders import YoutubeLoader
+```
+
+```python
+pip install -qU  youtube-transcript-api
+```
+
+```python
+loader = YoutubeLoader.from_youtube_url(
+    "https://www.youtube.com/watch?v=QsYGlZkevEg", add_video_info=False
+)
+```
+
+```python
+loader.load()
+```
+
+### 添加视频信息
+
+```python
+pip install -qU  pytube
+```
+
+```python
+loader = YoutubeLoader.from_youtube_url(
+    "https://www.youtube.com/watch?v=QsYGlZkevEg", add_video_info=True
+)
+loader.load()
+```
+
+### 添加语言偏好设置
+
+language 参数：这是一个语言代码列表，按优先级降序排列，默认为 `en`。
+
+translation 参数：这是一个翻译偏好设置，您可以将可用的字幕翻译成您偏好的语言。
+
+```python
+loader = YoutubeLoader.from_youtube_url(
+    "https://www.youtube.com/watch?v=QsYGlZkevEg",
+    add_video_info=True,
+    language=["en", "id"],
+    translation="en",
+)
+loader.load()
+```
+
+### 获取带时间戳的文本块
+
+获取一个或多个 @[`Document`] 对象，每个对象包含视频字幕的一个块。可以指定每个块的时长（以秒为单位）。每个块的元数据包含 YouTube 上视频的 URL，该 URL 将从特定块的开始处播放视频。
+
+`transcript_format` 参数：`langchain_community.document_loaders.youtube.TranscriptFormat` 值之一。在本例中为 `TranscriptFormat.CHUNKS`。
+
+`chunk_size_seconds` 参数：每个字幕数据块代表的视频秒数（整数）。默认为 120 秒。
+
+```python
+from langchain_community.document_loaders.youtube import TranscriptFormat
+
+loader = YoutubeLoader.from_youtube_url(
+    "https://www.youtube.com/watch?v=TKCMw0utiak",
+    add_video_info=True,
+    transcript_format=TranscriptFormat.CHUNKS,
+    chunk_size_seconds=30,
+)
+print("\n\n".join(map(repr, loader.load())))
+```
+
+## 来自 Google 云端的 YouTube 加载器
+
+### 先决条件
+
+1. 创建一个 Google Cloud 项目或使用现有项目
+1. 启用 [YouTube API](https://console.cloud.google.com/apis/enableflow?apiid=youtube.googleapis.com&project=sixth-grammar-344520)
+1. [为桌面应用程序授权凭据](https://developers.google.com/drive/api/quickstart/python#authorize_credentials_for_a_desktop_application)
+1. `pip install -U google-api-python-client google-auth-httplib2 google-auth-oauthlib youtube-transcript-api`
+
+### 🧑 摄取 Google 文档数据的说明
+
+默认情况下，`GoogleDriveLoader` 期望 `credentials.json` 文件位于 `~/.credentials/credentials.json`，但这可以通过 `credentials_file` 关键字参数进行配置。`token.json` 文件同理。请注意，`token.json` 将在您首次使用加载器时自动创建。
+
+`GoogleApiYoutubeLoader` 可以从 Google 文档 ID 列表或文件夹 ID 加载。您可以从 URL 获取您的文件夹和文档 ID：
+注意：根据您的设置，可能需要设置 `service_account_path`。有关更多详细信息，请参阅 [Google Drive API v3 快速入门](https://developers.google.com/drive/api/v3/quickstart/python)。
+
+```python
+# 初始化 GoogleApiClient
+from pathlib import Path
+
+from langchain_community.document_loaders import GoogleApiClient, GoogleApiYoutubeLoader
+
+google_api_client = GoogleApiClient(credentials_path=Path("your_path_creds.json"))
+
+
+# 使用频道
+youtube_loader_channel = GoogleApiYoutubeLoader(
+    google_api_client=google_api_client,
+    channel_name="Reducible",
+    captions_language="en",
+)
+
+# 使用 YouTube ID
+
+youtube_loader_ids = GoogleApiYoutubeLoader(
+    google_api_client=google_api_client, video_ids=["TrdevFK_am4"], add_video_info=True
+)
+
+# 返回一个 Document 列表
+youtube_loader_channel.load()
+```

@@ -1,0 +1,448 @@
+---
+title: 追踪 Vercel AI SDK 应用（仅限 JS/TS）
+sidebarTitle: Vercel AI SDK
+---
+
+你可以使用 LangSmith 来追踪 Vercel AI SDK 的运行。本指南将通过一个示例进行说明。
+
+## 安装
+
+<Note>
+此包装器要求 AI SDK v5 和 `langsmith>=0.3.63`。如果你使用的是旧版本的 AI SDK 或 `langsmith`，请参阅基于 OpenTelemetry (OTEL) 的方法[在此页面](/langsmith/legacy-trace-with-vercel-ai-sdk)。
+</Note>
+
+安装 Vercel AI SDK。本指南在下面的代码片段中使用 Vercel 的 OpenAI 集成，但你也可以使用他们的其他任何选项。
+
+<CodeGroup>
+
+```bash npm
+npm install ai @ai-sdk/openai zod
+```
+
+```bash yarn
+yarn add ai @ai-sdk/openai zod
+```
+
+```bash pnpm
+pnpm add ai @ai-sdk/openai zod
+```
+
+</CodeGroup>
+
+## 环境配置
+
+<CodeGroup>
+
+```bash Shell
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=<你的-api-key>
+
+# 示例使用 OpenAI，但你可以使用任何选择的 LLM 提供商
+export OPENAI_API_KEY=<你的-openai-api-key>
+
+# 对于链接到多个工作空间的 LangSmith API 密钥，设置 LANGSMITH_WORKSPACE_ID 环境变量以指定要使用的工作空间。
+export LANGSMITH_WORKSPACE_ID=<你的-workspace-id>
+```
+
+</CodeGroup>
+
+## 基本设置
+
+导入并包装 AI SDK 方法，然后像往常一样使用它们：
+
+```typescript
+import { openai } from "@ai-sdk/openai";
+import * as ai from "ai";
+
+import { wrapAISDK } from "langsmith/experimental/vercel";
+
+const { generateText, streamText, generateObject, streamObject } =
+  wrapAISDK(ai);
+
+await generateText({
+  model: openai("gpt-5-nano"),
+  prompt: "为 4 人写一份素食千层面食谱。",
+});
+```
+
+你应该能在 LangSmith 仪表板中看到一个追踪记录，[类似这样](https://smith.langchain.com/public/4f0e689e-c801-44d3-8857-93b47ab100cc/r)。
+
+你也可以追踪带有工具调用的运行：
+
+```typescript
+import * as ai from "ai";
+import { tool, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+
+import { wrapAISDK } from "langsmith/experimental/vercel";
+
+const { generateText, streamText, generateObject, streamObject } =
+  wrapAISDK(ai);
+
+await generateText({
+  model: openai("gpt-5-nano"),
+  messages: [
+    {
+      role: "user",
+      content: "我的订单是什么？它们在哪里？我的用户 ID 是 123",
+    },
+  ],
+  tools: {
+    listOrders: tool({
+      description: "列出所有订单",
+      inputSchema: z.object({ userId: z.string() }),
+      execute: async ({ userId }) =>
+        `用户 ${userId} 有以下订单：1`,
+    }),
+    viewTrackingInformation: tool({
+      description: "查看特定订单的跟踪信息",
+      inputSchema: z.object({ orderId: z.string() }),
+      execute: async ({ orderId }) =>
+        `这是订单 ${orderId} 的跟踪信息`,
+    }),
+  },
+  stopWhen: stepCountIs(5),
+});
+```
+
+这将产生一个追踪记录，[类似这样](https://smith.langchain.com/public/6075fa2c-d255-4885-a66a-4fc798afaa9f/r)。
+
+你可以像往常一样使用其他 AI SDK 方法。
+
+### 使用 `traceable`
+
+你可以在 AI SDK 调用周围或 AI SDK 工具调用内部包装 `traceable` 调用。如果你想在 LangSmith 中将运行分组，这很有用：
+
+```typescript
+import * as ai from "ai";
+import { tool, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+
+import { traceable } from "langsmith/traceable";
+import { wrapAISDK } from "langsmith/experimental/vercel";
+
+const { generateText, streamText, generateObject, streamObject } =
+  wrapAISDK(ai);
+
+const wrapper = traceable(async (input: string) => {
+  const { text } = await generateText({
+    model: openai("gpt-5-nano"),
+    messages: [
+      {
+        role: "user",
+        content: input,
+      },
+    ],
+    tools: {
+      listOrders: tool({
+        description: "列出所有订单",
+        inputSchema: z.object({ userId: z.string() }),
+        execute: async ({ userId }) =>
+          `用户 ${userId} 有以下订单：1`,
+      }),
+      viewTrackingInformation: tool({
+        description: "查看特定订单的跟踪信息",
+        inputSchema: z.object({ orderId: z.string() }),
+        execute: async ({ orderId }) =>
+          `这是订单 ${orderId} 的跟踪信息`,
+      }),
+    },
+    stopWhen: stepCountIs(5),
+  });
+  return text;
+}, {
+  name: "wrapper",
+});
+
+await wrapper("我的订单是什么？它们在哪里？我的用户 ID 是 123。");
+```
+
+生成的追踪记录将[类似这样](https://smith.langchain.com/public/ff25bc26-9389-4798-8b91-2bdcc95d4a8e/r)。
+
+## 在无服务器环境中追踪
+
+在无服务器环境中追踪时，必须在环境关闭前等待所有运行刷新完毕。为此，你可以在包装 AI SDK 方法时传递一个 LangSmith [`Client`](https://docs.smith.langchain.com/reference/js/classes/client.Client) 实例，然后调用 `await client.awaitPendingTraceBatches()`。
+确保也将其传递给你创建的任何 `traceable` 包装器：
+
+```typescript
+import * as ai from "ai";
+import { tool, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+
+import { Client } from "langsmith";
+import { traceable } from "langsmith/traceable";
+import { wrapAISDK } from "langsmith/experimental/vercel";
+
+const client = new Client();
+
+const { generateText, streamText, generateObject, streamObject } =
+  wrapAISDK(ai, { client });
+
+const wrapper = traceable(async (input: string) => {
+  const { text } = await generateText({
+    model: openai("gpt-5-nano"),
+    messages: [
+      {
+        role: "user",
+        content: input,
+      },
+    ],
+    tools: {
+      listOrders: tool({
+        description: "列出所有订单",
+        inputSchema: z.object({ userId: z.string() }),
+        execute: async ({ userId }) =>
+          `用户 ${userId} 有以下订单：1`,
+      }),
+      viewTrackingInformation: tool({
+        description: "查看特定订单的跟踪信息",
+        inputSchema: z.object({ orderId: z.string() }),
+        execute: async ({ orderId }) =>
+          `这是订单 ${orderId} 的跟踪信息`,
+      }),
+    },
+    stopWhen: stepCountIs(5),
+  });
+  return text;
+}, {
+  name: "wrapper",
+  client,
+});
+
+try {
+  await wrapper("我的订单是什么？它们在哪里？我的用户 ID 是 123。");
+} finally {
+  await client.awaitPendingTraceBatches();
+}
+```
+
+如果你使用 `Next.js`，有一个方便的 [`after`](https://nextjs.org/docs/app/api-reference/functions/after) 钩子，你可以在其中放置此逻辑：
+
+```typescript
+import { after } from "next/server"
+import { Client } from "langsmith";
+
+
+export async function POST(request: Request) {
+  const client = new Client();
+
+  ...
+
+  after(async () => {
+    await client.awaitPendingTraceBatches();
+  });
+
+  return new Response(JSON.stringify({ ... }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+};
+```
+
+有关更多详细信息，包括在无服务器环境中管理速率限制的信息，请参阅[在无服务器环境中追踪 JS 函数](/langsmith/serverless-environments)。
+
+## 传递 LangSmith 配置
+
+你可以通过 `providerOptions.langsmith` 在初始包装 AI SDK 方法时以及运行它们时传递 LangSmith 特定的配置。这包括元数据（稍后可用于在 LangSmith 中过滤运行）、顶级运行名称、标签、自定义客户端实例等。
+
+包装时传递的配置将应用于你使用包装方法进行的所有未来调用：
+
+```typescript
+import { openai } from "@ai-sdk/openai";
+import * as ai from "ai";
+
+import { wrapAISDK } from "langsmith/experimental/vercel";
+
+const { generateText, streamText, generateObject, streamObject } =
+  wrapAISDK(ai, {
+    metadata: {
+      key_for_all_runs: "value",
+    },
+    tags: ["myrun"],
+  });
+
+await generateText({
+  model: openai("gpt-5-nano"),
+  prompt: "为 4 人写一份素食千层面食谱。",
+});
+```
+
+而通过 `providerOptions.langsmith` 在运行时传递的配置仅适用于该次运行。
+我们建议导入并使用 `createLangSmithProviderOptions` 包装你的配置，以确保正确的类型：
+
+```typescript
+import { openai } from "@ai-sdk/openai";
+import * as ai from "ai";
+
+import {
+  wrapAISDK,
+  createLangSmithProviderOptions,
+} from "langsmith/experimental/vercel";
+
+const { generateText, streamText, generateObject, streamObject } =
+  wrapAISDK(ai);
+
+const lsConfig = createLangSmithProviderOptions({
+  metadata: {
+    individual_key: "value",
+  },
+  name: "my_individual_run",
+});
+
+await generateText({
+  model: openai("gpt-5-nano"),
+  prompt: "为 4 人写一份素食千层面食谱。",
+  providerOptions: {
+    langsmith: lsConfig,
+  },
+});
+```
+
+## 指定自定义运行 ID
+
+你可以使用 `providerOptions` 和 [`createLangSmithProviderOptions`](https://reference.langchain.com/javascript/langsmith/experimental/vercel#member-createLangSmithProviderOptions-1) 为每次调用预先指定一个运行 ID。使用 LangSmith SDK 中的 `uuid7()` 生成有效的 ID：
+
+```typescript
+import * as ai from "ai";
+import { openai } from "@ai-sdk/openai";
+import { wrapAISDK, createLangSmithProviderOptions } from "langsmith/experimental/vercel";
+import { uuid7 } from "langsmith";
+
+const { generateText } = wrapAISDK(ai);
+
+const runId = uuid7();
+const lsConfig = createLangSmithProviderOptions({ id: runId });
+
+await generateText({
+  model: openai("gpt-4.1-mini"),
+  prompt: "法国的首都是什么？",
+  providerOptions: {
+    langsmith: lsConfig,
+  },
+});
+
+// runId 现在可用于附加反馈、查询运行等。
+```
+
+有关手动指定运行 ID 的更多详细信息，请参阅[指定自定义运行 ID](/langsmith/custom-run-id)。
+
+## 数据脱敏
+
+你可以通过指定自定义的输入/输出处理函数来定制 AI SDK 发送到 LangSmith 的内容。如果你处理的是敏感数据并希望避免发送到 LangSmith，这很有用。
+
+由于输出格式根据你使用的 AI SDK 方法而异，我们建议单独定义配置并传递到包装的方法中。你还需要为 AI SDK 调用内部的子 LLM 运行提供单独的函数，因为在顶层调用 `generateText` 会在内部调用 LLM，并且可能多次调用。
+
+我们还建议向 `createLangSmithProviderOptions` 传递一个泛型参数，以获取输入和输出的正确类型。
+以下是 `generateText` 的示例：
+
+```typescript
+import {
+  wrapAISDK,
+  createLangSmithProviderOptions,
+} from "langsmith/experimental/vercel";
+import * as ai from "ai";
+import { openai } from "@ai-sdk/openai";
+
+const { generateText } = wrapAISDK(ai);
+
+const lsConfig = createLangSmithProviderOptions<typeof generateText>({
+  processInputs: (inputs) => {
+    const { messages } = inputs;
+    return {
+      messages: messages?.map((message) => ({
+        providerMetadata: message.providerOptions,
+        role: "assistant",
+        content: "已脱敏",
+      })),
+      prompt: "已脱敏",
+    };
+  },
+  processOutputs: (outputs) => {
+    return {
+      providerMetadata: outputs.providerMetadata,
+      role: "assistant",
+      content: "已脱敏",
+    };
+  },
+  processChildLLMRunInputs: (inputs) => {
+    const { prompt } = inputs;
+    return {
+      messages: prompt.map((message) => ({
+        ...message,
+        content: "已脱敏的子输入",
+      })),
+    };
+  },
+  processChildLLMRunOutputs: (outputs) => {
+    return {
+      providerMetadata: outputs.providerMetadata,
+      content: "已脱敏的子输出",
+      role: "assistant",
+    };
+  },
+});
+
+const { text } = await generateText({
+  model: openai("gpt-5-nano"),
+  prompt: "法国的首都是什么？",
+  providerOptions: {
+    langsmith: lsConfig,
+  },
+});
+
+// 巴黎。
+console.log(text);
+```
+
+实际的返回值将包含原始的、未脱敏的结果，但 LangSmith 中的追踪记录将被脱敏。[这是一个示例](https://smith.langchain.com/public/b4c69c8e-285b-4c0c-8492-e571e2cf562f/r)。
+
+对于工具输入/输出的脱敏，像这样将你的 `execute` 方法包装在 `traceable` 中：
+
+```typescript
+import * as ai from "ai";
+import { tool, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+
+import { Client } from "langsmith";
+import { traceable } from "langsmith/traceable";
+import { wrapAISDK } from "langsmith/experimental/vercel";
+
+const client = new Client();
+
+const { generateText, streamText, generateObject, streamObject } =
+  wrapAISDK(ai, { client });
+
+const { text } = await generateText({
+  model: openai("gpt-5-nano"),
+  messages: [
+    {
+      role: "user",
+      content: "我的订单是什么？我的用户 ID 是 123。",
+    },
+  ],
+  tools: {
+    listOrders: tool({
+      description: "列出所有订单",
+      inputSchema: z.object({ userId: z.string() }),
+      execute: traceable(
+        async ({ userId }) => {
+          return `用户 ${userId} 有以下订单：1`;
+        },
+        {
+          processInputs: (input) => ({ text: "已脱敏" }),
+          processOutputs: (outputs) => ({ text: "已脱敏" }),
+          run_type: "tool",
+          name: "listOrders",
+        }
+      ) as (input: { userId: string }) => Promise<string>,
+    }),
+  },
+  stopWhen: stepCountIs(5),
+});
+```
+
+`traceable` 的返回类型很复杂，因此需要进行类型转换。如果你希望避免类型转换，也可以省略 AI SDK 的 `tool` 包装函数。

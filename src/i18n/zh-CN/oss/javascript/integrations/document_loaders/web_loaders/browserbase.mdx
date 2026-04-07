@@ -1,0 +1,47 @@
+---
+title: "Browserbase 加载器集成"
+description: "使用 LangChain JavaScript 集成 Browserbase 加载器文档加载器。"
+---
+
+## 描述
+
+[Browserbase](https://browserbase.com) 是一个开发者平台，用于可靠地运行、管理和监控无头浏览器。
+
+通过以下功能为您的 AI 数据检索提供支持：
+
+- [无服务器基础设施](https://docs.browserbase.com/under-the-hood) 提供可靠的浏览器，从复杂的用户界面中提取数据
+- [隐身模式](https://docs.browserbase.com/features/stealth-mode) 包含指纹识别策略和自动验证码解决功能
+- [会话调试器](https://docs.browserbase.com/features/sessions) 通过网络时间轴和日志检查您的浏览器会话
+- [实时调试](https://docs.browserbase.com/guides/session-debug-connection/browser-remote-control) 快速调试您的自动化流程
+
+## 安装
+
+- 从 [browserbase.com](https://browserbase.com) 获取 API 密钥和项目 ID，并在环境变量中设置（`BROWSERBASE_API_KEY`、`BROWSERBASE_PROJECT_ID`）。
+- 安装 [Browserbase SDK](http://github.com/browserbase/js-sdk)：
+
+```bash npm
+npm i @langchain/community @langchain/core @browserbasehq/sdk
+```
+
+## 示例
+
+按如下方式使用 `BrowserbaseLoader`，使您的代理能够加载网站：
+
+```typescript
+import { BrowserbaseLoader } from "@langchain/community/document_loaders/web/browserbase";
+
+const loader = new BrowserbaseLoader(["https://example.com"], {
+  textContent: true,
+});
+const docs = await loader.load();
+```
+
+## 参数
+
+- `urls`：必需。要加载的 URL 列表。
+
+## 选项
+
+- `textContent` 仅检索文本内容。默认为 `false`。
+- `sessionId` 可选。提供现有的会话 ID。
+- `proxy` 可选。启用/禁用代理。

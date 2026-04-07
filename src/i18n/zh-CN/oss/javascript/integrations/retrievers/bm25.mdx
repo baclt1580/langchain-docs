@@ -1,0 +1,63 @@
+---
+title: "BM25 集成"
+description: "使用 LangChain JavaScript 集成 BM25 检索器。"
+---
+
+BM25，也称为 [Okapi BM25](https://en.wikipedia.org/wiki/Okapi_BM25)，是一种用于信息检索系统的排序函数，用于估计文档与给定搜索查询的相关性。
+
+您可以在检索流程中将其用作后处理步骤，在从其他来源检索到初始文档集后，对文档进行重新排序。
+
+## 安装设置
+
+`BM25Retriever` 从 `@langchain/community` 导出。您需要按如下方式安装：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/core
+```
+```bash yarn
+yarn add @langchain/community @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/core
+```
+</CodeGroup>
+
+该检索器使用了来自 [`此实现`](https://github.com/FurkanToprak/OkapiBM25) 的 Okapi BM25 代码。
+
+## 使用方法
+
+您现在可以使用先前检索到的文档创建一个新的检索器：
+
+```typescript
+import { BM25Retriever } from "@langchain/community/retrievers/bm25";
+
+const retriever = BM25Retriever.fromDocuments([
+  { pageContent: "建筑物由砖块构成", metadata: {} },
+  { pageContent: "建筑物由木材构成", metadata: {} },
+  { pageContent: "建筑物由石头构成", metadata: {} },
+  { pageContent: "汽车由金属构成", metadata: {} },
+  { pageContent: "汽车由塑料构成", metadata: {} },
+  { pageContent: "线粒体是细胞的动力源", metadata: {} },
+  { pageContent: "线粒体由脂质构成", metadata: {} },
+], { k: 4 });
+
+// 将返回经过 BM25 算法重新排序的 4 个文档
+await retriever.invoke("mitochondria");
+```
+
+```javascript
+[
+  { pageContent: '线粒体由脂质构成', metadata: {} },
+  {
+    pageContent: '线粒体是细胞的动力源',
+    metadata: {}
+  },
+  { pageContent: '建筑物由砖块构成', metadata: {} },
+  { pageContent: '建筑物由木材构成', metadata: {} }
+]
+```
+
+```typescript
+
+```

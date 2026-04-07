@@ -1,0 +1,286 @@
+---
+title: "ChatLlamaCpp 集成"
+description: "使用 LangChain JavaScript 集成 ChatLlamaCpp 聊天模型。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+该模块基于 [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) 的 Node.js 绑定，用于与 [llama.cpp](https://github.com/ggerganov/llama.cpp) 交互，允许您使用本地运行的 LLM。这使得您能够使用一个更小、经过量化的模型，该模型可在笔记本电脑环境中运行，非常适合测试和快速验证想法，而无需产生额外费用！
+
+## 安装设置
+
+您需要安装主版本为 `3` 的 [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) 模块，以便与您的本地模型通信。
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install -S node-llama-cpp@3 @langchain/community @langchain/core
+```
+
+您还需要一个本地的 Llama 3 模型（或 [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) 支持的其他模型）。您需要将此模型的路径作为参数的一部分传递给 LlamaCpp 模块（参见示例）。
+
+开箱即用的 `node-llama-cpp` 针对在 macOS 平台上运行进行了优化，支持 Apple M 系列处理器的 Metal GPU。如果您需要关闭此功能或需要 CUDA 架构支持，请参阅 [node-llama-cpp](https://withcatai.github.io/node-llama-cpp/) 的文档。
+
+关于获取和准备 `llama3` 模型的建议，请参阅此模块的 LLM 版本文档。
+
+给 LangChain.js 贡献者的提示：如果您想运行与此模块相关的测试，需要将本地模型的路径放入环境变量 `LLAMA_PATH` 中。
+
+## 使用方法
+
+### 基本使用
+
+在此示例中，我们传入一个包装为消息的提示，并期望得到响应。
+
+```typescript
+import { ChatLlamaCpp } from "@langchain/community/chat_models/llama_cpp";
+import { HumanMessage } from "@langchain/core/messages";
+
+const llamaPath = "/替换为/您的模型路径/gguf-llama3-Q4_0.bin";
+
+const model = await ChatLlamaCpp.initialize({ modelPath: llamaPath });
+
+const response = await model.invoke([
+  new HumanMessage({ content: "我的名字是 John。" }),
+]);
+console.log({ response });
+
+/*
+  AIMessage {
+    lc_serializable: true,
+    lc_kwargs: {
+      content: '你好 John。',
+      additional_kwargs: {}
+    },
+    lc_namespace: [ 'langchain', 'schema' ],
+    content: '你好 John。',
+    name: undefined,
+    additional_kwargs: {}
+  }
+*/
+```
+
+### 系统消息
+
+我们也可以提供系统消息，请注意，使用 `llama_cpp` 模块时，系统消息会导致创建新的会话。
+
+```typescript
+import { ChatLlamaCpp } from "@langchain/community/chat_models/llama_cpp";
+import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+
+const llamaPath = "/替换为/您的模型路径/gguf-llama3-Q4_0.bin";
+
+const model = await ChatLlamaCpp.initialize({ modelPath: llamaPath });
+
+const response = await model.invoke([
+  new SystemMessage(
+    "你是一个海盗，回答必须非常详细并使用海盗方言，每个句子后加上 'Arr, m'hearty!'。"
+  ),
+  new HumanMessage("告诉我羊驼来自哪里？"),
+]);
+console.log({ response });
+
+/*
+  AIMessage {
+    lc_serializable: true,
+    lc_kwargs: {
+      content: "Arr, m'hearty! 羊驼来自秘鲁的土地。",
+      additional_kwargs: {}
+    },
+    lc_namespace: [ 'langchain', 'schema' ],
+    content: "Arr, m'hearty! 羊驼来自秘鲁的土地。",
+    name: undefined,
+    additional_kwargs: {}
+  }
+*/
+```
+
+### 链式调用
+
+此模块也可用于链式调用，请注意，使用更复杂的链式调用将需要相应强大的 `llama3` 版本，例如 70B 版本。
+
+```typescript
+import { ChatLlamaCpp } from "@langchain/community/chat_models/llama_cpp";
+import { LLMChain } from "@langchain/classic/chains";
+import { PromptTemplate } from "@langchain/core/prompts";
+
+const llamaPath = "/替换为/您的模型路径/gguf-llama3-Q4_0.bin";
+
+const model = await ChatLlamaCpp.initialize({
+  modelPath: llamaPath,
+  temperature: 0.5,
+});
+
+const prompt = PromptTemplate.fromTemplate(
+  "为一家生产 {product} 的公司起什么名字好？"
+);
+const chain = new LLMChain({ llm: model, prompt });
+
+const response = await chain.invoke({ product: "彩色袜子" });
+
+console.log({ response });
+
+/*
+  {
+  text: `我不确定你说的“彩色袜子”是什么意思，但这里有一些想法：\n` +
+    '\n' +
+    '- 袜子出击！\n' +
+    '- 袜子飞走\n' +
+    '- 华丽鞋履'
+  }
+*/
+```
+
+### 流式处理
+
+我们也可以使用 Llama CPP 进行流式处理，这可以使用原始的“单提示”字符串：
+
+```typescript
+import { ChatLlamaCpp } from "@langchain/community/chat_models/llama_cpp";
+
+const llamaPath = "/替换为/您的模型路径/gguf-llama3-Q4_0.bin";
+
+const model = await ChatLlamaCpp.initialize({
+  modelPath: llamaPath,
+  temperature: 0.7,
+});
+
+const stream = await model.stream("给我讲一个关于快乐羊驼的短故事。");
+
+for await (const chunk of stream) {
+  console.log(chunk.content);
+}
+
+/*
+
+  从前
+  ，
+  在
+  一个
+  绿色
+  而
+  阳光
+  明媚
+  的
+  田野
+  里
+  ...
+*/
+```
+
+或者您可以提供多条消息，请注意，这会接收输入，然后将 Llama3 格式的提示提交给模型。
+
+```typescript
+import { ChatLlamaCpp } from "@langchain/community/chat_models/llama_cpp";
+import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+
+const llamaPath = "/替换为/您的模型路径/gguf-llama3-Q4_0.bin";
+
+const llamaCpp = await ChatLlamaCpp.initialize({
+  modelPath: llamaPath,
+  temperature: 0.7,
+});
+
+const stream = await llamaCpp.stream([
+  new SystemMessage(
+    "你是一个海盗，回答必须非常详细并使用海盗方言。"
+  ),
+  new HumanMessage("告诉我关于羊驼的事？"),
+]);
+
+for await (const chunk of stream) {
+  console.log(chunk.content);
+}
+
+/*
+
+  啊
+  嗬
+  嗬
+  ，
+  我
+  的
+  伙计
+  ！
+
+  你
+  在
+  问
+  关于
+  羊驼
+  的
+  事
+  吗
+  ？
+  ...
+*/
+```
+
+使用 `invoke` 方法，我们也可以实现流式生成，并使用 `signal` 来中止生成。
+
+```typescript
+import { ChatLlamaCpp } from "@langchain/community/chat_models/llama_cpp";
+import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+
+const llamaPath = "/替换为/您的模型路径/gguf-llama3-Q4_0.bin";
+
+const model = await ChatLlamaCpp.initialize({
+  modelPath: llamaPath,
+  temperature: 0.7,
+});
+
+const controller = new AbortController();
+
+setTimeout(() => {
+  controller.abort();
+  console.log("已中止");
+}, 5000);
+
+await model.invoke(
+  [
+    new SystemMessage(
+      "你是一个海盗，回答必须非常详细并使用海盗方言。"
+    ),
+    new HumanMessage("告诉我关于羊驼的事？"),
+  ],
+  {
+    signal: controller.signal,
+    callbacks: [
+      {
+        handleLLMNewToken(token) {
+          console.log(token);
+        },
+      },
+    ],
+  }
+);
+/*
+
+  从前
+  ，
+  在
+  一个
+  绿色
+  而
+  阳光
+  明媚
+  的
+  田野
+  里
+  ...
+  已中止
+
+  AbortError
+
+*/
+```
+
+## 相关链接
+
+- 聊天模型[概念指南](/oss/langchain/models)
+- 聊天模型[操作指南](/oss/langchain/models)

@@ -1,0 +1,142 @@
+---
+title: "ChatLiteLLM 与 ChatLiteLLMRouter 集成"
+description: "使用 LangChain Python 集成 ChatLiteLLM 和 ChatLiteLLMRouter 聊天模型。"
+---
+
+[LiteLLM](https://github.com/BerriAI/litellm) 是一个简化调用 Anthropic、Azure、Huggingface、Replicate 等服务的库。
+
+本笔记本介绍如何开始使用 LangChain + LiteLLM I/O 库。
+
+此集成包含两个主要类：
+
+- `ChatLiteLLM`：用于 LiteLLM 基本使用的主要 LangChain 包装器（[文档](https://docs.litellm.ai/docs/)）。
+- `ChatLiteLLMRouter`：一个利用 LiteLLM 路由器的 `ChatLiteLLM` 包装器（[文档](https://docs.litellm.ai/docs/routing)）。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | JS 支持 | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| [`ChatLiteLLM`](https://reference.langchain.com/python/langchain-litellm/chat_models/litellm/ChatLiteLLM) | [`langchain-litellm`](https://pypi.org/project/langchain-litellm/) | ❌ | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-litellm?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-litellm?style=flat-square&label=%20) |
+| [`ChatLiteLLMRouter`](https://reference.langchain.com/python/langchain-litellm/chat_models/litellm_router/ChatLiteLLMRouter) | [`langchain-litellm`](https://pypi.org/project/langchain-litellm/) | ❌ | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-litellm?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-litellm?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/langchain/tools) | [结构化输出](/oss/langchain/structured-output) | 图像输入 | 音频输入 | 视频输入 | [令牌级流式传输](/oss/integrations/chat/litellm#async-and-streaming-functionality) | [原生异步](/oss/integrations/chat/litellm#async-and-streaming-functionality) | [令牌用量](/oss/langchain/models#token-usage) | [对数概率](/oss/langchain/models#log-probabilities) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ |
+
+### 设置
+
+要访问 `ChatLiteLLM` 和 `ChatLiteLLMRouter` 模型，您需要安装 `langchain-litellm` 包，并创建 OpenAI、Anthropic、Azure、Replicate、OpenRouter、Hugging Face、Together AI 或 Cohere 账户。然后，您必须获取 API 密钥并将其导出为环境变量。
+
+## 凭证
+
+您需要选择所需的 LLM 提供商并注册以获取其 API 密钥。
+
+### 示例 - Anthropic
+
+前往 [Claude 控制台](https://console.anthropic.com) 注册并生成 Claude API 密钥。完成后，设置 `ANTHROPIC_API_KEY` 环境变量：
+
+### 示例 - OpenAI
+
+前往 [platform.openai.com/api-keys](https://platform.openai.com/api-keys) 注册 OpenAI 并生成 API 密钥。完成后，设置 OPENAI_API_KEY 环境变量。
+
+```python
+## 设置环境变量
+import os
+
+os.environ["OPENAI_API_KEY"] = "your-openai-key"
+os.environ["ANTHROPIC_API_KEY"] = "your-anthropic-key"
+```
+
+### 安装
+
+LangChain LiteLLM 集成可通过 `langchain-litellm` 包获取：
+
+```python
+pip install -qU langchain-litellm
+```
+
+## 实例化
+
+### ChatLiteLLM
+
+您可以通过提供 [LiteLLM 支持的](https://docs.litellm.ai/docs/providers) `model` 名称来实例化 `ChatLiteLLM` 模型。
+
+```python
+from langchain_litellm import ChatLiteLLM
+
+llm = ChatLiteLLM(model="gpt-4.1-nano", temperature=0.1)
+```
+
+### ChatLiteLLMRouter
+
+您还可以通过按照 [LiteLLM 路由文档](https://docs.litellm.ai/docs/routing) 中的说明定义模型列表，来利用 LiteLLM 的路由功能。
+
+```python
+from langchain_litellm import ChatLiteLLMRouter
+from litellm import Router
+
+model_list = [
+    {
+        "model_name": "gpt-4.1",
+        "litellm_params": {
+            "model": "azure/gpt-4.1",
+            "api_key": "<your-api-key>",
+            "api_version": "2024-10-21",
+            "api_base": "https://<your-endpoint>.openai.azure.com/",
+        },
+    },
+    {
+        "model_name": "gpt-4.1",
+        "litellm_params": {
+            "model": "azure/gpt-4.1",
+            "api_key": "<your-api-key>",
+            "api_version": "2024-10-21",
+            "api_base": "https://<your-endpoint>.openai.azure.com/",
+        },
+    },
+]
+litellm_router = Router(model_list=model_list)
+llm = ChatLiteLLMRouter(router=litellm_router, model_name="gpt-4.1", temperature=0.1)
+```
+
+## 调用
+
+无论您实例化的是 `ChatLiteLLM` 还是 `ChatLiteLLMRouter`，现在都可以通过 LangChain 的 API 使用该聊天模型。
+
+```python
+response = await llm.ainvoke(
+    "将文本分类为中性、负面或正面。文本：我觉得食物还可以。情感："
+)
+print(response)
+```
+
+```text
+content='Neutral' additional_kwargs={} response_metadata={'token_usage': Usage(completion_tokens=2, prompt_tokens=30, total_tokens=32, completion_tokens_details=CompletionTokensDetailsWrapper(accepted_prediction_tokens=0, audio_tokens=0, reasoning_tokens=0, rejected_prediction_tokens=0, text_tokens=None), prompt_tokens_details=PromptTokensDetailsWrapper(audio_tokens=0, cached_tokens=0, text_tokens=None, image_tokens=None)), 'model': 'gpt-3.5-turbo', 'finish_reason': 'stop', 'model_name': 'gpt-3.5-turbo'} id='run-ab6a3b21-eae8-4c27-acb2-add65a38221a-0' usage_metadata={'input_tokens': 30, 'output_tokens': 2, 'total_tokens': 32}
+```
+
+## 异步与流式功能
+
+`ChatLiteLLM` 和 `ChatLiteLLMRouter` 还支持异步和流式功能：
+
+```python
+async for token in llm.astream("你好，请解释抗生素的工作原理"):
+    print(token.text(), end="")
+```
+
+```text
+抗生素是用于对抗体内细菌感染的药物。它们通过针对特定细菌，要么杀死它们，要么阻止它们的生长和繁殖来发挥作用。
+
+抗生素通过几种不同的机制发挥作用。有些抗生素通过破坏细菌的细胞壁，导致细菌破裂死亡。其他抗生素干扰细菌的蛋白质合成，阻止它们生长和繁殖。还有一些抗生素针对细菌的 DNA 或 RNA，破坏其复制能力。
+
+需要注意的是，抗生素仅对细菌感染有效，对病毒感染无效。同样重要的是，按照医疗专业人员的处方服用抗生素，并完成整个疗程，即使症状在药物用完之前有所改善。这有助于防止抗生素耐药性，即细菌对抗生素的作用产生抵抗力。
+```
+
+---
+
+## API 参考
+
+有关 `ChatLiteLLM` 和 `ChatLiteLLMRouter` 所有功能和配置的详细文档，请访问 [API 参考](https://reference.langchain.com/python/langchain-litellm)。

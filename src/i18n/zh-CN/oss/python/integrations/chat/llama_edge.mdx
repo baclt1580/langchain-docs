@@ -1,0 +1,74 @@
+---
+title: "LlamaEdge 集成"
+description: "使用 LangChain Python 与 LlamaEdge 聊天模型集成。"
+---
+
+[LlamaEdge](https://github.com/second-state/LlamaEdge) 允许您通过本地或聊天服务与 [GGUF](https://github.com/ggerganov/llama.cpp/blob/master/gguf-py/README.md) 格式的 LLM 进行对话。
+
+- `LlamaEdgeChatService` 为开发者提供了一个与 OpenAI API 兼容的服务，可通过 HTTP 请求与 LLM 进行对话。
+
+- `LlamaEdgeChatLocal` 使开发者能够在本地与 LLM 进行对话（即将推出）。
+
+`LlamaEdgeChatService` 和 `LlamaEdgeChatLocal` 均运行在由 [WasmEdge Runtime](https://wasmedge.org/) 驱动的基础设施上，该运行时为 LLM 推理任务提供了一个轻量级且可移植的 WebAssembly 容器环境。
+
+## 通过 API 服务进行对话
+
+`LlamaEdgeChatService` 基于 `llama-api-server` 运行。按照 [llama-api-server 快速入门](https://github.com/second-state/llama-utils/tree/main/api-server#readme) 中的步骤，您可以托管自己的 API 服务，从而在任何有互联网连接的设备上与您喜欢的任何模型进行对话。
+
+```python
+from langchain_community.chat_models.llama_edge import LlamaEdgeChatService
+from langchain.messages import HumanMessage, SystemMessage
+```
+
+### 以非流式模式与 LLM 对话
+
+```python
+# 服务 URL
+service_url = "https://b008-54-186-154-209.ngrok-free.app"
+
+# 创建 wasm-chat 服务实例
+chat = LlamaEdgeChatService(service_url=service_url)
+
+# 创建消息序列
+system_message = SystemMessage(content="你是一个 AI 助手")
+user_message = HumanMessage(content="法国的首都是哪里？")
+messages = [system_message, user_message]
+
+# 与 wasm-chat 服务对话
+response = chat.invoke(messages)
+
+print(f"[Bot] {response.content}")
+```
+
+```text
+[Bot] 你好！法国的首都是巴黎。
+```
+
+### 以流式模式与 LLM 对话
+
+```python
+# 服务 URL
+service_url = "https://b008-54-186-154-209.ngrok-free.app"
+
+# 创建 wasm-chat 服务实例
+chat = LlamaEdgeChatService(service_url=service_url, streaming=True)
+
+# 创建消息序列
+system_message = SystemMessage(content="你是一个 AI 助手")
+user_message = HumanMessage(content="挪威的首都是哪里？")
+messages = [
+    system_message,
+    user_message,
+]
+
+output = ""
+for chunk in chat.stream(messages):
+    # print(chunk.content, end="", flush=True)
+    output += chunk.content
+
+print(f"[Bot] {output}")
+```
+
+```text
+[Bot]  你好！我很乐意帮助你解答问题。挪威的首都是奥斯陆。
+```

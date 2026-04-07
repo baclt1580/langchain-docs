@@ -1,0 +1,194 @@
+---
+title: "ChatPerplexity 集成"
+description: "使用 LangChain Python 集成 ChatPerplexity 聊天模型。"
+---
+
+
+本页面将帮助您开始使用 Perplexity [聊天模型](/oss/langchain/models)。有关 `ChatPerplexity` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-perplexity/chat_models/ChatPerplexity)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/chat/xai) | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| [`ChatPerplexity`](https://reference.langchain.com/python/langchain-perplexity/chat_models/ChatPerplexity) | [`langchain-perplexity`](https://reference.langchain.com/python/langchain-perplexity) | beta | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-perplexity?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-perplexity?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/langchain/tools) | [结构化输出](/oss/langchain/structured-output) | [图像输入](/oss/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/langchain/streaming#llm-tokens) | 原生异步 | [令牌使用量](/oss/langchain/models#token-usage) | [对数概率](/oss/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+
+## 设置
+
+要访问 Perplexity 模型，您需要创建一个 Perplexity 账户，获取 API 密钥，并安装 `langchain-perplexity` 集成包。
+
+### 凭证
+
+前往[此页面](https://www.perplexity.ai/)注册 Perplexity 并生成 API 密钥。完成后，设置 `PPLX_API_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+if "PPLX_API_KEY" not in os.environ:
+    os.environ["PPLX_API_KEY"] = getpass.getpass("输入您的 Perplexity API 密钥：")
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_perplexity import ChatPerplexity
+```
+
+提供的代码假设您的 PPLX_API_KEY 已设置在环境变量中。如果您想手动指定 API 密钥并选择不同的模型，可以使用以下代码：
+
+```python
+chat = ChatPerplexity(temperature=0, pplx_api_key="YOUR_API_KEY", model="sonar")
+```
+
+您可以查看[可用的 Perplexity 模型列表](https://docs.perplexity.ai/docs/model-cards)。为了可复现性，我们可以通过在本笔记本中将其作为输入来动态设置 API 密钥。
+
+```python
+chat = ChatPerplexity(temperature=0, model="sonar")
+```
+
+```python
+system = "你是一个乐于助人的助手。"
+human = "{input}"
+prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+
+chain = prompt | chat
+response = chain.invoke({"input": "为什么希格斯玻色子很重要？"})
+response.content
+```
+
+```text
+'希格斯玻色子是一种基本亚原子粒子，在粒子物理学的标准模型中扮演着至关重要的角色，该模型解释了支配我们宇宙行为的四种基本力中的三种：强核力、弱核力、电磁力和引力。希格斯玻色子之所以重要，有以下几个原因：\n\n1. **最后的基本粒子**：希格斯玻色子是标准模型下等待被发现的最后一个基本粒子。它的探测有助于完善标准模型，并进一步加深我们对宇宙基本力的理解。\n\n2. **质量生成**：希格斯玻色子负责赋予其他粒子质量，这一过程通过其与希格斯场的相互作用发生。这种质量生成对于原子、分子以及我们观察到的可见物质的形成至关重要。\n\n3. **对新物理学的启示**：虽然希格斯玻色子的探测证实了标准模型的许多方面，但它也为超越标准模型的新发现开辟了可能性。对希格斯玻色子的进一步研究可能揭示暗物质、超对称性和其他奇异现象的本质。\n\n4. **技术进步**：对希格斯玻色子的搜索带来了技术的重大进步，例如用于大型强子对撞机（LHC）等粒子加速器的人工智能和机器学习算法的发展。这些进步不仅促进了希格斯玻色子的发现，而且在其他各个领域也有潜在应用。\n\n总之，希格斯玻色子很重要，因为它完善了标准模型，在质量生成中扮演关键角色，暗示了超越标准模型的新物理现象，并推动了技术进步。\n'
+```
+
+您可以像通常那样格式化和构建提示。在以下示例中，我们要求模型讲一个关于猫的笑话。
+
+```python
+chat = ChatPerplexity(temperature=0, model="sonar")
+prompt = ChatPromptTemplate.from_messages([("human", "讲一个关于 {topic} 的笑话")])
+chain = prompt | chat
+response = chain.invoke({"topic": "cats"})
+response.content
+```
+
+```text
+'这是一个关于猫的笑话：\n\n为什么猫想向美人鱼学习数学？\n\n因为它找不到自己生活的“核心目标”！\n\n记住，猫是独特而迷人的生物，每只猫都有其特殊的特质和能力。虽然有些人可能认为它们神秘甚至有点冷漠，但它们仍然是深受喜爱的宠物，为主人带来快乐和陪伴。所以，如果你的猫曾经向美人鱼寻求指导，请记住它们正在自己的自我发现之旅中！\n'
+```
+
+## 通过 `ChatPerplexity` 使用 Perplexity 特定参数
+
+您还可以通过 ChatPerplexity 类使用 Perplexity 特定参数。例如，使用 `extra_body` 参数传递诸如 `search_domain_filter`、`return_images`、`return_related_questions` 或 `search_recency_filter` 等参数，如下所示：
+
+```python
+chat = ChatPerplexity(temperature=0.7, model="sonar")
+response = chat.invoke(
+    "讲一个关于猫的笑话", extra_body={"search_recency_filter": "week"}
+)
+response.content
+```
+
+```text
+"当然，这里有一个关于猫的笑话：\n\n为什么猫是糟糕的讲故事者？\n\n因为它们只有一个尾巴。（双关语警告！）\n\n来源：OneLineFun.com [4]"
+```
+
+### 访问搜索结果元数据
+
+Perplexity 通常会提供其查阅的网页列表（“search_results”）。
+您无需传递任何特殊参数——该列表位于 `response.additional_kwargs["search_results"]` 中。
+
+```python
+chat = ChatPerplexity(temperature=0, model="sonar")
+
+response = chat.invoke(
+    "南美洲最高的山是什么？",
+)
+
+# 主要答案
+print(response.content)
+
+# 前两个支持性搜索结果
+response.additional_kwargs["search_results"][:2]
+```
+
+```text
+南美洲最高的山是阿空加瓜山。其顶峰海拔约为 6,961 米（22,838 英尺），这使其不仅是南美洲的最高峰，也是美洲、西半球和南半球的最高山[1]\[2]\[4]。
+
+阿空加瓜山位于安第斯山脉的主科迪勒拉山系，在阿根廷的门多萨省，靠近智利边境[1]\[2]\[4]。它起源于火山，但不是活火山[4]。该山是阿空加瓜省立公园的一部分，拥有多个冰川，包括大型的温蒂斯克罗·奥科内斯下冰川[1]。
+
+总之，阿空加瓜山作为南美洲最高的山，高度约为 6,961 米（22,838 英尺）。
+```
+
+```text
+[{'title': '阿空加瓜山 - 维基百科',
+  'url': 'https://en.wikipedia.org/wiki/Aconcagua',
+  'date': None},
+ {'title': '南美洲十大最高山 - Much Better Adventures',
+  'url': 'https://www.muchbetteradventures.com/magazine/highest-mountains-south-america/',
+  'date': '2023-07-05'}]
+```
+
+## `ChatPerplexity` 也支持流式功能
+
+```python
+chat = ChatPerplexity(temperature=0.7, model="sonar")
+
+for chunk in chat.stream("给我一个巴基斯坦著名旅游景点的列表"):
+    print(chunk.content, end="", flush=True)
+```
+
+```text
+以下是巴基斯坦一些著名旅游景点的列表：
+
+1. **巴基斯坦塔**：拉合尔一座 62 米高的尖塔，代表了巴基斯坦的历史。
+2. **巴德夏希清真寺**：拉合尔一座历史悠久的清真寺，可容纳 10,000 名礼拜者。
+3. **夏利马尔花园**：拉合尔一座美丽的花园，拥有景观场地和一系列层叠水池。
+4. **巴基斯坦纪念碑**：伊斯兰堡的一座国家纪念碑，代表了巴基斯坦的四个省份和三个地区。
+5. **巴基斯坦国家博物馆**：卡拉奇的一座博物馆，展示了该国的文化历史。
+6. **费萨尔清真寺**：伊斯兰堡的一座大型清真寺，可容纳多达 300,000 名礼拜者。
+7. **克利夫顿海滩**：卡拉奇一处受欢迎的海滩，提供水上活动和娱乐设施。
+8. **卡尔塔普尔走廊**：一个免签证的边境通道和宗教走廊，连接巴基斯坦的达尔巴尔·萨希布谒师所和印度的古鲁瓦拉·斯里·卡尔塔普尔·萨希布谒师所。
+9. **摩亨佐-达罗**：信德省的一个古印度河流域文明遗址，可追溯到约公元前 2500 年。
+10. **罕萨山谷**：吉尔吉特-巴尔蒂斯坦的一个风景如画的山谷，以其壮丽的山景和独特的文化而闻名。
+
+这些景点展示了巴基斯坦丰富的历史、多元的文化和自然美景，使其成为本地和国际游客的热门目的地。
+```
+
+## `ChatPerplexity` 支持 3 级及以上用户的结构化输出
+
+```python
+from pydantic import BaseModel
+
+
+class AnswerFormat(BaseModel):
+    first_name: str
+    last_name: str
+    year_of_birth: int
+    num_seasons_in_nba: int
+
+
+chat = ChatPerplexity(temperature=0.7, model="sonar-pro")
+structured_chat = chat.with_structured_output(AnswerFormat)
+response = structured_chat.invoke(
+    "告诉我关于迈克尔·乔丹的信息。以 JSON 格式返回答案，"
+    "键为 first_name (str)、last_name (str)、"
+    "year_of_birth (int) 和 num_seasons_in_nba (int)。"
+)
+response
+```
+
+```text
+AnswerFormat(first_name='Michael', last_name='Jordan', year_of_birth=1963, num_seasons_in_nba=15)
+```

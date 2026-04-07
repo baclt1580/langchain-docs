@@ -1,0 +1,39 @@
+---
+title: 追踪 Claude Agent SDK 应用
+sidebarTitle: Claude Agent SDK
+---
+
+import InstallClaudeAgentSdk from '/snippets/langsmith/integrations/claude-agent-sdk/install.mdx';
+import SetupClaudeAgentSdk from '/snippets/langsmith/integrations/claude-agent-sdk/setup.mdx';
+import ExampleQuickstart from '/snippets/langsmith/integrations/claude-agent-sdk/example-quickstart.mdx';
+
+[Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview) 是一个用于构建基于 Claude 的智能体应用的 SDK。LangSmith 提供了与 Claude Agent SDK 的原生集成，能够自动追踪您的智能体执行过程、工具调用以及与 Claude 模型的交互。
+
+## 安装
+
+安装 Claude Agent SDK 的 LangSmith 集成
+
+<InstallClaudeAgentSdk/>
+
+## 设置
+
+设置您的 [API 密钥](/langsmith/create-account-api-key)：
+
+<SetupClaudeAgentSdk/>
+
+您可以在 [LangSmith UI](https://smith.langchain.com) 的 **设置** 中找到您的 LangSmith API 密钥和项目名称。
+
+关于 Anthropic API 密钥，请参考 [Claude 控制台](https://claude.ai/login)。
+
+## 快速开始
+
+要为您的 Claude Agent SDK 应用启用 LangSmith 追踪，请在应用启动时调用 `configure_claude_agent_sdk()`：
+
+<ExampleQuickstart/>
+
+配置完成后，所有 Claude Agent SDK 操作都将自动追踪到 LangSmith，包括：
+
+-   智能体查询与响应
+-   工具调用与结果
+-   Claude 模型交互
+-   MCP 服务器操作

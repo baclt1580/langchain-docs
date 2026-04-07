@@ -1,0 +1,222 @@
+---
+title: 自托管 LangSmith
+sidebarTitle: 概述
+---
+
+<Note>
+**重要提示**<br></br>
+自托管 LangSmith 是企业版计划的附加功能，专为规模最大、对安全性要求最高的客户设计。更多详情请参阅[定价](https://www.langchain.com/pricing)。如果您希望获取许可证密钥，在您的环境中试用 LangSmith，请[联系我们的销售团队](https://www.langchain.com/contact-sales)。
+</Note>
+
+根据您的规模、安全性和基础设施需求，LangSmith 支持不同的自托管配置。
+
+您可以在不部署代理的情况下，将 LangSmith 用于[可观测性](/langsmith/observability)和[评估](/langsmith/evaluation)。或者，您可以设置**完整的自托管平台**，用于可观测性、评估和[代理部署](/langsmith/deployment)。此外，您也可以直接部署代理，而无需使用[控制平面](/langsmith/control-plane)。
+
+<Tip>
+**有关在 AWS、GCP 或 Azure 上自托管 LangSmith 的分步设置说明**，请参阅我们的云架构指南：[AWS](/langsmith/aws-self-hosted)、[GCP](/langsmith/gcp-self-hosted) 或 [Azure](/langsmith/azure-self-hosted)。
+</Tip>
+
+本页概述了每种自托管模式：
+
+<Columns cols={1}>
+  <Card
+    title="LangSmith 可观测性与评估"
+    icon="chart-line"
+    href="#self-host-langsmith-observability-and-evaluation"
+  >
+    托管一个包含 UI 和 API 中的可观测性、追踪和评估功能的 LangSmith 实例。最适合希望拥有自托管监控和评估功能但无需部署代理的团队。
+  </Card>
+
+  <Card
+    title="LangSmith 可观测性、评估与部署"
+    icon="stack-2"
+    href="#enable-langsmith-deployment"
+  >
+    支持通过控制平面将图部署到代理服务器。控制平面和数据平面提供了完整的 LangSmith 平台，用于运行和监控代理。这包括可观测性、评估和部署。
+  </Card>
+
+  <Card
+    title="独立服务器"
+    icon="server"
+    href="#standalone-server"
+  >
+    直接托管代理服务器，无需控制平面 UI。这是一个轻量级选项，用于将一个或少数几个代理作为独立服务运行，并完全控制扩展和集成。
+  </Card>
+</Columns>
+
+模式 | 包含内容 | 最适合 | 部署方法
+------------------|------------------|----------|--------------------
+**可观测性与评估** | <ul><li>LangSmith (UI + API)</li><li>后端服务（队列、Playground、ACE）</li><li>数据存储：PostgreSQL、Redis、ClickHouse，可选对象存储</li></ul> | <ul><li>需要自托管可观测性、追踪和评估的团队</li><li>在不部署代理/图的情况下运行 LangSmith</li></ul> | <ul><li>Docker Compose（开发/测试）</li><li>Kubernetes + Helm（生产环境）</li></ul>
+**可观测性、评估与部署** | <ul><li>包含“可观测性与评估”的所有内容</li><li>控制平面（部署 UI、版本管理、Studio）</li><li>数据平面（代理服务器 Pod）</li><li>用于编排的 Kubernetes Operator</li></ul> | <ul><li>需要私有 LangChain Cloud 的企业团队</li><li>用于管理多个代理/图的集中式 UI/API</li><li>集成的可观测性和编排</li></ul> | <ul><li>Kubernetes 与 Helm（必需）</li><li>运行于 EKS、GKE、AKS 或自管理集群</li></ul>
+**独立服务器** | <ul><li>代理服务器容器</li><li>需要 PostgreSQL + Redis（共享或专用）</li><li>可选的 LangSmith 集成以支持追踪</li></ul> | <ul><li>轻量级部署一个或少数几个代理</li><li>将代理服务器作为微服务集成</li><li>倾向于自行管理扩展和 CI/CD 的团队</li></ul> | <ul><li>Docker / Docker Compose（开发/测试）</li><li>Kubernetes + Helm（生产环境）</li><li>任何容器运行时或虚拟机（ECS、EC2、ACI 等）</li></ul>
+
+<Note>
+有关设置指南，请参阅：
+
+* [启用 LangSmith 部署](/langsmith/deploy-self-hosted-full-platform)
+* [部署独立服务器](/langsmith/deploy-standalone-server)
+
+支持的计算平台：[Kubernetes](https://kubernetes.io/)（用于 LangSmith 部署），任何计算平台（用于独立服务器）
+</Note>
+
+<a id="langsmith"></a>
+
+## 自托管 LangSmith 可观测性与评估
+
+托管一个包含 UI 和 API 中的可观测性、追踪和评估功能的 LangSmith 实例，但**不包含**通过控制平面部署代理的能力。
+
+这包括：
+
+**服务：**
+- LangSmith 前端 UI
+- LangSmith 后端 API
+- LangSmith 平台后端
+- LangSmith Playground
+- LangSmith 队列
+- LangSmith ACE（任意代码执行）后端
+
+**存储服务：**
+- ClickHouse（追踪和反馈数据）
+- PostgreSQL（操作数据）
+- Redis（队列和缓存）
+- 对象存储（可选，但生产环境推荐使用）
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/cloud-arch-light.png"
+    alt="显示服务和数据存储的 LangSmith 架构图"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/cloud-arch-dark.png"
+    alt="显示服务和数据存储的 LangSmith 架构图"
+/>
+
+要访问 LangSmith UI 并发送 API 请求，您需要暴露 [LangSmith 前端](#langsmith-frontend) 服务。根据您的安装方法，这可以是负载均衡器或主机上暴露的端口。
+
+### 服务
+
+| 服务 | 描述 |
+|---------|-------------|
+| <a id="langsmith-frontend"></a> **LangSmith 前端** | 前端使用 Nginx 来提供 LangSmith UI 并将 API 请求路由到其他服务器。这是应用程序的入口点，也是唯一必须向用户暴露的组件。 |
+| <a id="langsmith-backend"></a> **LangSmith 后端** | 后端是 CRUD API 请求的主要入口点，处理应用程序的大部分业务逻辑。这包括处理来自前端和 SDK 的请求、准备要摄取的追踪以及支持 hub API。 |
+| <a id="langsmith-queue"></a> **LangSmith 队列** | 队列处理传入的追踪和反馈，确保它们被异步摄取并持久化到追踪和反馈数据存储中，处理数据完整性检查，确保成功插入数据存储，并在数据库错误或暂时无法连接数据库等情况时处理重试。 |
+| <a id="langsmith-platform-backend"></a> **LangSmith 平台后端** | 平台后端是另一个关键服务，主要处理身份验证、运行摄取和其他高容量任务。 |
+| <a id="langsmith-playground"></a> **LangSmith Playground** | Playground 是一项服务，负责将请求转发到各种 LLM API 以支持 Playground 功能。这也可用于连接到您自己的自定义模型服务器。 |
+| <a id="langsmith-ace-arbitrary-code-execution-backend"></a> **LangSmith ACE（任意代码执行）后端** | ACE 后端是一项服务，负责在安全环境中执行任意代码。这用于支持在 LangSmith 中运行自定义代码。 |
+
+### 存储服务
+
+<Note>
+LangSmith 默认会捆绑所有存储服务。您可以将其配置为使用所有存储服务的外部版本。在生产环境中，我们**强烈建议使用外部存储服务**。
+</Note>
+
+| 服务 | 描述 |
+|---------|-------------|
+| <a id="clickhouse"></a> **ClickHouse** | [ClickHouse](https://clickhouse.com/docs/en/intro) 是一个用于在线分析处理（OLAP）的高性能、面向列的 SQL 数据库管理系统（DBMS）。<br/><br/>LangSmith 使用 ClickHouse 作为追踪和反馈（高容量数据）的主要数据存储。<br/><br/>💡 [连接到外部 ClickHouse](/langsmith/self-host-external-clickhouse) |
+| <a id="postgresql"></a> **PostgreSQL** | [PostgreSQL](https://www.postgresql.org/about/) 是一个功能强大的开源对象关系数据库系统，它使用并扩展了 SQL 语言，结合了许多功能，可以安全地存储和扩展最复杂的数据工作负载。<br/><br/>LangSmith 使用 PostgreSQL 作为事务性工作负载和操作数据（除了追踪和反馈之外的几乎所有内容）的主要数据存储。<br/><br/>💡 [连接到外部 PostgreSQL](/langsmith/self-host-external-postgres) - AWS RDS、GCP Cloud SQL、Azure Database |
+| <a id="redis"></a> **Redis** | [Redis](https://github.com/redis/redis) 是一个强大的内存键值数据库，可将数据持久化到磁盘。通过将数据保存在内存中，Redis 为缓存等操作提供了高性能。<br/><br/>LangSmith 使用 Redis 来支持队列和缓存操作。<br/><br/>💡 [连接到外部 Redis](/langsmith/self-host-external-redis) - AWS ElastiCache、GCP Memorystore、Azure Cache |
+| <a id="blob-storage"></a> **对象存储** | LangSmith 支持多种对象存储提供商，包括 [AWS S3](https://aws.amazon.com/s3/)、[Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) 和 [Google Cloud Storage](https://cloud.google.com/storage)。<br/><br/>LangSmith 使用对象存储来存储大文件，例如追踪工件、反馈附件和其他大型数据对象。对象存储是可选的，但强烈建议用于生产部署。<br/><br/>💡 [启用对象存储](/langsmith/self-host-blob-storage) - AWS S3、GCP GCS、Azure Blob |
+
+### 设置方法
+
+- **Docker Compose**（仅限开发/测试）
+- **Kubernetes + Helm**（推荐用于生产环境）
+
+### 设置指南
+
+- [在 Kubernetes 上安装](/langsmith/kubernetes)（生产环境）
+- [使用 Docker 安装](/langsmith/docker)（仅限开发）
+
+## 启用 LangSmith 部署
+
+**LangSmith 部署**是一个可选附加组件，可以在您的 [LangSmith](#langsmith) 实例上启用。它非常适合希望拥有一个集中式、UI 驱动的平台来部署和管理多个代理和图的企业团队，并且所有基础设施、数据和编排都完全由他们自己控制。
+
+这包括 [LangSmith](#langsmith) 的所有内容，外加：
+
+| 组件 | 职责 | 运行位置 | 管理方 |
+|-----------|------------------|---------------|----------------|
+| <Tooltip tip="用于管理部署的 LangSmith UI 和 API。">控制平面</Tooltip> | <ul><li>用于创建部署和版本的 UI</li><li>用于部署管理的 API</li></ul> | 您的云环境 | 您 |
+| <Tooltip tip="您的代理服务器和代理执行的运行时环境。">数据平面</Tooltip> | <ul><li>用于协调部署的 Operator/监听器</li><li>代理服务器（代理/图）</li><li>支持服务（Postgres、Redis 等）</li></ul> | 您的云环境 | 您 |
+
+您在自己的基础设施内完全运行控制平面和数据平面。您负责配置和管理所有组件。
+
+<Note>
+了解更多关于[控制平面](/langsmith/control-plane)和[数据平面](/langsmith/data-plane)架构概念的信息。
+</Note>
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/full-platform-with-deployment-light.png"
+    alt="包含控制平面和数据平面的完整平台架构图"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/full-platform-with-deployment-dark.png"
+    alt="包含控制平面和数据平面的完整平台架构图"
+/>
+
+### 工作流程
+
+如果您想自托管 LangSmith 以实现可观测性、评估和代理部署，请按照以下步骤操作：
+
+<Steps>
+  <Step title="安装自托管 LangSmith">
+    您必须已经在您的云环境中安装了[自托管 LangSmith 实例](#langsmith)，并拥有一个 Kubernetes 集群（控制平面和数据平面所必需）。
+  </Step>
+  <Step title="本地测试您的图">
+    使用 `langgraph-cli` 或 [Studio](/langsmith/studio) 在本地测试您的图。
+  </Step>
+  <Step title="启用 LangSmith 部署">
+    按照[设置指南](/langsmith/deploy-self-hosted-full-platform)在您的 LangSmith 实例上启用 LangSmith 部署。
+  </Step>
+</Steps>
+
+## 独立服务器
+
+**独立服务器**选项是运行 LangSmith 最轻量级、最灵活的方式。与其他模式不同，您只管理一个简化的 <Tooltip tip="您的代理服务器和代理执行的运行时环境。">数据平面</Tooltip>，该平面由代理服务器及其所需的后端服务（PostgreSQL、Redis 等）组成。
+
+这包括：
+
+| 组件 | 职责 | 运行位置 | 管理方 |
+|-----------|------------------|---------------|----------------|
+| **控制平面** | 不适用 | 不适用 | 不适用 |
+| **数据平面** | <ul><li>代理服务器</li><li>Postgres、Redis 等</li></ul> | 您的云环境 | 您 |
+
+此选项让您完全控制扩展、部署和 CI/CD 流水线，同时仍允许与 LangSmith 进行可选集成以实现追踪和评估。
+
+<Warning>
+请勿在无服务器环境中运行独立服务器。缩放到零可能导致任务丢失，并且扩展启动可能无法可靠工作。
+</Warning>
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/standalone-server-light.png"
+    alt="独立服务器架构图"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/standalone-server-dark.png"
+    alt="独立服务器架构图"
+/>
+
+### 工作流程
+
+1.  使用 `langgraph-cli` 或 [Studio](/langsmith/studio) 在本地定义和测试您的图
+2.  将您的代理打包为 Docker 镜像
+3.  将代理服务器部署到您选择的计算平台（Kubernetes、Docker、虚拟机）
+4.  （可选）配置 LangSmith API 密钥和端点，以便服务器将追踪和评估报告回 LangSmith（自托管或 SaaS）
+
+### 支持的计算平台
+
+- **Kubernetes**：使用 LangSmith Helm chart 在 Kubernetes 集群中运行代理服务器。这是生产级部署的推荐选项。
+- **Docker**：在任何支持 Docker 的计算平台（本地开发机、虚拟机、ECS 等）中运行。这最适合开发或小规模工作负载。
+
+### 设置指南
+
+<Tip>
+要设置[代理服务器](/langsmith/agent-server)，请参阅应用程序部署部分中的[操作指南](/langsmith/deploy-standalone-server)。
+</Tip>

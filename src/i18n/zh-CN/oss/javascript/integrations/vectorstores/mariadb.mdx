@@ -1,0 +1,326 @@
+---
+title: "MariaDB 集成"
+description: "使用 LangChain JavaScript 与 MariaDB 向量存储集成。"
+---
+
+<Tip>
+**兼容性**：仅适用于 Node.js。
+</Tip>
+
+需要 MariaDB 11.7 或更高版本。
+
+本指南提供了快速入门 MariaDB [向量存储](/oss/integrations/vectorstores) 的概述。有关 `MariaDBStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/mariadb/MariaDBStore)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [Python 支持](https://python.langchain.com/docs/integrations/vectorstores/mariadb/) | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`MariaDBStore`](https://reference.langchain.com/javascript/langchain-community/vectorstores/mariadb/MariaDBStore) | [`@langchain/community`](https://npmjs.com/@langchain/community) | ✅ | ![NPM - 版本](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+## 设置
+
+要使用 MariaDBVector 向量存储，你需要设置 MariaDB 11.7 或更高版本，并将 [`mariadb`](https://www.npmjs.com/package/mariadb) 连接器作为对等依赖项。
+
+本指南还将使用 [OpenAI 嵌入](/oss/integrations/embeddings/openai)，这需要你安装 `@langchain/openai` 集成包。你也可以使用 [其他支持的嵌入模型](/oss/integrations/embeddings)。
+
+我们还将使用 [`uuid`](https://www.npmjs.com/package/uuid) 包来生成所需格式的 ID。
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/openai @langchain/core mariadb uuid
+```
+```bash yarn
+yarn add @langchain/community @langchain/openai @langchain/core mariadb uuid
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/openai @langchain/core mariadb uuid
+```
+</CodeGroup>
+
+### 设置实例
+
+创建一个名为 docker-compose.yml 的文件，内容如下：
+
+```yaml
+# 运行此命令启动数据库：
+# docker-compose up --build
+version: "3"
+services:
+  db:
+    hostname: 127.0.0.1
+    image: mariadb/mariadb:11.7-rc
+    ports:
+      - 3306:3306
+    restart: always
+    environment:
+      - MARIADB_DATABASE=api
+      - MARIADB_USER=myuser
+      - MARIADB_PASSWORD=ChangeMe
+      - MARIADB_ROOT_PASSWORD=ChangeMe
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+```
+
+然后在同一目录下运行 `docker compose up` 来启动容器。
+
+### 凭据
+
+要连接到你的 MariaDB 实例，你需要相应的凭据。有关支持选项的完整列表，请参阅 [`mariadb` 文档](https://github.com/mariadb-corporation/mariadb-connector-nodejs/blob/master/documentation/promise-api.md#connection-options)。
+
+如果你在本指南中使用 OpenAI 嵌入，还需要设置你的 OpenAI 密钥：
+
+```typescript
+process.env.OPENAI_API_KEY = "YOUR_API_KEY";
+```
+
+如果你想获取模型调用的自动跟踪，也可以通过取消注释以下内容来设置你的 [LangSmith](/langsmith/home) API 密钥：
+
+```typescript
+// process.env.LANGCHAIN_TRACING_V2="true"
+// process.env.LANGCHAIN_API_KEY="your-api-key"
+```
+
+## 实例化
+
+要实例化向量存储，请调用 `.initialize()` 静态方法。这将自动检查 `config` 中给定的 `tableName` 表是否存在。如果不存在，它将创建具有所需列的表。
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+import {
+   DistanceStrategy,
+   MariaDBStore,
+} from "@langchain/community/vectorstores/mariadb";
+import { PoolConfig } from "mariadb";
+
+const config = {
+  connectionOptions: {
+    type: "mariadb",
+    host: "127.0.0.1",
+    port: 3306,
+    user: "myuser",
+    password: "ChangeMe",
+    database: "api",
+  } as PoolConfig,
+  distanceStrategy: 'EUCLIDEAN' as DistanceStrategy,
+};
+const vectorStore = await MariaDBStore.initialize(
+  new OpenAIEmbeddings(),
+   config
+);
+```
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```typescript
+import { v4 as uuidv4 } from "uuid";
+import type { Document } from "@langchain/core/documents";
+
+const document1: Document = {
+  pageContent: "细胞的核心是线粒体",
+  metadata: { source: "https://example.com" }
+};
+
+const document2: Document = {
+  pageContent: "建筑物由砖块构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document3: Document = {
+  pageContent: "线粒体由脂质构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document4: Document = {
+  pageContent: "2024 年奥运会在巴黎举行",
+  metadata: { source: "https://example.com" }
+}
+
+const documents = [document1, document2, document3, document4];
+
+const ids = [uuidv4(), uuidv4(), uuidv4(), uuidv4()]
+
+// ID 不是必需的，但这里为了示例
+await vectorStore.addDocuments(documents, { ids: ids });
+```
+
+### 从向量存储删除项目
+
+```typescript
+const id4 = ids[ids.length - 1];
+
+await vectorStore.delete({ ids: [id4] });
+```
+
+## 查询向量存储
+
+一旦你的向量存储创建完成并添加了相关文档，你很可能希望在运行链或代理时查询它。
+
+### 直接查询
+
+执行简单的相似性搜索可以如下进行：
+
+```typescript
+const similaritySearchResults = await vectorStore.similaritySearch("生物学", 2, { "year": 2021 });
+for (const doc of similaritySearchResults) {
+  console.log(`* ${doc.pageContent} [${JSON.stringify(doc.metadata, null)}]`);
+}
+```
+
+```text
+* 细胞的核心是线粒体 [{"year": 2021}]
+* 线粒体由脂质构成 [{"year": 2022}]
+```
+
+上述过滤器语法可以更复杂：
+
+```json
+# name = 'martin' OR firstname = 'john'
+let res = await vectorStore.similaritySearch("生物学", 2, {"$or": [{"name":"martin"}, {"firstname", "john"}] });
+```
+
+如果你想执行相似性搜索并获取相应的分数，可以运行：
+
+```typescript
+const similaritySearchWithScoreResults = await vectorStore.similaritySearchWithScore("生物学", 2)
+
+for (const [doc, score] of similaritySearchWithScoreResults) {
+  console.log(`* [SIM=${score.toFixed(3)}] ${doc.pageContent} [${JSON.stringify(doc.metadata)}]`);
+}
+```
+
+```text
+* [SIM=0.835] 细胞的核心是线粒体 [{"source":"https://example.com"}]
+* [SIM=0.852] 线粒体由脂质构成 [{"source":"https://example.com"}]
+```
+
+### 转换为检索器进行查询
+
+你也可以将向量存储转换为 [检索器](/oss/langchain/retrieval)，以便在链中更轻松地使用。
+
+```typescript
+const retriever = vectorStore.asRetriever({
+  // 可选过滤器
+  // filter: filter,
+  k: 2,
+});
+await retriever.invoke("生物学");
+```
+
+```javascript
+[
+  Document {
+    pageContent: '细胞的核心是线粒体',
+    metadata: { source: 'https://example.com' },
+    id: undefined
+  },
+  Document {
+    pageContent: '线粒体由脂质构成',
+    metadata: { source: 'https://example.com' },
+    id: undefined
+  }
+]
+```
+
+### 用于检索增强生成
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [使用 LangChain 构建 RAG 应用](/oss/langchain/rag)。
+- [代理式 RAG](/oss/langgraph/agentic-rag)
+- [检索文档](/oss/langchain/retrieval)
+
+## 高级：重用连接
+
+你可以通过创建连接池，然后直接通过构造函数创建新的 `MariaDBStore` 实例来重用连接。
+
+注意，你应该至少调用一次 `.initialize()` 来正确设置数据库表，然后再使用构造函数。
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { MariaDBStore } from "@langchain/community/vectorstores/mariadb";
+import mariadb from "mariadb";
+
+// 首先，按照设置说明操作：
+// https://js.langchain.com/docs/modules/indexes/vector_stores/integrations/mariadb
+
+const reusablePool = mariadb.createPool({
+  host: "127.0.0.1",
+  port: 3306,
+  user: "myuser",
+  password: "ChangeMe",
+  database: "api",
+});
+
+const originalConfig = {
+  pool: reusablePool,
+  tableName: "testlangchainjs",
+  collectionName: "sample",
+  collectionTableName: "collections",
+  columns: {
+    idColumnName: "id",
+    vectorColumnName: "vect",
+    contentColumnName: "content",
+    metadataColumnName: "metadata",
+  },
+};
+
+// 设置数据库。
+// 如果已经初始化了数据库，可以跳过此步骤。
+// await MariaDBStore.initialize(new OpenAIEmbeddings(), originalConfig);
+const mariadbStore = new MariaDBStore(new OpenAIEmbeddings(), originalConfig);
+
+await mariadbStore.addDocuments([
+  { pageContent: "这是什么", metadata: { a: 2 } },
+  { pageContent: "猫喝牛奶", metadata: { a: 1 } },
+]);
+
+const results = await mariadbStore.similaritySearch("水", 1);
+
+console.log(results);
+
+/*
+  [ Document { pageContent: '猫喝牛奶', metadata: { a: 1 } } ]
+*/
+
+const mariadbStore2 = new MariaDBStore(new OpenAIEmbeddings(), {
+  pool: reusablePool,
+  tableName: "testlangchainjs",
+  collectionTableName: "collections",
+  collectionName: "some_other_collection",
+  columns: {
+    idColumnName: "id",
+    vectorColumnName: "vector",
+    contentColumnName: "content",
+    metadataColumnName: "metadata",
+  },
+});
+
+const results2 = await mariadbStore2.similaritySearch("水", 1);
+
+console.log(results2);
+
+/*
+  []
+*/
+
+await reusablePool.end();
+```
+
+## 关闭连接
+
+确保在完成后关闭连接，以避免资源过度消耗：
+
+```typescript
+await vectorStore.end();
+```
+
+---
+
+## API 参考
+
+有关 `MariaDBStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/mariadb/MariaDBStore)。

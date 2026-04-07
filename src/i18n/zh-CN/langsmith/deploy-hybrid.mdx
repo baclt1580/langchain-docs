@@ -1,0 +1,107 @@
+---
+title: 设置混合式 LangSmith
+sidebarTitle: 设置指南
+icon: "cloud"
+description: 将自托管数据平面连接到托管的 LangSmith 控制平面，实现混合代理部署。
+---
+
+<Info>
+**重要提示**
+混合部署选项需要 [企业版](https://langchain.com/pricing) 计划。
+</Info>
+
+[**混合**](/langsmith/hybrid) 模式允许您在自有云中运行 [数据平面](/langsmith/data-plane)（您的 Agent Server 部署和代理工作负载），而 LangChain 则托管和管理 [控制平面](/langsmith/control-plane)（LangSmith UI 和编排）。此设置为您提供了自托管运行时环境的灵活性，同时享有托管 LangSmith 实例的便利性。
+
+以下步骤描述了如何将您的自托管数据平面连接到托管的 LangSmith 控制平面。
+
+## Kubernetes
+
+### 先决条件
+
+1. 在您的集群上安装 `KEDA`。
+    ```bash
+      helm repo add kedacore https://kedacore.github.io/charts
+      helm install keda kedacore/keda --namespace keda --create-namespace
+    ```
+
+    <Info>
+    `KEDA` 用于根据队列大小自动扩展部署系统。
+    </Info>
+
+2. 在您的集群上安装有效的 `Ingress` 控制器。有关为部署配置入口的更多信息，请参阅 [为安装创建入口](/langsmith/self-host-ingress)。我们强烈建议在生产设置中使用现代的 [Gateway API](/langsmith/self-host-ingress#option-2%3A-gateway-api)。
+3. 如果您计划让监听器监视多个命名空间，则**必须**使用 [Gateway API](/langsmith/self-host-ingress#option-2%3A-gateway-api) 或 [Istio Gateway](/langsmith/self-host-ingress#option-3%3A-istio-gateway)，而不是 [标准入口](/langsmith/self-host-ingress#option-1%3A-standard-ingress) 资源。标准入口资源只能将流量路由到同一命名空间中的服务，而 Gateway 或 Istio Gateway 可以将流量路由到跨多个命名空间的服务。
+4. 您的集群中有足够的空间用于多个部署。建议使用 `Cluster-Autoscaler` 自动配置新节点。
+5. 您需要启用对两个控制平面 URL 的出站访问。监听器会轮询这些端点以获取部署信息：
+    - https://api.host.langchain.com
+    - https://api.smith.langchain.com
+
+### 设置
+
+1. 向我们提供您的 LangSmith 组织 ID。您的 LangSmith 组织将被配置为在您的云中部署数据平面。
+2. 从 LangSmith UI 创建一个监听器。`Listener` 数据模型是为实际的 ["监听器" 应用程序](/langsmith/data-plane#listener-application) 配置的。
+    1. 在左侧导航栏中，选择 `Deployments` > `Listeners`。
+    2. 在页面右上角，选择 `+ Create Listener`。
+    3. 为监听器输入一个唯一的 `Compute ID`。`Compute ID` 是用户定义的标识符，在当前 LangSmith 工作空间的所有监听器中应该是唯一的。当最终用户创建新部署时，会显示 `Compute ID`。请确保 `Compute ID` 能为最终用户提供关于其 Agent Server 部署将部署到何处的上下文信息。例如，`Compute ID` 可以设置为 `k8s-cluster-name-dev-01`。在此示例中，Kubernetes 集群的名称为 `k8s-cluster-name`，`dev` 表示该集群专用于"开发"工作负载，`01` 是用于减少命名冲突的数字后缀。
+    4. 输入一个或多个 Kubernetes 命名空间。稍后，"监听器" 应用程序将被配置为部署到这些命名空间中的每一个。
+    5. 在页面右上角，选择 `Submit`。
+    6. 监听器创建后，复制监听器 ID。稍后在 Kubernetes 集群中安装实际的 "监听器" 应用程序时（步骤 5）会用到它。
+    <Info>
+    **重要提示**
+    从 LangSmith UI 创建监听器并不会在 Kubernetes 集群中安装 "监听器" 应用程序。
+    </Info>
+3. 提供了一个 [Helm chart](https://github.com/langchain-ai/helm/tree/main/charts/langgraph-dataplane) 来在您的 Kubernetes 集群中安装必要的组件。
+    - `langgraph-dataplane-listener`：这是一个服务，用于监听 LangChain 的 [控制平面](/langsmith/control-plane) 以获取部署的更改，并创建/更新下游的 CRD。这就是 ["监听器" 应用程序](/langsmith/data-plane#listener-application)。
+    - `LangGraphPlatform CRD`：用于 LangSmith 部署的 CRD。它包含管理 LangSmith 部署实例的规范。
+    - `langgraph-dataplane-operator`：此操作符处理对您的 LangSmith CRD 的更改。
+    - `langgraph-dataplane-redis`：一个 Redis 实例，由 `langgraph-dataplane-listener` 用于管理各种任务（主要是创建和删除部署）。
+4. 配置您的 `langgraph-dataplane-values.yaml` 文件。
+    ```bash
+      config:
+        langsmithApiKey: "" # 您工作空间的 API 密钥
+        langsmithWorkspaceId: "" # 工作空间 ID
+        hostBackendUrl: "https://api.host.langchain.com" # 仅在 EU 区域时覆盖此值
+        smithBackendUrl: "https://api.smith.langchain.com" # 仅在 EU 区域时覆盖此值
+        langgraphListenerId: "" # 来自步骤 2f 的监听器 ID
+        watchNamespaces: "" # 监听器和操作符将部署到的 Kubernetes 命名空间列表，以逗号分隔
+        enableLGPDeploymentHealthCheck: true # 启用/禁用部署的健康检查步骤
+
+      ingress:
+        hostname: "" # 指定一个将为所有部署配置的主机名
+
+      operator:
+        enabled: true
+        createCRDs: true # 如果当前 Kubernetes 集群中已安装 CRD，请将此设置为 `false`
+    ```
+    - `config.langsmithApiKey`：`langgraph-listener` 部署使用 `langsmithApiKey` 与 LangChain 的 LangGraph 控制平面 API 进行身份验证。
+    - `config.langsmithWorkspaceId`：`langgraph-listener` 部署与 LangSmith 工作空间中的 Agent Server 部署相关联。换句话说，`langgraph-listener` 部署只能管理指定 LangSmith 工作空间 ID 中的 Agent Server 部署。
+    - `config.langgraphListenerId`：除了与 LangSmith 工作空间关联外，`langgraph-listener` 部署还与一个监听器关联。当创建新的 Agent Server 部署时，它会自动与一个 `langgraphListenerId` 关联。指定 `langgraphListenerId` 可确保 `langgraph-listener` 部署只能管理与 `langgraphListenerId` 关联的 Agent Server 部署。
+    - `config.watchNamespaces`：`langgraph-listener` 部署将部署到的 Kubernetes 命名空间列表，以逗号分隔。此列表应与步骤 2d 中指定的命名空间列表匹配。
+    - `config.enableLGPDeploymentHealthCheck`：要禁用 Agent Server 健康检查，请将此设置为 `false`。
+    - `ingress.hostname`：作为部署工作流的一部分，`langgraph-listener` 部署会尝试调用 Agent Server 健康检查端点 (`GET /ok`) 以验证应用程序是否已正确启动。典型的设置涉及为 Agent Server 部署创建一个共享的 DNS 记录或域。这不是由 LangSmith 管理的。创建后，将 `ingress.hostname` 设置为该域，该域将用于完成健康检查。
+    - `operator.createCRDs`：如果 Kubernetes 集群中已安装 `LangGraphPlatform CRD`，请将此值设置为 `false`。如果 CRD 已安装，安装过程中会出现错误。如果在同一 Kubernetes 集群上部署了多个监听器，则可能会出现这种情况。
+5. 部署 `langgraph-dataplane` Helm chart。
+    ```bash
+      helm repo add langchain https://langchain-ai.github.io/helm/
+      helm repo update
+      helm upgrade -i langgraph-dataplane langchain/langgraph-dataplane --values langgraph-dataplane-values.yaml --wait --debug
+    ```
+6. 如果成功，您将在您的命名空间中看到三个服务启动。
+    ```bash
+      NAME                                            READY   STATUS              RESTARTS   AGE
+      langgraph-dataplane-listener-6dd4749445-zjmr4   0/1     ContainerCreating   0          26s
+      langgraph-dataplane-operator-6b88879f9b-t76gk   1/1     Running             0          26s
+      langgraph-dataplane-redis-0                     1/1     Running             0          25s
+    ```
+
+    您的混合基础设施现已准备好创建部署。
+
+### 在同一集群中配置额外的数据平面
+要在同一集群的不同命名空间中创建数据平面，请重复上述步骤，并向 `helm upgrade` 传递 `-n` 选项以指定不同的命名空间。
+
+**在同一集群中安装多个数据平面时，请务必遵循以下规则：**
+1. `config.watchNamespaces` 列表不应与其他安装的 `config.watchNamespaces` 列表相交。例如，如果安装 A 正在监视命名空间 `foo,bar`，则安装 B 不能监视 `foo` 或 `bar`。多个操作符或监听器监视同一命名空间将导致意外行为。这意味着多个 LangSmith 工作空间不能部署到同一命名空间！请查看 [集群组织](/langsmith/hybrid#kubernetes-cluster-organization) 部分以更好地理解这一点。
+2. 必须使用 [Gateway API](/langsmith/self-host-ingress#option-2%3A-gateway-api) 或 [Istio Gateway](/langsmith/self-host-ingress#option-3%3A-istio-gateway)。依赖 [标准入口](/langsmith/self-host-ingress#option-1%3A-standard-ingress) 资源可能会导致与同一集群中其他数据平面创建的 Ingress 对象发生冲突。由于这些情况下的行为取决于特定的入口控制器，因此可能导致不可预测或不良的结果。
+
+## 后续步骤
+
+一旦您的基础设施设置完成，您就可以部署应用程序了。有关构建和部署应用程序的说明，请参阅 [部署选项卡](/langsmith/deployment) 中的部署指南。

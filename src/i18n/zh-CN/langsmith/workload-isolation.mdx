@@ -1,0 +1,176 @@
+---
+title: 工作负载隔离
+sidebarTitle: 工作负载隔离
+---
+
+LangSmith 采用分层结构来组织您的工作：[_组织_](/langsmith/administration-overview#organizations)、[_工作空间_](/langsmith/administration-overview#workspaces)、[_应用_](/langsmith/administration-overview#applications) 和 [_资源_](/langsmith/administration-overview#resources)。这种结构让您能在协作与访问控制之间取得平衡，从而根据团队需求选择适当的隔离级别。
+
+LangSmith 的权限系统建立在此层次结构之上。通过[基于角色的访问控制（RBAC）](/langsmith/rbac)，用户[权限](/langsmith/organization-workspace-operations)被限定在一个或多个工作空间内，从而强制工作空间之间的隔离。通过更细粒度的[基于属性的访问控制（ABAC）](/langsmith/organization-workspace-operations#access-policies)，可以基于工作空间内的标签或应用等属性进一步限制或授予访问权限（例如，允许用户仅访问开发资源或仅访问与特定应用关联的资源）。
+
+本页根据团队的隔离需求，解释了三种常见的工作空间组织方法：
+
+- [以团队为中心的工作空间](#以团队为中心的工作空间)：每个团队一个工作空间（推荐给大多数客户）
+- [协作式工作空间](#协作式工作空间)：每个工作空间包含多个团队
+- [项目隔离的工作空间](#项目隔离的工作空间)：每个团队拥有多个工作空间（适用于严格的隔离需求）
+
+<Tip>
+有关设置组织和工作空间的详细信息，请参阅[设置层次结构](/langsmith/set-up-hierarchy)。
+</Tip>
+
+## 以团队为中心的工作空间
+
+<Warning>
+这是默认模型，也是推荐给大多数客户的选择。
+</Warning>
+
+此模型（每个团队一个工作空间）使用单个组织作为顶级边界。在组织内部，使用多个工作空间来隔离不同的团队或业务单元。每个工作空间代表特定团队的逻辑边界，并管理该团队可以访问的数据和资源。在工作空间内，团队使用多个应用来分组支持同一智能体的资源。一个应用还可能包含不同的资源，例如用于开发和生产环境的独立追踪项目。
+
+```mermaid
+graph LR
+    Org[组织]
+
+    WS1[工作空间: 团队 A]
+    WS2[工作空间: 团队 B]
+
+    App1A[应用]
+    App1B[应用]
+
+    DevA[开发追踪项目]
+    ProdA[生产追踪项目]
+    DatasetA[数据集]
+
+    DevB[开发追踪项目]
+    ProdB[生产追踪项目]
+    DatasetB[数据集]
+
+    Org --> WS1
+    Org --> WS2
+
+    WS1 --> App1A
+    WS2 --> App1B
+
+    App1A --> DevA
+    App1A --> ProdA
+    App1A --> DatasetA
+
+    App1B --> DevB
+    App1B --> ProdB
+    App1B --> DatasetB
+
+    classDef orgStyle fill:#E0E7FF,stroke:#4F46E5,stroke-width:2px,color:#1E1B4B
+    classDef wsStyle fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef appStyle fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef resourceStyle fill:#F3F4F6,stroke:#9CA3AF,stroke-width:1px,color:#374151
+
+    class Org orgStyle
+    class WS1,WS2 wsStyle
+    class App1A,App1B appStyle
+    class DevA,ProdA,DatasetA,DevB,ProdB,DatasetB resourceStyle
+```
+
+- **优点：** 单个工作空间允许共享所有团队资源，使得团队内部的协作和迭代变得简单直接。它还简化了从开发到生产的升级过程。例如，同一个[提示词](/langsmith/prompt-engineering)可以通过标签进行版本控制和升级到生产环境，而无需复制或重复。
+- **缺点：** 主要的权衡在于同一团队不同环境之间的隔离有限。开发、测试和生产资源共存于同一个应用中，因此团队必须依赖标签和约定来避免对生产环境造成意外影响。[RBAC](/langsmith/rbac) 的作用范围在工作空间级别。[ABAC](/langsmith/organization-workspace-operations#access-policies) 通过基于资源属性（例如允许用户仅访问开发资源）限制访问，提供了工作空间内更细粒度的权限控制。
+
+## 协作式工作空间
+
+在此模型（每个工作空间包含多个团队）中，多个团队在组织内共享一个工作空间，并使用应用和[ABAC](/langsmith/organization-workspace-operations#access-policies)来分离资源并管理访问。因此，[提示词](/langsmith/prompt-engineering)和[部署](/langsmith/deployment)等共享资源可以在团队间重复使用，而对[追踪记录](/langsmith/observability-concepts#traces)和[数据集](/langsmith/evaluation-concepts#datasets)等敏感资源的访问则仅限于所属团队。
+
+```mermaid
+graph LR
+    Org[组织]
+
+    WS[共享工作空间]
+
+    AppA[应用: 团队 A]
+    AppB[应用: 团队 B]
+
+    TracesA[追踪记录: 团队 A]
+    DatasetA[数据集: 团队 A]
+    PromptA[提示词: 共享]
+
+    TracesB[追踪记录: 团队 B]
+    DatasetB[数据集: 团队 B]
+    PromptB[提示词: 共享]
+
+    Org --> WS
+
+    WS --> AppA
+    WS --> AppB
+
+    AppA --> TracesA
+    AppA --> DatasetA
+    AppA --> PromptA
+
+    AppB --> TracesB
+    AppB --> DatasetB
+    AppB --> PromptB
+
+    classDef orgStyle fill:#E0E7FF,stroke:#4F46E5,stroke-width:2px,color:#1E1B4B
+    classDef wsStyle fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef appStyle fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef restrictedStyle fill:#FEE2E2,stroke:#DC2626,stroke-width:1px,color:#7F1D1D
+    classDef sharedStyle fill:#FEF3C7,stroke:#F59E0B,stroke-width:1px,color:#78350F
+
+    class Org orgStyle
+    class WS wsStyle
+    class AppA,AppB appStyle
+    class TracesA,DatasetA,TracesB,DatasetB restrictedStyle
+    class PromptA,PromptB sharedStyle
+```
+
+- **优点：** 提示词和部署等公共资源可以在团队间共享和重用，增强了协作并减少了重复工作。与以团队为中心的工作空间模型不同，协作不仅限于单个团队，可以扩展到工作空间内的所有团队。
+- **缺点：** 团队和环境之间的隔离性弱于多工作空间模型，并且依赖于 ABAC 的正确使用。标签或策略配置错误可能导致敏感的[追踪记录](/langsmith/observability-concepts#traces)或[数据集](/langsmith/evaluation-concepts#datasets)在团队间暴露，跨多个团队管理权限也增加了操作复杂性。
+
+## 项目隔离的工作空间
+
+<Callout icon="check" iconType="solid" color="#C7D2FE">
+此方法仅应在需要严格隔离时使用。
+</Callout>
+
+在此模型（每个团队拥有多个工作空间）中，通过为单个团队创建多个工作空间来增强隔离性。工作空间可以按项目或按环境（例如独立的开发和生产工作空间）进行组织。每个工作空间完全隔离，拥有自己的用户、数据和资源，访问权限严格限定在该工作空间内。
+
+```mermaid
+graph LR
+    Org[组织]
+
+    WSDev[工作空间: 开发]
+    WSProd[工作空间: 生产]
+
+    AppDev[应用]
+    AppProd[应用]
+
+    TracesDev[追踪记录]
+    DatasetDev[数据集]
+    DeploymentDev[部署]
+
+    TracesProd[追踪记录]
+    DatasetProd[数据集]
+    DeploymentProd[部署]
+
+    Org --> WSDev
+    Org --> WSProd
+
+    WSDev --> AppDev
+    WSProd --> AppProd
+
+    AppDev --> TracesDev
+    AppDev --> DatasetDev
+    AppDev --> DeploymentDev
+
+    AppProd --> TracesProd
+    AppProd --> DatasetProd
+    AppProd --> DeploymentProd
+
+    classDef orgStyle fill:#E0E7FF,stroke:#4F46E5,stroke-width:2px,color:#1E1B4B
+    classDef wsStyle fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef appStyle fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef resourceStyle fill:#F3F4F6,stroke:#9CA3AF,stroke-width:1px,color:#374151
+
+    class Org orgStyle
+    class WSDev,WSProd wsStyle
+    class AppDev,AppProd appStyle
+    class TracesDev,DatasetDev,DeploymentDev,TracesProd,DatasetProd,DeploymentProd resourceStyle
+```
+
+- **优点：** 团队、项目和环境之间具有强隔离性。仅拥有开发工作空间访问权限的用户无法查看或访问生产数据或任何生产资源，降低了意外更改或跨环境误用的风险。
+- **缺点：** 资源无法在工作空间之间共享。即使是将智能体从开发升级到生产环境，重用[提示词](/langsmith/prompt-engineering)、[数据集](/langsmith/evaluation-concepts#datasets)或[实验](/langsmith/evaluation-concepts#experiment)也需要在工作空间之间手动复制，这会带来摩擦和重复工作。

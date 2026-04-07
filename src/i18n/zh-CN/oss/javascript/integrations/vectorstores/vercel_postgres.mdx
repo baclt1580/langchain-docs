@@ -1,0 +1,185 @@
+---
+title: "Vercel Postgres 集成"
+description: "使用 LangChain JavaScript 与 Vercel Postgres 向量存储进行集成。"
+---
+
+LangChain.js 支持使用 [`@vercel/postgres`](https://www.npmjs.com/package/@vercel/postgres) 包将通用的 Postgres 数据库作为向量存储使用，前提是这些数据库支持 [`pgvector`](https://github.com/pgvector/pgvector) Postgres 扩展。
+
+此集成在 Web 环境（如边缘函数）中特别有用。
+
+## 设置
+
+要使用 Vercel Postgres，你需要安装 `@vercel/postgres` 包：
+
+```bash npm
+npm install @vercel/postgres
+```
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+此集成会自动使用在 `process.env.POSTGRES_URL` 下设置的连接字符串进行连接。
+你也可以像这样手动传递连接字符串：
+
+```typescript
+const vectorstore = await VercelPostgres.initialize(new OpenAIEmbeddings(), {
+  postgresConnectionOptions: {
+    connectionString:
+      "postgres://<用户名>:<密码>@<主机名>:<端口>/<数据库名>",
+  },
+});
+```
+
+### 连接到 Vercel Postgres
+
+一个简单的入门方法是创建一个无服务器的 [Vercel Postgres 实例](https://vercel.com/docs/storage/vercel-postgres/quickstart)。
+如果你要部署到带有关联 Vercel Postgres 实例的 Vercel 项目，所需的 `POSTGRES_URL` 环境变量在托管环境中将已自动填充。
+
+### 连接到其他数据库
+
+如果你更倾向于托管自己的 Postgres 实例，可以使用与 LangChain 的 [PGVector](/oss/integrations/vectorstores/pgvector) 向量存储集成类似的流程，并将连接字符串设置为环境变量或如上所示。
+
+## 使用示例
+
+```typescript
+import { CohereEmbeddings } from "@langchain/cohere";
+import { VercelPostgres } from "@langchain/community/vectorstores/vercel_postgres";
+
+// 仅当需要覆盖默认值时才需要配置。
+const config = {
+  // tableName: "testvercelvectorstorelangchain",
+  // postgresConnectionOptions: {
+  //   connectionString: "postgres://<用户名>:<密码>@<主机名>:<端口>/<数据库名>",
+  // },
+  // columns: {
+  //   idColumnName: "id",
+  //   vectorColumnName: "vector",
+  //   contentColumnName: "content",
+  //   metadataColumnName: "metadata",
+  // },
+};
+
+const vercelPostgresStore = await VercelPostgres.initialize(
+  new CohereEmbeddings({ model: "embed-english-v3.0" }),
+  config
+);
+
+const docHello = {
+  pageContent: "hello",
+  metadata: { topic: "nonsense" },
+};
+const docHi = { pageContent: "hi", metadata: { topic: "nonsense" } };
+const docMitochondria = {
+  pageContent: "Mitochondria is the powerhouse of the cell",
+  metadata: { topic: "science" },
+};
+
+const ids = await vercelPostgresStore.addDocuments([
+  docHello,
+  docHi,
+  docMitochondria,
+]);
+
+const results = await vercelPostgresStore.similaritySearch("hello", 2);
+console.log(results);
+/*
+  [
+    Document { pageContent: 'hello', metadata: { topic: 'nonsense' } },
+    Document { pageContent: 'hi', metadata: { topic: 'nonsense' } }
+  ]
+*/
+
+// 元数据过滤
+const results2 = await vercelPostgresStore.similaritySearch(
+  "无关查询，元数据过滤",
+  2,
+  {
+    topic: "science",
+  }
+);
+console.log(results2);
+/*
+  [
+    Document {
+      pageContent: 'Mitochondria is the powerhouse of the cell',
+      metadata: { topic: 'science' }
+    }
+  ]
+*/
+
+// 使用 IN 过滤器的元数据过滤同样有效
+const results3 = await vercelPostgresStore.similaritySearch(
+  "无关查询，元数据过滤",
+  3,
+  {
+    topic: { in: ["science", "nonsense"] },
+  }
+);
+console.log(results3);
+/*
+  [
+    Document {
+      pageContent: 'hello',
+      metadata: { topic: 'nonsense' }
+    },
+    Document {
+      pageContent: 'hi',
+      metadata: { topic: 'nonsense' }
+    },
+    Document {
+      pageContent: 'Mitochondria is the powerhouse of the cell',
+      metadata: { topic: 'science' }
+    }
+  ]
+*/
+
+// 也支持更新插入
+await vercelPostgresStore.addDocuments(
+  [
+    {
+      pageContent: "ATP is the powerhouse of the cell",
+      metadata: { topic: "science" },
+    },
+  ],
+  { ids: [ids[2]] }
+);
+
+const results4 = await vercelPostgresStore.similaritySearch(
+  "什么是细胞的动力源？",
+  1
+);
+console.log(results4);
+/*
+  [
+    Document {
+      pageContent: 'ATP is the powerhouse of the cell',
+      metadata: { topic: 'science' }
+    }
+  ]
+*/
+
+await vercelPostgresStore.delete({ ids: [ids[2]] });
+
+const results5 = await vercelPostgresStore.similaritySearch(
+  "不再有元数据",
+  2,
+  {
+    topic: "science",
+  }
+);
+console.log(results5);
+/*
+  []
+*/
+
+// 记得调用 .end() 来关闭连接！
+await vercelPostgresStore.end();
+```
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

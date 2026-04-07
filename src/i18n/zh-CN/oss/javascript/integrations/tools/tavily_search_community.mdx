@@ -1,0 +1,162 @@
+---
+title: "TavilySearchResults（已弃用）集成"
+description: "使用 LangChain JavaScript 集成 TavilySearchResults（已弃用）工具。"
+
+<Info>
+**弃用通知**
+
+此工具已弃用。请改用 `@langchain/tavily` 包中的 [TavilySearch](/oss/integrations/tools/tavily_search) 工具。
+
+</Info>
+
+[Tavily](https://tavily.com/) Search 是一款专为 LLM 智能体设计的强大搜索 API。它能无缝集成多种数据源，确保提供优质、相关的搜索体验。
+
+本指南简要介绍了如何开始使用 `TavilySearchResults` [工具](/oss/integrations/tools/)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [PY 支持](https://python.langchain.com/docs/integrations/tools/tavily_search/) | 版本 |
+| :--- | :--- | :---: | :---: |
+| `TavilySearchResults` | [`@langchain/community`](https://www.npmjs.com/package/@langchain/community) | ✅ |  ![NPM - 版本](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+## 设置
+
+该集成位于 `@langchain/community` 包中，你可以按如下方式安装：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/core
+```
+```bash yarn
+yarn add @langchain/community @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/core
+```
+</CodeGroup>
+
+### 凭证
+
+[设置 Tavily API 密钥](https://app.tavily.com) 并将其设置为名为 `TAVILY_API_KEY` 的环境变量。
+
+```typescript
+process.env.TAVILY_API_KEY = "YOUR_API_KEY"
+```
+
+同时设置 [LangSmith](https://smith.langchain.com/) 以获得最佳的观测体验（非必需但推荐）：
+
+```typescript
+process.env.LANGSMITH_TRACING="true"
+process.env.LANGSMITH_API_KEY="your-api-key"
+```
+
+## 实例化
+
+你可以像这样导入并实例化 `TavilySearchResults` 工具：
+
+```typescript
+import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
+
+const tool = new TavilySearchResults({
+  maxResults: 2,
+  // ...
+});
+```
+
+## 调用
+
+### [直接传入参数调用](/oss/langchain/tools)
+
+你可以像这样直接调用工具：
+
+```typescript
+await tool.invoke({
+  input: "what is the current weather in SF?",
+});
+```
+
+### [通过 ToolCall 调用](/oss/langchain/tools)
+
+我们也可以通过模型生成的 `ToolCall` 来调用工具，此时将返回一个 @[`ToolMessage`]：
+
+```typescript
+// 这通常由模型生成，但为了演示目的，我们直接创建一个工具调用。
+const modelGeneratedToolCall = {
+  args: {
+    query: "what is the current weather in SF?"
+  },
+  id: "1",
+  name: tool.name,
+  type: "tool_call",
+}
+
+await tool.invoke(modelGeneratedToolCall)
+```
+
+## 链式调用
+
+我们可以将工具用于链式调用，首先将其绑定到一个 [支持工具调用的模型](/oss/langchain/tools/)，然后进行调用：
+
+```typescript
+// @lc-docs-hide-cell
+
+import { ChatOpenAI } from "@langchain/openai"
+
+const llm = new ChatOpenAI({
+  model: "gpt-4.1",
+  temperature: 0,
+})
+```
+
+```typescript
+import { HumanMessage } from "@langchain/core/messages";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { RunnableLambda } from "@langchain/core/runnables";
+
+const prompt = ChatPromptTemplate.fromMessages(
+  [
+    ["system", "你是一个有用的助手。"],
+    ["placeholder", "{messages}"],
+  ]
+)
+
+const llmWithTools = llm.bindTools([tool]);
+
+const chain = prompt.pipe(llmWithTools);
+
+const toolChain = RunnableLambda.from(
+  async (userInput: string, config) => {
+    const humanMessage = new HumanMessage(userInput,);
+    const aiMsg = await chain.invoke({
+      messages: [new HumanMessage(userInput)],
+    }, config);
+    const toolMsgs = await tool.batch(aiMsg.tool_calls, config);
+    return chain.invoke({
+      messages: [humanMessage, aiMsg, ...toolMsgs],
+    }, config);
+  }
+);
+
+const toolChainResult = await toolChain.invoke("what is the current weather in sf?");
+```
+
+```typescript
+const { tool_calls, content } = toolChainResult;
+
+console.log("AIMessage", JSON.stringify({
+  tool_calls,
+  content,
+}, null, 2));
+```
+
+## 智能体
+
+关于如何在智能体中使用 LangChain 工具的指南，请参阅 [LangGraph.js](https://langchain-ai.github.io/langgraphjs/) 文档。
+
+---
+
+## 相关链接
+
+* [工具文档](/oss/langchain/tools)

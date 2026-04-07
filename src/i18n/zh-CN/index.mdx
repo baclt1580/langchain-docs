@@ -1,0 +1,155 @@
+---
+title:
+sidebarTitle: 首页
+mode: "custom"
+---
+
+
+<div class="home-page mx-auto max-w-8xl px-0 lg:px-5" style={{ paddingBottom: "8rem" }}>
+    <div class="mdx-content prose prose-gray dark:prose-invert mx-4 pt-10">
+        <h1 class="flex whitespace-pre-wrap group font-semibold text-2xl sm:text-3xl mt-8">文档</h1>
+
+        LangChain 是智能体工程平台。来自 Clay、Rippling、Cloudflare、Workday 等公司的 AI 团队信赖 LangChain 的产品来构建可靠的智能体。
+
+        <h2 class="flex whitespace-pre-wrap group font-semibold">LangSmith</h2>
+
+        [**LangSmith**](/langsmith/home) 是一个帮助 AI 团队利用实时生产数据进行持续测试和改进的平台。LangSmith 提供：
+
+        <CardGroup cols={4}>
+            <Card
+                title="可观测性"
+                href="/langsmith/observability"
+                icon="/images/brand/observability-icon-dark.png"
+                cta="了解更多"
+            >
+                通过详细的追踪和聚合趋势指标，清晰了解您的智能体如何思考与行动。
+            </Card>
+            <Card
+                title="评估"
+                href="/langsmith/evaluation"
+                icon="/images/brand/evaluation-icon-dark.png"
+                cta="了解更多"
+            >
+                基于生产数据或离线数据集测试和评分智能体行为，持续提升性能。
+            </Card>
+            <Card
+                title="提示工程"
+                href="/langsmith/prompt-engineering"
+                icon="/images/brand/prompt-engineering-icon.png"
+                cta="了解更多"
+            >
+                通过版本控制、提示优化和协作功能迭代优化提示。
+            </Card>
+            <Card
+                title="部署"
+                href="/langsmith/deployment"
+                icon="/images/brand/deployment-icon-dark.png"
+                cta="了解更多"
+            >
+                一键部署您的智能体，使用专为长时间运行任务构建的可扩展基础设施。
+            </Card>
+        </CardGroup>
+
+        <Callout icon="shield-lock" color="#4F46E5" iconType="regular">
+        LangSmith 符合 HIPAA、SOC 2 Type 2 和 GDPR 标准，满足数据安全与隐私的最高要求。更多信息，请参阅 [信任中心](https://trust.langchain.com/)。
+        </Callout>
+
+        <h2 class="flex whitespace-pre-wrap group font-semibold">LangSmith Fleet</h2>
+        <Card
+                title="Fleet"
+                href="/langsmith/fleet/index"
+                icon="/images/brand/fleet-icon-dark.png"
+                cta="了解更多"
+            >
+                无需代码即可创建实用的 AI 智能体。从模板开始，连接您的账户，让智能体处理日常工作，同时您保持掌控。
+            </Card>
+
+        <h2 class="flex whitespace-pre-wrap group font-semibold">开源智能体框架</h2>
+
+        <Tabs>
+            <Tab title="Python" icon="brand-python">
+                <CardGroup cols={3}>
+                    <Card
+                        title="Deep Agents (Python)"
+                        href="/oss/python/deepagents/overview"
+                        icon="/images/brand/deep-agents-icon.png"
+                        cta="了解更多"
+                    >
+                        快速构建能够处理任何任务的智能体。
+                    </Card>
+                    <Card
+                        title="LangChain (Python)"
+                        href="/oss/python/langchain/overview"
+                        icon="/images/brand/langchain-icon.png"
+                        cta="了解更多"
+                    >
+                        自定义智能体的构建模块。
+                    </Card>
+                    <Card
+                        title="LangGraph (Python)"
+                        href="/oss/python/langgraph/overview"
+                        icon="/images/brand/langgraph-icon.png"
+                        cta="了解更多"
+                    >
+                        通过底层编排、记忆和人机协同支持，控制自定义智能体的每一步。
+                    </Card>
+                </CardGroup>
+            </Tab>
+            <Tab title="TypeScript" icon="brand-typescript">
+                <CardGroup cols={3}>
+                    <Card
+                        title="Deep Agents (TypeScript)"
+                        href="/oss/javascript/deepagents/overview"
+                        icon="/images/brand/deep-agents-icon.png"
+                        cta="了解更多"
+                    >
+                        快速构建能够处理任何任务的智能体。
+                    </Card>
+                    <Card
+                        title="LangChain (TypeScript)"
+                        href="/oss/javascript/langchain/overview"
+                        icon="/images/brand/langchain-icon.png"
+                        cta="了解更多"
+                    >
+                        自定义智能体的构建模块。
+                    </Card>
+                    <Card
+                        title="LangGraph (TypeScript)"
+                        href="/oss/javascript/langgraph/overview"
+                        icon="/images/brand/langgraph-icon.png"
+                        cta="了解更多"
+                    >
+                        通过底层编排、记忆和人机协同支持，控制自定义智能体的每一步。
+                    </Card>
+                </CardGroup>
+            </Tab>
+        </Tabs>
+
+        <h2 class="flex whitespace-pre-wrap group font-semibold">开始使用</h2>
+
+        <CardGroup cols={4}>
+            <Card title="使用 LangChain 构建您的第一个智能体" icon="settings" href="/oss/python/langchain/quickstart" cta="开始使用" />
+            <Card title="注册 LangSmith" icon="tools" href="https://smith.langchain.com/" cta="试用 LangSmith" />
+            <Card title="使用 LangGraph 构建高级智能体" icon="robot" href="/oss/python/langgraph/quickstart" cta="开始使用"/>
+            <Card title="报名 LangChain 学院" icon="school" href="https://academy.langchain.com/" cta="开始使用"/>
+        </CardGroup>
+
+        <h2 class="flex whitespace-pre-wrap group font-semibold">其他资源</h2>
+
+        <CardGroup cols={4}>
+            <Card title="社区论坛" icon="messages" href="https://forum.langchain.com/" cta="加入">
+                提问、分享解决方案并讨论最佳实践。
+            </Card>
+            <Card title="社区 Slack" icon="brand-slack" href="https://www.langchain.com/join-community" cta="加入">
+                与其他开发者交流并快速获取帮助。
+            </Card>
+            <Card title="支持门户" icon="message-circle-question" href="https://support.langchain.com/" cta="访问">
+                提交工单并跟踪支持请求。
+            </Card>
+            <Card title="LangSmith 状态" icon="tools" href="https://status.smith.langchain.com/" cta="查看">
+                LangSmith 服务与 API 的实时状态。
+            </Card>
+        </CardGroup>
+
+    </div>
+</div>

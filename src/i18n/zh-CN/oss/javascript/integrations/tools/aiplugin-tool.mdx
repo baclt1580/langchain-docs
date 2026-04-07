@@ -1,0 +1,74 @@
+---
+title: "ChatGPT 插件集成"
+description: "使用 LangChain JavaScript 集成 ChatGPT 插件工具。"
+---
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { initializeAgentExecutorWithOptions } from "@langchain/classic/agents";
+import { RequestsGetTool, RequestsPostTool } from "@langchain/classic/tools";
+import { AIPluginTool } from "@langchain/community/tools/aiplugin";
+
+export const run = async () => {
+  const tools = [
+    new RequestsGetTool(),
+    new RequestsPostTool(),
+    await AIPluginTool.fromPluginUrl(
+      "https://www.klarna.com/.well-known/ai-plugin.json"
+    ),
+  ];
+  const executor = await initializeAgentExecutorWithOptions(
+    tools,
+    new ChatOpenAI({ model: "gpt-4.1-mini", temperature: 0 }),
+    { agentType: "chat-zero-shot-react-description", verbose: true }
+  );
+
+  const result = await executor.invoke({
+    input: "what t shirts are available in klarna?",
+  });
+
+  console.log({ result });
+};
+```
+
+```
+进入新的 agent_executor 链...
+思考：Klarna 是一个支付提供商，不是商店。我需要检查是否有 Klarna 购物 API 可以用来搜索 T 恤。
+动作：
+```
+```
+{
+"action": "KlarnaProducts",
+"action_input": ""
+}
+```
+```
+使用指南：使用 Klarna 插件为任何购物或研究目的获取相关产品建议。发送的查询不应包含冠词、介词和限定词等停用词。当搜索与产品相关的词汇（如产品名称、品牌、型号或类别）时，API 效果最佳。链接将始终返回并应展示给用户。
+
+OpenAPI 规范：{"openapi":"3.0.1","info":{"version":"v0","title":"Open AI Klarna product Api"},"servers":[{"url":"https://www.klarna.com/us/shopping"}],"tags":[{"name":"open-ai-product-endpoint","description":"Open AI 产品端点。查询产品。"}],"paths":{"/public/openai/v0/products":{"get":{"tags":["open-ai-product-endpoint"],"summary":"获取 Klarna 产品信息的 API","operationId":"productsUsingGET","parameters":[{"name":"q","in":"query","description":"查询词，长度必须在 2 到 100 个字符之间","required":true,"schema":{"type":"string"}},{"name":"size","in":"query","description":"返回的产品数量","required":false,"schema":{"type":"integer"}},{"name":"budget","in":"query","description":"匹配产品的最高价格（本地货币），用于筛选结果","required":false,"schema":{"type":"integer"}}],"responses":{"200":{"description":"找到产品","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductResponse"}}}},"503":{"description":"一个或多个服务不可用"}},"deprecated":false}}},"components":{"schemas":{"Product":{"type":"object","properties":{"attributes":{"type":"array","items":{"type":"string"}},"name":{"type":"string"},"price":{"type":"string"},"url":{"type":"string"}},"title":"Product"},"ProductResponse":{"type":"object","properties":{"products":{"type":"array","items":{"$ref":"#/components/schemas/Product"}}},"title":"ProductResponse"}}}}
+现在我知道有 Klarna 购物 API，可以用它来搜索 T 恤。我将向 API 发送一个 GET 请求，查询参数为 "t-shirt"。
+```
+```
+动作：
+{
+"action": "requests_get",
+"action_input": "https://www.klarna.com/us/shopping/public/openai/v0/products?q=t-shirt"
+}
+
+```
+
+```
+{"products":[{"name":"Psycho Bunny Mens Copa Gradient Logo Graphic Tee","url":"https://www.klarna.com/us/shopping/pl/cl10001/3203663222/Clothing/Psycho-Bunny-Mens-Copa-Gradient-Logo-Graphic-Tee/?source=openai","price":"$35.00","attributes":["材质:棉","目标人群:男性","颜色:白色,蓝色,黑色,橙色"]},{"name":"T-shirt","url":"https://www.klarna.com/us/shopping/pl/cl10001/3203506327/Clothing/T-shirt/?source=openai","price":"$20.45","attributes":["材质:棉","目标人群:男性","颜色:灰色,白色,蓝色,黑色,橙色"]},{"name":"Palm Angels Bear T-shirt - Black","url":"https://www.klarna.com/us/shopping/pl/cl10001/3201090513/Clothing/Palm-Angels-Bear-T-shirt-Black/?source=openai","price":"$168.36","attributes":["材质:棉","目标人群:男性","颜色:黑色"]},{"name":"Tommy Hilfiger Essential Flag Logo T-shirt","url":"https://www.klarna.com/us/shopping/pl/cl10001/3201840629/Clothing/Tommy-Hilfiger-Essential-Flag-Logo-T-shirt/?source=openai","price":"$22.52","attributes":["材质:棉","目标人群:男性","颜色:红色,灰色,白色,蓝色,黑色","图案:纯色","环保属性:有机"]},{"name":"Coach Outlet Signature T Shirt","url":"https://www.klarna.com/us/shopping/pl/cl10001/3203005573/Clothing/Coach-Outlet-Signature-T-Shirt/?source=openai","price":"$75.00","attributes":["材质:棉","目标人群:男性","颜色:灰色"]}]}
+链结束。
+{
+  result: {
+    output: 'Klarna 中可用的 T 恤包括 Psycho Bunny Mens Copa Gradient Logo Graphic Tee、T-shirt、Palm Angels Bear T-shirt - Black、Tommy Hilfiger Essential Flag Logo T-shirt 和 Coach Outlet Signature T Shirt。',
+    intermediateSteps: [ [Object], [Object] ]
+  }
+}
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/langchain/tools)
+- 工具 [操作指南](/oss/langchain/tools)

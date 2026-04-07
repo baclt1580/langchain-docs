@@ -1,0 +1,61 @@
+---
+title: "Modern Treasury 集成"
+description: "使用 LangChain Python 与 Modern Treasury 文档加载器集成。"
+---
+
+>[Modern Treasury](https://www.moderntreasury.com/) 简化了复杂的支付操作。它是一个统一平台，为资金流动相关的产品和流程提供支持。
+>
+>- 连接银行与支付系统
+>- 实时追踪交易与余额
+>- 自动化支付操作以实现规模化
+
+本笔记本介绍了如何从 `Modern Treasury REST API` 加载数据，并将其转换为可被 LangChain 处理的格式，同时包含向量化使用的示例。
+
+```python
+from langchain.indexes import VectorstoreIndexCreator
+from langchain_community.document_loaders import ModernTreasuryLoader
+```
+
+Modern Treasury API 需要组织 ID 和 API 密钥，这些信息可在 Modern Treasury 仪表板的开发者设置中找到。
+
+此文档加载器还需要一个 `resource` 参数，用于定义要加载的数据类型。
+
+可用的资源包括：
+
+`payment_orders` [文档](https://docs.moderntreasury.com/reference/payment-order-object)
+
+`expected_payments` [文档](https://docs.moderntreasury.com/reference/expected-payment-object)
+
+`returns` [文档](https://docs.moderntreasury.com/reference/return-object)
+
+`incoming_payment_details` [文档](https://docs.moderntreasury.com/reference/incoming-payment-detail-object)
+
+`counterparties` [文档](https://docs.moderntreasury.com/reference/counterparty-object)
+
+`internal_accounts` [文档](https://docs.moderntreasury.com/reference/internal-account-object)
+
+`external_accounts` [文档](https://docs.moderntreasury.com/reference/external-account-object)
+
+`transactions` [文档](https://docs.moderntreasury.com/reference/transaction-object)
+
+`ledgers` [文档](https://docs.moderntreasury.com/reference/ledger-object)
+
+`ledger_accounts` [文档](https://docs.moderntreasury.com/reference/ledger-account-object)
+
+`ledger_transactions` [文档](https://docs.moderntreasury.com/reference/ledger-transaction-object)
+
+`events` [文档](https://docs.moderntreasury.com/reference/events)
+
+`invoices` [文档](https://docs.moderntreasury.com/reference/invoices)
+
+```python
+modern_treasury_loader = ModernTreasuryLoader("payment_orders")
+```
+
+```python
+# 从加载器创建向量存储检索器
+# 更多细节请参阅 https://python.langchain.com/en/latest/modules/data_connection/getting_started.html
+
+index = VectorstoreIndexCreator().from_loaders([modern_treasury_loader])
+modern_treasury_doc_retriever = index.vectorstore.as_retriever()
+```

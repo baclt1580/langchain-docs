@@ -1,0 +1,85 @@
+---
+title: "Discord 集成"
+description: "使用 LangChain JavaScript 与 Discord 工具集成。"
+---
+
+Discord 工具赋予您的代理搜索、读取和向 Discord 频道发送消息的能力。
+当您需要与 Discord 频道进行交互时，该工具非常有用。
+
+## 安装设置
+
+要使用 Discord 工具，您需要安装以下官方对等依赖项：
+
+```bash npm
+npm install discord.js
+```
+
+## 独立使用
+
+```typescript
+import {
+  DiscordGetMessagesTool,
+  DiscordChannelSearchTool,
+  DiscordSendMessagesTool,
+  DiscordGetGuildsTool,
+  DiscordGetTextChannelsTool,
+} from "@langchain/community/tools/discord";
+
+// 根据频道 ID 获取频道中的消息
+const getMessageTool = new DiscordGetMessagesTool();
+const messageResults = await getMessageTool.invoke("1153400523718938780");
+console.log(messageResults);
+
+// 获取服务器/群组
+const getGuildsTool = new DiscordGetGuildsTool();
+const guildResults = await getGuildsTool.invoke("");
+console.log(guildResults);
+
+// 在指定频道中搜索（不区分大小写）
+const searchTool = new DiscordChannelSearchTool();
+const searchResults = await searchTool.invoke("Test");
+console.log(searchResults);
+
+// 获取服务器的所有文本频道
+const getChannelsTool = new DiscordGetTextChannelsTool();
+const channelResults = await getChannelsTool.invoke("1153400523718938775");
+console.log(channelResults);
+
+// 发送消息
+const sendMessageTool = new DiscordSendMessagesTool();
+const sendMessageResults = await sendMessageTool.invoke("test message");
+console.log(sendMessageResults);
+```
+
+## 在代理中使用
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { initializeAgentExecutorWithOptions } from "@langchain/classic/agents";
+import { DiscordSendMessagesTool } from "@langchain/community/tools/discord";
+import { DadJokeAPI } from "@langchain/community/tools/dadjokeapi";
+
+const model = new ChatOpenAI({
+  model: "gpt-4.1-mini",
+  temperature: 0,
+});
+
+const tools = [new DiscordSendMessagesTool(), new DadJokeAPI()];
+
+const executor = await initializeAgentExecutorWithOptions(tools, model, {
+  agentType: "zero-shot-react-description",
+  verbose: true,
+});
+
+const res = await executor.invoke({
+  input: `在 Discord 频道中讲一个笑话`,
+});
+
+console.log(res.output);
+// "电梯笑话最棒的地方是什么？它们能在很多层面上发挥作用。"
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/langchain/tools)
+- 工具 [使用指南](/oss/langchain/tools)

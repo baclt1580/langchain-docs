@@ -1,0 +1,38 @@
+---
+title: "StackExchange 集成"
+description: "使用 LangChain JavaScript 与 StackExchange 工具集成。"
+---
+
+StackExchange 工具可将您的智能体和链连接到 StackExchange 的 API。
+
+## 使用方法
+
+```typescript
+import { StackExchangeAPI } from "@langchain/community/tools/stackexchange";
+
+// 从 StackExchange API 获取结果
+const stackExchangeTool = new StackExchangeAPI();
+const result = await stackExchangeTool.invoke("zsh: command not found: python");
+console.log(result);
+
+// 通过标题查询从 StackExchange API 获取结果
+const stackExchangeTitleTool = new StackExchangeAPI({
+  queryType: "title",
+});
+const titleResult = await stackExchangeTitleTool.invoke(
+  "zsh: command not found: python"
+);
+console.log(titleResult);
+
+// 使用无效查询从 StackExchange API 获取结果
+const stackExchangeBadTool = new StackExchangeAPI();
+const badResult = await stackExchangeBadTool.invoke(
+  "sjefbsmnazdkhbazkbdoaencopebfoubaef"
+);
+console.log(badResult);
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/langchain/tools)
+- 工具 [操作指南](/oss/langchain/tools)

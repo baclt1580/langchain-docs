@@ -1,0 +1,22 @@
+---
+title: "PPTX 文件集成"
+description: "使用 LangChain JavaScript 集成 PPTX 文件文档加载器。"
+---
+
+本示例介绍如何从 PPTX 文件中加载数据。默认情况下，PPTX 文件中的所有页面将合并为一个文档。
+
+## 安装
+
+```bash npm
+npm install officeparser
+```
+
+## 使用方法，每页一个文档
+
+```typescript
+import { PPTXLoader } from "@langchain/community/document_loaders/fs/pptx";
+
+const loader = new PPTXLoader("src/document_loaders/example_data/example.pptx");
+
+const docs = await loader.load();
+```

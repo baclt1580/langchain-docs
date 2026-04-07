@@ -1,0 +1,116 @@
+---
+title: "HTML 转文本集成"
+description: "使用 LangChain Python 集成 HTML 转文本文档转换器。"
+---
+
+>[html2text](https://github.com/Alir3z4/html2text/) 是一个 Python 包，可将 `HTML` 页面转换为干净、易读的纯 `ASCII 文本`。
+
+ASCII 文本也恰好是有效的 `Markdown`（一种文本到 HTML 的格式）。
+
+```python
+pip install -qU html2text
+```
+
+```python
+from langchain_community.document_loaders import AsyncHtmlLoader
+
+urls = ["https://www.espn.com", "https://lilianweng.github.io/posts/2023-06-23-agent/"]
+loader = AsyncHtmlLoader(urls)
+docs = loader.load()
+```
+
+```text
+未设置 USER_AGENT 环境变量，建议设置它以标识您的请求。
+正在获取页面: 100%|##########| 2/2 [00:00<00:00, 14.74it/s]
+```
+
+```python
+from langchain_community.document_transformers import Html2TextTransformer
+
+urls = ["https://www.espn.com", "https://lilianweng.github.io/posts/2023-06-23-agent/"]
+html2text = Html2TextTransformer()
+docs_transformed = html2text.transform_documents(docs)
+
+print(docs_transformed[0].page_content[1000:2000])
+
+print(docs_transformed[1].page_content[1000:2000])
+```
+
+```text
+## 梦幻体育
+
+  * 橄榄球
+
+  * 棒球
+
+  * 篮球
+
+  * 冰球
+
+## ESPN 站点
+
+  * ESPN Deportes
+
+  * Andscape
+
+  * espnW
+
+  * ESPNFC
+
+  * X Games
+
+  * SEC Network
+
+## ESPN 应用
+
+  * ESPN
+
+  * ESPN Fantasy
+
+  * Tournament Challenge
+
+## 关注 ESPN
+
+  * Facebook
+
+  * X/Twitter
+
+  * Instagram
+
+  * Snapchat
+
+  * TikTok
+
+  * YouTube
+
+## NBA 模拟选秀最新动态：第一轮开始前数小时我们听到的一切
+
+距离第一轮开始（东部时间晚上 8 点，ESPN 和 ABC 播出）仅剩数小时，ESPN 选秀专家 Jonathan Givony 和 Jeremy Woo 带来了关于乐透签等的最新消息。
+
+2hJonathan Givony 和 Jeremy Woo
+
+插图由 ESPN 提供
+
+## 从第 1 到第 100 名：2024 年 NBA 选秀前景排名
+
+谁是第一名？肯塔基、杜克和康涅狄格大学的球员排名如何？这是我们最终的 Top 100 大名单。
+
+6hJonathan Givony 和 Jeremy Woo
+
+  * 完整选秀顺序：两轮共 58 个签位
+  * 交易追踪器：所有交易的细节
+
+  * 投注热点：湖人队是选中布朗尼的热门
+  * 使用我们的 NBA 选秀模拟
+智能体系统中，LLM 充当智能体的大脑，
+并辅以几个关键组件：
+
+  * **规划**
+    * 子目标与分解：智能体将大型任务分解为更小、更易管理的子目标，从而能够高效处理复杂任务。
+    * 反思与改进：智能体可以对过去的行动进行自我批评和反思，从错误中学习并改进未来的步骤，从而提高最终结果的质量。
+  * **记忆**
+    * 短期记忆：我认为所有的上下文学习（参见提示工程）都是在利用模型的短期记忆进行学习。
+    * 长期记忆：这为智能体提供了在较长时间内保留和回忆（无限）信息的能力，通常通过利用外部向量存储和快速检索来实现。
+  * **工具使用**
+    * 智能体学习调用外部 API 来获取模型权重中缺失的额外信息（这些信息通常在预训练后难以更改），包括
+```

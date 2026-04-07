@@ -1,0 +1,71 @@
+---
+title: "集成 Zapier NLA 的智能体"
+description: "使用 LangChain JavaScript 集成带有 Zapier NLA 工具的智能体。"
+---
+
+<Warning>
+此模块已被弃用，不再受支持。以下文档在 0.2.0 或更高版本中将无法使用。
+</Warning>
+
+完整文档请参阅：https://nla.zapier.com/start/
+
+**Zapier 自然语言操作** 通过自然语言 API 接口，让你能够访问 Zapier 平台上的 5000 多个应用和 20000 多个操作。
+
+NLA 支持 Gmail、Salesforce、Trello、Slack、Asana、HubSpot、Google Sheets、Microsoft Teams 等数千款应用：https://zapier.com/apps
+
+Zapier NLA 处理所有底层的 API 身份验证，并将自然语言转换为底层 API 调用，再为 LLM 返回简化的输出。其核心思想是，你或你的用户通过类似 OAuth 的设置窗口公开一组操作，然后可以通过 REST API 查询和执行这些操作。
+
+NLA 提供 API 密钥和 OAuth 两种方式来签署 NLA API 请求。
+
+服务器端（API 密钥）：适用于快速入门、测试以及生产场景，其中 LangChain 仅使用开发者 Zapier 账户中公开的操作（并将使用开发者在 Zapier.com 上连接的账户）。
+
+用户端（OAuth）：适用于生产场景，其中你部署的是面向最终用户的应用，且 LangChain 需要访问最终用户公开的操作及其在 Zapier.com 上连接的账户。
+
+可以通过环境变量（`ZAPIER_NLA_OAUTH_ACCESS_TOKEN` 或 `ZAPIER_NLA_API_KEY`）附加 NLA 凭据，或参考 `ZapierNLAWrapper` API 参考中的 params 参数。
+
+更多详情请查阅 [身份验证文档](https://docs.zapier.com/platform/build/auth)。
+
+以下示例演示了如何将 Zapier 集成用作智能体：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅 [此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/core
+```
+```typescript
+import { OpenAI } from "@langchain/openai";
+import { ZapierNLAWrapper } from "@langchain/classic/tools";
+import {
+  initializeAgentExecutorWithOptions,
+  ZapierToolKit,
+} from "@langchain/classic/agents";
+
+const model = new OpenAI({ temperature: 0 });
+const zapier = new ZapierNLAWrapper();
+const toolkit = await ZapierToolKit.fromZapierNLAWrapper(zapier);
+
+const executor = await initializeAgentExecutorWithOptions(
+  toolkit.tools,
+  model,
+  {
+    agentType: "zero-shot-react-description",
+    verbose: true,
+  }
+);
+console.log("智能体已加载。");
+
+const input = `总结我收到的关于硅谷银行的最后一封电子邮件。将摘要发送到 #test-zapier Slack 频道。`;
+
+console.log(`正在执行输入："${input}"...`);
+
+const result = await executor.invoke({ input });
+
+console.log(`获得输出 ${result.output}`);
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/langchain/tools)
+- 工具 [操作指南](/oss/langchain/tools)

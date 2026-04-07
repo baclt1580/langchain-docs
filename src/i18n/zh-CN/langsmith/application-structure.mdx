@@ -1,0 +1,244 @@
+---
+title: 应用结构
+sidebarTitle: 应用结构
+---
+
+import FrameworkAgnostic from '/snippets/langsmith/framework-agnostic.mdx';
+
+要在 LangSmith 上部署，一个应用必须包含一个或多个图、一个配置文件 (`langgraph.json`)、一个指定依赖项的文件，以及一个可选的定义环境变量的 `.env` 文件。
+
+本页解释了 LangSmith 应用是如何组织的，以及如何提供部署所需的配置详情。
+
+## 核心概念
+
+要使用 LangSmith 进行部署，请提供以下信息：
+
+1.  一个[配置文件](#configuration-file-concepts) (`langgraph.json`)，用于指定应用所需的依赖项、图和环境变量。
+2.  实现应用逻辑的[图](#graphs)。
+3.  一个指定运行应用所需的[依赖项](#dependencies)的文件。
+4.  应用运行所需的[环境变量](#environment-variables)。
+
+<Tip>
+**框架无关**
+<FrameworkAgnostic/>
+</Tip>
+
+## 文件结构
+
+以下是 Python 和 JavaScript 应用的目录结构示例：
+
+<Tabs>
+    <Tab title="Python (requirements.txt)">
+    ```plaintext
+    my-app/
+    ├── my_agent # 所有项目代码位于此处
+    │   ├── utils # 图的工具函数
+    │   │   ├── __init__.py
+    │   │   ├── tools.py # 图的工具
+    │   │   ├── nodes.py # 图的节点函数
+    │   │   └── state.py # 图的状态定义
+    │   ├── __init__.py
+    │   └── agent.py # 构建图的代码
+    ├── .env # 环境变量
+    ├── requirements.txt # 包依赖项
+    └── langgraph.json # LangGraph 配置文件
+    ```
+    </Tab>
+    <Tab title="Python (pyproject.toml)">
+    ```plaintext
+    my-app/
+    ├── my_agent # 所有项目代码位于此处
+    │   ├── utils # 图的工具函数
+    │   │   ├── __init__.py
+    │   │   ├── tools.py # 图的工具
+    │   │   ├── nodes.py # 图的节点函数
+    │   │   └── state.py # 图的状态定义
+    │   ├── __init__.py
+    │   └── agent.py # 构建图的代码
+    ├── .env # 环境变量
+    ├── langgraph.json  # LangGraph 配置文件
+    └── pyproject.toml # 项目依赖项
+    ```
+    </Tab>
+    <Tab title="JS (package.json)">
+    ```plaintext
+    my-app/
+    ├── src # 所有项目代码位于此处
+    │   ├── utils # 可选的图工具函数
+    │   │   ├── tools.ts # 图的工具
+    │   │   ├── nodes.ts # 图的节点函数
+    │   │   └── state.ts # 图的状态定义
+    │   └── agent.ts # 构建图的代码
+    ├── package.json # 包依赖项
+    ├── .env # 环境变量
+    └── langgraph.json # LangGraph 配置文件
+    ```
+    </Tab>
+</Tabs>
+
+<Note>
+应用的目录结构可能因编程语言和使用的包管理器而异。
+</Note>
+
+<a id="configuration-file-concepts"></a>
+## 配置文件
+
+`langgraph.json` 文件是一个 JSON 文件，用于指定部署应用所需的依赖项、图、环境变量和其他设置。
+
+有关 JSON 文件中所有支持键的详细信息，请参阅 [LangGraph 配置文件参考](/langsmith/cli#configuration-file)。
+
+<Tip>
+[LangGraph CLI](/langsmith/cli) 默认使用当前目录下的配置文件 `langgraph.json`。
+</Tip>
+
+### 示例
+
+<Tabs>
+    <Tab title="Python">
+    * 依赖项涉及一个自定义的本地包和 `langchain_openai` 包。
+    * 将从文件 `./your_package/your_file.py` 中加载一个图，变量名为 `agent`。
+    * 环境变量从 `.env` 文件加载。
+
+    ```json
+    {
+        "dependencies": [
+            "langchain_openai",
+            "./your_package"
+        ],
+        "graphs": {
+            "my_agent": "./your_package/your_file.py:agent"
+        },
+        "env": "./.env"
+    }
+    ```
+    </Tab>
+    <Tab title="JavaScript">
+    * 依赖项将从本地目录的依赖文件（例如 `package.json`）加载。
+    * 将从文件 `./your_package/your_file.js` 中加载一个图，函数名为 `agent`。
+    * 环境变量 `OPENAI_API_KEY` 是内联设置的。
+
+    ```json
+    {
+        "dependencies": [
+            "."
+        ],
+        "graphs": {
+            "my_agent": "./your_package/your_file.js:agent"
+        },
+        "env": {
+            "OPENAI_API_KEY": "secret-key"
+        }
+    }
+    ```
+    </Tab>
+</Tabs>
+
+## 依赖项
+
+一个应用可能依赖于其他 Python 包或 JavaScript 库（取决于编写应用所使用的编程语言）。
+
+通常，您需要指定以下信息以确保依赖项正确设置：
+
+1.  目录中指定依赖项的文件（例如 `requirements.txt`、`pyproject.toml` 或 `package.json`）。
+2.  [配置文件](#configuration-file-concepts) 中的 `dependencies` 键，用于指定运行应用所需的依赖项。
+3.  任何额外的二进制文件或系统库可以使用 [LangGraph 配置文件](#configuration-file-concepts) 中的 `dockerfile_lines` 键来指定。
+
+## 图
+
+使用[配置文件](#configuration-file-concepts)中的 `graphs` 键来指定部署的应用中将提供哪些图。
+
+您可以在配置文件中指定一个或多个图。每个图由一个唯一的名称和一个指向 (1) 已编译的图或 (2) 定义图的函数的路径来标识。
+
+### 在 LangSmith 部署中使用任何框架
+
+虽然 LangSmith 部署要求应用以 LangGraph 图的形式构建，但该图中的各个节点可以包含任意代码。这意味着您可以在节点内使用任何框架或库，同时仍然受益于 LangSmith 的部署基础设施。
+
+图结构充当部署接口，但您的核心应用逻辑可以使用最适合您需求的任何工具和框架。
+
+要使用 LangSmith 部署，您需要：
+
+<Tabs>
+  <Tab title="Python">
+
+    1.  **一个 LangGraph 图结构**：使用 @[`StateGraph`] 以及 @[`add_node`] 和 @[`add_edge`] 定义一个图。
+    1.  **包含任意逻辑的节点函数**：您的节点函数可以调用任何框架或库。
+    1.  **一个已编译的图**：@[编译][StateGraph.compile] 该图以创建可部署的应用。
+
+    以下示例展示了如何将您现有的应用逻辑包装在一个最小的 LangGraph 结构中：
+
+  ```python
+  from langgraph.graph import StateGraph, START, END
+  from typing import TypedDict
+
+  # 您现有的使用任何框架的应用逻辑
+  from app_logic import process_data
+  from app_logic import fetch_data
+
+  class State(TypedDict):
+      input: str
+      result: str
+
+  def my_app_node(state: State) -> State:
+      """包含任意框架代码的节点。"""
+      # 在此处使用任何框架或库
+      raw_data = fetch_data(state["input"])
+      processed = process_data(raw_data)
+      return {"result": processed}
+
+  # 定义图结构
+  graph = StateGraph(State)
+  graph.add_node("process", my_app_node)  # 添加包含您逻辑的节点
+  graph.add_edge(START, "process")  # 将起点连接到您的节点
+  graph.add_edge("process", END)  # 将您的节点连接到终点
+
+  # 为部署而编译
+  app = graph.compile()
+  ```
+  </Tab>
+  <Tab title="JavaScript">
+
+    1.  **一个 LangGraph 图结构**：使用 [`StateGraph`](https://reference.langchain.com/javascript/classes/_langchain_langgraph.index.StateGraph.html) 以及 [`addNode`](https://reference.langchain.com/javascript/classes/_langchain_langgraph.index.StateGraph.html#addnode) 和 [`addEdge`](https://reference.langchain.com/javascript/classes/_langchain_langgraph.index.StateGraph.html#addedge) 定义一个图。
+    1.  **包含任意逻辑的节点函数**：您的节点函数可以调用任何框架或库。
+    1.  **一个已编译的图**：[编译](https://reference.langchain.com/javascript/classes/_langchain_langgraph.index.StateGraph.html#compile) 该图以创建可部署的应用。
+
+    以下示例展示了如何将您现有的应用逻辑包装在一个最小的 LangGraph 结构中：
+
+  ```typescript
+  import { StateGraph, START, END } from "@langchain/langgraph";
+  import { Annotation } from "@langchain/langgraph";
+
+  // 您现有的使用任何框架的应用逻辑
+  import { processData } from "./app-logic";
+  import { fetchData } from "./app-logic";
+
+  const State = Annotation.Root({
+    input: Annotation<string>,
+    result: Annotation<string>
+  });
+
+  async function myAppNode(state: typeof State.State) {
+    // 在此处使用任何框架或库
+    const rawData = await fetchData(state.input);
+    const processed = await processData(rawData);
+    return { result: processed };
+  }
+
+  // 定义图结构
+  const graph = new StateGraph(State)
+    .addNode("process", myAppNode)  // 添加包含您逻辑的节点
+    .addEdge(START, "process")  // 将起点连接到您的节点
+    .addEdge("process", END);  // 将您的节点连接到终点
+
+  // 为部署而编译
+  export const app = graph.compile();
+  ```
+  </Tab>
+</Tabs>
+
+在此示例中，节点函数（Python 的 `my_app_node` 和 JavaScript 的 `myAppNode`）可以包含对任何框架或库的调用。LangGraph 结构仅提供部署接口和编排层。
+
+## 环境变量
+
+如果您正在[本地](/langsmith/local-dev-testing)处理已部署的 LangGraph 应用，可以在[配置文件](#configuration-file-concepts)的 `env` 键中配置环境变量。
+
+对于生产部署，您通常需要在部署环境中配置环境变量。

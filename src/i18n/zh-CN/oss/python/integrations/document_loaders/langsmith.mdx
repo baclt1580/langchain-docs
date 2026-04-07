@@ -1,0 +1,146 @@
+---
+title: "LangSmithLoader 集成"
+description: "使用 LangChain Python 集成 LangSmithLoader 文档加载器。"
+---
+
+本指南提供了快速入门 `LangSmithLoader` [文档加载器](/oss/integrations/document_loaders) 的简要概述。有关 `LangSmithLoader` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-core/document_loaders/langsmith/LangSmithLoader)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | JS 支持 |
+| :--- | :--- | :---: | :---: | :---: |
+| `LangSmithLoader` | [`langchain-core`](https://reference.langchain.com/python/langchain-core) | ❌ | ❌ | ❌ |
+
+### 加载器特性
+
+| 来源 | 懒加载 | 原生异步 |
+| :---: | :---: | :---: |
+| `LangSmithLoader` | ✅ | ❌ |
+
+## 设置
+
+要访问 LangSmith 文档加载器，您需要安装 `langchain-core`，创建一个 [LangSmith](https://langsmith.com) 账户并获取 API 密钥。
+
+### 凭证
+
+在 [langsmith.com](https://langsmith.com) 注册并生成 API 密钥。完成后，设置 LANGSMITH_API_KEY 环境变量：
+
+```python
+import getpass
+import os
+
+if not os.environ.get("LANGSMITH_API_KEY"):
+    os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+```
+
+如果您希望获得自动化的最佳追踪功能，还可以开启 LangSmith 追踪：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+安装 `langchain-core`：
+
+```python
+pip install -qU langchain-core
+```
+
+### 克隆示例数据集
+
+对于此示例，我们将克隆并加载一个公共的 LangSmith 数据集。克隆会在我们的个人 LangSmith 账户上创建此数据集的副本。您只能加载您拥有个人副本的数据集。
+
+```python
+from langsmith import Client as LangSmithClient
+
+ls_client = LangSmithClient()
+
+dataset_name = "LangSmith Few Shot Datasets Notebook"
+dataset_public_url = (
+    "https://smith.langchain.com/public/55658626-124a-4223-af45-07fb774a6212/d"
+)
+
+ls_client.clone_public_dataset(dataset_public_url)
+```
+
+## 初始化
+
+现在我们可以实例化文档加载器并加载文档：
+
+```python
+from langchain_core.document_loaders import LangSmithLoader
+
+loader = LangSmithLoader(
+    dataset_name=dataset_name,
+    content_key="question",
+    limit=50,
+    # format_content=...,
+    # ...
+)
+```
+
+## 加载
+
+```python
+docs = loader.load()
+print(docs[0].page_content)
+```
+
+```text
+给我一个使用 Weaviate 的示例，但要自定义 vectorStoreRetriever 以返回前 10 个 k 最近邻。
+```
+
+```python
+print(docs[0].metadata["inputs"])
+```
+
+```python
+{'question': '给我一个使用 Weaviate 的示例，但要自定义 vectorStoreRetriever 以返回前 10 个 k 最近邻。'}
+```
+
+```python
+print(docs[0].metadata["outputs"])
+```
+
+```python
+{'answer': '要自定义 Weaviate 客户端并返回前 10 个 k 最近邻，您可以使用 `as_retriever` 方法并设置适当的参数。以下是实现方法：\n\n```python\n# 假设您已导入必要的模块和类\n\n# 创建 Weaviate 客户端\nclient = weaviate.Client(url=os.environ["WEAVIATE_URL"], ...)\n\n# 初始化 Weaviate 包装器\nweaviate = Weaviate(client, index_name, text_key)\n\n# 使用 as_retriever 自定义客户端以返回前 10 个 k 最近邻\ncustom_retriever = weaviate.as_retriever(\n    search_type="similarity",\n    search_kwargs={\n        \'k\': 10  # 根据需要自定义 k 值\n    }\n)\n\n# 现在您可以使用 custom_retriever 执行搜索\nresults = custom_retriever.search(query, ...)\n```'}
+```
+
+```python
+list(docs[0].metadata.keys())
+```
+
+```python
+['dataset_id',
+ 'inputs',
+ 'outputs',
+ 'metadata',
+ 'id',
+ 'created_at',
+ 'modified_at',
+ 'runs',
+ 'source_run_id']
+```
+
+## 懒加载
+
+```python
+page = []
+for doc in loader.lazy_load():
+    page.append(doc)
+    if len(page) >= 10:
+        # 执行一些分页操作，例如：
+        # index.upsert(page)
+        # page = []
+        break
+len(page)
+```
+
+```text
+10
+```
+
+---

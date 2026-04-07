@@ -1,0 +1,103 @@
+---
+title: 混合部署
+sidebarTitle: 概述
+---
+
+<Info>
+**重要提示**
+混合部署选项需要 [企业版](https://langchain.com/pricing) 计划。
+</Info>
+
+**混合** 模型将 LangSmith 基础设施拆分在 LangChain 的云端和您的云端之间运行：
+
+- **控制平面**（LangSmith UI、API 和编排服务）运行在 LangChain 的云端，由 LangChain 管理。
+- **数据平面**（您的 <Tooltip tip="运行您应用程序的服务器。">智能体服务器</Tooltip> 和智能体工作负载）运行在您的云端，由您管理。
+
+这种模式结合了托管界面的便利性和在您自己的环境中运行工作负载的灵活性。
+
+<Note>
+了解更多关于 [控制平面](/langsmith/control-plane)、[数据平面](/langsmith/data-plane) 和 [智能体服务器](/langsmith/agent-server) 架构概念的信息。
+</Note>
+
+| 组件 | 职责 | 运行位置 | 管理方 |
+|------|------|----------|--------|
+| <Tooltip tip="用于管理部署的 LangSmith UI 和 API。">控制平面</Tooltip> | <ul><li>用于创建部署和修订版本的 UI</li><li>用于管理部署的 API</li><li>可观测性数据存储</li></ul> | LangChain 云端 | LangChain |
+| <Tooltip tip="您的智能体服务器和智能体执行的运行时环境。">数据平面</Tooltip> | <ul><li>用于协调部署的 Operator/监听器</li><li>智能体服务器（智能体/图）</li><li>支撑服务（Postgres、Redis 等）</li></ul> | 您的云端 | 您 |
+
+在混合模型中运行 LangSmith 时，您需要使用 [LangSmith API 密钥](/langsmith/create-account-api-key) 进行身份验证。
+
+### 工作流程
+
+1. 使用 `langgraph-cli` 或 [Studio](/langsmith/studio) 在本地测试您的图。
+1. 使用 `langgraph build` 命令构建 Docker 镜像。
+1. 从 [控制平面 UI](/langsmith/control-plane#control-plane-ui) 部署您的智能体服务器。
+
+<Note>
+支持的算力平台：[Kubernetes](https://kubernetes.io/)。<br></br>
+有关设置，请参阅 [混合部署设置指南](/langsmith/deploy-hybrid)。
+</Note>
+
+### 架构
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/hybrid-with-deployment-light.png"
+    alt="混合部署：LangChain 托管的控制平面（LangSmith UI/API）管理部署。您的云端在 Kubernetes 上运行监听器、智能体服务器实例和支撑存储（Postgres/Redis）。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/hybrid-with-deployment-dark.png"
+    alt="混合部署：LangChain 托管的控制平面（LangSmith UI/API）管理部署。您的云端在 Kubernetes 上运行监听器、智能体服务器实例和支撑存储（Postgres/Redis）。"
+/>
+
+### 算力平台
+
+- **Kubernetes**：混合部署支持在任何 Kubernetes 集群上运行数据平面。
+
+<Tip>
+有关在 Kubernetes 中设置，请参阅 [混合部署设置指南](/langsmith/deploy-hybrid)
+</Tip>
+
+### 向 LangSmith 和控制平面的出口流量
+
+在混合部署模型中，您自托管的数据平面将向控制平面发送网络请求，以轮询需要在数据平面中实施的更改。来自数据平面部署的追踪数据也会发送到与控制平面集成的 LangSmith 实例。流向控制平面的此流量是加密的，通过 HTTPS 传输。数据平面使用 LangSmith API 密钥向控制平面进行身份验证。
+
+为了启用此出口流量，您可能需要更新内部防火墙规则或云资源（例如安全组），以 [允许特定 IP 地址](/langsmith/cloud#ingress-into-langchain-saas) 的访问。
+
+<Warning>
+目前不支持 AWS/Azure PrivateLink 或 GCP Private Service Connect。此流量将通过互联网传输。
+</Warning>
+
+## 监听器
+
+在混合部署选项中，可以根据您的 LangSmith 工作空间和 Kubernetes 集群的组织方式，运行一个或多个 ["监听器" 应用程序](/langsmith/data-plane#listener-application)。
+
+### Kubernetes 集群组织
+- 一个或多个监听器可以在一个 Kubernetes 集群中运行。
+- 一个监听器可以部署到该集群中的一个或多个命名空间。
+- 多个监听器不能部署到同一个命名空间。
+- 集群所有者负责规划监听器布局和智能体服务器部署。
+
+### LangSmith 工作空间组织
+- 一个工作空间可以与一个或多个监听器关联。
+- 一个监听器只能与一个工作空间关联。LangSmith 工作空间与监听器是一对多的关系。
+- 一个工作空间只能部署到其所有监听器都已部署的 Kubernetes 集群。
+
+## 使用场景
+
+以下是一些常见的监听器配置（并非严格要求）：
+
+### 每个 LangSmith 工作空间 → 独立的 Kubernetes 集群
+- 集群 `alpha` 运行工作空间 `A`
+- 集群 `beta` 运行工作空间 `B`
+
+### 一个集群，每个工作空间一个命名空间
+- 集群 `alpha`，命名空间 `1` 运行工作空间 `A`
+- 集群 `alpha`，命名空间 `2` 运行工作空间 `B`
+
+### 独立的集群，并共享一个 "开发" 集群
+- 集群 `alpha` 运行工作空间 `A`
+- 集群 `beta` 运行工作空间 `B`
+- 集群 `dev` 运行工作空间 `A` 和 `B`
+- 两个工作空间都有两个监听器；集群 `dev` 有两个监听器部署

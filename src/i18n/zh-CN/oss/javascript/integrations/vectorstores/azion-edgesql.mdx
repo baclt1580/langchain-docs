@@ -1,0 +1,206 @@
+---
+title: "AzionVectorStore 集成"
+description: "使用 LangChain JavaScript 与 AzionVectorStore 集成。"
+---
+
+`AzionVectorStore` 用于通过向量嵌入管理和搜索文档集合，直接在 Azion 的边缘平台上使用 Edge SQL 实现。
+
+本指南提供了快速入门 `AzionVectorStore` [向量存储](/oss/integrations/vectorstores) 的概述。有关 `AzionVectorStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/azion_edgesql/AzionVectorStore)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [PY 支持] | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`AzionVectorStore`](https://reference.langchain.com/javascript/langchain-community/vectorstores/azion_edgesql/AzionVectorStore) | [`@langchain/community`](https://npmjs.com/@langchain/community) | ❌ |  ![NPM - 版本](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+## 设置
+
+要使用 `AzionVectorStore` 向量存储，您需要安装 `@langchain/community` 包。此外，您还需要一个 [Azion 账户](https://www.azion.com/en/documentation/products/accounts/creating-account/) 和一个 [令牌](https://www.azion.com/en/documentation/products/guides/personal-tokens/) 来使用 Azion API，并将其配置为环境变量 `AZION_TOKEN`。更多相关信息可在 [文档](https://www.azion.com/en/documentation/) 中找到。
+
+本指南还将使用 [OpenAI 嵌入](/oss/integrations/embeddings/openai)，这需要您安装 `@langchain/openai` 集成包。您也可以使用 [其他支持的嵌入模型](/oss/integrations/embeddings)。
+
+<CodeGroup>
+```bash npm
+npm install azion @langchain/openai @langchain/community
+```
+```bash yarn
+yarn add azion @langchain/openai @langchain/community
+```
+```bash pnpm
+pnpm add azion @langchain/openai @langchain/community
+```
+</CodeGroup>
+
+### 凭证
+
+完成安装后，设置 AZION_TOKEN 环境变量：
+
+```typescript
+process.env.AZION_TOKEN = "your-api-key"
+```
+
+如果您在本指南中使用 OpenAI 嵌入，还需要设置您的 OpenAI 密钥：
+
+```typescript
+process.env.OPENAI_API_KEY = "YOUR_API_KEY";
+```
+
+如果您希望获得模型调用的自动追踪，也可以设置您的 [LangSmith](/langsmith/home) API 密钥，取消以下注释：
+
+```typescript
+// process.env.LANGCHAIN_TRACING_V2="true"
+// process.env.LANGCHAIN_API_KEY="your-api-key"
+```
+
+## 实例化
+
+```typescript
+import { AzionVectorStore } from "@langchain/community/vectorstores/azion_edgesql";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const embeddings = new OpenAIEmbeddings({
+  model: "text-embedding-3-small",
+});
+
+// 如果数据库和表已创建，使用构造函数实例化
+const vectorStore = new AzionVectorStore(embeddings, { dbName: "langchain", tableName: "documents" });
+
+// 如果尚未创建数据库和表，可以使用 setupDatabase 方法创建
+// await vectorStore.setupDatabase({ columns:["topic","language"], mode: "hybrid" })
+
+// 或者，如果数据库和表尚未创建，使用静态方法实例化
+// const vectorStore = await AzionVectorStore.initialize(embeddingModel, { dbName: "langchain", tableName: "documents" }, { columns:[], mode: "hybrid" })
+```
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```typescript
+import type { Document } from "@langchain/core/documents";
+
+const document1: Document = {
+  pageContent: "细胞中的能量工厂是线粒体",
+  metadata: { language: "en", topic: "biology" }
+};
+
+const document2: Document = {
+  pageContent: "建筑物由砖块构成",
+  metadata: { language: "en", topic: "history" }
+};
+
+const document3: Document = {
+  pageContent: "线粒体由脂质构成",
+  metadata: { language: "en", topic: "biology" }
+};
+
+const document4: Document = {
+  pageContent: "2024 年奥运会在巴黎举行",
+  metadata: { language: "en", topic: "history" }
+}
+
+const documents = [document1, document2, document3, document4];
+
+await vectorStore.addDocuments(documents);
+```
+
+```text
+正在插入分块
+插入分块 0
+分块已插入！
+```
+
+### 从向量存储删除项目
+
+```typescript
+await vectorStore.delete(["4"]);
+```
+
+```text
+已从 documents 中删除 1 个项目
+```
+
+## 查询向量存储
+
+一旦您的向量存储创建完成并添加了相关文档，您很可能希望在运行链或代理时查询它。
+
+### 直接查询
+
+执行简单的相似性搜索可以按如下方式进行：
+
+```typescript
+const filter = [{ operator: "=", column: "language", value: "en" }]
+
+const hybridSearchResults = await vectorStore.azionHybridSearch("biology", {kfts:2, kvector:1,
+                                      filter:[{ operator: "=", column: "language", value: "en" }]});
+
+console.log("混合搜索结果")
+for (const doc of hybridSearchResults) {
+  console.log(`${JSON.stringify(doc)}`);
+}
+```
+
+```text
+混合搜索结果
+[{"pageContent":"澳大利亚野犬是一种独特的物种，在生态系统中扮演关键角色","metadata":{"searchtype":"fulltextsearch"},"id":"6"},-0.25748711028997995]
+[{"pageContent":"细胞中的能量工厂是线粒体","metadata":{"searchtype":"fulltextsearch"},"id":"16"},-0.31697985337654005]
+[{"pageContent":"澳大利亚的原住民已在这片大陆上居住了超过 65,000 年","metadata":{"searchtype":"similarity"},"id":"3"},0.14822345972061157]
+```
+
+```typescript
+const similaritySearchResults = await vectorStore.azionSimilaritySearch("australia", {kvector:3, filter:[{ operator: "=", column: "topic", value: "history" }]});
+
+console.log("相似性搜索结果")
+for (const doc of similaritySearchResults) {
+  console.log(`${JSON.stringify(doc)}`);
+}
+```
+
+```text
+相似性搜索结果
+[{"pageContent":"澳大利亚的原住民已在这片大陆上居住了超过 65,000 年","metadata":{"searchtype":"similarity"},"id":"3"},0.4486490488052368]
+```
+
+### 通过转换为检索器查询
+
+您也可以将向量存储转换为 [检索器](/oss/langchain/retrieval)，以便在链中更轻松地使用。
+
+```typescript
+const retriever = vectorStore.asRetriever({
+  // 可选过滤器
+  filter: filter,
+  k: 2,
+});
+await retriever.invoke("biology");
+```
+
+```javascript
+[
+  Document {
+    pageContent: '澳大利亚的原住民已在这片大陆上居住了超过 65,000 年',
+    metadata: { searchtype: 'similarity' },
+    id: '3'
+  },
+  Document {
+    pageContent: '线粒体由脂质构成',
+    metadata: { searchtype: 'similarity' },
+    id: '18'
+  }
+]
+```
+
+### 用于检索增强生成
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [使用 LangChain 构建 RAG 应用](/oss/langchain/rag)。
+- [代理式 RAG](/oss/langgraph/agentic-rag)
+- [检索文档](/oss/langchain/retrieval)
+
+---
+
+## API 参考
+
+有关 `AzionVectorStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/azion_edgesql/AzionVectorStore)。

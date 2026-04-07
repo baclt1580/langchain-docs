@@ -1,0 +1,110 @@
+---
+title: "ClickHouse 集成"
+description: "使用 LangChain JavaScript 与 ClickHouse 向量存储进行集成。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+[ClickHouse](https://clickhouse.com/) 是一个强大且开源的列式数据库，专为处理分析查询和高效存储而设计，旨在提供向量搜索与分析功能的强大组合。
+
+## 设置步骤
+
+1. 启动一个 ClickHouse 集群。详情请参考 [ClickHouse 安装指南](https://clickhouse.com/docs/en/getting-started/install/)。
+2. 启动 ClickHouse 集群后，从集群的 `操作` 菜单中获取 `连接详情`。您将需要主机地址、端口、用户名和密码。
+3. 在您的工作空间中安装 ClickHouse 所需的 Node.js 对等依赖项。
+
+您需要安装以下对等依赖项：
+
+```bash npm
+npm install -S @clickhouse/client mysql2
+```
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅 [此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+## 索引与查询文档
+
+```typescript
+import { ClickHouseStore } from "@langchain/community/vectorstores/clickhouse";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+// 从文本初始化 ClickHouse 存储
+const vectorStore = await ClickHouseStore.fromTexts(
+  ["Hello world", "Bye bye", "hello nice world"],
+  [
+    { id: 2, name: "2" },
+    { id: 1, name: "1" },
+    { id: 3, name: "3" },
+  ],
+  new OpenAIEmbeddings(),
+  {
+    host: process.env.CLICKHOUSE_HOST || "localhost",
+    port: process.env.CLICKHOUSE_PORT || 8443,
+    username: process.env.CLICKHOUSE_USER || "username",
+    password: process.env.CLICKHOUSE_PASSWORD || "password",
+    database: process.env.CLICKHOUSE_DATABASE || "default",
+    table: process.env.CLICKHOUSE_TABLE || "vector_table",
+  }
+);
+
+// 等待 1 秒，确保搜索操作在数据成功插入后执行
+// eslint-disable-next-line no-promise-executor-return
+await new Promise((resolve) => setTimeout(resolve, 1000));
+
+// 执行无过滤的相似性搜索
+const results = await vectorStore.similaritySearch("hello world", 1);
+console.log(results);
+
+// 执行带过滤的相似性搜索
+const filteredResults = await vectorStore.similaritySearch("hello world", 1, {
+  whereStr: "metadata.name = '1'",
+});
+console.log(filteredResults);
+```
+
+## 从现有集合查询文档
+
+```typescript
+import { ClickHouseStore } from "@langchain/community/vectorstores/clickhouse";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+// 初始化 ClickHouse 存储
+const vectorStore = await ClickHouseStore.fromExistingIndex(
+  new OpenAIEmbeddings(),
+  {
+    host: process.env.CLICKHOUSE_HOST || "localhost",
+    port: process.env.CLICKHOUSE_PORT || 8443,
+    username: process.env.CLICKHOUSE_USER || "username",
+    password: process.env.CLICKHOUSE_PASSWORD || "password",
+    database: process.env.CLICKHOUSE_DATABASE || "default",
+    table: process.env.CLICKHOUSE_TABLE || "vector_table",
+  }
+);
+
+// 等待 1 秒，确保搜索操作在数据成功插入后执行
+// eslint-disable-next-line no-promise-executor-return
+await new Promise((resolve) => setTimeout(resolve, 1000));
+
+// 执行无过滤的相似性搜索
+const results = await vectorStore.similaritySearch("hello world", 1);
+console.log(results);
+
+// 执行带过滤的相似性搜索
+const filteredResults = await vectorStore.similaritySearch("hello world", 1, {
+  whereStr: "metadata.name = '1'",
+});
+console.log(filteredResults);
+```
+
+## 相关链接
+
+- 向量存储 [概念指南](/oss/integrations/vectorstores)
+- 向量存储 [操作指南](/oss/integrations/vectorstores)

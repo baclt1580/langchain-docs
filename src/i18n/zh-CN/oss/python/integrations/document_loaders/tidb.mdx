@@ -1,0 +1,117 @@
+---
+title: "TiDB 集成"
+description: "使用 LangChain Python 与 TiDB 文档加载器集成。"
+---
+
+> [TiDB Cloud](https://tidbcloud.com/) 是一个全面的数据库即服务（DBaaS）解决方案，提供专用和 Serverless 两种选项。TiDB Serverless 现正将内置向量搜索功能融入 MySQL 生态。借助这一增强，您可以无缝地使用 TiDB Serverless 开发 AI 应用，无需引入新的数据库或额外的技术栈。立即加入私有测试版等待列表，成为首批体验者：[tidb.cloud/ai](https://tidb.cloud/ai)。
+
+本笔记本介绍如何在 LangChain 中使用 `TiDBLoader` 从 TiDB 加载数据。
+
+## 前提条件
+
+在使用 `TiDBLoader` 之前，我们将安装以下依赖项：
+
+```python
+pip install -qU langchain
+```
+
+然后，我们将配置到 TiDB 的连接。在本笔记本中，我们将遵循 TiDB Cloud 提供的标准连接方法，建立安全高效的数据库连接。
+
+```python
+import getpass
+
+# 从 tidb cloud 控制台复制，替换为您自己的
+tidb_connection_string_template = "mysql+pymysql://<USER>:<PASSWORD>@<HOST>:4000/<DB>?ssl_ca=/etc/ssl/cert.pem&ssl_verify_cert=true&ssl_verify_identity=true"
+tidb_password = getpass.getpass("输入您的 TiDB 密码：")
+tidb_connection_string = tidb_connection_string_template.replace(
+    "<PASSWORD>", tidb_password
+)
+```
+
+## 从 TiDB 加载数据
+
+以下是一些可用于自定义 `TiDBLoader` 行为的关键参数说明：
+
+- `query` (str)：这是要在 TiDB 数据库上执行的 SQL 查询。该查询应选择您要加载到 @[`Document`] 对象中的数据。
+    例如，您可以使用类似 `"SELECT * FROM my_table"` 的查询来获取 `my_table` 中的所有数据。
+
+- `page_content_columns` (Optional[List[str]])：指定应包含在每个 @[`Document`] 对象的 `page_content` 中的列名列表。
+    如果设置为 `None`（默认值），则查询返回的所有列都将包含在 `page_content` 中。这允许您根据数据的特定列来定制每个文档的内容。
+
+- `metadata_columns` (Optional[List[str]])：指定应包含在每个 @[`Document`] 对象的 `metadata` 中的列名列表。
+    默认情况下，此列表为空，意味着除非明确指定，否则不会包含任何元数据。这对于包含有关每个文档的附加信息非常有用，这些信息不构成主要内容的一部分，但对于处理或分析仍然有价值。
+
+```python
+from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine
+
+# 连接到数据库
+engine = create_engine(tidb_connection_string)
+metadata = MetaData()
+table_name = "test_tidb_loader"
+
+# 创建表
+test_table = Table(
+    table_name,
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("name", String(255)),
+    Column("description", String(255)),
+)
+metadata.create_all(engine)
+
+
+with engine.connect() as connection:
+    transaction = connection.begin()
+    try:
+        connection.execute(
+            test_table.insert(),
+            [
+                {"name": "Item 1", "description": "Description of Item 1"},
+                {"name": "Item 2", "description": "Description of Item 2"},
+                {"name": "Item 3", "description": "Description of Item 3"},
+            ],
+        )
+        transaction.commit()
+    except:
+        transaction.rollback()
+        raise
+```
+
+```python
+from langchain_community.document_loaders import TiDBLoader
+
+# 设置 TiDBLoader 以检索数据
+loader = TiDBLoader(
+    connection_string=tidb_connection_string,
+    query=f"SELECT * FROM {table_name};",
+    page_content_columns=["name", "description"],
+    metadata_columns=["id"],
+)
+
+# 加载数据
+documents = loader.load()
+
+# 显示加载的文档
+for doc in documents:
+    print("-" * 30)
+    print(f"内容：{doc.page_content}\n元数据：{doc.metadata}")
+```
+
+```text
+------------------------------
+内容：name: Item 1
+description: Description of Item 1
+元数据：{'id': 1}
+------------------------------
+内容：name: Item 2
+description: Description of Item 2
+元数据：{'id': 2}
+------------------------------
+内容：name: Item 3
+description: Description of Item 3
+元数据：{'id': 3}
+```
+
+```python
+test_table.drop(bind=engine)
+```

@@ -1,0 +1,432 @@
+---
+title: "Couchbase 搜索集成"
+description: "使用 LangChain JavaScript 与 Couchbase 搜索向量存储集成。"
+---
+
+`CouchbaseSearchVectorStore` 是向量搜索的一种实现，属于 Couchbase 中[全文搜索服务](https://docs.couchbase.com/server/current/learn/services-and-indexes/services/search-service.html)（搜索服务）的一部分。
+
+本教程解释了如何通过 Couchbase 搜索服务使用向量搜索。你可以同时使用 [Couchbase Capella](https://www.couchbase.com/products/capella/) 和你自管理的 Couchbase Server。
+
+## 安装
+
+你需要安装 couchbase 和 langchain community 来使用 couchbase 向量存储。在本教程中，我们将使用 OpenAI 嵌入。
+
+```bash npm
+npm install couchbase @langchain/openai @langchain/community @langchain/core
+```
+
+## 创建 couchbase 连接对象
+
+我们首先创建到 Couchbase 集群的连接，然后将集群对象传递给向量存储。这里，我们使用用户名和密码进行连接。
+你也可以使用任何其他支持的方式连接到你的集群。
+
+有关连接到 Couchbase 集群的更多信息，请查看 [Node SDK 文档](https://docs.couchbase.com/nodejs-sdk/current/hello-world/start-using-sdk.html#connect)。
+
+```typescript
+import { Cluster } from "couchbase";
+
+const connectionString = "couchbase://localhost"; // 如果使用 TLS，则为 couchbases://localhost
+const dbUsername = "Administrator"; // 对查询的存储桶具有读取权限的有效数据库用户
+const dbPassword = "Password"; // 数据库用户的密码
+
+const couchbaseClient = await Cluster.connect(connectionString, {
+  username: dbUsername,
+  password: dbPassword,
+  configProfile: "wanDevelopment",
+});
+```
+
+## 创建搜索索引
+
+目前，搜索索引需要通过 Couchbase Capella 或 Server UI 或使用 REST 接口创建。
+
+对于此示例，让我们使用 UI 上搜索服务的“导入索引”功能。
+
+让我们在测试存储桶上定义一个名为 `vector-index` 的搜索索引。
+我们在 `testing` 存储桶的 `_default` 作用域下的 `_default` 集合上定义一个索引，向量字段设置为 `embedding`，维度为 1536，文本字段设置为 `text`。
+我们还对文档中 `metadata` 下的所有字段进行动态映射索引和存储，以适应不同的文档结构。相似度度量设置为 `dot_product`。
+
+### 如何将索引导入全文搜索服务？
+
+- [Couchbase Server](https://docs.couchbase.com/server/current/search/import-search-index.html)
+  - 点击 Search -> Add Index -> Import
+  - 在导入屏幕中复制以下索引定义
+  - 点击 Create Index 创建索引。
+- [Couchbase Capella](https://docs.couchbase.com/cloud/search/import-search-index.html)
+  - 将以下索引定义复制到新文件 `index.json`
+  - 按照文档中的说明在 Capella 中导入该文件。
+  - 点击 Create Index 创建索引。
+
+### 索引定义
+
+```json
+{
+  "name": "vector-index",
+  "type": "fulltext-index",
+  "params": {
+    "doc_config": {
+      "docid_prefix_delim": "",
+      "docid_regexp": "",
+      "mode": "type_field",
+      "type_field": "type"
+    },
+    "mapping": {
+      "default_analyzer": "standard",
+      "default_datetime_parser": "dateTimeOptional",
+      "default_field": "_all",
+      "default_mapping": {
+        "dynamic": true,
+        "enabled": true,
+        "properties": {
+          "metadata": {
+            "dynamic": true,
+            "enabled": true
+          },
+          "embedding": {
+            "enabled": true,
+            "dynamic": false,
+            "fields": [
+              {
+                "dims": 1536,
+                "index": true,
+                "name": "embedding",
+                "similarity": "dot_product",
+                "type": "vector",
+                "vector_index_optimized_for": "recall"
+              }
+            ]
+          },
+          "text": {
+            "enabled": true,
+            "dynamic": false,
+            "fields": [
+              {
+                "index": true,
+                "name": "text",
+                "store": true,
+                "type": "text"
+              }
+            ]
+          }
+        }
+      },
+      "default_type": "_default",
+      "docvalues_dynamic": false,
+      "index_dynamic": true,
+      "store_dynamic": true,
+      "type_field": "_type"
+    },
+    "store": {
+      "indexType": "scorch",
+      "segmentVersion": 16
+    }
+  },
+  "sourceType": "gocbcore",
+  "sourceName": "testing",
+  "sourceParams": {},
+  "planParams": {
+    "maxPartitionsPerPIndex": 103,
+    "indexPartitions": 10,
+    "numReplicas": 0
+  }
+}
+```
+
+有关如何创建支持向量字段的搜索索引的更多详细信息，请参阅文档：
+
+- [Couchbase Capella](https://docs.couchbase.com/cloud/search/create-search-indexes.html)
+- [Couchbase Server](https://docs.couchbase.com/server/current/search/create-search-indexes.html)
+
+要使用此向量存储，需要配置 CouchbaseVectorStoreArgs。
+textKey 和 embeddingKey 是可选字段，如果你想使用特定键，则需要设置。
+
+```typescript
+const couchbaseConfig: CouchbaseVectorStoreArgs = {
+  cluster: couchbaseClient,
+  bucketName: "testing",
+  scopeName: "_default",
+  collectionName: "_default",
+  indexName: "vector-index",
+  textKey: "text",
+  embeddingKey: "embedding",
+};
+```
+
+## 创建向量存储
+
+我们使用集群信息和搜索索引名称创建向量存储对象。
+
+```typescript
+const store = await CouchbaseVectorStore.initialize(
+  embeddings, // 用于从文本创建嵌入的嵌入对象
+  couchbaseConfig
+);
+```
+
+## 基本向量搜索示例
+
+以下示例展示了如何通过搜索服务使用 couchbase 向量搜索并执行相似性搜索。
+对于此示例，我们将通过 TextLoader 加载 "state_of_the_union.txt" 文件，
+将文本分割成 500 个字符的块，无重叠，并将所有这些块索引到 Couchbase 中。
+
+数据索引完成后，我们执行一个简单的查询，以查找与查询 "What did president say about Ketanji Brown Jackson" 最相似的 4 个块。
+最后，它还展示了如何获取相似度分数。
+
+```ts
+import { OpenAIEmbeddings } from "@langchain/openai";
+import {
+  CouchbaseVectorStoreArgs,
+  CouchbaseVectorStore,
+} from "@langchain/community/vectorstores/couchbase";
+import { Cluster } from "couchbase";
+import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
+import { CharacterTextSplitter } from "@langchain/textsplitters";
+
+const connectionString =
+  process.env.COUCHBASE_DB_CONN_STR ?? "couchbase://localhost";
+const databaseUsername = process.env.COUCHBASE_DB_USERNAME ?? "Administrator";
+const databasePassword = process.env.COUCHBASE_DB_PASSWORD ?? "Password";
+
+// 从文件加载文档
+const loader = new TextLoader("./state_of_the_union.txt");
+const rawDocuments = await loader.load();
+const splitter = new CharacterTextSplitter({
+  chunkSize: 500,
+  chunkOverlap: 0,
+});
+const docs = await splitter.splitDocuments(rawDocuments);
+
+const couchbaseClient = await Cluster.connect(connectionString, {
+  username: databaseUsername,
+  password: databasePassword,
+  configProfile: "wanDevelopment",
+});
+
+// 使用 OpenAIEmbeddings 需要 Open AI API 密钥，也可以使用其他一些嵌入
+const embeddings = new OpenAIEmbeddings({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const couchbaseConfig: CouchbaseVectorStoreArgs = {
+  cluster: couchbaseClient,
+  bucketName: "testing",
+  scopeName: "_default",
+  collectionName: "_default",
+  indexName: "vector-index",
+  textKey: "text",
+  embeddingKey: "embedding",
+};
+
+const store = await CouchbaseVectorStore.fromDocuments(
+  docs,
+  embeddings,
+  couchbaseConfig
+);
+
+const query = "What did president say about Ketanji Brown Jackson";
+
+const resultsSimilaritySearch = await store.similaritySearch(query);
+console.log("resulting documents: ", resultsSimilaritySearch[0]);
+
+// 带分数的相似性搜索
+const resultsSimilaritySearchWithScore = await store.similaritySearchWithScore(
+  query,
+  1
+);
+console.log("resulting documents: ", resultsSimilaritySearchWithScore[0][0]);
+console.log("resulting scores: ", resultsSimilaritySearchWithScore[0][1]);
+
+const result = await store.similaritySearch(query, 1, {
+  fields: ["metadata.source"],
+});
+console.log(result[0]);
+```
+
+## 指定返回字段
+
+你可以在搜索期间使用过滤器中的 `fields` 参数指定要从文档返回的字段。
+这些字段作为 `metadata` 对象的一部分返回。你可以获取索引中存储的任何字段。
+文档的 `textKey` 作为文档 `pageContent` 的一部分返回。
+
+如果你没有指定要获取的任何字段，则返回索引中存储的所有字段。
+
+如果你想获取 metadata 中的一个字段，需要使用 `.` 来指定。
+例如，要获取 metadata 中的 `source` 字段，需要使用 `metadata.source`。
+
+```typescript
+const result = await store.similaritySearch(query, 1, {
+  fields: ["metadata.source"],
+});
+console.log(result[0]);
+```
+
+## 混合搜索
+
+Couchbase 允许你通过将向量搜索结果与文档非向量字段（如 `metadata` 对象）上的搜索相结合来进行混合搜索。
+
+结果将基于向量搜索和全文搜索服务支持的搜索结果的组合。
+每个组件搜索的分数相加得到结果的总分。
+
+要执行混合搜索，可以在 `fields` 参数中有一个可选键 `searchOptions`，可以传递给所有相似性搜索。
+你可以在 [Couchbase 搜索请求参数文档](https://docs.couchbase.com/server/current/search/search-request-params.html#query-object) 中找到 `searchOptions` 的不同搜索/查询可能性。
+
+### 为混合搜索创建多样化的元数据
+
+为了模拟混合搜索，让我们从现有文档中创建一些随机元数据。
+我们均匀地向元数据添加三个字段：`date` 在 2010 到 2020 之间，`rating` 在 1 到 5 之间，`author` 设置为 John Doe 或 Jane Doe。
+我们还将声明一些示例查询。
+
+```typescript
+for (let i = 0; i < docs.length; i += 1) {
+  docs[i].metadata.date = `${2010 + (i % 10)}-01-01`;
+  docs[i].metadata.rating = 1 + (i % 5);
+  docs[i].metadata.author = ["John Doe", "Jane Doe"][i % 2];
+}
+
+const store = await CouchbaseVectorStore.fromDocuments(
+  docs,
+  embeddings,
+  couchbaseConfig
+);
+
+const query = "What did the president say about Ketanji Brown Jackson";
+const independenceQuery = "Any mention about independence?";
+```
+
+### 示例：按精确值搜索
+
+我们可以搜索文本字段（如 `metadata` 对象中的作者）的精确匹配。
+
+```typescript
+const exactValueResult = await store.similaritySearch(query, 4, {
+  fields: ["metadata.author"],
+  searchOptions: {
+    query: { field: "metadata.author", match: "John Doe" },
+  },
+});
+console.log(exactValueResult[0]);
+```
+
+### 示例：按部分匹配搜索
+
+我们可以通过为搜索指定模糊度来搜索部分匹配。当你想搜索搜索查询的轻微变化或拼写错误时，这很有用。
+
+这里，"Johny" 接近（模糊度为 1）"John Doe"。
+
+```typescript
+const partialMatchResult = await store.similaritySearch(query, 4, {
+  fields: ["metadata.author"],
+  searchOptions: {
+    query: { field: "metadata.author", match: "Johny", fuzziness: 1 },
+  },
+});
+console.log(partialMatchResult[0]);
+```
+
+### 示例：按日期范围查询搜索
+
+我们可以搜索日期字段（如 `metadata.date`）在日期范围查询内的文档。
+
+```typescript
+const dateRangeResult = await store.similaritySearch(independenceQuery, 4, {
+  fields: ["metadata.date", "metadata.author"],
+  searchOptions: {
+    query: {
+      start: "2016-12-31",
+      end: "2017-01-02",
+      inclusiveStart: true,
+      inclusiveEnd: false,
+      field: "metadata.date",
+    },
+  },
+});
+console.log(dateRangeResult[0]);
+```
+
+### 示例：按数值范围查询搜索
+
+我们可以搜索数值字段（如 `metadata.rating`）在范围内的文档。
+
+```typescript
+const ratingRangeResult = await store.similaritySearch(independenceQuery, 4, {
+  fields: ["metadata.rating"],
+  searchOptions: {
+    query: {
+      min: 3,
+      max: 5,
+      inclusiveMin: false,
+      inclusiveMax: true,
+      field: "metadata.rating",
+    },
+  },
+});
+console.log(ratingRangeResult[0]);
+```
+
+### 示例：组合多个搜索条件
+
+可以使用 AND (conjuncts) 或 OR (disjuncts) 运算符组合不同的查询。
+
+在此示例中，我们检查评分在 3 到 4 之间且日期在 2015 到 2018 年之间的文档。
+
+```typescript
+const multipleConditionsResult = await store.similaritySearch(texts[0], 4, {
+  fields: ["metadata.rating", "metadata.date"],
+  searchOptions: {
+    query: {
+      conjuncts: [
+        { min: 3, max: 4, inclusive_max: true, field: "metadata.rating" },
+        { start: "2016-12-31", end: "2017-01-02", field: "metadata.date" },
+      ],
+    },
+  },
+});
+console.log(multipleConditionsResult[0]);
+```
+
+### 其他查询
+
+类似地，你可以在 `filter` 参数的 `searchOptions` 键中使用任何支持的查询方法，如地理距离、多边形搜索、通配符、正则表达式等。
+有关可用查询方法及其语法的更多详细信息，请参阅文档。
+
+- [Couchbase Capella](https://docs.couchbase.com/cloud/search/search-request-params.html#query-object)
+- [Couchbase Server](https://docs.couchbase.com/server/current/search/search-request-params.html#query-object)
+
+<br />
+<br />
+
+# 常见问题
+
+## 问题：我应该在创建 CouchbaseVectorStore 对象之前创建搜索索引吗？
+
+是的，目前你需要在创建 `CouchbaseVectorStore` 对象之前创建搜索索引。
+
+## 问题：我在搜索结果中没有看到我指定的所有字段。
+
+在 Couchbase 中，我们只能返回搜索索引中存储的字段。请确保你尝试在搜索结果中访问的字段是搜索索引的一部分。
+
+处理此问题的一种方法是在索引中动态索引和存储文档的字段。
+
+- 在 Capella 中，你需要进入“高级模式”，然后在“常规设置”下勾选“[X] 存储动态字段”或“[X] 索引动态字段”
+- 在 Couchbase Server 中，在索引编辑器（非快速编辑器）中的“高级”下勾选“[X] 存储动态字段”或“[X] 索引动态字段”
+
+请注意，这些选项会增加索引的大小。
+
+有关动态映射的更多详细信息，请参阅[文档](https://docs.couchbase.com/cloud/search/customize-index.html)。
+
+## 问题：我在搜索结果中看不到 metadata 对象。
+
+这很可能是由于 Couchbase 搜索索引没有索引和/或存储文档中的 `metadata` 字段。为了索引文档中的 `metadata` 字段，你需要将其作为子映射添加到索引中。
+
+如果你选择映射映射中的所有字段，你将能够按所有元数据字段进行搜索。或者，为了优化索引，你可以选择索引 `metadata` 对象内的特定字段。
+你可以参考[文档](https://docs.couchbase.com/cloud/search/customize-index.html)来了解有关索引子映射的更多信息。
+
+要创建子映射，可以参考以下文档：
+
+- [Couchbase Capella](https://docs.couchbase.com/cloud/search/create-child-mapping.html)
+- [Couchbase Server](https://docs.couchbase.com/server/current/fts/fts-creating-index-from-UI-classic-editor-dynamic.html)
+
+## 相关
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

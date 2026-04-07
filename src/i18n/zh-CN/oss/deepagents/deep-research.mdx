@@ -1,0 +1,633 @@
+---
+title: 构建深度研究智能体
+sidebarTitle: 深度研究
+description: 构建一个具备子智能体委派功能的多步骤网络研究智能体
+---
+
+import DeepResearchToolsPy from '/snippets/code-samples/deep-research-tools-py.mdx';
+import DeepResearchAgentClaudePy from '/snippets/code-samples/deep-research-agent-claude-py.mdx';
+import DeepResearchRunSyncPy from '/snippets/code-samples/deep-research-run-sync-py.mdx';
+import DeepResearchRunStreamPy from '/snippets/code-samples/deep-research-run-stream-py.mdx';
+import DeepResearchToolsJs from '/snippets/code-samples/deep-research-tools-js.mdx';
+import DeepResearchAgentClaudeJs from '/snippets/code-samples/deep-research-agent-claude-js.mdx';
+import DeepResearchRunSyncJs from '/snippets/code-samples/deep-research-run-sync-js.mdx';
+import DeepResearchRunStreamJs from '/snippets/code-samples/deep-research-run-stream-js.mdx';
+
+## 概述
+
+本指南演示了如何使用 [Deep Agents](/oss/deepagents) 从零开始构建一个多步骤的网络研究智能体。该智能体将研究问题分解为聚焦的任务，将其委派给专门的子智能体，并将发现综合成一份全面的报告。
+
+您将构建的智能体将：
+
+1.  使用待办事项列表规划研究
+2.  将聚焦的研究任务委派给具有隔离上下文的子智能体
+3.  在收集信息时评估搜索结果并规划后续步骤
+4.  将发现与适当的引用综合成最终报告
+
+生成的子智能体将使用 Tavily 进行网络搜索，获取完整的网页内容进行分析。
+
+### 核心概念
+
+本教程涵盖：
+
+-   用于并行、上下文隔离研究的[子智能体](/oss/deepagents/subagents)
+-   用于网络搜索的自定义[工具](/oss/langchain/tools)
+-   使用[内置规划工具](/oss/deepagents/harness#planning-capabilities)进行多步骤规划
+
+## 前提条件
+
+以下服务的 API 密钥：
+
+-   Anthropic (Claude) 或 Google (Gemini)
+-   用于网络搜索的 [Tavily](https://www.tavily.com/) (可选 - 免费层足够)
+-   用于追踪的 [LangSmith](https://smith.langchain.com/) (可选)
+
+## 设置
+
+:::python
+<Steps>
+<Step title="创建项目目录">
+
+```bash
+mkdir deep-research-agent
+cd deep-research-agent
+```
+
+</Step>
+<Step title="安装依赖">
+
+<Tabs>
+<Tab title="Claude">
+<CodeGroup>
+```bash pip wrap
+pip install deepagents tavily-python httpx markdownify langchain-anthropic langchain-core
+```
+
+```bash uv wrap
+uv init
+uv add deepagents tavily-python httpx markdownify langchain-anthropic langchain-core
+uv sync
+```
+</CodeGroup>
+</Tab>
+<Tab title="Gemini">
+<CodeGroup>
+```bash pip wrap
+pip install deepagents tavily-python httpx markdownify langchain-google-genai langchain-core
+```
+
+```bash uv wrap
+uv init
+uv add deepagents tavily-python httpx markdownify langchain-google-genai langchain-core
+uv sync
+```
+</CodeGroup>
+</Tab>
+</Tabs>
+
+</Step>
+<Step title="设置 API 密钥">
+
+<Tabs>
+<Tab title="Claude">
+```bash
+export ANTHROPIC_API_KEY="your_anthropic_api_key"
+export TAVILY_API_KEY="your_tavily_api_key"
+export LANGSMITH_API_KEY="your_langsmith_api_key"   # 可选
+```
+</Tab>
+<Tab title="Gemini">
+```bash
+export GOOGLE_API_KEY="your_google_api_key"
+export TAVILY_API_KEY="your_tavily_api_key"
+export LANGSMITH_API_KEY="your_langsmith_api_key"   # 可选
+```
+</Tab>
+</Tabs>
+
+</Step>
+</Steps>
+:::
+
+:::js
+<Steps>
+<Step title="创建项目目录">
+
+```bash
+mkdir deep-research-agent
+cd deep-research-agent
+```
+
+</Step>
+<Step title="安装依赖">
+
+<Tabs>
+<Tab title="Claude">
+```bash npm wrap
+npm install deepagents @langchain/anthropic @langchain/core
+```
+</Tab>
+<Tab title="Gemini">
+```bash npm wrap
+npm install deepagents @langchain/google-genai @langchain/core
+```
+</Tab>
+</Tabs>
+
+</Step>
+<Step title="设置 API 密钥">
+
+<Tabs>
+<Tab title="Claude">
+```bash
+export ANTHROPIC_API_KEY="your_anthropic_api_key"
+export TAVILY_API_KEY="your_tavily_api_key"
+export LANGSMITH_API_KEY="your_langsmith_api_key"   # 可选
+```
+</Tab>
+<Tab title="Gemini">
+```bash
+export GOOGLE_API_KEY="your_google_api_key"
+export TAVILY_API_KEY="your_tavily_api_key"
+export LANGSMITH_API_KEY="your_langsmith_api_key"   # 可选
+```
+</Tab>
+</Tabs>
+
+</Step>
+</Steps>
+:::
+
+## 构建智能体
+
+:::python
+在您的项目目录中创建 `agent.py`：
+:::
+
+:::js
+在您的项目目录中创建 `agent.ts`：
+:::
+
+<Steps>
+<Step title="添加工具">
+
+添加自定义搜索工具。`tavily_search` 工具使用 Tavily 进行 URL 发现，然后获取完整的网页内容，以便智能体可以分析完整的来源而非摘要。
+
+:::python
+<DeepResearchToolsPy />
+:::
+
+:::js
+<DeepResearchToolsJs />
+:::
+
+</Step>
+<Step title="添加提示词">
+
+:::python
+将编排器工作流和子智能体提示词模板添加到 `agent.py`：
+:::
+
+:::js
+将编排器工作流和子智能体提示词模板添加到 `agent.ts`：
+:::
+
+:::python
+```python expandable wrap
+RESEARCH_WORKFLOW_INSTRUCTIONS = """# 研究工作流
+
+对所有研究请求遵循此工作流：
+
+1.  **规划**：使用 write_todos 创建待办事项列表，将研究分解为聚焦的任务
+2.  **保存请求**：使用 write_file() 将用户的研究问题保存到 `/research_request.md`
+3.  **研究**：使用 task() 工具将研究任务委派给子智能体 - 始终使用子智能体进行研究，切勿自行研究
+4.  **综合**：查看所有子智能体的发现并合并引用（每个唯一的 URL 在所有发现中只获得一个编号）
+5.  **撰写报告**：撰写一份全面的最终报告到 `/final_report.md`（参见下面的报告撰写指南）
+6.  **验证**：读取 `/research_request.md` 并确认您已处理所有方面，且引用和结构正确
+
+## 研究规划指南
+- 将类似的研究任务批量处理到单个 TODO 中以最小化开销
+- 对于简单的事实查找问题，使用 1 个子智能体
+- 对于比较或多方面主题，委派给多个并行子智能体
+- 每个子智能体应研究一个特定方面并返回发现
+
+## 报告撰写指南
+
+当将最终报告写入 `/final_report.md` 时，遵循以下结构模式：
+
+**对于比较：**
+1.  引言
+2.  主题 A 概述
+3.  主题 B 概述
+4.  详细比较
+5.  结论
+
+**对于列表/排名：**
+只需列出项目及其详细信息 - 无需引言：
+1.  项目 1 及解释
+2.  项目 2 及解释
+3.  项目 3 及解释
+
+**对于摘要/概述：**
+1.  主题概述
+2.  关键概念 1
+3.  关键概念 2
+4.  关键概念 3
+5.  结论
+
+**通用指南：**
+- 使用清晰的章节标题（## 用于章节，### 用于子章节）
+- 默认使用段落形式 - 内容要丰富，而不仅仅是要点
+- 请勿使用自我指涉的语言（"我发现..."，"我研究了..."）
+- 撰写专业的报告，无需元评论
+- 每个章节都应全面且详细
+- 仅当列表比散文更合适时才使用要点
+
+**引用格式：**
+- 使用 [1]、[2]、[3] 格式在行内引用来源
+- 为每个唯一的 URL 在所有子智能体发现中分配一个引用编号
+- 在报告末尾以 ### 来源 章节列出每个编号的来源
+- 按顺序编号来源，不留空档（1,2,3,4...）
+- 格式：[1] 来源标题：URL（每个单独一行以正确渲染列表）
+- 示例：
+
+ 一些重要发现 [1]。另一个关键见解 [2]。
+
+ ### 来源
+ [1] AI 研究论文：https://example.com/paper
+ [2] 行业分析：https://example.com/analysis
+"""
+```
+
+```python expandable wrap
+RESEARCHER_INSTRUCTIONS = """你是一名研究助理，正在研究用户输入的主题。作为背景，今天的日期是 {date}。
+
+你的工作是使用工具收集有关用户输入主题的信息。
+你可以使用 tavily_search 工具来查找有助于回答研究问题的资源。
+你可以连续或并行调用它，你的研究是在工具调用循环中进行的。
+
+你可以使用 tavily_search 工具进行网络搜索。
+
+像时间有限的人类研究员一样思考。遵循以下步骤：
+
+1.  **仔细阅读问题** - 用户需要什么具体信息？
+2.  **从更广泛的搜索开始** - 首先使用广泛、全面的查询
+3.  **每次搜索后，暂停并评估** - 我有足够的信息来回答吗？还缺少什么？
+4.  **在收集信息时执行更窄的搜索** - 填补空白
+5.  **当你能自信地回答时停止** - 不要为了完美而继续搜索
+
+**工具调用预算**（防止过度搜索）：
+- **简单查询**：最多使用 2-3 次搜索工具调用
+- **复杂查询**：最多使用 5 次搜索工具调用
+- **始终停止**：如果找不到正确的来源，在 5 次搜索工具调用后停止
+
+**立即停止当**：
+- 你可以全面回答用户的问题
+- 你拥有 3 个以上相关示例/来源来回答问题
+- 你最近 2 次搜索返回了类似的信息
+
+每次搜索后，在继续之前评估结果：我找到了什么关键信息？缺少什么？我有足够的信息来回答吗？我应该继续搜索还是提供答案？
+
+当你向编排器提供发现时：
+
+1.  **结构化你的回答**：使用清晰的标题和详细的解释来组织发现
+2.  **行内引用来源**：引用来自搜索的信息时，使用 [1]、[2]、[3] 格式
+3.  **包含来源章节**：以 ### 来源 结尾，列出每个编号的来源及其标题和 URL
+
+示例：
+## 关键发现
+
+上下文工程是 AI 智能体的一项关键技术 [1]。研究表明，适当的上下文管理可以将性能提高 40% [2]。
+
+### 来源
+[1] 上下文工程指南：https://example.com/context-guide
+[2] AI 性能研究：https://example.com/study
+
+编排器将把所有子智能体的引用合并到最终报告中。
+"""
+```
+
+```python expandable wrap
+SUBAGENT_DELEGATION_INSTRUCTIONS = """# 子智能体研究协调
+
+你的角色是通过将待办事项列表中的任务委派给专门的研究子智能体来协调研究。
+
+## 委派策略
+
+**默认：从 1 个子智能体开始** 处理大多数查询：
+- "什么是量子计算？" -> 1 个子智能体（概述）
+- "列出旧金山排名前 10 的咖啡店" -> 1 个子智能体
+- "总结互联网的历史" -> 1 个子智能体
+- "研究 AI 智能体的上下文工程" -> 1 个子智能体（涵盖所有方面）
+
+**仅当查询明确需要比较或具有明显独立方面时才并行化：**
+
+**明确比较** -> 每个元素 1 个子智能体：
+- "比较 OpenAI、Anthropic 和 DeepMind 的 AI 安全方法" -> 3 个并行子智能体
+- "比较 Python 与 JavaScript 在 Web 开发中的应用" -> 2 个并行子智能体
+
+**明显分离的方面** -> 每个方面 1 个子智能体（谨慎使用）：
+- "研究欧洲、亚洲和北美的可再生能源采用情况" -> 3 个并行子智能体（地理分离）
+- 仅当单个全面搜索无法有效覆盖各个方面时才使用此模式
+
+## 关键原则
+- **偏向于单个子智能体**：一个全面的研究任务比多个狭窄的任务更节省 token
+- **避免过早分解**：不要将"研究 X"分解为"研究 X 概述"、"研究 X 技术"、"研究 X 应用" - 只需为所有 X 使用 1 个子智能体
+- **仅对明确比较进行并行化**：当比较不同的实体或地理上分离的数据时，使用多个子智能体
+
+## 并行执行限制
+- 每次迭代最多使用 {max_concurrent_research_units} 个并行子智能体
+- 在单个响应中进行多个 task() 调用以实现并行执行
+- 每个子智能体独立返回发现
+
+## 研究限制
+- 如果尚未找到足够的来源，在 {max_researcher_iterations} 轮委派后停止
+- 当你有足够的信息进行全面回答时停止
+- 偏向于聚焦的研究而非穷尽的探索"""
+```
+:::
+
+:::js
+```ts expandable wrap
+const RESEARCH_WORKFLOW_INSTRUCTIONS = `# 研究工作流
+
+对所有研究请求遵循此工作流：
+
+1.  **规划**：使用 write_todos 创建待办事项列表，将研究分解为聚焦的任务
+2.  **保存请求**：使用 write_file() 将用户的研究问题保存到 \`/research_request.md\`
+3.  **研究**：使用 task() 工具将研究任务委派给子智能体 - 始终使用子智能体进行研究，切勿自行研究
+4.  **综合**：查看所有子智能体的发现并合并引用（每个唯一的 URL 在所有发现中只获得一个编号）
+5.  **撰写报告**：撰写一份全面的最终报告到 \`/final_report.md\`（参见下面的报告撰写指南）
+6.  **验证**：读取 \`/research_request.md\` 并确认您已处理所有方面，且引用和结构正确
+
+## 研究规划指南
+- 将类似的研究任务批量处理到单个 TODO 中以最小化开销
+- 对于简单的事实查找问题，使用 1 个子智能体
+- 对于比较或多方面主题，委派给多个并行子智能体
+- 每个子智能体应研究一个特定方面并返回发现
+
+## 报告撰写指南
+
+当将最终报告写入 \`/final_report.md\` 时，遵循以下结构模式：
+
+**对于比较：**
+1.  引言
+2.  主题 A 概述
+3.  主题 B 概述
+4.  详细比较
+5.  结论
+
+**对于列表/排名：**
+只需列出项目及其详细信息 - 无需引言：
+1.  项目 1 及解释
+2.  项目 2 及解释
+3.  项目 3 及解释
+
+**对于摘要/概述：**
+1.  主题概述
+2.  关键概念 1
+3.  关键概念 2
+4.  关键概念 3
+5.  结论
+
+**通用指南：**
+- 使用清晰的章节标题（## 用于章节，### 用于子章节）
+- 默认使用段落形式 - 内容要丰富，而不仅仅是要点
+- 请勿使用自我指涉的语言（"我发现..."，"我研究了..."）
+- 撰写专业的报告，无需元评论
+- 每个章节都应全面且详细
+- 仅当列表比散文更合适时才使用要点
+
+**引用格式：**
+- 使用 [1]、[2]、[3] 格式在行内引用来源
+- 为每个唯一的 URL 在所有子智能体发现中分配一个引用编号
+- 在报告末尾以 ### 来源 章节列出每个编号的来源
+- 按顺序编号来源，不留空档（1,2,3,4...）
+- 格式：[1] 来源标题：URL（每个单独一行以正确渲染列表）
+- 示例：
+
+ 一些重要发现 [1]。另一个关键见解 [2]。
+
+ ### 来源
+ [1] AI 研究论文：https://example.com/paper
+ [2] 行业分析：https://example.com/analysis
+`;
+```
+
+```ts expandable wrap
+const RESEARCHER_INSTRUCTIONS = `你是一名研究助理，正在研究用户输入的主题。作为背景，今天的日期是 {date}。
+
+你的工作是使用工具收集有关用户输入主题的信息。
+你可以使用 tavily_search 工具来查找有助于回答研究问题的资源。
+你可以连续或并行调用它，你的研究是在工具调用循环中进行的。
+
+你可以使用 tavily_search 工具进行网络搜索。
+
+像时间有限的人类研究员一样思考。遵循以下步骤：
+
+1.  **仔细阅读问题** - 用户需要什么具体信息？
+2.  **从更广泛的搜索开始** - 首先使用广泛、全面的查询
+3.  **每次搜索后，暂停并评估** - 我有足够的信息来回答吗？还缺少什么？
+4.  **在收集信息时执行更窄的搜索** - 填补空白
+5.  **当你能自信地回答时停止** - 不要为了完美而继续搜索
+
+**工具调用预算**（防止过度搜索）：
+- **简单查询**：最多使用 2-3 次搜索工具调用
+- **复杂查询**：最多使用 5 次搜索工具调用
+- **始终停止**：如果找不到正确的来源，在 5 次搜索工具调用后停止
+
+**立即停止当**：
+- 你可以全面回答用户的问题
+- 你拥有 3 个以上相关示例/来源来回答问题
+- 你最近 2 次搜索返回了类似的信息
+
+每次搜索后，在继续之前评估结果：我找到了什么关键信息？缺少什么？我有足够的信息来回答吗？我应该继续搜索还是提供答案？
+
+当你向编排器提供发现时：
+
+1.  **结构化你的回答**：使用清晰的标题和详细的解释来组织发现
+2.  **行内引用来源**：引用来自搜索的信息时，使用 [1]、[2]、[3] 格式
+3.  **包含来源章节**：以 ### 来源 结尾，列出每个编号的来源及其标题和 URL
+
+示例：
+## 关键发现
+上下文工程是 AI 智能体的一项关键技术 [1]。研究表明，适当的上下文管理可以将性能提高 40% [2]。
+
+### 来源
+[1] 上下文工程指南：https://example.com/context-guide
+[2] AI 性能研究：https://example.com/study
+
+编排器将把所有子智能体的引用合并到最终报告中。
+`;
+```
+
+```ts expandable wrap
+const SUBAGENT_DELEGATION_INSTRUCTIONS = `# 子智能体研究协调
+
+你的角色是通过将待办事项列表中的任务委派给专门的研究子智能体来协调研究。
+
+## 委派策略
+
+**默认：从 1 个子智能体开始** 处理大多数查询：
+- "什么是量子计算？" -> 1 个子智能体（概述）
+- "列出旧金山排名前 10 的咖啡店" -> 1 个子智能体
+- "总结互联网的历史" -> 1 个子智能体
+- "研究 AI 智能体的上下文工程" -> 1 个子智能体（涵盖所有方面）
+
+**仅当查询明确需要比较或具有明显独立方面时才并行化：**
+
+**明确比较** -> 每个元素 1 个子智能体：
+- "比较 OpenAI、Anthropic 和 DeepMind 的 AI 安全方法" -> 3 个并行子智能体
+- "比较 Python 与 JavaScript 在 Web 开发中的应用" -> 2 个并行子智能体
+
+**明显分离的方面** -> 每个方面 1 个子智能体（谨慎使用）：
+- "研究欧洲、亚洲和北美的可再生能源采用情况" -> 3 个并行子智能体（地理分离）
+- 仅当单个全面搜索无法有效覆盖各个方面时才使用此模式
+
+## 关键原则
+- **偏向于单个子智能体**：一个全面的研究任务比多个狭窄的任务更节省 token
+- **避免过早分解**：不要将"研究 X"分解为"研究 X 概述"、"研究 X 技术"、"研究 X 应用" - 只需为所有 X 使用 1 个子智能体
+- **仅对明确比较进行并行化**：当比较不同的实体或地理上分离的数据时，使用多个子智能体
+
+## 并行执行限制
+- 每次迭代最多使用 {maxConcurrentResearchUnits} 个并行子智能体
+- 在单个响应中进行多个 task() 调用以实现并行执行
+- 每个子智能体独立返回发现
+
+## 研究限制
+- 如果尚未找到足够的来源，在 {maxResearcherIterations} 轮委派后停止
+- 当你有足够的信息进行全面回答时停止
+- 偏向于聚焦的研究而非穷尽的探索`;
+```
+:::
+
+</Step>
+<Step title="创建智能体">
+
+:::python
+将模型初始化和智能体创建代码添加到 `agent.py`。选择您的提供商：
+
+<Tabs>
+<Tab title="Claude">
+<DeepResearchAgentClaudePy />
+</Tab>
+<Tab title="Gemini">
+```python
+from datetime import datetime
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+from deepagents import create_deep_agent
+
+max_concurrent_research_units = 3
+max_researcher_iterations = 3
+
+current_date = datetime.now().strftime("%Y-%m-%d")
+
+INSTRUCTIONS = (
+    RESEARCH_WORKFLOW_INSTRUCTIONS
+    + "\n\n"
+    + "=" * 80
+    + "\n\n"
+    + SUBAGENT_DELEGATION_INSTRUCTIONS.format(
+        max_concurrent_research_units=max_concurrent_research_units,
+        max_researcher_iterations=max_researcher_iterations,
+    )
+)
+
+research_sub_agent = {
+    "name": "research-agent",
+    "description": "将研究委派给子智能体。一次给一个主题。",
+    "system_prompt": RESEARCHER_INSTRUCTIONS.format(date=current_date),
+    "tools": [tavily_search],
+}
+
+model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", temperature=0.0)
+
+agent = create_deep_agent(
+    model=model,
+    tools=[tavily_search],
+    system_prompt=INSTRUCTIONS,
+    subagents=[research_sub_agent],
+)
+```
+</Tab>
+</Tabs>
+:::
+
+:::js
+将模型初始化和智能体创建代码添加到 `agent.ts`：
+
+<DeepResearchAgentClaudeJs />
+:::
+
+</Step>
+</Steps>
+
+## 运行智能体
+
+您可以同步运行智能体，这意味着它将等待完整结果然后打印，或者您可以在更新到来时流式传输它们。
+
+:::python
+将相应选项卡中的代码添加到 `agent.py` 的底部：
+:::
+
+:::js
+将相应选项卡中的代码添加到 `agent.ts` 的底部：
+:::
+
+<Tabs>
+<Tab title="同步运行" value="sync">
+
+:::python
+<DeepResearchRunSyncPy />
+:::
+
+:::js
+<DeepResearchRunSyncJs />
+:::
+
+</Tab>
+<Tab title="流式更新" value="stream">
+
+:::python
+<DeepResearchRunStreamPy />
+:::
+
+:::js
+<DeepResearchRunStreamJs />
+:::
+
+</Tab>
+</Tabs>
+
+从项目根目录运行智能体：
+
+:::python
+```sh
+python agent.py
+```
+:::
+
+:::js
+```sh
+npx tsx agent.ts
+```
+:::
+
+如果您在运行前设置了 `LANGSMITH_API_KEY` 环境变量，您可以在 [LangSmith](/langsmith/home) 中查看智能体的追踪记录，以调试和监控多步骤行为。
+
+## 完整代码
+
+在 GitHub 上查看完整的 [深度研究示例](https://github.com/langchain-ai/deepagents/tree/main/examples/deep_research)。
+
+## 后续步骤
+
+现在您已经构建了智能体，可以通过更改智能体文件中的提示词常量来自定义它，以调整工作流、委派策略或研究员行为。
+您还可以调整委派限制，以允许更多的并行子智能体或委派轮次。
+
+有关本教程中概念的更多信息，请查看以下资源：
+
+-   [子智能体](/oss/deepagents/subagents)：了解如何配置具有不同工具和提示词的子智能体
+-   [自定义](/oss/deepagents/customization)：自定义模型、工具、系统提示词和规划行为
+-   [LangSmith](/langsmith/home)：追踪研究运行并调试多步骤行为
+-   [深度研究课程](https://academy.langchain.com/courses/deep-research-with-langgraph)：关于使用 LangGraph 进行深度研究的完整课程

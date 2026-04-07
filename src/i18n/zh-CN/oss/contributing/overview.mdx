@@ -1,0 +1,138 @@
+---
+title: 贡献指南
+sidebarTitle: 概述
+---
+
+**欢迎！感谢您有兴趣参与贡献。**
+
+LangChain 已帮助形成了生成式 AI 领域最大的开发者社区，我们始终对新贡献者持开放态度。无论是修复错误、添加功能、改进文档还是分享反馈，您的参与都有助于让 LangChain 和 LangGraph 变得对每个人更好 🦜❤️
+
+## 贡献方式
+
+<AccordionGroup>
+    <Accordion title="报告错误" icon="bug">
+        发现了错误？请按照以下步骤帮助我们修复：
+
+        <Steps>
+            <Step title="搜索">
+                检查相应仓库的 GitHub Issues 中是否已存在该问题：
+
+                :::python
+                <Columns cols={3}>
+                    <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/langchain/issues">Issues</Card>
+                    <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraph/issues">Issues</Card>
+                    <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagents/issues">Issues</Card>
+                </Columns>
+                :::
+                :::js
+                <Columns cols={3}>
+                    <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/langchainjs/issues">Issues</Card>
+                    <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraphjs/issues">Issues</Card>
+                    <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagentsjs/issues">Issues</Card>
+                </Columns>
+                :::
+            </Step>
+            <Step title="创建问题">
+                如果不存在相应问题，请创建一个新的。撰写时，请务必遵循提供的模板，并包含一个[最小、可复现的示例](https://stackoverflow.com/help/minimal-reproducible-example)。创建后，请为最终的问题附加任何相关标签。如果项目维护者无法复现该问题，则不太可能及时处理。
+            </Step>
+            <Step title="等待">
+                项目维护者将对问题进行归类，并可能要求提供更多信息。由于我们处理的问题量很大，请耐心等待。除非您有新的信息要提供，否则请不要催促问题。
+            </Step>
+        </Steps>
+
+        如果您要添加问题，请尽量使其专注于单一主题。如果两个问题相关或存在阻塞关系，请[链接它们](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword)，而不是合并它们。例如：
+
+        ```text
+        此问题被 #123 阻塞，并与 #456 相关。
+        ```
+    </Accordion>
+
+    <Accordion title="建议功能" icon="wand">
+        对新功能或增强有想法？
+
+        <Steps>
+            <Step title="搜索">
+                在相应仓库的 issues 中搜索现有的功能请求：
+
+                :::python
+                <Columns cols={3}>
+                    <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/langchain/issues?q=state%3Aopen%20label%3A%22feature%20request%22">Issues</Card>
+                    <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraph/issues?q=state%3Aopen%20label%3Aenhancement">Issues</Card>
+                    <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagents/issues?q=is%3Aissue%20state%3Aopen%20label%3Afeature">Issues</Card>
+                </Columns>
+                :::
+                :::js
+                <Columns cols={3}>
+                    <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/langchainjs">Issues</Card>
+                    <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraphjs/labels?q=feature">Issues</Card>
+                    <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagentsjs/issues?q=is%3Aissue%20state%3Aopen%20label%3Aenhancement">Issues</Card>
+                </Columns>
+                :::
+            </Step>
+            <Step title="讨论">
+                如果没有现有请求，请在[相关类别](https://forum.langchain.com/c/oss-product-help-lc-and-lg/16)下发起新讨论，以便项目维护者和社区提供反馈。
+            </Step>
+            <Step title="描述">
+                请务必描述使用场景以及它为何对他人有价值。如果可能，请提供示例或模型图。概述应通过的测试用例。
+            </Step>
+        </Steps>
+    </Accordion>
+
+    <Accordion title="改进文档" icon="book">
+        欢迎改进文档！我们努力保持文档清晰全面，您的视角可以带来很大不同。
+
+        <Card title="如何提议文档更改" href="/oss/contributing/documentation" arrow>指南</Card>
+    </Accordion>
+
+    <Accordion title="贡献代码" icon="code">
+        由于用户基数庞大，我们的小团队很难跟上所有功能请求和错误修复。如果您有技能和时间，我们非常欢迎您的帮助！
+
+        <Card title="如何提交您的第一个 Pull Request" href="/oss/contributing/code" arrow>指南</Card>
+
+        如果您开始处理某个问题，请将其分配给自己或请维护者分配。这有助于避免重复工作。
+
+        如果您在寻找可贡献的内容，请查看我们仓库中标记为 "help wanted" 的问题：
+
+        :::python
+        <Columns cols={3}>
+            <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/langchain/labels?q=help+wanted">Labels</Card>
+            <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraph/labels?q=help+wanted">Labels</Card>
+            <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagents/labels?q=help+wanted">Labels</Card>
+        </Columns>
+        :::
+        :::js
+        <Columns cols={3}>
+            <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/deepagents/labels?q=help+wanted">Labels</Card>
+            <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraphjs/labels?q=help+wanted">Labels</Card>
+            <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagentsjs/labels?q=help+wanted">Labels</Card>
+        </Columns>
+        :::
+    </Accordion>
+    <Accordion title="构建新集成" icon="plug-connected">
+        任何人都可以构建并发布自己的 LangChain 集成包。新的集成不会作为 PR 被接受至 `langchain-ai` 仓库——它们必须独立发布到 PyPI 或 npm。
+
+        <Card title="LangChain" icon="link" href="/oss/contributing/integrations-langchain" arrow>构建 LangChain 集成指南</Card>
+        <Card title="Deep Agents 沙盒" icon="cube" href="/oss/contributing/integrations-langchain" arrow>构建沙盒集成指南</Card>
+    </Accordion>
+</AccordionGroup>
+
+## Pull Request 要求
+
+<Warning>
+    **所有 Pull Request 必须链接到一个问题或讨论，其中解决方案已获得维护者批准。** 未经事先批准的 PR 将被关闭。
+</Warning>
+
+所有 Pull Request 应展示有意义的努力和上下文理解。**如果创建 Pull Request 所需的努力少于维护者审查它所需的努力，则该贡献不应提交。** 低质量的“路过式”贡献——无论其产生方式如何——通常在上下文相关性、准确性和质量方面达不到要求。大规模的自动化贡献是对我们人力努力的拒绝服务攻击。
+
+所有外部 Pull Request 必须满足以下要求：
+
+* Pull Request 必须链接到一个问题或讨论，其中解决方案已获得维护者批准。
+* Pull Request 必须填写仓库的 Pull Request 模板。
+
+如果这些要求未满足，维护者保留在不评论的情况下关闭 PR 的权利。**我们将关闭看似低质量垃圾信息的 Pull Request 和问题。**
+
+## 语言政策
+
+所有贡献——问题、Pull Request、代码审查和讨论——必须使用英语。这有助于保持我们全球贡献者基础间的沟通可访问和可搜索。
+
+如果英语不是您的母语，请不要担心。我们重视清晰的沟通胜过完美的语法，欢迎使用翻译工具。

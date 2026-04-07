@@ -1,0 +1,203 @@
+---
+title: LangSmith Polly
+sidebarTitle: Polly AI 助手
+icon: "feather"
+---
+
+import secret from '/snippets/langsmith/set-workspace-secrets.mdx';
+
+**LangSmith Polly** 是一个直接嵌入在您 LangSmith [工作区](/langsmith/administration-overview#workspaces) 中的 AI 助手，旨在帮助您分析和理解应用程序数据。
+
+Polly 帮助您从追踪记录、对话线程和提示中获取洞察，无需手动挖掘数据。通过提出自然语言问题，您可以快速了解智能体性能、调试问题并分析用户情绪。
+
+<img src="/images/brand/polly-icon.png" alt="LangSmith Polly 图标" style={{float: 'left', marginRight: '20px', marginTop: '-1px', marginBottom: '20px', maxWidth: '100px'}} /> Polly 出现在 [LangSmith UI](https://smith.langchain.com) 中以下位置的右下角：
+
+<br></br><br></br>**可观测性与调试：**
+- [项目](#项目)：浏览和筛选项目中的所有运行记录。
+- [追踪页面](#追踪页面)：分析单个运行记录和执行追踪。
+- [线程视图](#线程视图)：理解对话线程和用户交互。
+
+**提示工程：**
+- [Playground](#playground)：编辑和优化提示。
+- [提示中心页面](#提示中心页面)：探索和理解共享的提示。
+
+**评估与测试：**
+- [数据集实验](#数据集实验)：分析实验结果并比较运行记录。
+- [数据集示例](#数据集示例)：浏览和理解数据集结构。
+- [标注队列](#标注队列)：审查运行记录并做出明智的标注决策。
+- [评估器](#评估器)：借助 AI 助手构建和完善评估器。
+
+<img
+className="block dark:hidden"
+src="/langsmith/images/polly-datasets-light.png"
+alt="数据集视图侧边栏中的 Polly 聊天界面。"
+/>
+
+<img
+className="hidden dark:block"
+src="/langsmith/images/polly-datasets-dark.png"
+alt="数据集视图侧边栏中的 Polly 聊天界面。"
+/>
+
+## 开始使用
+
+在开始使用 Polly 之前，您需要为您使用的模型添加一个 API 密钥：
+
+<secret/>
+
+### 支持的模型
+
+Polly 开箱即用地支持以下模型提供商：
+
+- Anthropic (Claude)
+- OpenAI
+- Google Gemini
+- AWS Bedrock
+- Groq
+- Mistral
+- xAI
+- DeepSeek
+- Fireworks AI
+
+您也可以使用在 [Playground 设置](/langsmith/prompt-engineering-concepts#playground) 中配置的任何自定义模型，只需在该配置上启用 **在 Polly 中可用** 开关即可。工作区管理员管理哪些自定义模型可用。
+
+### 键盘快捷键
+
+| 操作 | Mac | Windows/Linux |
+|---|---|---|
+| 打开/关闭 Polly | `Cmd+I` | `Ctrl+I` |
+| 清除当前线程 | `Cmd+Shift+O` | `Ctrl+Shift+O` |
+
+## 可观测性
+
+### 项目
+
+在项目的运行列表中，Polly 可以浏览和筛选整个项目中的运行记录、创建数据集以及添加示例。使用 Polly 快速探索追踪记录中发生的情况，无需手动翻页查看结果。
+
+**示例问题：**
+- “显示过去 24 小时内所有失败的运行记录”
+- “哪些运行记录耗时最长？”
+- “将失败的运行记录添加到我的测试数据集中”
+- “本周有多少运行记录出错了？”
+
+### 追踪页面
+
+在单个 [追踪记录](/langsmith/observability-concepts#traces) 上，Polly 会分析 [运行记录](/langsmith/observability-concepts#runs) 数据和执行轨迹。Polly 会检查完整的追踪上下文，包括 [运行元数据](/langsmith/observability-concepts#metadata)、输入、输出、中间步骤和配置，以帮助您了解发生了什么并确定需要改进的地方。
+
+**示例问题：**
+- “智能体在这里有什么可以做得更好的地方吗？”
+- “这次运行为什么会失败？”
+- “这个追踪记录中什么环节耗时最多？”
+- “总结一下这个追踪记录中发生了什么”
+
+### 线程视图
+
+在 **线程** 标签页下，Polly 分析对话 [线程](/langsmith/observability-concepts#threads)，帮助您理解用户情绪、对话结果和交互模式。使用 Polly 来识别用户痛点并了解问题是否得到解决。
+
+**示例问题：**
+- “用户似乎感到沮丧吗？”
+- “用户遇到了什么问题？”
+- “用户的问题解决了吗？”
+- “这个线程的主要话题是什么？”
+
+## 提示工程
+
+### Playground
+
+在 [Playground](/langsmith/prompt-engineering-concepts#playground) 中，Polly 帮助您编辑和优化您的 [提示](/langsmith/prompt-engineering-concepts#prompts-in-langsmith)。使用自动化选项，如 **优化提示**、**生成工具** 或 **生成输出模式**，或者给 Polly 自定义指令来编辑您的提示。Polly 可以直接修改 Playground 的状态——更新消息、工具、输出模式和示例——这样您就可以通过对话来迭代提示。
+
+**示例问题：**
+- “让它用意大利语回复”
+- “添加上下文信息，说明用户的角色”
+- “让语气更专业一些”
+- “简化指令”
+
+### 提示中心页面
+
+在 [LangSmith Hub](/langsmith/prompt-engineering-concepts#prompts-in-langsmith) 中查看提示时，Polly 帮助您理解提示的结构、消息、工具和配置。这对于探索和学习共享的提示非常有用。
+
+**示例问题：**
+- “这个提示是做什么的？”
+- “这个提示使用了哪些工具？”
+- “解释一下这个提示的结构”
+- “这个提示中的关键指令是什么？”
+
+## 评估
+
+### 数据集实验
+
+在 **数据集** 页面的 **实验** 标签页下，Polly 分析实验结果，并帮助您比较不同实验中的运行记录。Polly 可以识别模式、总结性能，并帮助您了解哪些方法效果最好。
+
+**示例问题：**
+- “哪个实验表现最好？”
+- “这些运行记录之间的主要区别是什么？”
+- “总结一下这个实验的结果”
+- “在失败案例中你看到了什么模式？”
+
+### 数据集示例
+
+在 **数据集** 页面的 **示例** 标签页下，Polly 帮助您理解数据集结构、浏览示例并识别数据模式。这对于了解您正在处理的数据以及为实验准备数据集非常有用。
+
+**示例问题：**
+- “这个数据集中包含什么类型的数据？”
+- “给我看看有错误的示例”
+- “你在输入中看到了什么模式？”
+- “这个数据集中有多少个示例？”
+
+### 标注队列
+
+在 **标注队列** 中，Polly 帮助您在做出标注决策前分析运行记录。无论您是单独审查运行记录还是成对比较，Polly 都会提供关于运行行为、错误和执行模式的洞察，为您的评分提供信息。
+
+**示例问题：**
+- “这次运行哪里出错了？”
+- “总结一下这次运行发生了什么”
+- “比较这两个运行记录”
+- “给这个评分时我应该考虑什么？”
+
+### 评估器
+
+在 **评估器** 构建器中，Polly 帮助您编写和完善评估器逻辑。Polly 可以生成评估器代码、提出改进建议，并帮助您针对示例测试评估器。
+
+**示例问题：**
+- “编写一个检查幻觉的评估器”
+- “提高这个评估器的准确性”
+- “这个评估器检查什么？”
+- “添加对边缘情况的处理”
+
+## 下一步
+
+了解更多 Polly 帮助您探索的功能：
+
+<CardGroup cols={2}>
+  <Card
+    title="可观测性"
+    icon="search"
+    href="/langsmith/observability"
+  >
+    了解更多关于追踪和监控您的 LLM 应用程序的信息
+  </Card>
+
+  <Card
+    title="线程"
+    icon="messages"
+    href="/langsmith/threads"
+  >
+    了解 LangSmith 中线程的工作原理
+  </Card>
+
+  <Card
+    title="提示工程"
+    icon="wand"
+    href="/langsmith/prompt-engineering"
+  >
+    在 Playground 中创建和迭代提示
+  </Card>
+
+  <Card
+    title="评估"
+    icon="clipboard-check"
+    href="/langsmith/evaluation"
+  >
+    系统地评估和测试您的应用程序
+  </Card>
+</CardGroup>

@@ -1,0 +1,264 @@
+---
+title: 为 LangSmith 遥测配置收集器
+sidebarTitle: 为遥测配置收集器
+---
+
+LangSmith 部署中的各个服务会以日志、指标和追踪的形式发出遥测数据。您可能已经在 Kubernetes 集群中设置了遥测收集器，或者希望部署一个来监控您的应用程序。
+
+本页介绍如何配置 [OTel 收集器](https://opentelemetry.io/docs/collector/configuration/) 以收集来自 LangSmith 的遥测数据。请注意，下面讨论的所有概念都可以应用于其他收集器，例如 [Fluentd](https://www.fluentd.org/) 或 [FluentBit](https://fluentbit.io/)。
+
+<Warning>
+**本节仅适用于 Kubernetes 部署。**
+</Warning>
+
+# 接收器
+
+## 日志
+
+这是一个 ***Sidecar*** 收集器的示例，用于从其自身 Pod 读取日志，并排除非特定领域容器的日志。由于需要访问每个容器的文件系统，Sidecar 配置在此处很有用。也可以使用 DaemonSet。
+
+```yaml
+filelog:
+  exclude:
+    - "**/otc-container/*.log"
+  include:
+    - /var/log/pods/${POD_NAMESPACE}_${POD_NAME}_${POD_UID}/*/*.log
+  include_file_name: false
+  include_file_path: true
+  operators:
+    - id: container-parser
+      type: container
+  retry_on_failure:
+    enabled: true
+  start_at: end
+env:
+  - name: POD_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+  - name: POD_NAMESPACE
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.namespace
+  - name: POD_UID
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.uid
+volumes:
+  - name: varlogpods
+    hostPath:
+      path: /var/log/pods
+volumeMounts:
+  - name: varlogpods
+    mountPath: /var/log/pods
+    readOnly: true
+```
+
+<Info>
+**此配置需要对给定命名空间中的 Pod 拥有 'get'、'list' 和 'watch' 权限。**
+</Info>
+
+## 指标
+
+可以使用 Prometheus 端点抓取指标。可以使用单个实例的 ***Gateway*** 收集器，以避免在获取指标时重复查询。以下配置抓取所有默认命名的 LangSmith 服务：
+
+```yaml
+prometheus:
+  config:
+    scrape_configs:
+      - job_name: langsmith-services
+        metrics_path: /metrics
+        scrape_interval: 15s
+        # 仅抓取 LangSmith 命名空间中的端点
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names: [<langsmith-namespace>]
+        relabel_configs:
+          # 仅抓取服务名称为 langsmith-.* 的服务
+          - source_labels: [__meta_kubernetes_service_name]
+            regex: "langsmith-.*"
+            action: keep
+          # 仅抓取具有以下名称的端口
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            regex: "(backend|platform|playground|redis-metrics|postgres-metrics|metrics)"
+            action: keep
+          # 将有用的元数据提升为常规标签
+          - source_labels: [__meta_kubernetes_service_name]
+            target_label: k8s_service
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: k8s_pod
+          # 将默认的 "host:port" 替换为 Prom 的实例标签
+          - source_labels: [__address__]
+            target_label: instance
+```
+
+<Info>
+**此配置需要对给定命名空间中的 Pod、服务和端点拥有 'get'、'list' 和 'watch' 权限。**
+</Info>
+
+### 追踪
+
+对于追踪，您需要启用 OTLP 接收器。以下配置可用于监听端口 4318 上的 HTTP 追踪和端口 4317 上的 GRPC：
+
+```yaml
+otlp:
+  protocols:
+    grpc:
+      endpoint: 0.0.0.0:4317
+    http:
+      endpoint: 0.0.0.0:4318
+```
+
+## 处理器
+
+### 推荐的 OTEL 处理器
+
+使用 OTel 收集器时，建议使用以下处理器：
+
+* [批处理处理器](https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/batchprocessor/README.md)：在将数据发送到导出器之前将其分组为批次。
+* [内存限制器](https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/memorylimiterprocessor/README.md)：防止收集器使用过多内存并崩溃。当超过软限制时，收集器停止接受新数据。
+* [Kubernetes 属性处理器](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)：将 Kubernetes 元数据（如 Pod 名称）添加到遥测数据中。
+
+## 导出器
+
+导出器只需指向您喜欢的外部端点。以下配置允许您为日志、指标和追踪配置单独的端点：
+
+```yaml
+otlphttp/logs:
+  endpoint: <your_logs_endpoint>
+otlphttp/metrics:
+  endpoint: <your_metrics_endpoint>
+otlphttp/traces:
+  endpoint: <your_traces_endpoint>
+```
+
+<Note>
+**OTel 收集器还支持直接导出到 [Datadog](https://docs.datadoghq.com/opentelemetry/setup/collector_exporter) 端点。**
+</Note>
+
+# 收集器配置示例：日志 Sidecar
+
+```yaml
+mode: sidecar
+image: otel/opentelemetry-collector-contrib
+config:
+  receivers:
+    filelog:
+      exclude:
+        - "**/otc-container/*.log"
+      include:
+        - /var/log/pods/${POD_NAMESPACE}_${POD_NAME}_${POD_UID}/*/*.log
+      include_file_name: false
+      include_file_path: true
+      operators:
+        - id: container-parser
+          type: container
+      retry_on_failure:
+        enabled: true
+      start_at: end
+  processors:
+    batch:
+      send_batch_size: 8192
+      timeout: 10s
+    memory_limiter:
+      check_interval: 1m
+      limit_percentage: 90
+      spike_limit_percentage: 80
+  exporters:
+    otlphttp/logs:
+      endpoint: <your-endpoint>
+  service:
+    pipelines:
+      logs/langsmith:
+        receivers: [filelog]
+        processors: [batch, memory_limiter]
+        exporters: [otlphttp/logs]
+env:
+  - name: POD_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+  - name: POD_NAMESPACE
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.namespace
+  - name: POD_UID
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.uid
+volumes:
+  - name: varlogpods
+    hostPath:
+      path: /var/log/pods
+volumeMounts:
+  - name: varlogpods
+    mountPath: /var/log/pods
+    readOnly: true
+```
+
+# 收集器配置示例：指标和追踪 Gateway
+
+```yaml
+mode: deployment
+image: otel/opentelemetry-collector-contrib
+config:
+  receivers:
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: langsmith-services
+            metrics_path: /metrics
+            scrape_interval: 15s
+            # 仅抓取 LangSmith 命名空间中的端点
+            kubernetes_sd_configs:
+              - role: endpoints
+                namespaces:
+                  names: [<langsmith-namespace>]
+            relabel_configs:
+              # 仅抓取服务名称为 langsmith-.* 的服务
+              - source_labels: [__meta_kubernetes_service_name]
+                regex: "langsmith-.*"
+                action: keep
+              # 仅抓取具有以下名称的端口
+              - source_labels: [__meta_kubernetes_endpoint_port_name]
+                regex: "(backend|platform|playground|redis-metrics|postgres-metrics|metrics)"
+                action: keep
+              # 将有用的元数据提升为常规标签
+              - source_labels: [__meta_kubernetes_service_name]
+                target_label: k8s_service
+              - source_labels: [__meta_kubernetes_pod_name]
+                target_label: k8s_pod
+              # 将默认的 "host:port" 替换为 Prom 的实例标签
+              - source_labels: [__address__]
+                target_label: instance
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  processors:
+    batch:
+      send_batch_size: 8192
+      timeout: 10s
+    memory_limiter:
+      check_interval: 1m
+      limit_percentage: 90
+      spike_limit_percentage: 80
+  exporters:
+    otlphttp/metrics:
+      endpoint: <metrics_endpoint>
+    otlphttp/traces:
+      endpoint: <traces_endpoint>
+  service:
+    pipelines:
+      metrics/langsmith:
+        receivers: [prometheus]
+        processors: [batch, memory_limiter]
+        exporters: [otlphttp/metrics]
+      traces/langsmith:
+        receivers: [otlp]
+        processors: [batch, memory_limiter]
+        exporters: [otlphttp/traces]
+```

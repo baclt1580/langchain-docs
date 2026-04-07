@@ -1,0 +1,41 @@
+---
+title: "AwaDB 集成"
+description: "使用 LangChain Python 集成 AwaDB 嵌入模型。"
+---
+
+>[AwaDB](https://github.com/awa-ai/awadb) 是一个 AI 原生数据库，用于 LLM 应用程序中嵌入向量的搜索和存储。
+
+本笔记本介绍了如何在 LangChain 中使用 `AwaEmbeddings`。
+
+```python
+# pip install awadb
+```
+
+## 导入库
+
+```python
+from langchain_community.embeddings import AwaEmbeddings
+```
+
+```python
+Embedding = AwaEmbeddings()
+```
+
+# 设置嵌入模型
+
+用户可以使用 `Embedding.set_model()` 来指定嵌入模型。\
+该函数的输入是一个字符串，代表模型名称。\
+你可以在 [AwaDB 仓库](https://github.com/awa-ai/awadb) 中查看当前支持的模型列表。
+
+**默认模型** 是 `all-mpnet-base-v2`，无需设置即可使用。
+
+```python
+text = "我们的嵌入测试"
+
+Embedding.set_model("all-mpnet-base-v2")
+```
+
+```python
+res_query = Embedding.embed_query("测试信息")
+res_document = Embedding.embed_documents(["test1", "another test"])
+```

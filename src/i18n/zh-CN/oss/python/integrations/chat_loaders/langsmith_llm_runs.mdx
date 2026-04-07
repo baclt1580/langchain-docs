@@ -1,0 +1,264 @@
+---
+title: "LangSmith LLM 运行记录集成"
+description: "使用 LangChain Python 集成 LangSmith LLM 运行记录聊天加载器。"
+---
+
+本笔记本演示了如何直接从 LangSmith 的 LLM 运行记录中加载数据，并基于这些数据对模型进行微调。
+该过程简单明了，包含 3 个步骤。
+
+1. 选择用于训练的 LLM 运行记录。
+2. 使用 LangSmithRunChatLoader 将运行记录加载为聊天会话。
+3. 微调您的模型。
+
+之后，您就可以在 LangChain 应用中使用微调后的模型了。
+
+在开始之前，我们先安装必要的依赖项。
+
+## 前提条件
+
+确保已安装 langchain >= 0.0.311，并且已在环境中配置好您的 LangSmith API 密钥。
+
+```python
+pip install -qU  langchain langchain-openai
+```
+
+```python
+import os
+import uuid
+
+uid = uuid.uuid4().hex[:6]
+project_name = f"运行记录微调演练 {uid}"
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = "YOUR API KEY"
+os.environ["LANGSMITH_PROJECT"] = project_name
+```
+
+## 1. 选择运行记录
+
+第一步是选择要用于微调的运行记录。一个常见场景是选择那些在跟踪中获得用户正面反馈的 LLM 运行记录。您可以在 [LangSmith Cookbook](https://github.com/langchain-ai/langsmith-cookbook/blob/main/exploratory-data-analysis/exporting-llm-runs-and-feedback/llm_run_etl.ipynb) 和 [文档](https://docs.smith.langchain.com/tracing/use-cases/export-runs/local) 中找到相关示例。
+
+为了本教程的顺利进行，我们将为您生成一些运行记录以供使用。让我们尝试微调一个简单的函数调用链。
+
+```python
+from enum import Enum
+
+from pydantic import BaseModel, Field
+
+
+class Operation(Enum):
+    add = "+"
+    subtract = "-"
+    multiply = "*"
+    divide = "/"
+
+
+class Calculator(BaseModel):
+    """一个计算器函数"""
+
+    num1: float
+    num2: float
+    operation: Operation = Field(description="+,-,*,/")
+
+    def calculate(self):
+        if self.operation == Operation.add:
+            return self.num1 + self.num2
+        elif self.operation == Operation.subtract:
+            return self.num1 - self.num2
+        elif self.operation == Operation.multiply:
+            return self.num1 * self.num2
+        elif self.operation == Operation.divide:
+            if self.num2 != 0:
+                return self.num1 / self.num2
+            else:
+                return "Cannot divide by zero"
+```
+
+```python
+from pprint import pprint
+
+from langchain_core.utils.function_calling import convert_pydantic_to_openai_function
+from pydantic import BaseModel
+
+openai_function_def = convert_pydantic_to_openai_function(Calculator)
+pprint(openai_function_def)
+```
+
+```text
+{'description': 'A calculator function',
+ 'name': 'Calculator',
+ 'parameters': {'description': 'A calculator function',
+                'properties': {'num1': {'title': 'Num1', 'type': 'number'},
+                               'num2': {'title': 'Num2', 'type': 'number'},
+                               'operation': {'allOf': [{'description': 'An '
+                                                                       'enumeration.',
+                                                        'enum': ['+',
+                                                                 '-',
+                                                                 '*',
+                                                                 '/'],
+                                                        'title': 'Operation'}],
+                                             'description': '+,-,*,/'}},
+                'required': ['num1', 'num2', 'operation'],
+                'title': 'Calculator',
+                'type': 'object'}}
+```
+
+```python
+from langchain_core.output_parsers.openai_functions import PydanticOutputFunctionsParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "您是一个会计助手。"),
+        ("user", "{input}"),
+    ]
+)
+chain = (
+    prompt
+    | ChatOpenAI().bind(functions=[openai_function_def])
+    | PydanticOutputFunctionsParser(pydantic_schema=Calculator)
+    | (lambda x: x.calculate())
+)
+```
+
+```python
+math_questions = [
+    "45/9 等于多少？",
+    "81/9 等于多少？",
+    "72/8 等于多少？",
+    "56/7 等于多少？",
+    "36/6 等于多少？",
+    "64/8 等于多少？",
+    "12*6 等于多少？",
+    "8*8 等于多少？",
+    "10*10 等于多少？",
+    "11*11 等于多少？",
+    "13*13 等于多少？",
+    "45+30 等于多少？",
+    "72+28 等于多少？",
+    "56+44 等于多少？",
+    "63+37 等于多少？",
+    "70-35 等于多少？",
+    "60-30 等于多少？",
+    "50-25 等于多少？",
+    "40-20 等于多少？",
+    "30-15 等于多少？",
+]
+results = chain.batch([{"input": q} for q in math_questions], return_exceptions=True)
+```
+
+#### 加载未出错的运行记录
+
+现在我们可以选择成功的运行记录用于微调。
+
+```python
+from langsmith.client import Client
+
+client = Client()
+```
+
+```python
+successful_traces = {
+    run.trace_id
+    for run in client.list_runs(
+        project_name=project_name,
+        execution_order=1,
+        error=False,
+    )
+}
+
+llm_runs = [
+    run
+    for run in client.list_runs(
+        project_name=project_name,
+        run_type="llm",
+    )
+    if run.trace_id in successful_traces
+]
+```
+
+## 2. 准备数据
+
+现在我们可以创建一个 LangSmithRunChatLoader 实例，并使用其 lazy_load() 方法加载聊天会话。
+
+```python
+from langchain_community.chat_loaders.langsmith import LangSmithRunChatLoader
+
+loader = LangSmithRunChatLoader(runs=llm_runs)
+
+chat_sessions = loader.lazy_load()
+```
+
+#### 聊天会话加载完成后，将其转换为适合微调的格式
+
+```python
+from langchain_community.adapters.openai import convert_messages_for_finetuning
+
+training_data = convert_messages_for_finetuning(chat_sessions)
+```
+
+## 3. 微调模型
+
+现在，使用 OpenAI 库启动微调过程。
+
+```python
+import json
+import time
+from io import BytesIO
+
+import openai
+
+my_file = BytesIO()
+for dialog in training_data:
+    my_file.write((json.dumps({"messages": dialog}) + "\n").encode("utf-8"))
+
+my_file.seek(0)
+training_file = openai.files.create(file=my_file, purpose="fine-tune")
+
+job = openai.fine_tuning.jobs.create(
+    training_file=training_file.id,
+    model="gpt-3.5-turbo",
+)
+
+# 等待微调完成（这可能需要一些时间）
+status = openai.fine_tuning.jobs.retrieve(job.id).status
+start_time = time.time()
+while status != "succeeded":
+    print(f"状态=[{status}]... {time.time() - start_time:.2f}s", end="\r", flush=True)
+    time.sleep(5)
+    status = openai.fine_tuning.jobs.retrieve(job.id).status
+
+# 现在您的模型已经微调完成！
+```
+
+```text
+状态=[running]... 349.84s. 17.72s
+```
+
+## 4. 在 LangChain 中使用
+
+微调完成后，在您的 LangChain 应用中使用生成的模型 ID 与 ChatOpenAI 模型类。
+
+```python
+# 获取微调后的模型 ID
+job = openai.fine_tuning.jobs.retrieve(job.id)
+model_id = job.fine_tuned_model
+
+# 在 LangChain 中使用微调后的模型
+from langchain_openai import ChatOpenAI
+
+model = ChatOpenAI(
+    model=model_id,
+    temperature=1,
+)
+```
+
+```python
+(prompt | model).invoke({"input": "56/7 等于多少？"})
+```
+
+```text
+AIMessage(content='让我为您计算一下。')
+```
+
+现在您已成功使用 LangSmith LLM 运行记录的数据微调了一个模型！

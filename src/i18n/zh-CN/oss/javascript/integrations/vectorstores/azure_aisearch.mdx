@@ -1,0 +1,145 @@
+---
+title: "Azure AI 搜索集成"
+description: "使用 LangChain JavaScript 与 Azure AI 搜索向量存储集成。"
+---
+
+[Azure AI 搜索](https://azure.microsoft.com/zh-cn/products/ai-services/ai-search)（原名 Azure Search 和 Azure Cognitive Search）是一个分布式、RESTful 搜索引擎，针对 Azure 上生产级工作负载的速度和相关性进行了优化。它还支持使用 [k-最近邻](https://en.wikipedia.org/wiki/Nearest_neighbor_search)（kNN）算法的向量搜索以及[语义搜索](https://learn.microsoft.com/zh-cn/azure/search/semantic-search-overview)。
+
+此向量存储集成支持全文搜索、向量搜索和[混合搜索以获得最佳排名性能](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-cognitive-search-outperforming-vector-search-with-hybrid/ba-p/3929167)。
+
+了解如何利用 Azure AI 搜索的向量搜索功能，请参阅[此页面](https://learn.microsoft.com/zh-cn/azure/search/vector-search-overview)。如果您没有 Azure 账户，可以[创建免费账户](https://azure.microsoft.com/zh-cn/free/)开始使用。
+
+## 设置
+
+首先需要安装 `@azure/search-documents` SDK 和 [`@langchain/community`](https://www.npmjs.com/package/@langchain/community) 包：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install -S @langchain/community @langchain/core @azure/search-documents
+```
+
+您还需要运行一个 Azure AI 搜索实例。您可以按照[此指南](https://learn.microsoft.com/zh-cn/azure/search/search-create-service-portal)在 Azure 门户上免费部署一个版本。
+
+一旦您的实例运行起来，请确保您拥有端点和管理员密钥（查询密钥仅可用于搜索文档，不能用于索引、更新或删除）。端点是您实例的 URL，可以在 Azure 门户中实例的“概述”部分找到。管理员密钥可以在实例的“密钥”部分找到。然后您需要设置以下环境变量：
+
+```bash .env vars
+# Azure AI 搜索连接设置
+AZURE_AISEARCH_ENDPOINT=
+AZURE_AISEARCH_KEY=
+
+# 如果您使用 Azure OpenAI API，需要设置这些变量
+AZURE_OPENAI_API_KEY=
+AZURE_OPENAI_API_INSTANCE_NAME=
+AZURE_OPENAI_API_DEPLOYMENT_NAME=
+AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME=
+AZURE_OPENAI_API_VERSION=
+
+# 或者您可以直接使用 OpenAI API
+OPENAI_API_KEY=
+```
+
+## 关于混合搜索
+
+混合搜索是一种结合全文搜索和向量搜索优势的功能，以提供最佳排名性能。它在 Azure AI 搜索向量存储中默认启用，但您可以在创建向量存储时通过设置 `search.type` 属性选择不同的搜索查询类型。
+
+您可以在[官方文档](https://learn.microsoft.com/zh-cn/azure/search/hybrid-search-overview)中阅读更多关于混合搜索以及它如何改善搜索结果的信息。
+
+在某些场景中，如检索增强生成（RAG），您可能希望在混合搜索之外启用**语义排名**以提高搜索结果的相关性。您可以在创建向量存储时将 `search.type` 属性设置为 `AzureAISearchQueryType.SemanticHybrid` 来启用语义排名。
+请注意，语义排名功能仅在基本及更高定价层中可用，并受[区域可用性](https://azure.microsoft.com/zh-cn/explore/global-infrastructure/products-by-region/?products=search)限制。
+
+您可以在[此博客文章](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-cognitive-search-outperforming-vector-search-with-hybrid/ba-p/3929167)中阅读更多关于使用语义排名与混合搜索的性能信息。
+
+## 示例：索引文档、向量搜索和 LLM 集成
+
+以下示例展示了如何在 Azure AI 搜索中索引文件中的文档，运行混合搜索查询，并最终使用链基于检索到的文档以自然语言回答问题。
+
+```typescript
+import {
+  AzureAISearchVectorStore,
+  AzureAISearchQueryType,
+} from "@langchain/community/vectorstores/azure_aisearch";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import { createStuffDocumentsChain } from "@langchain/classic/chains/combine_documents";
+import { createRetrievalChain } from "@langchain/classic/chains/retrieval";
+import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+
+// 从文件加载文档
+const loader = new TextLoader("./state_of_the_union.txt");
+const rawDocuments = await loader.load();
+const splitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 1000,
+  chunkOverlap: 0,
+});
+const documents = await splitter.splitDocuments(rawDocuments);
+
+// 创建 Azure AI 搜索向量存储
+const store = await AzureAISearchVectorStore.fromDocuments(
+  documents,
+  new OpenAIEmbeddings(),
+  {
+    search: {
+      type: AzureAISearchQueryType.SimilarityHybrid,
+    },
+  }
+);
+
+// 首次运行时将创建索引。
+// 您可能需要等待一段时间索引创建完成后才能执行搜索，或者可以提前手动创建索引。
+
+// 执行相似性搜索
+const resultDocuments = await store.similaritySearch(
+  "总统对 Ketanji Brown Jackson 说了什么？"
+);
+
+console.log("相似性搜索结果：");
+console.log(resultDocuments[0].pageContent);
+/*
+  今晚。我呼吁参议院：通过《自由投票法案》。通过《约翰·刘易斯投票权法案》。同时，通过《披露法案》，让美国人知道谁在资助我们的选举。
+
+  今晚，我想向一位毕生致力于服务这个国家的人致敬：斯蒂芬·布雷耶大法官——一位陆军退伍军人、宪法学者、即将退休的美国最高法院大法官。布雷耶大法官，感谢您的服务。
+
+  总统最严肃的宪法职责之一是提名某人担任美国最高法院大法官。
+
+  我在四天前这样做了，当时我提名了巡回上诉法院法官 Ketanji Brown Jackson。她是我们国家顶尖的法律人才之一，将继续布雷耶大法官的卓越传统。
+*/
+
+// 将存储用作链的一部分
+const model = new ChatOpenAI({ model: "gpt-3.5-turbo-1106" });
+const questionAnsweringPrompt = ChatPromptTemplate.fromMessages([
+  [
+    "system",
+    "根据以下上下文回答用户的问题：\n\n{context}",
+  ],
+  ["human", "{input}"],
+]);
+
+const combineDocsChain = await createStuffDocumentsChain({
+  llm: model,
+  prompt: questionAnsweringPrompt,
+});
+
+const chain = await createRetrievalChain({
+  retriever: store.asRetriever(),
+  combineDocsChain,
+});
+
+const response = await chain.invoke({
+  input: "总统在价格方面的首要任务是什么？",
+});
+
+console.log("链响应：");
+console.log(response.answer);
+/*
+  总统的首要任务是控制价格。
+*/
+```
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

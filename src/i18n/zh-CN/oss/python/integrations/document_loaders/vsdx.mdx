@@ -1,0 +1,418 @@
+---
+title: "Vsdx 集成"
+description: "使用 LangChain Python 集成 Vsdx 文档加载器。"
+---
+
+> [Visio 文件](https://fr.wikipedia.org/wiki/Microsoft_Visio)（扩展名为 .vsdx）与 Microsoft Visio 相关联，后者是一款图表创建软件。它存储有关图表结构、布局和图形元素的信息。这种格式便于在商业、工程和计算机科学等领域创建和共享可视化内容。
+
+一个 Visio 文件可以包含多个页面。其中一些页面可能作为其他页面的背景，并且这种情况可能跨越多个图层。此**加载器**会提取每个页面及其关联页面的文本内容，从而能够提取每个页面上所有可见的文本，类似于 OCR 算法所做的。
+
+**警告**：只有扩展名为 **.vsdx** 的 Visio 文件与此加载器兼容。扩展名为 .vsd 等的文件不兼容，因为它们无法转换为压缩的 XML。
+
+```python
+from langchain_community.document_loaders import VsdxLoader
+```
+
+```python
+loader = VsdxLoader(file_path="./example_data/fake.vsdx")
+documents = loader.load()
+```
+
+**显示已加载的文档**
+
+```python
+for i, doc in enumerate(documents):
+    print(f"\n------ 第 {doc.metadata['page']} 页 ------")
+    print(f"页面标题 : {doc.metadata['page_name']}")
+    print(f"来源 : {doc.metadata['source']}")
+    print("\n==> 内容 <== ")
+    print(doc.page_content)
+```
+
+```text
+------ 第 0 页 ------
+页面标题 : Summary
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+世界最佳标题
+这是一个箭头
+这是地球
+这是一个有界箭头
+
+------ 第 1 页 ------
+页面标题 : Glossary
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+
+------ 第 2 页 ------
+页面标题 : blanket page
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+这是一个 vsdx 文件
+第一段文本
+第二段文本
+第三段文本
+
+------ 第 3 页 ------
+页面标题 : BLABLABLA
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+又一个红色箭头，哇！
+带点的箭头但是红色的
+绿线
+用户
+标题
+红色箭头魔法！
+白色的东西
+红色的东西
+这是一个完全没用的图表，酷！！
+
+但这只是示例！
+这个图表是这个文件中许多页面的基础。但它可以在文件“BG WITH CONTENT”中编辑
+这是一个有内容的页面...
+
+哇，我学到了一些东西！
+这是一个有内容的页面...
+
+哇，我学到了一些东西！
+
+X2
+
+------ 第 4 页 ------
+页面标题 : What a page !!
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+白色的东西
+红色的东西
+这是一个完全没用的图表，酷！！
+
+但这只是示例！
+这个图表是这个文件中许多页面的基础。但它可以在文件“BG WITH CONTENT”中编辑
+又一个红色箭头，哇！
+带点的箭头但是红色的
+绿线
+用户
+标题
+红色箭头魔法！
+
+------ 第 5 页 ------
+页面标题 : next page after previous one
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+又一个红色箭头，哇！
+带点的箭头但是红色的
+绿线
+用户
+标题
+红色箭头魔法！
+白色的东西
+红色的东西
+这是一个完全没用的图表，酷！！
+
+但这只是示例！
+这个图表是这个文件中许多页面的基础。但它可以在文件“BG WITH CONTENT”中编辑
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0-\u00a0incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in
+
+
+voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa
+*
+
+
+qui officia deserunt mollit anim id est laborum.
+
+------ 第 6 页 ------
+页面标题 : Connector Page
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+白色的东西
+红色的东西
+这是一个完全没用的图表，酷！！
+
+但这只是示例！
+这个图表是这个文件中许多页面的基础。但它可以在文件“BG WITH CONTENT”中编辑
+
+------ 第 7 页 ------
+页面标题 : Useful ↔ Useless page
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+白色的东西
+红色的东西
+这是一个完全没用的图表，酷！！
+
+但这只是示例！
+这个图表是这个文件中许多页面的基础。但它可以在文件“BG WITH CONTENT”中编辑
+本文档标题：BLABLABLA
+
+------ 第 8 页 ------
+页面标题 : Alone page
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+黑色云朵
+单向流量主路径
+单向流量备份路径
+封装
+用户
+标题
+双向流量
+孤独，悲伤
+另一页面的测试
+这是一个“横幅”
+一些特殊字符的测试：\u00a0\u00e3\u00e4\u00e5\u0101\u0103 \u00fc\u2554\u00a0 \u00a0\u00bc \u00c7 \u25d8\u25cb\u2642\u266b\u2640\u00ee\u2665
+这是以太网
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+这是一个空案例
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+\u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0 \u00a0-\u00a0 incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in
+
+
+ voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa
+*
+
+
+qui officia deserunt mollit anim id est laborum.
+
+------ 第 9 页 ------
+页面标题 : BG
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+世界最佳标题
+这是一个箭头
+这是地球
+这是一个有界箭头
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+
+------ 第 10 页 ------
+页面标题 : BG  + caption1
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+又一个红色箭头，哇！
+带点的箭头但是红色的
+绿线
+用户
+标题
+红色箭头魔法！
+白色的东西
+红色的东西
+这是一个完全没用的图表，酷！！
+
+但这只是示例！
+这个图表是这个文件中许多页面的基础。但它可以在文件“BG WITH CONTENT”中编辑
+有用\u2194 无用页面\u00a0
+
+一些特殊字符的测试：\u00a0\u00e3\u00e4\u00e5\u0101\u0103 \u00fc\u2554\u00a0\u00a0\u00bc \u00c7 \u25d8\u25cb\u2642\u266b\u2640\u00ee\u2665
+
+------ 第 11 页 ------
+页面标题 : BG+
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+
+------ 第 12 页 ------
+页面标题 : BG WITH CONTENT
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+
+
+
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. - Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+这是一个有很多文本的页面
+
+------ 第 13 页 ------
+页面标题 : 2nd caption with ____________________________________________________________________ content
+来源 : ./example_data/fake.vsdx
+
+==> 内容 <==
+创建者
+创建日期
+修改者
+修改日期
+版本
+标题
+Florian MOREL
+2024-01-14
+FLORIAN Morel
+今天
+0.0.0.0.0.1
+这是一个标题
+又一个红色箭头，哇！
+带点的箭头但是红色的
+绿线
+用户
+标题
+红色箭头魔法！
+白色的东西
+红色的东西
+这是一个完全没用的图表，酷！！
+
+但这只是示例！
+这个图表是这个文件中许多页面的基础。但它可以在文件“BG WITH CONTENT”中编辑
+此页面上只有连接器。这是连接器页面
+```

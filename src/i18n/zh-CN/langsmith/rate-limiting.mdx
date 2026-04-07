@@ -1,0 +1,93 @@
+---
+title: 如何处理模型速率限制
+sidebarTitle: 处理模型速率限制
+---
+
+运行大规模评估任务时，一个常见问题是遇到第三方 API 的速率限制，通常来自模型提供商。有几种方法可以应对速率限制。
+
+## 使用 `langchain` 速率限制器（仅限 Python）
+
+如果在应用程序或评估器中使用 `langchain` Python 聊天模型，可以为模型添加速率限制器，从而在客户端控制发送到模型提供商 API 的请求频率，避免速率限制错误。
+
+```python
+from langchain.chat_models import init_chat_model
+from langchain_core.rate_limiters import InMemoryRateLimiter
+
+rate_limiter = InMemoryRateLimiter(
+    requests_per_second=0.1,  # <-- 非常慢！我们每 10 秒只能发送一个请求！！
+    check_every_n_seconds=0.1,  # 每 100 毫秒唤醒一次，检查是否允许发送请求，
+    max_bucket_size=10,  # 控制最大突发请求量。
+)
+
+model = init_chat_model("gpt-4.1", rate_limiter=rate_limiter)
+
+def app(inputs: dict) -> dict:
+    response = model.invoke(...)
+    ...
+
+def evaluator(inputs: dict, outputs: dict, reference_outputs: dict) -> dict:
+    response = model.invoke(...)
+    ...
+```
+
+有关如何配置速率限制器的更多信息，请参阅 [`langchain`](/oss/langchain/models#rate-limiting) 文档。
+
+## 使用指数退避重试
+
+处理速率限制错误的一种非常常见的方法是使用指数退避进行重试。指数退避重试意味着以（指数级）增加的等待时间重复重试失败的请求，直到请求成功或达到最大重试次数。
+
+#### 使用 `langchain`
+
+如果使用 `langchain` 组件，可以通过 `.with_retry(...)` / `.withRetry()` 方法为所有模型调用添加重试机制：
+
+<CodeGroup>
+
+```python Python
+from langchain import init_chat_model
+
+model_with_retry = init_chat_model("gpt-4.1-mini").with_retry(stop_after_attempt=6)
+```
+
+```typescript TypeScript
+import { initChatModel } from "langchain";
+
+const model = await initChatModel("gpt-4.1", {
+    modelProvider: "openai",
+});
+
+const modelWithRetry = model.withRetry({ stopAfterAttept: 2 });
+```
+
+</CodeGroup>
+
+更多信息请参阅 `langchain` 的 @[Python][BaseChatModel.with_retry] 和 [JS](https://reference.langchain.com/javascript/langchain-core/language_models/chat_models/BaseChatModel/withRetry) API 参考文档。
+
+#### 不使用 `langchain`
+
+如果不使用 `langchain`，可以使用其他库如 `tenacity`（Python）或 `backoff`（Python）来实现指数退避重试，或者从头开始实现。具体示例可参阅 [OpenAI 文档](https://platform.openai.com/docs/guides/rate-limits#retrying-with-exponential-backoff)。
+
+## 限制 `max_concurrency`
+
+限制对应用程序和评估器的并发调用数量是另一种降低模型调用频率的方法，从而避免速率限制错误。`max_concurrency` 可以直接在 [evaluate()](https://docs.smith.langchain.com/reference/python/evaluation/langsmith.evaluation._runner.evaluate) / [aevaluate()](https://docs.smith.langchain.com/reference/python/evaluation/langsmith.evaluation._arunner.aevaluate) 函数上设置。这通过将数据集在线程间分割来实现评估的并行化。
+
+<CodeGroup>
+
+```python Python
+from langsmith import aevaluate
+
+results = await aevaluate(
+    ...
+    max_concurrency=4,
+)
+```
+
+```typescript TypeScript
+import { evaluate } from "langsmith/evaluation";
+
+await evaluate(..., {
+  ...,
+  maxConcurrency: 4,
+});
+```
+
+</CodeGroup>

@@ -1,0 +1,438 @@
+---
+title: "ChatMiniMax 集成"
+description: "使用 LangChain JavaScript 与 ChatMiniMax 聊天模型集成。"
+---
+
+[Minimax](https://api.minimax.chat) 是一家中国初创公司，为企业和个人提供自然语言处理模型。
+
+本示例演示了如何使用 LangChain.js 与 Minimax 进行交互。
+
+## 设置
+
+要使用 Minimax 模型，您需要拥有一个 Minimax 账户、一个 API 密钥和一个 Group ID。
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+<Tip>
+我们正在统一所有包中的模型参数。现在建议使用 `model` 而不是 `modelName`，并使用 `apiKey` 表示 API 密钥。
+</Tip>
+
+## 基本用法
+
+```typescript
+import { ChatMinimax } from "@langchain/community/chat_models/minimax";
+import { HumanMessage } from "@langchain/core/messages";
+
+// 使用 abab5.5
+const abab5_5 = new ChatMinimax({
+  model: "abab5.5-chat",
+  botSetting: [
+    {
+      bot_name: "MM Assistant",
+      content: "MM Assistant 是由 minimax 开发的 AI 助手。",
+    },
+  ],
+});
+const messages = [
+  new HumanMessage({
+    content: "Hello",
+  }),
+];
+
+const res = await abab5_5.invoke(messages);
+console.log(res);
+
+/*
+AIChatMessage {
+  text: 'Hello! How may I assist you today?',
+  name: undefined,
+  additional_kwargs: {}
+  }
+}
+*/
+
+// 使用 abab5
+const abab5 = new ChatMinimax({
+  proVersion: false,
+  model: "abab5-chat",
+  minimaxGroupId: process.env.MINIMAX_GROUP_ID, // 在 Node.js 中默认为 process.env.MINIMAX_GROUP_ID
+  minimaxApiKey: process.env.MINIMAX_API_KEY, // 在 Node.js 中默认为 process.env.MINIMAX_API_KEY
+});
+
+const result = await abab5.invoke([
+  new HumanMessage({
+    content: "Hello",
+    name: "XiaoMing",
+  }),
+]);
+console.log(result);
+
+/*
+AIMessage {
+  lc_serializable: true,
+  lc_kwargs: {
+    content: 'Hello! Can I help you with anything?',
+    additional_kwargs: { function_call: undefined }
+  },
+  lc_namespace: [ 'langchain', 'schema' ],
+  content: 'Hello! Can I help you with anything?',
+  name: undefined,
+  additional_kwargs: { function_call: undefined }
+}
+ */
+```
+
+## 链式模型调用
+
+```typescript
+import { LLMChain } from "@langchain/classic/chains";
+import { ChatMinimax } from "@langchain/community/chat_models/minimax";
+import {
+  ChatPromptTemplate,
+  HumanMessagePromptTemplate,
+  SystemMessagePromptTemplate,
+} from "@langchain/core/prompts";
+
+// 我们也可以从 ChatPromptTemplate 和聊天模型构造一个 LLMChain。
+const chat = new ChatMinimax({ temperature: 0.01 });
+
+const chatPrompt = ChatPromptTemplate.fromMessages([
+  SystemMessagePromptTemplate.fromTemplate(
+    "你是一个有用的助手，可以将 {input_language} 翻译成 {output_language}。"
+  ),
+  HumanMessagePromptTemplate.fromTemplate("{text}"),
+]);
+const chainB = new LLMChain({
+  prompt: chatPrompt,
+  llm: chat,
+});
+
+const resB = await chainB.invoke({
+  input_language: "English",
+  output_language: "Chinese",
+  text: "I love programming.",
+});
+console.log({ resB });
+```
+
+## 使用函数调用
+
+```typescript
+import { ChatMinimax } from "@langchain/community/chat_models/minimax";
+import { HumanMessage } from "@langchain/core/messages";
+
+const functionSchema = {
+  name: "get_weather",
+  description: "获取天气信息。",
+  parameters: {
+    type: "object",
+    properties: {
+      location: {
+        type: "string",
+        description: "获取天气的地点",
+      },
+    },
+    required: ["location"],
+  },
+};
+
+// 将函数参数绑定到模型。
+// 所有后续的 invoke 调用都将使用绑定的参数。
+// "functions.parameters" 必须格式化为 JSON Schema
+const model = new ChatMinimax({
+  botSetting: [
+    {
+      bot_name: "MM Assistant",
+      content: "MM Assistant 是由 minimax 开发的 AI 助手。",
+    },
+  ],
+}).withConfig({
+  functions: [functionSchema],
+});
+
+const result = await model.invoke([
+  new HumanMessage({
+    content: "纽约明天的天气怎么样？",
+    name: "我",
+  }),
+]);
+
+console.log(result);
+
+/*
+AIMessage {
+  lc_serializable: true,
+  lc_kwargs: { content: '', additional_kwargs: { function_call: [Object] } },
+  lc_namespace: [ 'langchain', 'schema' ],
+  content: '',
+  name: undefined,
+  additional_kwargs: {
+    function_call: { name: 'get_weather', arguments: '{"location": "NewYork"}' }
+  }
+}
+*/
+
+// 或者，您可以将函数调用参数作为一次性附加参数传递：
+
+const minimax = new ChatMinimax({
+  model: "abab5.5-chat",
+  botSetting: [
+    {
+      bot_name: "MM Assistant",
+      content: "MM Assistant 是由 minimax 开发的 AI 助手。",
+    },
+  ],
+});
+
+const result2 = await minimax.invoke(
+  [new HumanMessage("纽约明天的天气怎么样？")],
+  {
+    functions: [functionSchema],
+  }
+);
+console.log(result2);
+
+/*
+AIMessage {
+  lc_serializable: true,
+  lc_kwargs: { content: '', additional_kwargs: { function_call: [Object] } },
+  lc_namespace: [ 'langchain', 'schema' ],
+  content: '',
+  name: undefined,
+  additional_kwargs: {
+    function_call: { name: 'get_weather', arguments: '{"location": "NewYork"}' }
+  }
+}
+ */
+```
+
+## 使用 zod 的函数
+
+<MinimaxFunctionsZod />
+
+## 使用 glyph
+
+此功能可以帮助用户强制模型以请求的格式返回内容。
+
+```typescript
+import { ChatMinimax } from "@langchain/community/chat_models/minimax";
+import {
+  ChatPromptTemplate,
+  HumanMessagePromptTemplate,
+} from "@langchain/core/prompts";
+import { HumanMessage } from "@langchain/core/messages";
+
+const model = new ChatMinimax({
+  model: "abab5.5-chat",
+  botSetting: [
+    {
+      bot_name: "MM Assistant",
+      content: "MM Assistant 是由 minimax 开发的 AI 助手。",
+    },
+  ],
+}).withConfig({
+  replyConstraints: {
+    sender_type: "BOT",
+    sender_name: "MM Assistant",
+    glyph: {
+      type: "raw",
+      raw_glyph: "翻译后的文本：{{gen 'content'}}",
+    },
+  },
+});
+
+const messagesTemplate = ChatPromptTemplate.fromMessages([
+  HumanMessagePromptTemplate.fromTemplate(
+    "请帮我翻译以下英文句子： {text}"
+  ),
+]);
+
+const messages = await messagesTemplate.formatMessages({ text: "我是谁" });
+const result = await model.invoke(messages);
+
+console.log(result);
+
+/*
+AIMessage {
+  lc_serializable: true,
+  lc_kwargs: {
+    content: '翻译后的文本： Who am I\x02',
+    additional_kwargs: { function_call: undefined }
+  },
+  lc_namespace: [ 'langchain', 'schema' ],
+  content: '翻译后的文本： Who am I\x02',
+  name: undefined,
+  additional_kwargs: { function_call: undefined }
+}
+*/
+
+// 使用 json_value
+
+const modelMinimax = new ChatMinimax({
+  model: "abab5.5-chat",
+  botSetting: [
+    {
+      bot_name: "MM Assistant",
+      content: "MM Assistant 是由 minimax 开发的 AI 助手。",
+    },
+  ],
+}).withConfig({
+  replyConstraints: {
+    sender_type: "BOT",
+    sender_name: "MM Assistant",
+    glyph: {
+      type: "json_value",
+      json_properties: {
+        name: {
+          type: "string",
+        },
+        age: {
+          type: "number",
+        },
+        is_student: {
+          type: "boolean",
+        },
+        is_boy: {
+          type: "boolean",
+        },
+        courses: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+            },
+            score: {
+              type: "number",
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
+const result2 = await modelMinimax.invoke([
+  new HumanMessage({
+    content:
+      "我的名字是岳无双，今年18岁，刚刚以99.99分完成了测试。",
+    name: "XiaoMing",
+  }),
+]);
+
+console.log(result2);
+
+/*
+AIMessage {
+  lc_serializable: true,
+  lc_kwargs: {
+    content: '{\n' +
+      '  "name": "Yue Wushuang",\n' +
+      '  "is_student": true,\n' +
+      '  "is_boy": false,\n' +
+      '  "courses":   {\n' +
+      '    "name": "Mathematics",\n' +
+      '    "score": 99.99\n' +
+      '   },\n' +
+      '  "age": 18\n' +
+      ' }',
+    additional_kwargs: { function_call: undefined }
+  }
+}
+
+ */
+```
+
+## 使用示例消息
+
+此功能可以帮助模型更好地理解用户希望获取的返回信息，
+包括但不限于信息的内容、格式和响应方式。
+
+```typescript
+import { ChatMinimax } from "@langchain/community/chat_models/minimax";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
+
+const model = new ChatMinimax({
+  model: "abab5.5-chat",
+  botSetting: [
+    {
+      bot_name: "MM Assistant",
+      content: "MM Assistant 是由 minimax 开发的 AI 助手。",
+    },
+  ],
+}).withConfig({
+  sampleMessages: [
+    new HumanMessage({
+      content: "将 A5 变为红色并将内容修改为 minimax。",
+    }),
+    new AIMessage({
+      content: "select A5 color red change minimax",
+    }),
+  ],
+});
+
+const result = await model.invoke([
+  new HumanMessage({
+    content:
+      '请根据以下要求回复我的内容：根据以下接口列表，为我给出的内容提供调用接口的顺序和参数。你只需给出调用接口的顺序和参数，不要给出任何其他输出。以下是可用接口列表：select：选择特定的表格位置，输入参数使用字母和数字确定，例如 "B13"；color：为选定的表格位置上色，输入参数使用颜色的英文名称，例如 "red"；change：修改选定的表格位置，输入参数使用字符串。',
+  }),
+  new HumanMessage({
+    content: "将 B6 处理为灰色并将内容修改为 question。",
+  }),
+]);
+
+console.log(result);
+```
+
+## 使用插件
+
+此功能支持调用搜索引擎等工具来获取可以辅助模型的额外数据。
+
+```typescript
+import { ChatMinimax } from "@langchain/community/chat_models/minimax";
+import { HumanMessage } from "@langchain/core/messages";
+
+const model = new ChatMinimax({
+  model: "abab5.5-chat",
+  botSetting: [
+    {
+      bot_name: "MM Assistant",
+      content: "MM Assistant 是由 minimax 开发的 AI 助手。",
+    },
+  ],
+}).withConfig({
+  plugins: ["plugin_web_search"],
+});
+
+const result = await model.invoke([
+  new HumanMessage({
+    content: "纽约明天的天气怎么样？",
+  }),
+]);
+
+console.log(result);
+
+/*
+AIMessage {
+  lc_serializable: true,
+  lc_kwargs: {
+    content: '上海明天的天气预计会很热。请注意，这只是预报，实际天气情况可能有所不同。',
+    additional_kwargs: { function_call: undefined }
+  },
+  lc_namespace: [ 'langchain', 'schema' ],
+  content: '上海明天的天气预计会很热。请注意，这只是预报，实际天气情况可能有所不同。',
+  name: undefined,
+  additional_kwargs: { function_call: undefined }
+}
+*/
+```
+
+## 相关链接
+
+- 聊天模型[概念指南](/oss/langchain/models)
+- 聊天模型[操作指南](/oss/langchain/models)

@@ -1,0 +1,50 @@
+---
+title: "Google 云存储集成"
+description: "使用 LangChain JavaScript 集成 Google 云存储文档加载器。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+本文介绍如何将 Google 云存储中的文件加载为 LangChain 文档。
+
+## 环境设置
+
+要使用此加载器，你需要预先配置好 Unstructured 服务，并确保其可通过一个可访问的 URL 端点调用。该服务也可配置为在本地运行。
+
+关于如何配置 Unstructured，请参阅 [Unstructured 文件加载器文档](/oss/integrations/document_loaders/file_loaders/unstructured)。
+
+此外，你还需要安装官方的 Google 云存储 SDK：
+
+```bash npm
+npm install @langchain/community @langchain/core @google-cloud/storage
+```
+
+## 使用方法
+
+配置好 Unstructured 后，即可使用 Google 云存储加载器来加载文件，并将其转换为 Document 对象。
+
+另外，你还可以选择性地提供 `storageOptions` 参数，用于指定存储选项以及其他认证方式（如果你不希望使用默认的应用默认凭据 (ADC) 方式）。
+
+```typescript
+import { GoogleCloudStorageLoader } from "@langchain/community/document_loaders/web/google_cloud_storage";
+
+const loader = new GoogleCloudStorageLoader({
+  bucket: "my-bucket-123",
+  file: "path/to/file.pdf",
+  storageOptions: {
+    keyFilename: "/path/to/keyfile.json",
+  },
+  unstructuredLoaderOptions: {
+    apiUrl: "http://localhost:8000/general/v0/general",
+    apiKey: "", // 此参数即将变为必填项
+  },
+});
+
+const docs = await loader.load();
+
+console.log(docs);
+```

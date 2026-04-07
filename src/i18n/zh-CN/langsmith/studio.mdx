@@ -1,0 +1,66 @@
+---
+title: LangSmith Studio
+sidebarTitle: 概述
+---
+
+<Info>
+**前提条件**
+* [LangSmith](/langsmith/home)
+* [Agent Server](/langsmith/agent-server)
+* [LangGraph CLI](/langsmith/cli)
+</Info>
+
+Studio 是一个专为智能体设计的集成开发环境，支持对遵循 Agent Server API 协议的智能体系统进行可视化、交互和调试。Studio 还集成了[追踪](/langsmith/observability-concepts)、[评估](/langsmith/evaluation)和[提示工程](/langsmith/prompt-engineering)功能。
+
+## 功能特性
+
+Studio 的核心功能包括：
+
+* 可视化您的图架构
+* [运行并与您的智能体交互](/langsmith/use-studio#run-application)
+* [管理助手](/langsmith/use-studio#manage-assistants)
+* [管理会话线程](/langsmith/use-studio#manage-threads)
+* [迭代优化提示词](/langsmith/observability-studio)
+* [在数据集上运行实验](/langsmith/observability-studio#run-experiments-over-a-dataset)
+* 管理[长期记忆](/oss/concepts/memory)
+* 通过[时间旅行](/oss/langgraph/use-time-travel)调试智能体状态
+
+```mermaid actions={false}
+flowchart
+    subgraph LangSmith 部署
+        A[LangGraph CLI] -->|创建| B(Agent Server 部署)
+        B <--> D[Studio]
+        B <--> E[SDKs]
+        B <--> F[RemoteGraph]
+    end
+
+    classDef process fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+
+    class A,B,D,E,F process
+```
+
+Studio 适用于部署在 [LangSmith](/langsmith/deployment-quickstart) 上的图，也适用于通过 [Agent Server](/langsmith/local-dev-testing) 在本地运行的图。
+
+Studio 支持两种模式：
+
+### 图模式
+
+图模式提供完整的功能集，当您需要详细了解智能体执行的各个环节时非常有用，包括遍历的节点、中间状态以及 LangSmith 集成功能（例如添加到数据集和提示词调试场）。
+
+### 聊天模式
+
+聊天模式是一个更简洁的界面，专门用于迭代和测试面向聊天的智能体。它适合业务用户和希望测试智能体整体行为的开发者。聊天模式仅支持状态包含或继承 [`MessagesState`](/oss/langgraph/use-graph-api#messagesstate) 的图。
+
+## 了解更多
+
+* 查看本指南了解如何[快速开始](/langsmith/quick-start-studio)使用 Studio。
+
+## 视频指南
+<iframe
+  className="w-full aspect-video rounded-xl"
+  src="https://www.youtube.com/embed/Mi1gSlHwZLM?si=oWCeHQ640zPHoLwn"
+  title="YouTube 视频播放器"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>

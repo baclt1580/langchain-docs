@@ -1,0 +1,156 @@
+---
+title: "Vectara 集成"
+description: "使用 LangChain JavaScript 与 Vectara 向量存储集成。"
+---
+
+Vectara 是一个用于构建生成式 AI 应用的平台。它提供了一个易于使用的 API，用于文档索引和查询，由 Vectara 管理，并针对性能和准确性进行了优化。
+
+您可以将 Vectara 作为向量存储与 LangChain.js 一起使用。
+
+## 👉 内置嵌入
+
+Vectara 在底层使用自己的嵌入模型，因此您无需自行提供任何嵌入，也无需调用其他服务来获取嵌入。
+
+这也意味着，如果您提供自己的嵌入，它们将不会生效。
+
+```typescript
+const store = await VectaraStore.fromTexts(
+  ["hello world", "hi there"],
+  [{ foo: "bar" }, { foo: "baz" }],
+  // 这不会产生效果。为清晰起见，请提供一个 FakeEmbeddings 实例。
+  new OpenAIEmbeddings(),
+  args
+);
+```
+
+## 设置
+
+您需要：
+
+- 创建一个 [免费的 Vectara 账户](https://vectara.com/integrations/langchain)。
+- 创建一个 [语料库](https://docs.vectara.com/docs/console-ui/creating-a-corpus) 来存储您的数据。
+- 创建一个具有 QueryService 和 IndexService 访问权限的 [API 密钥](https://docs.vectara.com/docs/common-use-cases/app-authn-authz/api-keys)，以便访问此语料库。
+
+配置您的 `.env` 文件或提供参数，以将 LangChain 连接到您的 Vectara 语料库：
+
+```
+VECTARA_CUSTOMER_ID=您的客户ID
+VECTARA_CORPUS_ID=您的语料库ID
+VECTARA_API_KEY=您的vectara-api密钥
+```
+
+请注意，您可以提供多个以逗号分隔的语料库 ID，以便同时查询多个语料库。例如：`VECTARA_CORPUS_ID=3,8,9,43`。
+要为多个语料库建立索引，您需要为每个语料库创建一个单独的 VectaraStore 实例。
+
+## 使用示例
+
+```typescript
+import { VectaraStore } from "@langchain/community/vectorstores/vectara";
+import { VectaraSummaryRetriever } from "@langchain/community/retrievers/vectara_summary";
+import { Document } from "@langchain/core/documents";
+
+// 创建 Vectara 存储。
+const store = new VectaraStore({
+  customerId: Number(process.env.VECTARA_CUSTOMER_ID),
+  corpusId: Number(process.env.VECTARA_CORPUS_ID),
+  apiKey: String(process.env.VECTARA_API_KEY),
+  verbose: true,
+});
+
+// 添加两个带有元数据的文档。
+const doc_ids = await store.addDocuments([
+  new Document({
+    pageContent: "我敢吃一个桃子吗？",
+    metadata: {
+      foo: "baz",
+    },
+  }),
+  new Document({
+    pageContent: "房间里女人们来来去去，谈论着米开朗基罗",
+    metadata: {
+      foo: "bar",
+    },
+  }),
+]);
+
+// 执行相似性搜索。
+const resultsWithScore = await store.similaritySearchWithScore(
+  "女人们在谈论什么？",
+  1,
+  {
+    lambda: 0.025,
+  }
+);
+
+// 打印结果。
+console.log(JSON.stringify(resultsWithScore, null, 2));
+/*
+[
+  [
+    {
+      "pageContent": "房间里女人们来来去去，谈论着米开朗基罗",
+      "metadata": {
+        "lang": "eng",
+        "offset": "0",
+        "len": "57",
+        "foo": "bar"
+      }
+    },
+    0.4678752
+  ]
+]
+*/
+
+const retriever = new VectaraSummaryRetriever({ vectara: store, topK: 3 });
+const documents = await retriever.invoke("女人们在谈论什么？");
+
+console.log(JSON.stringify(documents, null, 2));
+/*
+[
+  {
+    "pageContent": "<b>房间里女人们来来去去，谈论着米开朗基罗</b>",
+    "metadata": {
+      "lang": "eng",
+      "offset": "0",
+      "len": "57",
+      "foo": "bar"
+    }
+  },
+  {
+    "pageContent": "<b>房间里女人们来来去去，谈论着米开朗基罗</b>",
+    "metadata": {
+      "lang": "eng",
+      "offset": "0",
+      "len": "57",
+      "foo": "bar"
+    }
+  },
+  {
+    "pageContent": "<b>房间里女人们来来去去，谈论着米开朗基罗</b>",
+    "metadata": {
+      "lang": "eng",
+      "offset": "0",
+      "len": "57",
+      "foo": "bar"
+    }
+  }
+]
+*/
+
+// 删除文档。
+await store.deleteDocuments(doc_ids);
+```
+
+请注意，`lambda` 是一个与 Vectara 混合搜索能力相关的参数，用于在神经搜索和布尔/精确匹配之间进行权衡，如 [Vectara 的词法匹配文档](https://docs.vectara.com/docs/api-reference/search-apis/lexical-matching) 中所述。我们建议默认值为 0.025，同时为高级用户提供自定义此值的途径（如果需要）。
+
+## API
+
+Vectara 的 LangChain 向量存储使用了 Vectara 的核心 API：
+
+- [索引 API](https://docs.vectara.com/docs/indexing-apis/indexing) 用于将文档存储在 Vectara 语料库中。
+- [搜索 API](https://docs.vectara.com/docs/search-apis/search) 用于查询这些数据。此 API 支持混合搜索。
+
+## 相关链接
+
+- 向量存储 [概念指南](/oss/integrations/vectorstores)
+- 向量存储 [操作指南](/oss/integrations/vectorstores)

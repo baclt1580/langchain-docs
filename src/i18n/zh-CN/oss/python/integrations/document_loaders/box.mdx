@@ -1,0 +1,268 @@
+---
+title: "BoxLoader 与 BoxBlobLoader 集成"
+description: "使用 LangChain Python 集成 BoxLoader 和 BoxBlobLoader 文档加载器。"
+---
+
+`langchain-box` 包提供了两种从 Box 索引文件的方法：`BoxLoader` 和 `BoxBlobLoader`。`BoxLoader` 允许您提取在 Box 中具有文本表示形式的文件的文本表示。`BoxBlobLoader` 允许您下载任何文档或图像文件的二进制大对象（blob），以便使用您选择的 blob 解析器进行处理。
+
+本笔记本详细介绍了如何开始使用这两种加载器。
+
+## 概述
+
+`BoxLoader` 类帮助您将 Box 中的非结构化内容以 LangChain 的 @[`Document`] 格式获取。您可以使用包含 Box 文件 ID 的 `List[str]`，或包含 Box 文件夹 ID 的 `str` 来实现。
+
+`BoxBlobLoader` 类帮助您将 Box 中的非结构化内容以 LangChain 的 `Blob` 格式获取。您可以使用包含 Box 文件 ID 的 `List[str]`、包含 Box 文件夹 ID 的 `str`、搜索查询或 `BoxMetadataQuery` 来实现。
+
+如果从具有文件夹 ID 的文件夹中获取文件，您还可以设置一个 `Bool` 值来指示加载器获取该文件夹中的所有子文件夹。
+
+<Info>
+一个 Box 实例可以包含 PB 级别的文件，而文件夹可以包含数百万个文件。在选择要索引的文件夹时请务必谨慎。我们建议永远不要递归地获取文件夹 0 中的所有文件。文件夹 ID 0 是您的根文件夹。
+</Info>
+
+`BoxLoader` 会跳过没有文本表示形式的文件，而 `BoxBlobLoader` 会返回所有文档和图像文件的 blob。
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | JS 支持 |
+| :--- | :--- | :---: | :---: | :---: |
+| `BoxLoader` | [`langchain_box`](https://reference.langchain.com/python/langchain-box) | ✅ | ❌ | ❌ |
+| `BoxBlobLoader` | [`langchain_box`](https://reference.langchain.com/python/langchain-box) | ✅ | ❌ | ❌ |
+
+### 加载器特性
+
+| 来源 | 文档懒加载 | 异步支持 |
+| :---: | :---: | :---: |
+| `BoxLoader` | ✅ | ❌ |
+| `BoxBlobLoader` | ✅ | ❌ |
+
+## 设置
+
+为了使用 Box 包，您需要准备以下几项：
+
+* 一个 Box 账户 — 如果您不是当前的 Box 客户，或者希望在您的生产 Box 实例之外进行测试，可以使用[免费开发者账户](https://account.box.com/signup/n/developer#ty9l3)。
+* [一个 Box 应用](https://developer.box.com/guides/getting-started/first-application/) — 在[开发者控制台](https://account.box.com/developers/console)中配置，对于 Box AI，必须启用 `Manage AI` 范围。在这里您还需要选择您的认证方法。
+* 该应用必须[由管理员启用](https://developer.box.com/guides/authorization/custom-app-approval/#manual-approval)。对于免费开发者账户，管理员即注册账户的人。
+
+### 凭证
+
+在这些示例中，我们将使用[令牌认证](https://developer.box.com/guides/authentication/tokens/developer-tokens)。这可以与任何[认证方法](https://developer.box.com/guides/authentication/)一起使用。只需使用任何方法获取令牌即可。如果您想了解更多关于如何在 `langchain-box` 中使用其他认证类型的信息，请访问 [Box 提供者](/oss/integrations/providers/box)文档。
+
+```python
+import getpass
+import os
+
+box_developer_token = getpass.getpass("输入您的 Box 开发者令牌：")
+```
+
+```text
+输入您的 Box 开发者令牌： ········
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+安装 **langchain_box**。
+
+```python
+pip install -qU langchain_box
+```
+
+## 初始化
+
+### 加载文件
+
+如果您希望加载文件，必须在实例化时提供文件 ID 的 `List`。
+
+这需要 1 条信息：
+
+* **box_file_ids** (`List[str]`) - Box 文件 ID 的列表。
+
+#### BoxLoader
+
+```python
+from langchain_box.document_loaders import BoxLoader
+
+box_file_ids = ["1514555423624", "1514553902288"]
+
+loader = BoxLoader(
+    box_developer_token=box_developer_token,
+    box_file_ids=box_file_ids,
+    character_limit=10000,  # 可选。默认为无限制
+)
+```
+
+#### BoxBlobLoader
+
+```python
+from langchain_box.blob_loaders import BoxBlobLoader
+
+box_file_ids = ["1514555423624", "1514553902288"]
+
+loader = BoxBlobLoader(
+    box_developer_token=box_developer_token, box_file_ids=box_file_ids
+)
+```
+
+### 从文件夹加载
+
+如果您希望从文件夹加载文件，必须在实例化时提供包含 Box 文件夹 ID 的 `str`。
+
+这需要 1 条信息：
+
+* **box_folder_id** (`str`) - 包含 Box 文件夹 ID 的字符串。
+
+#### BoxLoader
+
+```python
+from langchain_box.document_loaders import BoxLoader
+
+box_folder_id = "260932470532"
+
+loader = BoxLoader(
+    box_folder_id=box_folder_id,
+    recursive=False,  # 可选。返回整个树，默认为 False
+    character_limit=10000,  # 可选。默认为无限制
+)
+```
+
+#### BoxBlobLoader
+
+```python
+from langchain_box.blob_loaders import BoxBlobLoader
+
+box_folder_id = "260932470532"
+
+loader = BoxBlobLoader(
+    box_folder_id=box_folder_id,
+    recursive=False,  # 可选。返回整个树，默认为 False
+)
+```
+
+### 使用 BoxBlobLoader 搜索文件
+
+如果您需要搜索文件，`BoxBlobLoader` 提供了两种方法。首先，您可以执行全文搜索，并可选择使用搜索选项来缩小搜索范围。
+
+这需要 1 条信息：
+
+* **query** (`str`) - 包含要执行的搜索查询的字符串。
+
+您还可以提供一个 `BoxSearchOptions` 对象来缩小搜索范围：
+
+* **box_search_options** (`BoxSearchOptions`)
+
+#### BoxBlobLoader 搜索
+
+```python
+from langchain_box.blob_loaders import BoxBlobLoader
+from langchain_box.utilities import BoxSearchOptions, DocumentFiles, SearchTypeFilter
+
+box_folder_id = "260932470532"
+
+box_search_options = BoxSearchOptions(
+    ancestor_folder_ids=[box_folder_id],
+    search_type_filter=[SearchTypeFilter.FILE_CONTENT],
+    created_date_range=["2023-01-01T00:00:00-07:00", "2024-08-01T00:00:00-07:00,"],
+    file_extensions=[DocumentFiles.DOCX, DocumentFiles.PDF],
+    k=200,
+    size_range=[1, 1000000],
+    updated_data_range=None,
+)
+
+loader = BoxBlobLoader(
+    box_developer_token=box_developer_token,
+    query="Victor",
+    box_search_options=box_search_options,
+)
+```
+
+您还可以基于 Box 元数据搜索内容。如果您的 Box 实例使用元数据，您可以搜索附加了特定元数据模板且满足特定条件的任何文档，例如返回上季度创建且总额大于或等于 500 美元的任何发票。
+
+这需要 1 条信息：
+
+* **query** (`str`) - 包含要执行的搜索查询的字符串。
+
+您还可以提供一个 `BoxSearchOptions` 对象来缩小搜索范围：
+
+* **box_search_options** (`BoxSearchOptions`)
+
+#### BoxBlobLoader 元数据查询
+
+```python
+from langchain_box.blob_loaders import BoxBlobLoader
+from langchain_box.utilities import BoxMetadataQuery
+
+query = BoxMetadataQuery(
+    template_key="enterprise_1234.myTemplate",
+    query="total >= :value",
+    query_params={"value": 100},
+    ancestor_folder_id="260932470532",
+)
+
+loader = BoxBlobLoader(box_metadata_query=query)
+```
+
+## 加载
+
+#### BoxLoader
+
+```python
+docs = loader.load()
+docs[0]
+```
+
+```text
+Document(metadata={'source': 'https://dl.boxcloud.com/api/2.0/internal_files/1514555423624/versions/1663171610024/representations/extracted_text/content/', 'title': 'Invoice-A5555_txt'}, page_content='供应商：AstroTech Solutions\n发票编号：A5555\n\n行项目：\n    - 引力波探测器套件：$800\n    - 系外行星生态箱：$120\n总计：$920')
+```
+
+```python
+print(docs[0].metadata)
+```
+
+```python
+{'source': 'https://dl.boxcloud.com/api/2.0/internal_files/1514555423624/versions/1663171610024/representations/extracted_text/content/', 'title': 'Invoice-A5555_txt'}
+```
+
+#### BoxBlobLoader
+
+```python
+for blob in loader.yield_blobs():
+    print(f"Blob({blob})")
+```
+
+```text
+Blob(id='1514555423624' metadata={'source': 'https://app.box.com/0/260935730128/260931903795/Invoice-A5555.txt', 'name': 'Invoice-A5555.txt', 'file_size': 150} data="b'供应商：AstroTech Solutions\\n发票编号：A5555\\n\\n行项目：\\n    - 引力波探测器套件：$800\\n    - 系外行星生态箱：$120\\n总计：$920'" mimetype='text/plain' path='https://app.box.com/0/260935730128/260931903795/Invoice-A5555.txt')
+Blob(id='1514553902288' metadata={'source': 'https://app.box.com/0/260935730128/260931903795/Invoice-B1234.txt', 'name': 'Invoice-B1234.txt', 'file_size': 168} data="b'供应商：Galactic Gizmos Inc.\\n发票编号：B1234\\n采购订单号：001\\n行项目：\\n    - 量子通量电容器：$500\\n    - 反重力笔套装：$75\\n总计：$575'" mimetype='text/plain' path='https://app.box.com/0/260935730128/260931903795/Invoice-B1234.txt')
+```
+
+## 懒加载
+
+#### 仅 BoxLoader
+
+```python
+page = []
+for doc in loader.lazy_load():
+    page.append(doc)
+    if len(page) >= 10:
+        # 执行一些分页操作，例如：
+        # index.upsert(page)
+
+        page = []
+```
+
+## 额外字段
+
+所有 Box 连接器都提供了从 Box `FileFull` 对象中选择额外字段作为自定义 LangChain 元数据返回的能力。每个对象都接受一个可选的 `List[str]`，称为 `extra_fields`，包含返回对象中的 JSON 键，例如 `extra_fields=["shared_link"]`。
+
+连接器会将该字段添加到集成功能所需的字段列表中，然后将结果添加到返回的 @[`Document`] 或 `Blob` 的元数据中，例如 `"metadata" : { "source" : "source, "shared_link" : "shared_link" }`。如果该字段对该文件不可用，它将作为空字符串返回，例如 `"shared_link" : ""`。
+
+---
+
+## 帮助
+
+如果您有任何问题，可以查看我们的[开发者文档](https://developer.box.com)，或在我们的[开发者社区](https://community.box.com)中联系我们。

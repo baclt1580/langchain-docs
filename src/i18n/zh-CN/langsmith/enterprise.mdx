@@ -1,0 +1,123 @@
+---
+title: LangSmith 企业版
+sidebarTitle: 企业功能
+description: 企业用户的部署选项、访问控制、数据隐私、成本控制和安全合规信息。
+mode: wide
+icon: "building-skyscraper"
+---
+
+本页面是企业团队的参考中心，包含对您组织重要的功能信息，例如[部署选项](#部署选项)、[访问控制](#访问控制)、[数据隐私](#数据隐私与个人身份信息)和[成本控制](#成本控制与使用情况)。
+
+<Callout>
+有关可用 LangSmith 计划的更多详细信息，请查看[定价计划](/langsmith/pricing-plans)页面。
+</Callout>
+
+## 部署选项
+
+选择如何托管 LangSmith，以满足您的基础设施和数据驻留要求。
+
+<CardGroup cols={3}>
+  <Card title="云端" icon="cloud" href="/langsmith/cloud">
+    在 LangSmith 管理的云中托管 LangSmith，可选择美国或欧盟数据驻留。
+  </Card>
+  <Card title="混合部署" icon="topology-complex" href="/langsmith/hybrid">
+    在 LangSmith 云中运行控制平面，在您自己的 VPC 中运行数据平面，实现完全的数据隔离。
+  </Card>
+  <Card title="自托管" icon="server-2" href="/langsmith/self-hosted">
+    使用 Docker Compose 或 Kubernetes 在您自己的基础设施内完全部署 LangSmith。
+  </Card>
+</CardGroup>
+
+## 用户管理
+
+管理用户并在整个组织中自动化配置。
+
+<CardGroup cols={2}>
+  <Card title="用户管理" icon="users" href="/langsmith/user-management">
+    邀请用户、分配角色，并配置 SCIM 以实现自动化的用户配置和取消配置。
+  </Card>
+  <Card title="SSO 与即时配置" icon="login" href="/langsmith/authentication-methods">
+    为您的身份提供商配置 SAML 或 OIDC 单点登录以及即时用户配置。
+  </Card>
+  <Card title="组织设置" icon="building" href="/langsmith/set-up-hierarchy">
+    在您的企业内创建和配置组织、工作空间以及用户层级结构。
+  </Card>
+  <Card title="通过 API 管理" icon="terminal-2" href="/langsmith/manage-organization-by-api">
+    通过 API 以编程方式管理用户、配置安全设置并管理您的组织。
+  </Card>
+</CardGroup>
+
+## 访问控制
+
+控制组织内谁可以访问什么内容。
+
+<CardGroup cols={2}>
+  <Card title="基于角色的访问控制 (RBAC)" icon="shield-lock" href="/langsmith/rbac">
+    使用内置或自定义角色定义每个工作空间的权限。仅在企业计划中提供。
+  </Card>
+  <Card title="基于属性的访问控制 (ABAC)" icon="tag" href="/langsmith/abac">
+    应用细粒度的、基于标签的访问策略来限制资源访问——包括阻止特定用户访问包含个人身份信息的数据。
+  </Card>
+  <Card title="工作负载隔离" icon="layout-sidebar" href="/langsmith/workload-isolation">
+    使用多工作空间模型来隔离团队、建立信任边界并分离环境。
+  </Card>
+  <Card title="资源标签" icon="tag" href="/langsmith/set-up-resource-tags">
+    为资源添加标签，以便与 ABAC 策略配合使用，并组织开发、预发布和生产等环境。
+  </Card>
+</CardGroup>
+
+## 数据隐私与个人身份信息
+
+控制敏感数据的存储和访问方式。
+
+<CardGroup cols={2}>
+  <Card title="数据存储与隐私" icon="database" href="/langsmith/data-storage-and-privacy">
+    了解 LangSmith 存储的内容、加密工作原理以及如何选择退出遥测和追踪。
+  </Card>
+  <Card title="使用 ABAC 控制个人身份信息" icon="eye-off" href="/langsmith/abac">
+    使用 ABAC 拒绝策略来限制对包含个人身份信息的追踪记录和数据集的访问。
+  </Card>
+</CardGroup>
+
+## 数据保留与清理
+
+配置数据保留时长以及删除方式。
+
+<CardGroup cols={2}>
+  <Card title="合规性数据清除" icon="trash" href="/langsmith/data-purging-compliance">
+    设置自定义保留期限、按元数据删除追踪记录，并满足删除要求。
+  </Card>
+  <Card title="数据保留设置" icon="clock" href="/langsmith/administration-overview#data-retention">
+    了解基础与扩展保留层级、自动升级以及保留策略如何影响计费。
+  </Card>
+</CardGroup>
+
+## 成本控制与使用情况
+
+跟踪并限制整个组织的支出。
+
+<CardGroup cols={2}>
+  <Card title="计费与支出限制" icon="credit-card" href="/langsmith/billing">
+    设置月度使用限制、跟踪预付费承诺消耗情况，并优化追踪支出。
+  </Card>
+  <Card title="细粒度使用报告" icon="chart-bar" href="/langsmith/granular-usage">
+    按工作空间、项目、用户或 API 密钥细分追踪使用情况，以便在各团队间分摊成本。
+  </Card>
+</CardGroup>
+
+## 安全与合规
+
+查看 LangSmith 的安全态势和合规认证。
+
+<CardGroup cols={2}>
+  <Card title="责任共担模型" icon="shield-check" href="/langsmith/shared-responsibility-model">
+    查看 LangChain 与您的组织之间共担的安全责任。LangSmith 持有 SOC 2 Type II、HIPAA 和 GDPR 认证。
+  </Card>
+  <Card title="可扩展性与弹性" icon="chart-arrows-vertical" href="/langsmith/scalability-and-resilience">
+    查看 SLA 保证、灾难恢复策略和高可用性配置。
+  </Card>
+</CardGroup>
+
+<Callout>
+如有关于企业定价的问题或希望开始使用，请[联系我们的销售团队](https://www.langchain.com/contact-sales)。
+</Callout>

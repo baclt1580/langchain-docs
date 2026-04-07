@@ -1,0 +1,72 @@
+---
+title: "Searxng 搜索集成"
+description: "使用 LangChain JavaScript 集成 Searxng 搜索工具。"
+---
+
+`SearxngSearch` 工具将您的智能体和链连接到互联网。
+
+该工具是对 SearxNG API 的封装，适用于通过 SearxNG API 执行元搜索引擎查询。它在回答有关当前事件的问题时特别有用。
+
+## 使用方法
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { AgentExecutor } from "@langchain/classic/agents";
+import { BaseMessageChunk } from "@langchain/core/messages";
+import { AgentAction, AgentFinish } from "@langchain/core/agents";
+import { RunnableSequence } from "@langchain/core/runnables";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { SearxngSearch } from "@langchain/community/tools/searxng_search";
+
+const model = new ChatOpenAI({
+  maxTokens: 1000,
+  model: "gpt-4",
+});
+
+// `apiBase` 将自动从 .env 文件解析，请在 .env 中设置 "SEARXNG_API_BASE"，
+const tools = [
+  new SearxngSearch({
+    params: {
+      format: "json", // 请勿更改此项，非 "json" 格式将抛出错误
+      engines: "google",
+    },
+    // 自定义请求头以支持 rapidAPI 认证或任何需要自定义请求头的实例
+    headers: {},
+  }),
+];
+const prefix = ChatPromptTemplate.fromMessages([
+  [
+    "ai",
+    "请尽可能回答以下问题。在最终答案中，请使用项目符号列表的 Markdown 格式。",
+  ],
+  ["human", "{input}"],
+]);
+// 请将此替换为您实际的输出解析器。
+const customOutputParser = (
+  input: BaseMessageChunk
+): AgentAction | AgentFinish => ({
+  log: "test",
+  returnValues: {
+    output: input,
+  },
+});
+// 请将此占位符智能体替换为您实际的实现。
+const agent = RunnableSequence.from([prefix, model, customOutputParser]);
+const executor = AgentExecutor.fromAgentAndTools({
+  agent,
+  tools,
+});
+console.log("已加载智能体。");
+const input = `什么是 LangChain？请用 50 个词描述`;
+console.log(`正在执行输入 "${input}"...`);
+const result = await executor.invoke({ input });
+console.log(result);
+/**
+ * LangChain 是一个用于开发由语言模型驱动的应用程序的框架，例如聊天机器人、生成式问答、摘要等。它提供了标准接口、与其他工具的集成以及常见应用的端到端链。LangChain 支持数据感知且功能强大的应用程序。
+ */
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/langchain/tools)
+- 工具 [操作指南](/oss/langchain/tools)

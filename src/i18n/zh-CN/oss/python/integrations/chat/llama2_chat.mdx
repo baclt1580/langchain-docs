@@ -1,0 +1,193 @@
+---
+title: "Llama2chat 集成"
+description: "使用 LangChain Python 与 Llama2chat 模型集成。"
+---
+
+本笔记本展示了如何通过 `Llama2Chat` 包装器增强 Llama-2 `LLM`，以支持 [Llama-2 聊天提示格式](https://huggingface.co/blog/llama2#how-to-prompt-llama-2)。LangChain 中的多种 `LLM` 实现可用作 Llama-2 聊天模型的接口。其中包括 [ChatHuggingFace](/oss/integrations/chat/huggingface)、[LlamaCpp](/oss/integrations/chat/llamacpp/)、[GPT4All](/oss/integrations/llms/gpt4all) 等示例。
+
+`Llama2Chat` 是一个通用包装器，实现了 `BaseChatModel`，因此可在应用程序中作为[聊天模型](/oss/langchain/models)使用。`Llama2Chat` 将消息列表转换为[所需的聊天提示格式](https://huggingface.co/blog/llama2#how-to-prompt-llama-2)，并将格式化后的提示作为 `str` 转发给包装的 `LLM`。
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain.memory import ConversationBufferMemory
+from langchain_experimental.chat_models import Llama2Chat
+```
+
+对于下面的聊天应用示例，我们将使用以下聊天 `prompt_template`：
+
+```python
+from langchain.messages import SystemMessage
+from langchain_core.prompts.chat import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
+)
+
+template_messages = [
+    SystemMessage(content="你是一个有用的助手。"),
+    MessagesPlaceholder(variable_name="chat_history"),
+    HumanMessagePromptTemplate.from_template("{text}"),
+]
+prompt_template = ChatPromptTemplate.from_messages(template_messages)
+```
+
+## 通过 `HuggingFaceTextGenInference` LLM 与 Llama-2 聊天
+
+HuggingFaceTextGenInference LLM 封装了对 [text-generation-inference](https://github.com/huggingface/text-generation-inference) 服务器的访问。在以下示例中，推理服务器运行的是 [meta-llama/Llama-2-13b-chat-hf](https://huggingface.co/meta-llama/Llama-2-13b-chat-hf) 模型。可以通过以下命令在本地启动：
+
+```bash
+docker run \
+  --rm \
+  --gpus all \
+  --ipc=host \
+  -p 8080:80 \
+  -v ~/.cache/huggingface/hub:/data \
+  -e HF_API_TOKEN=${HF_API_TOKEN} \
+  ghcr.io/huggingface/text-generation-inference:0.9 \
+  --hostname 0.0.0.0 \
+  --model-id meta-llama/Llama-2-13b-chat-hf \
+  --quantize bitsandbytes \
+  --num-shard 4
+```
+
+例如，这可以在配备 4 张 RTX 3080ti 显卡的机器上运行。根据可用的 GPU 数量调整 `--num_shard` 值。`HF_API_TOKEN` 环境变量保存着 Hugging Face API 令牌。
+
+```python
+# !pip3 install text-generation
+```
+
+创建一个连接到本地推理服务器的 `HuggingFaceTextGenInference` 实例，并将其包装到 `Llama2Chat` 中。
+
+```python
+from langchain_community.llms import HuggingFaceTextGenInference
+
+llm = HuggingFaceTextGenInference(
+    inference_server_url="http://127.0.0.1:8080/",
+    max_new_tokens=512,
+    top_k=50,
+    temperature=0.1,
+    repetition_penalty=1.03,
+)
+
+model = Llama2Chat(llm=llm)
+```
+
+然后，你就可以在 `LLMChain` 中将聊天 `model` 与 `prompt_template` 和对话 `memory` 一起使用。
+
+```python
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+chain = LLMChain(llm=model, prompt=prompt_template, memory=memory)
+```
+
+```python
+print(
+    chain.run(
+        text="在维也纳可以看什么？推荐几个地点。只需名称，无需细节。"
+    )
+)
+```
+
+```text
+ 当然，我很乐意帮忙！以下是维也纳一些值得考虑的流行景点：
+
+1. 美泉宫
+2. 圣斯蒂芬大教堂
+3. 霍夫堡宫
+4. 美景宫
+5. 普拉特公园
+6. 维也纳国家歌剧院
+7. 阿尔贝蒂娜博物馆
+8. 自然历史博物馆
+9. 艺术史博物馆
+10. 环城大道
+```
+
+```python
+print(chain.run(text="告诉我更多关于 #2 的信息。"))
+```
+
+```text
+ 当然！圣斯蒂芬大教堂（Stephansdom）是维也纳最知名的地标之一，也是游客必看的景点。这座令人惊叹的哥特式大教堂位于市中心，以其复杂的石雕、彩色玻璃窗和宏伟的圆顶而闻名。
+
+这座大教堂建于 12 世纪，历史上曾是许多重要事件的举办地，包括神圣罗马帝国皇帝的加冕礼和莫扎特的葬礼。如今，它仍然是一个活跃的礼拜场所，并提供导览、音乐会和特别活动。游客可以爬上南塔欣赏城市全景，或参加礼拜体验美妙的音乐和圣咏。
+```
+
+## 通过 `LlamaCPP` LLM 与 Llama-2 聊天
+
+要将 Llama-2 聊天模型与 [LlamaCPP](/oss/integrations/providers/llamacpp) `LMM` 一起使用，请按照[这些安装说明](/oss/integrations/providers/llamacpp#installation-and-setup)安装 `llama-cpp-python` 库。以下示例使用存储在本地 `~/Models/llama-2-7b-chat.Q4_0.gguf` 的量化模型 [llama-2-7b-chat.Q4_0.gguf](https://huggingface.co/TheBloke/Llama-2-7b-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_0.gguf)。
+
+创建 `LlamaCpp` 实例后，再次将 `llm` 包装到 `Llama2Chat` 中。
+
+```python
+from os.path import expanduser
+
+from langchain_community.llms import LlamaCpp
+
+model_path = expanduser("~/Models/llama-2-7b-chat.Q4_0.gguf")
+
+llm = LlamaCpp(
+    model_path=model_path,
+    streaming=False,
+)
+model = Llama2Chat(llm=llm)
+```
+
+并以与之前示例相同的方式使用。
+
+```python
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+chain = LLMChain(llm=model, prompt=prompt_template, memory=memory)
+```
+
+```python
+print(
+    chain.run(
+        text="在维也纳可以看什么？推荐几个地点。只需名称，无需细节。"
+    )
+)
+```
+
+```text
+ 当然！维也纳是一座拥有丰富历史和文化的美丽城市。以下是一些您可能想参观的顶级旅游景点：
+1. 美泉宫
+2. 圣斯蒂芬大教堂
+3. 霍夫堡宫
+4. 美景宫
+5. 普拉特公园
+6. 博物馆区
+7. 环城大道
+8. 维也纳国家歌剧院
+9. 艺术史博物馆
+10. 帝国皇宫
+
+这些只是维也纳众多精彩景点中的一部分。每个地方都有其独特的历史和魅力，希望您享受探索这座美丽城市的时光！
+```
+```text
+llama_print_timings:        load time =     250.46 ms
+llama_print_timings:      sample time =      56.40 ms /   144 runs   (    0.39 ms per token,  2553.37 tokens per second)
+llama_print_timings: prompt eval time =    1444.25 ms /    47 tokens (   30.73 ms per token,    32.54 tokens per second)
+llama_print_timings:        eval time =    8832.02 ms /   143 runs   (   61.76 ms per token,    16.19 tokens per second)
+llama_print_timings:       total time =   10645.94 ms
+```
+
+```python
+print(chain.run(text="告诉我更多关于 #2 的信息。"))
+```
+
+```text
+Llama.generate: prefix-match hit
+```
+```text
+ 当然！圣斯蒂芬大教堂（也称为 Stephansdom）是一座令人惊叹的哥特式风格大教堂，位于奥地利维也纳市中心。它是该市最知名的地标之一，被认为是维也纳的象征。
+以下是关于圣斯蒂芬大教堂的一些有趣事实：
+1. 历史：圣斯蒂芬大教堂的建造始于 12 世纪，原址是一座前罗马式教堂，耗时超过 600 年才完成。在其历史中，大教堂经历了多次翻修和扩建，最重要的翻修发生在 19 世纪。
+2. 建筑：圣斯蒂芬大教堂采用哥特式风格建造，以其高耸的尖塔、尖拱和复杂的石雕为特色。大教堂融合了罗马式、哥特式和巴洛克元素，使其成为风格独特的混合体。
+3. 设计：大教堂的设计基于十字形平面图，有一个长中殿和两个较短的翼部延伸。主祭坛是
+```
+```text
+llama_print_timings:        load time =     250.46 ms
+llama_print_timings:      sample time =     100.60 ms /   256 runs   (    0.39 ms per token,  2544.73 tokens per second)
+llama_print_timings: prompt eval time =    5128.71 ms /   160 tokens (   32.05 ms per token,    31.20 tokens per second)
+llama_print_timings:        eval time =   16193.02 ms /   255 runs   (   63.50 ms per token,    15.75 tokens per second)
+llama_print_timings:       total time =   21988.57 ms
+```

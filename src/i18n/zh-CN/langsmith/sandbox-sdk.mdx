@@ -1,0 +1,521 @@
+---
+title: 沙盒 SDK 使用指南
+sidebarTitle: SDK 使用
+description: 使用 Python 或 TypeScript SDK 以编程方式创建和管理沙盒。
+---
+
+import SandboxPreview from "/snippets/langsmith/sandbox-preview-warning.mdx";
+
+<SandboxPreview />
+
+[LangSmith SDK](/langsmith/reference) 提供了一个编程接口，用于创建沙盒并与之交互。
+
+## 安装
+
+<CodeGroup>
+
+```bash Python
+# uv
+uv add "langsmith[sandbox] @ git+https://github.com/langchain-ai/langsmith-sdk#subdirectory=python"
+
+# pip
+pip install "langsmith[sandbox] @ git+https://github.com/langchain-ai/langsmith-sdk#subdirectory=python"
+```
+
+```bash TypeScript
+npm install langsmith
+# 或
+yarn add langsmith
+```
+
+</CodeGroup>
+
+Python 的 `[sandbox]` 额外依赖项会安装 `websockets`，它支持实时流式传输和 `timeout=0`。如果没有安装，`run()` 会自动回退到 HTTP。对于 TypeScript，请安装可选的 `ws` 包以支持 WebSocket 流式传输：
+
+```bash
+npm install ws
+```
+
+## 创建并运行沙盒
+
+<CodeGroup>
+
+```python Python
+from langsmith.sandbox import SandboxClient
+
+# 客户端使用环境变量中的 LANGSMITH_ENDPOINT 和 LANGSMITH_API_KEY
+client = SandboxClient()
+
+# 创建模板（定义容器镜像）
+client.create_template(
+    name="python-sandbox",
+    image="python:3.12-slim",
+)
+
+# 根据模板创建沙盒并运行代码
+with client.sandbox(template_name="python-sandbox") as sb:
+    result = sb.run("python -c 'print(2 + 2)'")
+    print(result.stdout)  # "4\n"
+    print(result.success)  # True
+```
+
+```ts TypeScript
+import { SandboxClient } from "langsmith/experimental/sandbox";
+
+// 客户端使用环境变量中的 LANGSMITH_ENDPOINT 和 LANGSMITH_API_KEY
+const client = new SandboxClient();
+
+// 创建模板（定义容器镜像）
+await client.createTemplate("node-sandbox", {
+  image: "node:20-slim",
+});
+
+// 根据模板创建沙盒并运行代码
+const sandbox = await client.createSandbox("node-sandbox");
+const result = await sandbox.run("node -e 'console.log(2 + 2)'");
+console.log(result.stdout); // "4\n"
+
+// 别忘了清理
+await sandbox.delete();
+```
+
+</CodeGroup>
+
+## 运行命令
+
+每次 `run()` 调用都会返回一个 `ExecutionResult`，包含 `stdout`、`stderr`、`exit_code` 和 `success`。
+
+<CodeGroup>
+
+```python Python
+with client.sandbox(template_name="my-sandbox") as sb:
+    result = sb.run("echo 'Hello, World!'")
+
+    print(result.stdout)     # "Hello, World!\n"
+    print(result.stderr)     # ""
+    print(result.exit_code)  # 0
+    print(result.success)    # True
+
+    # 失败的命令会返回非零退出码
+    result = sb.run("exit 1")
+    print(result.success)    # False
+    print(result.exit_code)  # 1
+```
+
+```ts TypeScript
+const sandbox = await client.createSandbox("my-sandbox");
+try {
+  const result = await sandbox.run("echo 'Hello, World!'");
+
+  console.log(result.stdout);     // "Hello, World!\n"
+  console.log(result.stderr);     // ""
+  console.log(result.exit_code);  // 0
+
+  // 传递环境变量和工作目录
+  const envResult = await sandbox.run("echo $MY_VAR", {
+    env: { MY_VAR: "test-value" },
+    cwd: "/tmp",
+  });
+} finally {
+  await sandbox.delete();
+}
+```
+
+</CodeGroup>
+
+## 流式输出
+
+对于长时间运行的命令，可以使用回调函数或 `CommandHandle` 实时流式传输输出。
+
+### 使用回调函数流式传输
+
+<CodeGroup>
+
+```python Python
+import sys
+
+with client.sandbox(template_name="my-sandbox") as sb:
+    result = sb.run(
+        "make build",
+        timeout=600,
+        on_stdout=lambda s: print(s, end=""),
+        on_stderr=lambda s: print(s, end="", file=sys.stderr),
+    )
+    print(f"\n构建{'成功' if result.success else '失败'}")
+```
+
+```ts TypeScript
+const result = await sandbox.run("make build", {
+  timeout: 600,
+  onStdout: (data) => process.stdout.write(data),
+  onStderr: (data) => process.stderr.write(data),
+});
+console.log(`退出码: ${result.exit_code}`);
+```
+
+</CodeGroup>
+
+### 使用 CommandHandle 流式传输
+
+设置 `wait=False` 以获取 `CommandHandle`，从而完全控制输出流。
+
+<CodeGroup>
+
+```python Python
+with client.sandbox(template_name="my-sandbox") as sb:
+    handle = sb.run("make build", timeout=600, wait=False)
+
+    print(f"命令 ID: {handle.command_id}")
+
+    for chunk in handle:
+        prefix = "OUT" if chunk.stream == "stdout" else "ERR"
+        print(f"[{prefix}] {chunk.data}", end="")
+
+    result = handle.result
+    print(f"\n退出码: {result.exit_code}")
+```
+
+```ts TypeScript
+const handle = await sandbox.run("python train.py", {
+  wait: false,
+  timeout: 600,
+});
+
+console.log(`命令 ID: ${handle.commandId}`);
+console.log(`PID: ${handle.pid}`);
+
+for await (const chunk of handle) {
+  if (chunk.stream === "stdout") {
+    process.stdout.write(chunk.data);
+  } else {
+    process.stderr.write(chunk.data);
+  }
+}
+
+const result = await handle.result;
+console.log(`退出码: ${result.exit_code}`);
+```
+
+</CodeGroup>
+
+### 发送 stdin 并终止命令
+
+<CodeGroup>
+
+```python Python
+with client.sandbox(template_name="my-sandbox") as sb:
+    handle = sb.run(
+        "python -c 'name = input(\"Name: \"); print(f\"Hello {name}\")'",
+        timeout=30,
+        wait=False,
+    )
+
+    for chunk in handle:
+        if "Name:" in chunk.data:
+            handle.send_input("World\n")
+        print(chunk.data, end="")
+
+    result = handle.result
+```
+
+```ts TypeScript
+const handle = await sandbox.run("python -i", { wait: false });
+
+// 向 stdin 发送输入
+handle.sendInput("print(2 + 2)\n");
+handle.sendInput("exit()\n");
+
+for await (const chunk of handle) {
+  process.stdout.write(chunk.data);
+}
+```
+
+</CodeGroup>
+
+终止正在运行的命令：
+
+<CodeGroup>
+
+```python Python
+with client.sandbox(template_name="my-sandbox") as sb:
+    handle = sb.run("python server.py", timeout=0, wait=False)
+
+    for chunk in handle:
+        print(chunk.data, end="")
+        if "Ready" in chunk.data:
+            break
+
+    handle.kill()
+```
+
+```ts TypeScript
+const handle = await sandbox.run("sleep 300", { wait: false });
+handle.kill();
+
+const result = await handle.result;
+console.log(result.exit_code); // 非零值
+```
+
+</CodeGroup>
+
+### 重新连接到正在运行的命令
+
+如果客户端断开连接，可以使用命令 ID 重新连接：
+
+<CodeGroup>
+
+```python Python
+with client.sandbox(template_name="my-sandbox") as sb:
+    handle = sb.run("make build", timeout=600, wait=False)
+    command_id = handle.command_id
+
+    # 稍后，可能在不同的进程中
+    handle = sb.reconnect(command_id)
+    for chunk in handle:
+        print(chunk.data, end="")
+    result = handle.result
+```
+
+```ts TypeScript
+const handle = await sandbox.run("long-task", { wait: false });
+const commandId = handle.commandId;
+
+// 稍后，或从不同的客户端
+const newHandle = await sandbox.reconnect(commandId);
+for await (const chunk of newHandle) {
+  process.stdout.write(chunk.data);
+}
+```
+
+</CodeGroup>
+
+## 文件操作
+
+在沙盒中读写文件：
+
+<CodeGroup>
+
+```python Python
+with client.sandbox(template_name="my-python") as sb:
+    # 写入文件
+    sb.write("/app/script.py", "print('Hello from file!')")
+
+    # 运行脚本
+    result = sb.run("python /app/script.py")
+    print(result.stdout)  # "Hello from file!\n"
+
+    # 读取文件（返回字节）
+    content = sb.read("/app/script.py")
+    print(content.decode())  # "print('Hello from file!')"
+
+    # 写入二进制文件
+    sb.write("/app/data.bin", b"\x00\x01\x02\x03")
+```
+
+```ts TypeScript
+const sandbox = await client.createSandbox("my-python");
+try {
+  // 写入文件（字符串内容）
+  await sandbox.write("/app/script.py", "print('Hello from file!')");
+
+  // 运行脚本
+  const result = await sandbox.run("python /app/script.py");
+  console.log(result.stdout);  // "Hello from file!\n"
+
+  // 读取文件（返回 Uint8Array）
+  const content = await sandbox.read("/app/script.py");
+  console.log(new TextDecoder().decode(content));
+
+  // 写入二进制文件
+  await sandbox.write("/app/data.bin", new Uint8Array([0x00, 0x01, 0x02, 0x03]));
+} finally {
+  await sandbox.delete();
+}
+```
+
+</CodeGroup>
+
+## 命令生命周期和 TTL
+
+沙盒守护进程通过两种超时机制管理命令会话的生命周期：
+
+- **会话 TTL（已完成的命令）**：命令完成后，其会话会在内存中保留一段 TTL 时间。在此期间，您可以重新连接以获取输出。TTL 过期后，会话会被清理。
+- **空闲超时（正在运行的命令）**：没有客户端连接的正在运行的命令会在空闲超时（默认：5 分钟）后被终止。每次有客户端连接时，空闲计时器会重置。设置为 `-1` 表示无空闲超时。
+
+### 组合生命周期选项
+
+<CodeGroup>
+
+```python Python
+with client.sandbox(template_name="my-sandbox") as sb:
+    # 长时间运行的任务：30 分钟空闲超时，1 小时会话 TTL
+    handle = sb.run(
+        "python train.py",
+        timeout=0,              # 无命令超时
+        idle_timeout=1800,      # 无客户端连接 30 分钟后终止
+        ttl_seconds=3600,       # 退出后保留会话 1 小时
+        wait=False,
+    )
+
+    # 即发即弃：无空闲超时，无限 TTL
+    handle = sb.run(
+        "python background_job.py",
+        timeout=0,
+        idle_timeout=-1,        # 永不因空闲而终止
+        ttl_seconds=-1,         # 永久保留会话
+        wait=False,
+    )
+```
+
+```ts TypeScript
+const sandbox = await client.createSandbox("my-sandbox");
+try {
+  // 长时间运行的任务：30 分钟空闲超时，1 小时会话 TTL
+  const handle = await sandbox.run("python train.py", {
+    timeout: 0,              // 无命令超时
+    idleTimeout: 1800,       // 无客户端连接 30 分钟后终止
+    ttlSeconds: 3600,        // 退出后保留会话 1 小时
+    wait: false,
+  });
+
+  // 即发即弃：无空闲超时，无限 TTL
+  const bg = await sandbox.run("python background_job.py", {
+    timeout: 0,
+    idleTimeout: -1,         // 永不因空闲而终止
+    ttlSeconds: -1,          // 永久保留会话
+    wait: false,
+  });
+} finally {
+  await sandbox.delete();
+}
+```
+
+</CodeGroup>
+
+设置 `kill_on_disconnect=True`（Python）或 `killOnDisconnect: true`（TypeScript）可以在最后一个客户端断开连接时立即终止命令，而不是等待空闲超时。
+
+## TCP 隧道（Python）
+
+像访问本地服务一样访问沙盒内运行的任何 TCP 服务。隧道会打开一个本地 TCP 端口，并通过 WebSocket 将连接转发到沙盒内的目标端口。
+
+```python
+import psycopg2
+
+# 模板使用官方的 postgres:16 镜像
+sb = client.create_sandbox(template_name="my-postgres")
+pg_handle = sb.run(
+    "POSTGRES_HOST_AUTH_METHOD=trust docker-entrypoint.sh postgres",
+    timeout=0,
+    wait=False,
+)
+import time; time.sleep(6)  # 等待 Postgres 启动
+
+try:
+    with sb.tunnel(remote_port=5432, local_port=25432) as t:
+        conn = psycopg2.connect(
+            host="127.0.0.1",
+            port=t.local_port,
+            user="postgres",
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT version()")
+        print(cursor.fetchone())
+        conn.close()
+finally:
+    pg_handle.kill()
+    client.delete_sandbox(sb.name)
+```
+
+隧道适用于任何 TCP 服务（Redis、HTTP 服务器等），并且可以同时打开多个隧道：
+
+```python
+with sb.tunnel(remote_port=5432, local_port=25432) as t1, \
+     sb.tunnel(remote_port=6379, local_port=26379) as t2:
+    # 同时使用 Postgres 和 Redis
+    pass
+```
+
+## 异步支持（Python）
+
+Python SDK 提供了完整的异步客户端：
+
+```python
+from langsmith.sandbox import AsyncSandboxClient
+
+async def main():
+    async with AsyncSandboxClient() as client:
+        await client.create_template(name="async-python", image="python:3.12-slim")
+
+        async with await client.sandbox(template_name="async-python") as sb:
+            result = await sb.run("python -c 'print(1 + 1)'")
+            print(result.stdout)  # "2\n"
+
+            await sb.write("/app/test.txt", "async content")
+            content = await sb.read("/app/test.txt")
+            print(content.decode())
+
+            # 异步流式传输
+            handle = await sb.run("make build", timeout=600, wait=False)
+            async for chunk in handle:
+                print(chunk.data, end="")
+            result = await handle.result
+```
+
+## 错误处理
+
+两个 SDK 都提供了类型化的异常，用于特定的错误处理：
+
+<CodeGroup>
+
+```python Python
+from langsmith.sandbox import (
+    SandboxClientError,       # 基础异常
+    ResourceCreationError,    # 资源创建失败
+    ResourceNotFoundError,    # 资源不存在
+    ResourceTimeoutError,     # 操作超时
+    SandboxNotReadyError,     # 沙盒尚未就绪
+    SandboxConnectionError,   # 网络/WebSocket 错误
+    CommandTimeoutError,      # 命令超时
+    QuotaExceededError,       # 配额限制达到
+)
+
+try:
+    with client.sandbox(template_name="my-sandbox") as sb:
+        result = sb.run("sleep 999", timeout=10)
+except CommandTimeoutError as e:
+    print(f"命令超时: {e}")
+except ResourceNotFoundError as e:
+    print(f"{e.resource_type} 未找到: {e}")
+except SandboxClientError as e:
+    print(f"错误: {e}")
+```
+
+```ts TypeScript
+import {
+  LangSmithSandboxError,
+  LangSmithResourceNotFoundError,
+  LangSmithResourceTimeoutError,
+  LangSmithSandboxConnectionError,
+  LangSmithCommandTimeoutError,
+  LangSmithQuotaExceededError,
+} from "langsmith/experimental/sandbox";
+
+try {
+  const sandbox = await client.createSandbox("nonexistent");
+  await sandbox.delete();
+} catch (e) {
+  if (e instanceof LangSmithResourceNotFoundError) {
+    console.log(`${e.resourceType} 未找到: ${e.message}`);
+  } else if (e instanceof LangSmithResourceTimeoutError) {
+    console.log(`等待 ${e.resourceType} 超时: ${e.message}`);
+  } else if (e instanceof LangSmithSandboxError) {
+    console.log(`错误: ${e.message}`);
+  }
+}
+```
+
+</CodeGroup>
+
+<Note>
+更多详细信息，请参阅 GitHub 上的沙盒 SDK 参考文档：[Python](https://github.com/langchain-ai/langsmith-sdk/tree/main/python/langsmith/sandbox) 或 [TypeScript](https://github.com/langchain-ai/langsmith-sdk/tree/main/js/src/experimental/sandbox)。
+</Note>

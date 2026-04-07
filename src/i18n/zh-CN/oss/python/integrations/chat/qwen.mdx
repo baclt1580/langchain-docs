@@ -1,0 +1,166 @@
+---
+title: "ChatQwen 集成"
+description: "使用 LangChain Python 集成 ChatQwen 聊天模型。"
+---
+
+本文将帮助您开始使用 Qwen [聊天模型](/oss/langchain/models)。有关 `ChatQwen` 所有功能和配置的详细文档，请参阅 [API 参考](https://pypi.org/project/langchain-qwq/)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | 下载量 | 版本 |
+| :--- | :--- |  :---: | :---: | :---: |
+| [`ChatQwen`](https://pypi.org/project/langchain-qwq/) | [`langchain-qwq`](https://pypi.org/project/langchain-qwq/) | beta | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-qwq?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-qwq?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/langchain/tools) | [结构化输出](/oss/langchain/structured-output) | [图像输入](/oss/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/langchain/streaming#llm-tokens) | 原生异步 | [令牌使用量](/oss/langchain/models#token-usage) | [对数概率](/oss/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ✅ | ✅ |✅  | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+
+## 设置
+
+要访问 Qwen 模型，您需要创建一个阿里云账户，获取 API 密钥，并安装 `langchain-qwq` 集成包。
+
+### 凭证
+
+前往 [阿里云 API 密钥页面](https://account.alibabacloud.com/login/login.htm?oauth_callback=https%3A%2F%2Fbailian.console.alibabacloud.com%2F%3FapiKey%3D1&lang=en#/api-key) 注册阿里云并生成 API 密钥。完成后，设置 `DASHSCOPE_API_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+if not os.getenv("DASHSCOPE_API_KEY"):
+    os.environ["DASHSCOPE_API_KEY"] = getpass.getpass("请输入您的 Dashscope API 密钥：")
+```
+
+### 安装
+
+LangChain Qwen 集成位于 `langchain-qwq` 包中：
+
+```python
+pip install -qU langchain-qwq
+```
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+```python
+from langchain_qwq import ChatQwen
+
+llm = ChatQwen(
+    model="qwen-flash",
+    max_tokens=3_000,
+    timeout=None,
+    max_retries=2,
+    # 其他参数...
+)
+```
+
+## 调用
+
+```python
+messages = [
+    (
+        "system",
+        "您是一个将英语翻译成法语的助手。"
+        "请翻译用户的句子。",
+    ),
+    ("human", "I love programming."),
+]
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+```text
+AIMessage(content="J'adore la programmation.", additional_kwargs={}, response_metadata={'finish_reason': 'stop', 'model_name': 'qwen-flash'}, id='run--40f2e75b-7d28-4a71-8f5f-561509ac2010-0', usage_metadata={'input_tokens': 32, 'output_tokens': 8, 'total_tokens': 40, 'input_token_details': {}, 'output_token_details': {}})
+```
+
+## 工具调用
+
+ChatQwen 支持工具调用 API，允许您描述工具及其参数，并让模型返回一个 JSON 对象，其中包含要调用的工具及其输入。
+
+### 与 `bind_tools` 一起使用
+
+```python
+from langchain.tools import tool
+from langchain_qwq import ChatQwen
+
+
+@tool
+def multiply(first_int: int, second_int: int) -> int:
+    """将两个整数相乘。"""
+    return first_int * second_int
+
+
+llm = ChatQwen(model="qwen-flash")
+
+llm_with_tools = llm.bind_tools([multiply])
+
+msg = llm_with_tools.invoke("5 乘以 42 是多少")
+
+print(msg)
+```
+
+```text
+content='' additional_kwargs={'tool_calls': [{'index': 0, 'id': 'call_f0c2cc49307f480db78a45', 'function': {'arguments': '{"first_int": 5, "second_int": 42}', 'name': 'multiply'}, 'type': 'function'}]} response_metadata={'finish_reason': 'tool_calls', 'model_name': 'qwen-flash'} id='run--27c5aafb-9710-42f5-ab78-5a2ad1d9050e-0' tool_calls=[{'name': 'multiply', 'args': {'first_int': 5, 'second_int': 42}, 'id': 'call_f0c2cc49307f480db78a45', 'type': 'tool_call'}] usage_metadata={'input_tokens': 166, 'output_tokens': 27, 'total_tokens': 193, 'input_token_details': {}, 'output_token_details': {}}
+```
+### 视觉支持
+#### 图像
+```python
+from langchain.messages import HumanMessage
+
+model = ChatQwen(model="qwen-vl-max-latest")
+
+messages = [
+    HumanMessage(content=[
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "https://example.com/image/image.png"
+            },
+        },
+        {"type": "text", "text": "您在这张图片中看到了什么？"},
+    ])
+]
+
+response = model.invoke(messages)
+print(response)
+```
+
+```text
+content='在这张图片中，我看到一个温馨的场景，发生在沙滩上，时间似乎是日出或日落时分，因为光线温暖柔和，呈金黄色。一位女士坐在沙滩上，微笑着温柔地握着一只大型浅色狗（可能是一只拉布拉多寻回犬）的爪子。狗坐得笔直，面对着她，似乎正在与她进行友好的握手或击掌动作。\n\n这位女士穿着格子衬衫和深色裤子，长发松散地垂着。她看起来快乐而放松，享受着与宠物的这一刻。狗戴着带有图案的彩色背带，附近沙滩上松散地放着一根牵引绳。\n\n背景中，轻柔的海浪拍打着海岸，地平线与天空柔和地融为一体，营造出一种宁静祥和的氛围。图片的整体情绪是欢乐、深情和宁静的，捕捉了这位女士与她的狗在美丽自然环境中特殊的纽带。' additional_kwargs={} response_metadata={'finish_reason': 'stop', 'model_name': 'qwen-vl-max-latest'} id='run--22fecc27-9455-4426-bbd4-aa5a5bde400c-0' usage_metadata={'input_tokens': 1265, 'output_tokens': 202, 'total_tokens': 1467, 'input_token_details': {}, 'output_token_details': {}}
+```
+#### 视频
+```python
+from langchain.messages import HumanMessage
+
+model = ChatQwen(model="qwen-vl-max-latest")
+
+messages = [
+    HumanMessage(content=[
+        {
+            "type": "video_url",
+            "video_url": {
+                "url": "https://example.com/video/1.mp4"
+            },
+        },
+        {"type": "text", "text": "您能告诉我关于这个视频的信息吗？"},
+    ])
+]
+
+response = model.invoke(messages)
+print(response)
+```
+
+```text
+content='这个视频展示了一位年轻女士，她留着整齐的棕色短发和刘海。她穿着一件柔软的粉色针织开衫，内搭白色上衣，佩戴着一条精致的项链。背景柔和模糊，暗示着一个户外的城市环境，有现代建筑，可能是在白天的自然光线下。\n\n在整个视频中，这位女士保持着温暖友好的态度，温柔地微笑着，偶尔大笑。她的表情生动而愉快，传达出一种幸福和亲切感。光线优美地突出了她的特征，给场景带来了愉悦和吸引人的氛围。\n\n右上角的水印表明这个视频是使用 AI 合成技术（"通义·AI合成"）创建的，暗示内容可能是由人工智能生成或增强的。这可能意味着视觉效果高度抛光和风格化，这是 AI 生成媒体的典型特征。\n\n总体而言，这个视频似乎是一个简短、积极、令人振奋的片段，可能用于宣传内容、社交媒体或作为数字角色展示的一部分。' additional_kwargs={} response_metadata={'finish_reason': 'stop', 'model_name': 'qwen-vl-max-latest'} id='run--c567a6e2-14e0-47e1-acb6-cfe2953fb1ad-0' usage_metadata={'input_tokens': 3607, 'output_tokens': 204, 'total_tokens': 3811, 'input_token_details': {}, 'output_token_details': {}}
+```
+
+---
+
+## API 参考
+
+有关 `ChatQwen` 所有功能和配置的详细文档，请参阅 [API 参考](https://pypi.org/project/langchain-qwq/)

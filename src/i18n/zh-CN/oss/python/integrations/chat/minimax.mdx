@@ -1,0 +1,36 @@
+---
+title: "MiniMaxChat 集成"
+description: "使用 LangChain Python 与 MiniMaxChat 聊天模型进行集成。"
+---
+
+[Minimax](https://api.minimax.chat) 是一家中国初创公司，为企业和个人提供大语言模型服务。
+
+本示例将介绍如何使用 LangChain 与 MiniMax 推理服务进行聊天交互。
+
+```python
+import os
+
+os.environ["MINIMAX_GROUP_ID"] = "MINIMAX_GROUP_ID"
+os.environ["MINIMAX_API_KEY"] = "MINIMAX_API_KEY"
+```
+
+```python
+from langchain_community.chat_models import MiniMaxChat
+from langchain.messages import HumanMessage
+```
+
+```python
+chat = MiniMaxChat(
+    # 如果你在中国，请使用此 base_url：base_url="https://api.minimaxi.com/v1/text/chatcompletion_v2"
+)
+```
+
+```python
+chat(
+    [
+        HumanMessage(
+            content="将这句话从英语翻译成法语。I love programming."
+        )
+    ]
+)
+```

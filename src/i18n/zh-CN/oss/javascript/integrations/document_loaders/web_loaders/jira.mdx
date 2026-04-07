@@ -1,0 +1,48 @@
+---
+title: "Jira 集成"
+description: "使用 LangChain JavaScript 集成 Jira 文档加载器。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+本文介绍如何从 Jira 项目中的问题加载文档对象。
+
+## 凭证
+
+- 您需要设置访问令牌，并将其与 Jira 用户名一起提供以验证请求。
+- 您还需要提供包含待加载文档的问题所在项目的项目键和主机 URL。
+
+## 使用方法
+
+```typescript
+import { JiraProjectLoader } from "@langchain/community/document_loaders/web/jira";
+
+const host = process.env.JIRA_HOST || "https://jira.example.com";
+const username = process.env.JIRA_USERNAME;
+const accessToken = process.env.JIRA_ACCESS_TOKEN;
+const projectKey = process.env.JIRA_PROJECT_KEY || "PROJ";
+
+if (username && accessToken) {
+  // 最近 30 天内创建的问题
+  const createdAfter = new Date();
+  createdAfter.setDate(createdAfter.getDate() - 30);
+  const loader = new JiraProjectLoader({
+    host,
+    projectKey,
+    username,
+    accessToken,
+    createdAfter,
+  });
+
+  const documents = await loader.load();
+  console.log(`已加载 ${documents.length} 个 Jira 文档`);
+} else {
+  console.log(
+    "运行此示例必须提供用户名和访问令牌。"
+  );
+}
+```

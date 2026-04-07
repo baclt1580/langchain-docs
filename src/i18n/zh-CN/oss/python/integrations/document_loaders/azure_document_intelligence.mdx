@@ -1,0 +1,117 @@
+---
+title: "Azure AI 文档智能集成"
+description: "使用 LangChain Python 与 Azure AI 文档智能文档加载器集成。"
+---
+
+>[Azure AI 文档智能](https://aka.ms/doc-intelligence)（原名 `Azure Form Recognizer`）是一项基于机器学习的服务，可从数字或扫描的 PDF、图像、Office 和 HTML 文件中提取文本（包括手写内容）、表格、文档结构（例如标题、章节标题等）以及键值对。
+>
+>文档智能支持 `PDF`、`JPEG/JPG`、`PNG`、`BMP`、`TIFF`、`HEIF`、`DOCX`、`XLSX`、`PPTX` 和 `HTML` 格式。
+
+当前使用 `文档智能` 的加载器实现可以按页整合内容，并将其转换为 LangChain 文档。默认输出格式为 Markdown，便于与 `MarkdownHeaderTextSplitter` 链式结合，实现语义文档分块。您也可以使用 `mode="single"` 或 `mode="page"` 来返回单页的纯文本或按页分割的文档。
+
+## 前提条件
+
+需要一个位于以下三个预览区域之一的 Azure AI 文档智能资源：**美国东部**、**美国西部 2**、**西欧** - 如果您还没有，请按照[此文档](https://learn.microsoft.com/azure/ai-services/document-intelligence/create-document-intelligence-resource?view=doc-intel-4.0.0)创建一个。您需要将 `<endpoint>` 和 `<key>` 作为参数传递给加载器。
+
+```python
+pip install -qU  langchain langchain-community azure-ai-documentintelligence
+```
+
+## 示例 1
+
+第一个示例使用本地文件，该文件将被发送到 Azure AI 文档智能。
+
+初始化文档分析客户端后，我们可以继续创建 DocumentIntelligenceLoader 的实例：
+
+```python
+from langchain_community.document_loaders import AzureAIDocumentIntelligenceLoader
+
+file_path = "<文件路径>"
+endpoint = "<端点>"
+key = "<密钥>"
+loader = AzureAIDocumentIntelligenceLoader(
+    api_endpoint=endpoint, api_key=key, file_path=file_path, api_model="prebuilt-layout"
+)
+
+documents = loader.load()
+```
+
+默认输出包含一个 LangChain 文档，内容为 Markdown 格式：
+
+```python
+documents
+```
+
+## 示例 2
+
+输入文件也可以是公共 URL 路径。例如：[raw.githubusercontent.com/Azure-Samples/cognitive-services-REST-api-samples/master/curl/form-recognizer/rest-api/layout.png](https://raw.githubusercontent.com/Azure-Samples/cognitive-services-REST-api-samples/master/curl/form-recognizer/rest-api/layout.png)。
+
+```python
+url_path = "<URL>"
+loader = AzureAIDocumentIntelligenceLoader(
+    api_endpoint=endpoint, api_key=key, url_path=url_path, api_model="prebuilt-layout"
+)
+
+documents = loader.load()
+```
+
+```python
+documents
+```
+
+## 示例 3
+
+您还可以指定 `mode="page"` 来按页加载文档。
+
+```python
+from langchain_community.document_loaders import AzureAIDocumentIntelligenceLoader
+
+file_path = "<文件路径>"
+endpoint = "<端点>"
+key = "<密钥>"
+loader = AzureAIDocumentIntelligenceLoader(
+    api_endpoint=endpoint,
+    api_key=key,
+    file_path=file_path,
+    api_model="prebuilt-layout",
+    mode="page",
+)
+
+documents = loader.load()
+```
+
+输出将是列表中的每个页面存储为单独的文档：
+
+```python
+for document in documents:
+    print(f"页面内容: {document.page_content}")
+    print(f"元数据: {document.metadata}")
+```
+
+## 示例 4
+
+您还可以指定 `analysis_feature=["ocrHighResolution"]` 来启用附加功能。更多信息，请参阅：[aka.ms/azsdk/python/documentintelligence/analysisfeature](https://aka.ms/azsdk/python/documentintelligence/analysisfeature)。
+
+```python
+from langchain_community.document_loaders import AzureAIDocumentIntelligenceLoader
+
+file_path = "<文件路径>"
+endpoint = "<端点>"
+key = "<密钥>"
+analysis_features = ["ocrHighResolution"]
+loader = AzureAIDocumentIntelligenceLoader(
+    api_endpoint=endpoint,
+    api_key=key,
+    file_path=file_path,
+    api_model="prebuilt-layout",
+    analysis_features=analysis_features,
+)
+
+documents = loader.load()
+```
+
+输出包含通过高分辨率附加功能识别的 LangChain 文档：
+
+```python
+documents
+```

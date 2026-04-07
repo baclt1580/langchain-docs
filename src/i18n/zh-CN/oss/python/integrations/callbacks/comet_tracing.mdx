@@ -1,0 +1,71 @@
+---
+title: "Comet 追踪集成"
+description: "使用 LangChain Python 与 Comet 追踪回调进行集成。"
+---
+
+有两种方式可以通过 Comet 追踪你的 LangChain 执行过程：
+
+1. 将 `LANGCHAIN_COMET_TRACING` 环境变量设置为 "true"。这是推荐的方式。
+2. 手动导入 `CometTracer` 并显式传递它。
+
+```python
+import os
+
+import comet_llm
+from langchain_openai import OpenAI
+
+os.environ["LANGCHAIN_COMET_TRACING"] = "true"
+
+# 如果未设置 API 密钥，则连接到 Comet
+comet_llm.init()
+
+# 通过环境变量配置 comet 的文档
+# https://www.comet.com/docs/v2/api-and-sdk/llm-sdk/configuration/
+# 这里我们配置 comet 项目
+os.environ["COMET_PROJECT_NAME"] = "comet-example-langchain-tracing"
+
+from langchain.agents import create_agent, load_tools
+```
+
+```python
+# 启用追踪的代理运行。确保已正确设置 OPENAI_API_KEY 以运行此示例。
+
+llm = OpenAI(temperature=0)
+tools = load_tools(["llm-math"], llm=llm)
+
+agent = create_agent(
+    model=llm,
+    tools=tools,
+    verbose=True,
+)
+
+agent.invoke("2 的 .123243 次方是多少？")  # 这应该会被追踪
+# 控制台应打印类似以下的链的 URL：
+# https://www.comet.com/<workspace>/<project_name>
+# 该 URL 可用于在 Comet 中查看 LLM 链。
+```
+
+```python
+# 现在，我们取消设置环境变量并使用上下文管理器。
+if "LANGCHAIN_COMET_TRACING" in os.environ:
+    del os.environ["LANGCHAIN_COMET_TRACING"]
+
+from langchain_community.callbacks.tracers.comet import CometTracer
+
+tracer = CometTracer()
+
+# 重新创建 LLM、工具和代理，并将回调传递给它们
+llm = OpenAI(temperature=0)
+tools = load_tools(["llm-math"], llm=llm)
+
+agent = create_agent(
+    model=llm,
+    tools=tools,
+    verbose=True,
+)
+
+agent.invoke(
+    "2 的 .123243 次方是多少？",
+    callbacks=[tracer],
+)  # 这应该会被追踪
+```

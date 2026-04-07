@@ -1,0 +1,122 @@
+---
+title: "RSS 源集成"
+description: "使用 LangChain Python 集成 RSS 源文档加载器。"
+---
+
+本文介绍如何从一系列 RSS 源 URL 加载 HTML 新闻文章，并将其转换为可用于下游处理的文档格式。
+
+```python
+pip install -qU  feedparser newspaper3k listparser
+```
+
+```python
+from langchain_community.document_loaders import RSSFeedLoader
+```
+
+```python
+urls = ["https://news.ycombinator.com/rss"]
+```
+
+传入 URL 以将其加载为文档
+
+```python
+loader = RSSFeedLoader(urls=urls)
+data = loader.load()
+print(len(data))
+```
+
+```python
+print(data[0].page_content)
+```
+
+```text
+(下一个 Rich)
+
+2023年8月4日
+
+Rich Hickey
+
+怀着复杂的心情，我在此宣布（早已计划的）从商业软件开发领域的退休，以及我在 Nubank 的任职结束。看到 Clojure 和 Datomic 在大规模应用中获得成功，这一直令人激动。
+
+我期待以独立开发者的身份，继续与 Alex、Stu、Fogus 及许多其他人一起，领导 Clojure 的维护和增强工作。我们为 1.12 及后续版本规划了许多有用的功能。社区依然友好、成熟且高效，并正在将 Clojure 带入许多有趣的新领域。
+
+我想特别强调并感谢 Nubank 对 Alex、Fogus 及核心团队，以及整个 Clojure 社区的持续赞助。
+
+Stu 将继续在 Nubank 领导 Datomic 的开发，Datomic 团队在那里不断壮大和蓬勃发展。我对 Datomic 新的免费可用性将带来的前景尤其感到兴奋。
+
+在 Cognitect 的时光是我职业生涯的亮点。我从团队的每个人身上都学到了东西，并对我们之间的所有互动永远心怀感激。要感谢的人太多，但我必须向 Stu 和 Justin 表达最诚挚的感激和爱意，感谢他们（多次）对我及我的想法给予信任，并始终作为最好的伙伴和朋友，充分体现了正直的理念。当然还有 Alex Miller——他拥有许多我所缺乏的技能，没有他那不屈不挠的精神、积极性和友谊，Clojure 不可能取得今天的成就。
+
+通过 Clojure 和 Cognitect，我结识了许多朋友，我希望在未来继续培育这些友谊。
+
+退休让我回到了最初开发 Clojure 时所拥有的自由和独立。旅程仍在继续！
+```
+
+你可以向 NewsURLLoader 传递参数，这些参数将用于加载文章。
+
+```python
+loader = RSSFeedLoader(urls=urls, nlp=True)
+data = loader.load()
+print(len(data))
+```
+
+```text
+获取或处理 https://twitter.com/andrewmccalip/status/1687405505604734978 时出错，异常：你必须先 `parse()` 一篇文章！
+处理条目 https://twitter.com/andrewmccalip/status/1687405505604734978 时出错，异常：列表索引超出范围
+```
+```text
+13
+```
+
+```python
+data[0].metadata["keywords"]
+```
+
+```python
+['nubank',
+ 'alex',
+ 'stu',
+ 'taking',
+ 'team',
+ 'remains',
+ 'rich',
+ 'clojure',
+ 'thank',
+ 'planned',
+ 'datomic']
+```
+
+```python
+data[0].metadata["summary"]
+```
+
+```text
+'看到 Clojure 和 Datomic 在大规模应用中获得成功，这一直令人激动。\n我期待以独立开发者的身份，继续与 Alex、Stu、Fogus 及许多其他人一起，领导 Clojure 的维护和增强工作。\n社区依然友好、成熟且高效，并正在将 Clojure 带入许多有趣的新领域。\n我想特别强调并感谢 Nubank 对 Alex、Fogus 及核心团队，以及整个 Clojure 社区的持续赞助。\nStu 将继续在 Nubank 领导 Datomic 的开发，Datomic 团队在那里不断壮大和蓬勃发展。'
+```
+
+你也可以使用 OPML 文件，例如 Feedly 的导出文件。可以传入 URL 或 OPML 内容。
+
+```python
+with open("example_data/sample_rss_feeds.opml", "r") as f:
+        loader = RSSFeedLoader(opml=f.read())
+data = loader.load()
+print(len(data))
+```
+
+```text
+获取 http://www.engadget.com/rss-full.xml 时出错，异常：获取 http://www.engadget.com/rss-full.xml 时出错，异常：文档声明为 us-ascii，但解析为 utf-8
+```
+```text
+20
+```
+
+```python
+data[0].page_content
+```
+
+```text
+'电动汽车初创公司 Fisker 昨晚在亨廷顿海滩引起了轰动，展示了其计划与 Fisker Ocean 一同生产的一系列新电动汽车，Fisker Ocean 目前正缓慢开始在欧洲和美国交付。带着 2010 年左右 Lotus 的影子，似乎能满足大多数人的口味，包括一款强大的四门 GT、一款多功能皮卡和一款经济实惠的电动城市车。\n\n"我们希望世界知道，我们有大计划，并打算进入几个不同的细分市场，用我们独特的设计、创新和可持续性组合重新定义每个市场，"首席执行官 Henrik Fisker 说。\n\n从最便宜的车型开始，Fisker PEAR——一个可爱的缩写，代表 "Personal Electric Automotive Revolution"（个人电动汽车革命）——据说使用的零部件比其他小型电动汽车少 35%。虽然它是一款较小的汽车，但由于前后排长椅式座椅，PEAR 可容纳六人。哦，它还有一个前行李箱，公司称之为 "froot"，这会让一些英式英语使用者感到满意，比如 Ars 的朋友兼汽车记者 Jonny Smith。\n\n但最令人兴奋的是价格——起价 29,900 美元，计划于 2025 年上市。Fisker 计划与富士康签约，在俄亥俄州洛兹敦生产 PEAR，这意味着它将有资格获得联邦税收优惠。\n\n广告\n\nFisker Alaska 是该公司的皮卡，基于 Ocean 所用平台的改进版本打造。它有一个可扩展的货箱，长度最短可达 4.5 英尺（1,371 毫米），最长可达 9.2 英尺（2,804 毫米）。Fisker 声称它将是市面上最轻的电动皮卡，也是世界上最可持续的皮卡。预计续航里程为 230–240 英里（370–386 公里）。\n\n这款车也计划于 2025 年推出，价格相对实惠，起价 45,400 美元。Fisker 希望也在北美生产这款车，尽管没有说明具体地点。\n\n最后是 Ronin，一款四门 GT，与 Henrik Fisker 2012 年的作品 Fisker Karma 有着惊人的相似之处。这款车没有公布价格，但 Fisker 表示其全轮驱动动力系统将拥有 1,000 马力（745 千瓦），并能在两秒内从静止加速到 60 英里/小时——这几乎是现代轮胎允许的最快速度。预计这款车将配备一块巨大的电池，因为 Fisker 表示其目标是 600 英里（956 公里）的续航里程。\n\n"创新和可持续性，以及设计，是我们的三个品牌价值。到 2027 年，我们计划生产世界上第一辆气候中和的汽车，随着我们的客户重新定义他们与移动性的关系，我们希望成为软件定义交通领域的领导者，" Fisker 说。'
+```
+
+```python
+
+```

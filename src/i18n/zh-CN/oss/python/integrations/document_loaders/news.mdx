@@ -1,0 +1,77 @@
+---
+title: "新闻URL集成"
+description: "使用LangChain Python与新闻URL文档加载器集成。"
+---
+
+本文介绍如何将HTML新闻文章从URL列表加载到可用于下游处理的文档格式。
+
+```python
+from langchain_community.document_loaders import NewsURLLoader
+```
+
+```python
+urls = [
+    "https://www.bbc.com/news/world-us-canada-66388172",
+    "https://www.bbc.com/news/entertainment-arts-66384971",
+]
+```
+
+传入URL以将其加载到文档中
+
+```python
+loader = NewsURLLoader(urls=urls)
+data = loader.load()
+print("第一篇文章: ", data[0])
+print("\n第二篇文章: ", data[1])
+```
+
+```text
+第一篇文章:  page_content='在向调查1月6日骚乱的国会委员会作证时，鲍威尔女士表示她没有审查她提出的众多选举舞弊指控，并告诉他们“没有理性的人”会认为她的指控是事实。她及其代表均未发表评论。' metadata={'title': 'Donald Trump indictment: What do we know about the six co-conspirators?', 'link': 'https://www.bbc.com/news/world-us-canada-66388172', 'authors': [], 'language': 'en', 'description': 'Six people accused of helping Mr Trump undermine the election have been described by prosecutors.', 'publish_date': None}
+
+第二篇文章:  page_content='威廉姆斯女士补充道：“如果我能尽我所能确保舞者或歌手或任何决定与她合作的人不必经历同样的遭遇，我一定会这么做。”' metadata={'title': "Lizzo dancers Arianna Davis and Crystal Williams: 'No one speaks out, they are scared'", 'link': 'https://www.bbc.com/news/entertainment-arts-66384971', 'authors': [], 'language': 'en', 'description': 'The US pop star is being sued for sexual harassment and fat-shaming but has yet to comment.', 'publish_date': None}
+```
+
+使用nlp=True运行自然语言处理分析并生成关键词和摘要
+
+```python
+loader = NewsURLLoader(urls=urls, nlp=True)
+data = loader.load()
+print("第一篇文章: ", data[0])
+print("\n第二篇文章: ", data[1])
+```
+
+```text
+第一篇文章:  page_content='在向调查1月6日骚乱的国会委员会作证时，鲍威尔女士表示她没有审查她提出的众多选举舞弊指控，并告诉他们“没有理性的人”会认为她的指控是事实。她及其代表均未发表评论。' metadata={'title': 'Donald Trump indictment: What do we know about the six co-conspirators?', 'link': 'https://www.bbc.com/news/world-us-canada-66388172', 'authors': [], 'language': 'en', 'description': 'Six people accused of helping Mr Trump undermine the election have been described by prosecutors.', 'publish_date': None, 'keywords': ['powell', 'know', 'donald', 'trump', 'review', 'indictment', 'telling', 'view', 'reasonable', 'person', 'testimony', 'coconspirators', 'riot', 'representatives', 'claims'], 'summary': 'In testimony to the congressional committee examining the 6 January riot, Mrs Powell said she did not review all of the many claims of election fraud she made, telling them that "no reasonable person" would view her claims as fact.\nNeither she nor her representatives have commented.'}
+
+第二篇文章:  page_content='威廉姆斯女士补充道：“如果我能尽我所能确保舞者或歌手或任何决定与她合作的人不必经历同样的遭遇，我一定会这么做。”' metadata={'title': "Lizzo dancers Arianna Davis and Crystal Williams: 'No one speaks out, they are scared'", 'link': 'https://www.bbc.com/news/entertainment-arts-66384971', 'authors': [], 'language': 'en', 'description': 'The US pop star is being sued for sexual harassment and fat-shaming but has yet to comment.', 'publish_date': None, 'keywords': ['davis', 'lizzo', 'singers', 'experience', 'crystal', 'ensure', 'arianna', 'theres', 'williams', 'power', 'going', 'dancers', 'im', 'speaks', 'work', 'ms', 'scared'], 'summary': 'Ms Williams added: "If there\'s anything that I can do in my power to ensure that dancers or singers or whoever decides to work with her don\'t have to go through that same experience, I\'m going to do that."'}
+```
+
+```python
+data[0].metadata["keywords"]
+```
+
+```python
+['powell',
+ 'know',
+ 'donald',
+ 'trump',
+ 'review',
+ 'indictment',
+ 'telling',
+ 'view',
+ 'reasonable',
+ 'person',
+ 'testimony',
+ 'coconspirators',
+ 'riot',
+ 'representatives',
+ 'claims']
+```
+
+```python
+data[0].metadata["summary"]
+```
+
+```text
+'In testimony to the congressional committee examining the 6 January riot, Mrs Powell said she did not review all of the many claims of election fraud she made, telling them that "no reasonable person" would view her claims as fact.\nNeither she nor her representatives have commented.'
+```

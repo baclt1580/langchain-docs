@@ -1,0 +1,459 @@
+---
+title: 子代理流式处理
+description: 展示具有流式内容、进度跟踪和可折叠卡片功能的专业子代理
+---
+
+当协调代理生成专业子代理（如研究员、分析师、撰稿人）时，你需要将协调器的消息与每个子代理的流式输出分开渲染。在 `useStream` 中设置 `filterSubagentMessages: true` 以清晰分离这两个流，然后使用 `getSubagentsByMessage` 将每个子代理的进度卡片附加到触发它的协调器消息上。
+
+import { PatternEmbed } from "/snippets/pattern-embed.jsx"
+
+<PatternEmbed pattern="deep-agent-subagent-cards" />
+
+## 为何过滤子代理消息
+
+如果不进行过滤，每个子代理生成的每个令牌都会交错出现在协调器的消息流中，导致内容难以阅读。使用 `filterSubagentMessages: true` 后：
+
+- `stream.messages` 仅包含协调器的消息
+- 每个子代理的内容可通过 `stream.subagents` 和 `stream.getSubagentsByMessage` 访问
+- 界面保持清晰：协调器的推理过程与专家的工作内容分离
+
+这种分离让你可以在一个位置渲染协调器的消息，并将每个子代理的进度卡片精确地附加到其所属位置：即生成它的协调器消息下方。
+
+## 设置 useStream
+
+始终设置 `filterSubagentMessages: true`。这会从主消息流中移除子代理令牌，以便你可以独立渲染协调器的消息和子代理输出。
+
+:::python
+
+定义一个与你的代理状态模式匹配的 TypeScript 接口，并将其作为类型参数传递给 `useStream`，以便类型安全地访问状态值。在下面的示例中，将 `typeof myAgent` 替换为你的接口名称：
+
+```ts
+import type { BaseMessage } from "@langchain/core/messages";
+
+interface AgentState {
+  messages: BaseMessage[];
+}
+```
+
+:::
+
+:::js
+
+导入你的代理，并将 `typeof myAgent` 作为类型参数传递给 `useStream`，以便类型安全地访问状态值：
+
+```ts
+import type { myAgent } from "./agent";
+```
+
+:::
+
+<CodeGroup>
+```tsx React
+import { useStream } from "@langchain/react";
+
+const AGENT_URL = "http://localhost:2024";
+
+export function DeepAgentChat() {
+  const stream = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "deep_agent_subagent_cards",
+    filterSubagentMessages: true,
+  });
+
+  return (
+    <div>
+      {stream.messages.map((msg) => (
+        <MessageWithSubagents
+          key={msg.id}
+          message={msg}
+          subagents={stream.getSubagentsByMessage(msg.id)}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+```vue Vue
+<script setup lang="ts">
+import { useStream } from "@langchain/vue";
+
+const AGENT_URL = "http://localhost:2024";
+
+const stream = useStream<typeof myAgent>({
+  apiUrl: AGENT_URL,
+  assistantId: "deep_agent_subagent_cards",
+  filterSubagentMessages: true,
+});
+</script>
+
+<template>
+  <div>
+    <MessageWithSubagents
+      v-for="msg in stream.messages.value"
+      :key="msg.id"
+      :message="msg"
+      :subagents="stream.getSubagentsByMessage(msg.id)"
+    />
+  </div>
+</template>
+```
+
+```svelte Svelte
+<script lang="ts">
+  import { useStream } from "@langchain/svelte";
+
+  const AGENT_URL = "http://localhost:2024";
+
+  const { messages, getSubagentsByMessage, submit } = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "deep_agent_subagent_cards",
+    filterSubagentMessages: true,
+  });
+</script>
+
+<div>
+  {#each $messages as msg (msg.id)}
+    <MessageWithSubagents
+      message={msg}
+      subagents={getSubagentsByMessage(msg.id)}
+    />
+  {/each}
+</div>
+```
+
+```ts Angular
+import { Component } from "@angular/core";
+import { useStream } from "@langchain/angular";
+
+const AGENT_URL = "http://localhost:2024";
+
+@Component({
+  selector: "app-deep-agent-chat",
+  template: `
+    @for (msg of stream.messages(); track msg.id) {
+      <app-message-with-subagents
+        [message]="msg"
+        [subagents]="stream.getSubagentsByMessage(msg.id)"
+      />
+    }
+  `,
+})
+export class DeepAgentChatComponent {
+  stream = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "deep_agent_subagent_cards",
+    filterSubagentMessages: true,
+  });
+}
+```
+</CodeGroup>
+
+## 提交消息并启用子图流式处理
+
+提交消息时，启用子图流式处理并设置适当的递归限制。深度代理工作流通常涉及多层嵌套子图，因此较高的递归限制可防止过早终止：
+
+```ts
+stream.submit(
+  { messages: [{ type: "human", content: text }] },
+  { streamSubgraphs: true }
+);
+```
+
+<Note>
+DeepAgents 默认的递归限制为 10,000，这对于大多数多专家设置已足够。如有需要，可通过 `config.recursion_limit` 覆盖此设置。
+</Note>
+
+## SubagentStreamInterface 接口
+
+每个子代理都暴露一个 `SubagentStreamInterface`，其中包含有关子代理任务、状态和时间的元数据：
+
+```ts
+interface SubagentStreamInterface {
+  id: string;
+  status: "pending" | "running" | "complete" | "error";
+  messages: BaseMessage[];
+  result: string | undefined;
+  toolCall: {
+    id: string;
+    name: string;
+    args: {
+      description: string;
+      subagent_type: string;
+      [key: string]: unknown;
+    };
+  };
+  startedAt: number | undefined;
+  completedAt: number | undefined;
+}
+```
+
+| 属性 | 描述 |
+| --- | --- |
+| `id` | 此子代理实例的唯一标识符 |
+| `status` | 生命周期状态：`pending` → `running` → `complete` 或 `error` |
+| `messages` | 子代理自身的消息流，实时更新 |
+| `result` | 最终输出文本，仅在 `status` 为 `"complete"` 时可用 |
+| `toolCall` | 生成此子代理的工具调用，包括任务元数据 |
+| `toolCall.args.description` | 协调器分配给此子代理的任务描述 |
+| `toolCall.args.subagent_type` | 专家的类型或名称（例如 `"researcher"`、`"analyst"`） |
+| `startedAt` | 子代理开始执行的时间戳 |
+| `completedAt` | 子代理完成的时间戳 |
+
+## 将子代理链接到消息
+
+`getSubagentsByMessage` 方法返回由特定 AI 消息生成的子代理。这使你可以将子代理卡片直接渲染在触发它们的协调器消息下方：
+
+```ts
+const turnSubagents = stream.getSubagentsByMessage(msg.id);
+```
+
+此方法返回一个 `SubagentStreamInterface` 对象数组。如果该消息未生成任何子代理，则返回空数组。
+
+## 构建 SubagentCard 组件
+
+每个子代理卡片显示专家的名称、任务描述、流式内容或最终结果以及时间信息：
+
+```tsx
+import { AIMessage } from "@langchain/core/messages";
+
+function SubagentCard({
+  subagent,
+}: {
+  subagent: SubagentStreamInterface;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  const title =
+    subagent.toolCall?.args?.subagent_type ?? `Agent ${subagent.id}`;
+  const description = subagent.toolCall?.args?.description ?? "";
+
+  const lastAIMessage = subagent.messages
+    .filter(AIMessage.isInstance)
+    .at(-1);
+
+  const displayContent =
+    subagent.status === "complete"
+      ? subagent.result
+      : typeof lastAIMessage?.content === "string"
+        ? lastAIMessage.content
+        : "";
+
+  const elapsed = getElapsedTime(subagent.startedAt, subagent.completedAt);
+
+  return (
+    <div className="rounded-lg border bg-white shadow-sm">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between p-4"
+      >
+        <div className="flex items-center gap-3">
+          <StatusIcon status={subagent.status} />
+          <div>
+            <h4 className="font-semibold capitalize">{title}</h4>
+            <p className="text-xs text-gray-500">{description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {elapsed && (
+            <span className="text-xs text-gray-400">{elapsed}</span>
+          )}
+          <StatusBadge status={subagent.status} />
+        </div>
+      </button>
+
+      {expanded && displayContent && (
+        <div className="border-t px-4 py-3">
+          <div className="prose prose-sm max-w-none line-clamp-6">
+            {displayContent}
+            {subagent.status === "running" && (
+              <span className="inline-block h-4 w-1 animate-pulse bg-blue-500" />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getElapsedTime(
+  startedAt: number | undefined,
+  completedAt: number | undefined
+): string | null {
+  if (!startedAt) return null;
+  const end = completedAt ?? Date.now();
+  const seconds = Math.round((end - startedAt) / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+```
+
+## 状态图标和徽章
+
+一致的视觉指示器帮助用户一目了然地解析子代理状态：
+
+```tsx
+function StatusIcon({ status }: { status: SubagentStreamInterface["status"] }) {
+  switch (status) {
+    case "pending":
+      return <span className="text-gray-400">○</span>;
+    case "running":
+      return <span className="animate-spin text-blue-500">◉</span>;
+    case "complete":
+      return <span className="text-green-500">✓</span>;
+    case "error":
+      return <span className="text-red-500">✕</span>;
+  }
+}
+
+function StatusBadge({ status }: { status: SubagentStreamInterface["status"] }) {
+  const styles = {
+    pending: "bg-gray-100 text-gray-600",
+    running: "bg-blue-100 text-blue-700",
+    complete: "bg-green-100 text-green-700",
+    error: "bg-red-100 text-red-700",
+  };
+
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
+      {status}
+    </span>
+  );
+}
+```
+
+## 进度跟踪
+
+显示进度条和计数器，让用户知道有多少子代理已完成：
+
+```tsx
+function SubagentProgress({
+  subagents,
+}: {
+  subagents: SubagentStreamInterface[];
+}) {
+  const completed = subagents.filter((s) => s.status === "complete").length;
+  const total = subagents.length;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span>子代理进度</span>
+        <span>
+          {completed}/{total} 完成
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+        <div
+          className="h-full rounded-full bg-blue-500 transition-all duration-300"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+## 渲染带有子代理卡片的消息
+
+关键布局模式是渲染每个协调器消息，如果该消息生成了子代理，则立即在其下方渲染它们的卡片：
+
+```tsx
+function MessageWithSubagents({
+  message,
+  subagents,
+}: {
+  message: BaseMessage;
+  subagents: SubagentStreamInterface[];
+}) {
+  if (message.type === "human") {
+    return <HumanMessage content={message.content} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {message.content && (
+        <div className="prose prose-sm max-w-none">
+          {message.content}
+        </div>
+      )}
+
+      {subagents.length > 0 && (
+        <div className="ml-4 space-y-3 border-l-2 border-blue-200 pl-4">
+          <SubagentProgress subagents={subagents} />
+          {subagents.map((subagent) => (
+            <SubagentCard key={subagent.id} subagent={subagent} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## 合成指示器
+
+所有子代理完成后，协调器需要时间将结果合成为最终响应。在此阶段显示清晰的指示器：
+
+```tsx
+function SynthesisIndicator({
+  subagents,
+  isLoading,
+}: {
+  subagents: SubagentStreamInterface[];
+  isLoading: boolean;
+}) {
+  const allComplete =
+    subagents.length > 0 &&
+    subagents.every((s) => s.status === "complete" || s.status === "error");
+
+  if (!allComplete || !isLoading) return null;
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-purple-50 px-4 py-2 text-sm text-purple-700">
+      <span className="animate-spin">⟳</span>
+      正在从 {subagents.length} 个子代理合成结果{subagents.length !== 1 ? "们" : ""}...
+    </div>
+  );
+}
+```
+
+<Tip>
+对于复杂的多专家工作流，合成阶段可能需要几秒钟。清晰的“正在合成结果...”指示器可以防止用户误以为代理已停滞。
+</Tip>
+
+## 调试未过滤的输出
+
+在开发过程中，你可以临时设置 `filterSubagentMessages: false`，以在主消息流中查看所有子代理的原始交错输出。这对于验证子代理令牌是否正确流动很有用，但不应在生产 UI 中使用。
+
+## 使用场景
+
+深度代理子代理卡片适用于以下代理工作流场景：
+
+- **深度研究**：协调器派遣研究员调查问题的不同方面，然后综合他们的发现
+- **多专家分析**：例如领域专家（法律、金融、技术）各自贡献其观点
+- **复杂任务分解**：规划器将大型任务分解为子任务，并将每个子任务分配给专业工作者
+- **代码审查流水线**：单独的代理处理安全审查、风格检查、性能分析和文档审查
+
+## 访问完整的子代理映射
+
+除了按消息查找外，你还可以通过 `stream.subagents` 一次性访问所有子代理：
+
+```ts
+const allSubagents = [...stream.subagents.values()];
+const running = allSubagents.filter((s) => s.status === "running");
+const completed = allSubagents.filter((s) => s.status === "complete");
+const errors = allSubagents.filter((s) => s.status === "error");
+```
+
+这对于构建全局进度指示器或仪表板非常有用，这些仪表板汇总所有子代理活动，而不考虑是哪个协调器消息生成的。
+
+## 最佳实践
+
+- **始终设置 `filterSubagentMessages: true`**。未过滤的流会产生协调器和子代理令牌难以阅读的交错。
+- **显示任务描述**。`toolCall.args.description` 字段告诉用户每个子代理被要求执行的确切任务。始终突出显示此信息。
+- **使用可折叠卡片**。在包含 5 个以上子代理的工作流中，自动折叠已完成的卡片，以便用户可以专注于正在进行的工作。
+- **显示时间数据**。显示每个子代理花费的时间有助于用户理解性能特征并识别瓶颈。
+- **设置适当的递归限制**。具有嵌套子图的深度代理工作流需要比默认值 25 更高的限制。建议从 100 开始。
+- **按子代理处理错误**。一个子代理失败不应导致整个 UI 崩溃。在该子代理的卡片中显示错误，同时其他子代理继续运行。

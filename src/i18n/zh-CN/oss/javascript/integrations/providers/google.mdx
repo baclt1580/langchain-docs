@@ -1,0 +1,119 @@
+---
+title: "Google 集成"
+description: "使用 LangChain JavaScript 与 Google 集成。"
+sidebarTitle: "概述"
+---
+
+LangChain 通过 `@langchain/google` 包提供了与 [Google AI Studio](https://aistudio.google.com/) 和 [Google Cloud Vertex AI](https://cloud.google.com/vertex-ai) 的集成。
+
+<Info>
+  寻找旧的 `@langchain/google-genai` 或 `@langchain/google-vertexai` 包？它们仍在[长期支持](#legacy-packages)下维护，但不再推荐用于新项目。
+</Info>
+
+## 聊天模型
+
+[`ChatGoogle`](/oss/integrations/chat/google) 类是访问 Gemini 模型（如 `gemini-2.5-pro`、`gemini-2.5-flash` 和 `gemini-3.1-pro-preview`）以及 Gemma 等开源模型的推荐方式。它通过单一接口同时支持 Google AI Studio 和 Vertex AI。
+
+<Tip>
+  关于安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+<CodeGroup>
+```bash npm
+npm install @langchain/google @langchain/core
+```
+```bash yarn
+yarn add @langchain/google @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/google @langchain/core
+```
+</CodeGroup>
+
+配置您的 API 密钥：
+
+```bash
+export GOOGLE_API_KEY=your-api-key
+```
+
+```typescript
+import { ChatGoogle } from "@langchain/google";
+
+const model = new ChatGoogle("gemini-2.5-flash");
+
+const res = await model.invoke([
+  ["human", "一家生产彩色袜子的公司，起什么名字好？"],
+]);
+```
+
+`ChatGoogle` 支持工具调用、结构化输出、多模态输入（图像、音频、视频）、推理/思考、图像生成、文本转语音，以及 Gemini 特定的原生工具，如 Google 搜索基础、代码执行等。
+
+<CardGroup cols={2}>
+  <Card
+    title="ChatGoogle"
+    icon="message-chatbot"
+    href="/oss/integrations/chat/google"
+  >
+    完整的聊天模型文档，包括设置、调用、流式传输、结构化输出等。
+  </Card>
+  <Card
+    title="Gemini 原生工具"
+    icon="tool"
+    href="/oss/integrations/tools/google"
+  >
+    Google 搜索、代码执行、URL 上下文、Google 地图、文件搜索、计算机使用和 MCP 服务器。
+  </Card>
+</CardGroup>
+
+### Vertex AI 上的第三方模型
+
+[Anthropic](/oss/integrations/chat/anthropic) 的 Claude 模型也可以通过 [Vertex AI](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude) 平台使用。有关启用模型访问权限和要使用的模型名称的更多信息，请参阅[在 Vertex AI 上使用 Claude](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude)。
+
+## 向量存储
+
+### Vertex AI 向量搜索
+
+> [Vertex AI 向量搜索](https://cloud.google.com/vertex-ai/docs/matching-engine/overview)（以前称为 Vertex AI Matching Engine）提供了业界领先的高规模、低延迟向量数据库。这些向量数据库通常被称为向量相似性匹配或近似最近邻（ANN）服务。
+
+```typescript
+import { MatchingEngine } from "@langchain/community/vectorstores/googlevertexai";
+```
+
+### Postgres 向量存储
+
+[`@langchain/google-cloud-sql-pg`](https://www.npmjs.com/package/@langchain/google-cloud-sql-pg) 包中的 [PostgresVectorStore](/oss/integrations/vectorstores/google_cloudsql_pg) 模块提供了一种使用 CloudSQL for PostgreSQL 来存储向量嵌入的方法。
+
+```bash
+npm install @langchain/google-cloud-sql-pg
+```
+
+## 社区工具
+
+与 Google 相关的社区工具可在 `@langchain/community` 包中找到：
+
+- [Google 日历](/oss/integrations/tools/google_calendar)
+- [Gmail](/oss/integrations/tools/google_gmail)
+- [Google 地点](/oss/integrations/tools/google_places)
+- [Google 路线](/oss/integrations/tools/google_routes)
+- [Google 学术](/oss/integrations/tools/google_scholar)
+- [Google 趋势](/oss/integrations/tools/google_trends)
+
+## 旧版包
+
+以下包为现有用户提供长期支持。新项目应使用 `@langchain/google`。
+
+### `@langchain/google-genai`
+
+`@langchain/google-genai` 包提供了 [`ChatGoogleGenerativeAI`](/oss/integrations/chat/google_generative_ai)，用于通过 Google AI Studio 访问 Gemini 模型。此包基于已弃用的 Google SDK 构建，不会获得新功能。
+
+### `@langchain/google-vertexai`
+
+`@langchain/google-vertexai` 包提供了 [`ChatVertexAI`](/oss/integrations/chat/google_vertex_ai)，用于通过 Vertex AI 访问 Gemini 模型。此包已被 `@langchain/google` 内置的 Vertex AI 支持所取代。
+
+### `@langchain/google-common`
+
+`@langchain/google-common` 包包含 Google 集成包内部使用的共享抽象。它不打算直接使用。
+
+<Tip>
+  要从 `@langchain/google-genai` 或 `@langchain/google-vertexai` 迁移到 `@langchain/google`，请参阅 [ChatGoogle](/oss/integrations/chat/google) 页面获取设置说明。`ChatGoogle` 类提供了等效的功能，并统一了对 Google AI Studio 和 Vertex AI 的访问。
+</Tip>

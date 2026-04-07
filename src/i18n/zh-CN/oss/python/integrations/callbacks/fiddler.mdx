@@ -1,0 +1,114 @@
+---
+title: "Fiddler 集成"
+description: "使用 LangChain Python 与 Fiddler 回调进行集成。"
+---
+
+>[Fiddler](https://www.fiddler.ai/) 是企业级生成式和预测式系统运维的先驱，提供了一个统一的平台，使数据科学、MLOps、风险、合规、分析及其他业务线团队能够以企业规模监控、解释、分析和改进机器学习部署。
+
+## 1. 安装与设置
+
+```python
+#!pip install langchain langchain-community langchain-openai fiddler-client
+```
+
+## 2. Fiddler 连接信息
+
+*在您向 Fiddler 添加模型信息之前，需要准备以下内容：*
+
+1. 您用于连接 Fiddler 的 URL
+2. 您的组织 ID
+3. 您的授权令牌
+
+这些信息可以在您的 Fiddler 环境的 *设置* 页面中找到。
+
+```python
+URL = ""  # 您的 Fiddler 实例 URL，请确保包含完整 URL（包括 https://）。例如：https://demo.fiddler.ai
+ORG_NAME = ""
+AUTH_TOKEN = ""  # 您的 Fiddler 实例授权令牌
+
+# Fiddler 项目和模型名称，用于模型注册
+PROJECT_NAME = ""
+MODEL_NAME = ""  # Fiddler 中的模型名称
+```
+
+## 3. 创建 fiddler 回调处理程序实例
+
+```python
+from langchain_community.callbacks.fiddler_callback import FiddlerCallbackHandler
+
+fiddler_handler = FiddlerCallbackHandler(
+    url=URL,
+    org=ORG_NAME,
+    project=PROJECT_NAME,
+    model=MODEL_NAME,
+    api_key=AUTH_TOKEN,
+)
+```
+
+## 示例 1：基础链
+
+```python
+from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import OpenAI
+
+# 注意：请确保在环境变量 OPENAI_API_KEY 中设置了 OpenAI API 密钥
+llm = OpenAI(temperature=0, streaming=True, callbacks=[fiddler_handler])
+output_parser = StrOutputParser()
+
+chain = llm | output_parser
+
+# 调用链。调用将被记录到 Fiddler，并自动生成指标
+chain.invoke("月球离地球有多远？")
+```
+
+```python
+# 更多调用示例
+chain.invoke("火星上的温度是多少？")
+chain.invoke("2 + 200000 等于多少？")
+chain.invoke("今年哪部电影获得了奥斯卡奖？")
+chain.invoke("你能为我写一首关于失眠的诗吗？")
+chain.invoke("你今天过得怎么样？")
+chain.invoke("生命的意义是什么？")
+```
+
+## 示例 2：包含提示模板的链
+
+```python
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    FewShotChatMessagePromptTemplate,
+)
+
+examples = [
+    {"input": "2+2", "output": "4"},
+    {"input": "2+3", "output": "5"},
+]
+
+example_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("human", "{input}"),
+        ("ai", "{output}"),
+    ]
+)
+
+few_shot_prompt = FewShotChatMessagePromptTemplate(
+    example_prompt=example_prompt,
+    examples=examples,
+)
+
+final_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "你是一位神奇的数学巫师。"),
+        few_shot_prompt,
+        ("human", "{input}"),
+    ]
+)
+
+# 注意：请确保在环境变量 OPENAI_API_KEY 中设置了 OpenAI API 密钥
+llm = OpenAI(temperature=0, streaming=True, callbacks=[fiddler_handler])
+
+chain = final_prompt | llm
+
+# 调用链。调用将被记录到 Fiddler，并自动生成指标
+chain.invoke({"input": "三角形的平方是什么？"})
+```

@@ -1,0 +1,101 @@
+---
+title: "网页抓取，集成 Playwright"
+description: "使用 LangChain JavaScript 集成网页抓取，通过 Playwright 文档加载器。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+本示例演示了如何使用 Playwright 从网页加载数据。每个网页将生成一个文档。
+
+Playwright 是一个 Node.js 库，提供了控制多种浏览器引擎（包括 Chromium、Firefox 和 WebKit）的高级 API。您可以使用 Playwright 自动化网页交互，包括从需要 JavaScript 渲染的动态网页中提取数据。
+
+如果您需要一个更轻量级的解决方案，并且要加载的网页不需要 JavaScript 渲染，可以使用 [`CheerioWebBaseLoader`](/oss/integrations/document_loaders/web_loaders/web_cheerio) 替代。
+
+## 安装
+
+```bash npm
+npm install @langchain/community @langchain/core playwright
+```
+
+## 使用方法
+
+```typescript
+import { PlaywrightWebBaseLoader } from "@langchain/community/document_loaders/web/playwright";
+
+/**
+ * 加载器默认使用 `page.content()`
+ * 作为评估函数
+ **/
+const loader = new PlaywrightWebBaseLoader("https://www.tabnews.com.br/");
+
+const docs = await loader.load();
+```
+
+## 配置选项
+
+以下是 PlaywrightWebBaseLoaderOptions 接口中可传递给 PlaywrightWebBaseLoader 构造函数的参数说明：
+
+```typescript
+type PlaywrightWebBaseLoaderOptions = {
+  launchOptions?: LaunchOptions;
+  gotoOptions?: PlaywrightGotoOptions;
+  evaluate?: PlaywrightEvaluate;
+};
+```
+
+1. `launchOptions`：可选对象，用于指定传递给 `playwright.chromium.launch()` 方法的额外选项。可以包括例如 `headless` 标志以在无头模式下启动浏览器等选项。
+
+2. `gotoOptions`：可选对象，用于指定传递给 `page.goto()` 方法的额外选项。可以包括例如 `timeout` 选项以指定最大导航时间（毫秒），或 `waitUntil` 选项以指定何时认为导航成功。
+
+3. `evaluate`：可选函数，可用于通过自定义评估函数在页面上执行 JavaScript 代码。这对于从页面提取数据、与页面元素交互或处理特定的 HTTP 响应非常有用。该函数应返回一个解析为包含评估结果的字符串的 Promise。
+
+通过将这些选项传递给 `PlaywrightWebBaseLoader` 构造函数，您可以自定义加载器的行为，并利用 Playwright 的强大功能来抓取和与网页交互。
+
+以下是一个基本示例：
+
+```typescript
+import {
+  PlaywrightWebBaseLoader,
+  Page,
+  Browser,
+} from "@langchain/community/document_loaders/web/playwright";
+
+const url = "https://www.tabnews.com.br/";
+const loader = new PlaywrightWebBaseLoader(url);
+const docs = await loader.load();
+
+// 原始 HTML 页面内容
+const extractedContents = docs[0].pageContent;
+```
+
+以及一个更高级的示例：
+
+```typescript
+import {
+  PlaywrightWebBaseLoader,
+  Page,
+  Browser,
+} from "@langchain/community/document_loaders/web/playwright";
+
+const loader = new PlaywrightWebBaseLoader("https://www.tabnews.com.br/", {
+  launchOptions: {
+    headless: true,
+  },
+  gotoOptions: {
+    waitUntil: "domcontentloaded",
+  },
+  /** 传递自定义评估函数，在此示例中您可以获取页面和浏览器实例 */
+  async evaluate(page: Page, browser: Browser, response: Response | null) {
+    await page.waitForResponse("https://www.tabnews.com.br/va/view");
+
+    const result = await page.evaluate(() => document.body.innerHTML);
+    return result;
+  },
+});
+
+const docs = await loader.load();
+```

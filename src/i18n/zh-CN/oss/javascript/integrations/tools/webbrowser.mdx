@@ -1,0 +1,140 @@
+---
+title: "Web浏览器集成"
+description: "使用LangChain JavaScript与Web浏览器工具集成。"
+---
+
+Web浏览器工具赋予您的智能体访问网站并提取信息的能力。它被描述给智能体的说明如下：
+
+```
+当您需要在网页上查找内容或进行摘要时非常有用。输入应为一个逗号分隔的列表，格式为："包含协议的有效URL","您想在页面上查找的内容或留空以进行摘要"。
+```
+
+它提供两种操作模式：
+
+- 当智能体仅传入URL调用时，它会生成网站内容的摘要
+- 当智能体传入URL和查找内容描述调用时，它将使用内存中的向量存储查找最相关的片段并汇总这些片段
+
+## 安装设置
+
+要使用Web浏览器工具，您需要安装以下依赖项：
+
+```bash npm
+npm install cheerio axios
+```
+
+## 独立使用
+
+```typescript
+import { WebBrowser } from "@langchain/classic/tools/webbrowser";
+import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+
+export async function run() {
+  const model = new ChatOpenAI({ model: "gpt-4.1-mini", temperature: 0 });
+  const embeddings = new OpenAIEmbeddings();
+
+  const browser = new WebBrowser({ model, embeddings });
+
+  const result = await browser.invoke(
+    `"https://www.themarginalian.org/2015/04/09/find-your-bliss-joseph-campbell-power-of-myth","who is joseph campbell"`
+  );
+
+  console.log(result);
+  /*
+  约瑟夫·坎贝尔是一位神话学家和作家，他讨论了灵性、心理原型、文化神话和自我神话。他在乔治·卢卡斯的天空行者牧场与比尔·莫耶斯进行了长时间对话，次年对话在纽约美国自然历史博物馆继续。最终的24小时原始素材被剪辑成六个一小时的剧集，于1988年在坎贝尔去世后不久在PBS播出，成为公共电视史上最受欢迎的节目之一。
+
+  相关链接：
+  - [The Holstee Manifesto](http://holstee.com/manifesto-bp)
+  - [The Silent Music of the Mind: Remembering Oliver Sacks](https://www.themarginalian.org/2015/08/31/remembering-oliver-sacks)
+  - [Joseph Campbell series](http://billmoyers.com/spotlight/download-joseph-campbell-and-the-power-of-myth-audio/)
+  - [Bill Moyers](https://www.themarginalian.org/tag/bill-moyers/)
+  - [books](https://www.themarginalian.org/tag/books/)
+  */
+}
+```
+
+## 在智能体中使用
+
+```typescript
+import { OpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import { initializeAgentExecutorWithOptions } from "@langchain/classic/agents";
+import { Calculator } from "@langchain/community/tools/calculator";
+import { WebBrowser } from "@langchain/classic/tools/webbrowser";
+import { SerpAPI } from "@langchain/community/tools/serpapi";
+
+export const run = async () => {
+  const model = new OpenAI({ temperature: 0 });
+  const embeddings = new OpenAIEmbeddings();
+  const tools = [
+    new SerpAPI(process.env.SERPAPI_API_KEY, {
+      location: "Austin,Texas,United States",
+      hl: "en",
+      gl: "us",
+    }),
+    new Calculator(),
+    new WebBrowser({ model, embeddings }),
+  ];
+
+  const executor = await initializeAgentExecutorWithOptions(tools, model, {
+    agentType: "zero-shot-react-description",
+    verbose: true,
+  });
+  console.log("已加载智能体。");
+
+  const input = `What is the word of the day on merriam webster. What is the top result on google for that word`;
+
+  console.log(`正在执行输入："${input}"...`);
+
+  const result = await executor.invoke({ input });
+  /*
+  进入新的agent_executor链...
+  我需要找到Merriam Webster的每日一词，然后在Google上搜索它
+  行动：web-browser
+  行动输入："https://www.merriam-webster.com/word-of-the-day", ""
+
+
+  摘要：Merriam-Webster是一个为用户提供各种资源的网站，包括词典、同义词词典、单词查找器、每日一词、游戏和测验等。该网站还允许用户登录并保存单词、查看最近记录以及访问账户设置。2023年4月14日的每日一词是"lackadaisical"，意思是缺乏活力、精神或热情。该网站还提供测验和游戏来帮助用户积累词汇。
+
+  相关链接：
+  - [Test Your Vocabulary](https://www.merriam-webster.com/games)
+  - [Thesaurus](https://www.merriam-webster.com/thesaurus)
+  - [Word Finder](https://www.merriam-webster.com/wordfinder)
+  - [Word of the Day](https://www.merriam-webster.com/word-of-the-day)
+  - [Shop](https://shop.merriam-webster.com/?utm_source=mwsite&utm_medium=nav&utm_content=
+  现在我需要搜索Google上的每日一词
+  行动：search
+  行动输入："lackadaisical"
+  lackadaisical暗示一种以半心半意的努力为标志的漫不经心的漠不关心。假装学习的lackadaisical大学毕业生。listless暗示缺乏...
+  链完成。
+  */
+
+  console.log(`获得输出 ${JSON.stringify(result, null, 2)}`);
+  /*
+  获得输出 {
+    "output": "Merriam Webster的每日一词是\"lackadaisical\"，它暗示一种以半心半意的努力为标志的漫不经心的漠不关心。",
+    "intermediateSteps": [
+      {
+        "action": {
+          "tool": "web-browser",
+          "toolInput": "https://www.merriam-webster.com/word-of-the-day\", ",
+          "log": " 我需要找到Merriam Webster的每日一词，然后在Google上搜索它\n行动：web-browser\n行动输入：\"https://www.merriam-webster.com/word-of-the-day\", \"\""
+        },
+        "observation": "\n\n摘要：Merriam-Webster是一个为用户提供各种资源的网站，包括词典、同义词词典、单词查找器、每日一词、游戏和测验等。该网站还允许用户登录并保存单词、查看最近记录以及访问账户设置。2023年4月14日的每日一词是\"lackadaisical\"，意思是缺乏活力、精神或热情。该网站还提供测验和游戏来帮助用户积累词汇。\n\n相关链接： \n- [Test Your Vocabulary](https://www.merriam-webster.com/games)\n- [Thesaurus](https://www.merriam-webster.com/thesaurus)\n- [Word Finder](https://www.merriam-webster.com/wordfinder)\n- [Word of the Day](https://www.merriam-webster.com/word-of-the-day)\n- [Shop](https://shop.merriam-webster.com/?utm_source=mwsite&utm_medium=nav&utm_content="
+      },
+      {
+        "action": {
+          "tool": "search",
+          "toolInput": "lackadaisical",
+          "log": " 现在我需要搜索Google上的每日一词\n行动：search\n行动输入：\"lackadaisical\""
+        },
+        "observation": "lackadaisical暗示一种以半心半意的努力为标志的漫不经心的漠不关心。假装学习的lackadaisical大学毕业生。listless暗示缺乏 ..."
+      }
+    ]
+  }
+  */
+};
+```
+
+## 相关资源
+
+- 工具[概念指南](/oss/langchain/tools)
+- 工具[使用指南](/oss/langchain/tools)

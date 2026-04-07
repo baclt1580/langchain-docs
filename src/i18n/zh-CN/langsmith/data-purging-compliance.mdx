@@ -1,0 +1,169 @@
+---
+title: 合规性数据清除
+sidebarTitle: 合规性数据清除
+---
+
+本指南介绍了数据到达 LangSmith Cloud 服务器后，为帮助您实现隐私目标而提供的各项功能。
+
+## 数据保留
+
+LangSmith 提供自动数据保留功能，以协助合规性和存储管理。数据保留策略可在组织和项目级别进行配置。
+
+有关数据保留配置和管理的详细信息，请参阅[数据保留概念](/langsmith/administration-overview#data-retention)文档。
+
+## 自定义延长保留策略
+
+<Note>
+此功能适用于[企业版](/langsmith/pricing-plans)计划客户。对于[自托管](/langsmith/self-hosted)企业版客户，请参阅[工作区级别配置部分](#workspace-level-extended-retention-for-self-hosted)。
+</Note>
+
+[企业版](/langsmith/pricing-plans)客户可以在[工作区](/langsmith/administration-overview#workspaces)级别自定义跟踪数据的延长保留期限，以满足特定的合规性要求。默认情况下，延长保留期设置为 400 天，但您可以根据组织的需求进行调整。保留期限的更改仅适用于新的跟踪数据。
+
+### 配置延长保留
+
+在 [LangSmith UI](https://smith.langchain.com) 中：
+
+1. 导航至页面底部的 **Settings**。
+1. 从左侧菜单中选择 **Usage configuration**。
+1. 在列表中找到您要配置的工作区。
+1. 点击该工作区 **Data retention policy** 列下的值。
+1. 在 **workspace usage configurations** 模态框中，使用 **Extended - All traces are retained for** 选项的下拉菜单自定义延长策略。
+1. 选择 **Save**。
+
+### 自托管环境的工作区级别延长保留
+
+自托管[企业版](/langsmith/pricing-plans)客户也可以使用工作区级别的延长保留配置，而不是系统范围的 TTL 设置。这提供了对不同工作区数据保留的更精细控制，而无需更改环境变量。
+
+<Warning>
+如果您使用 blob 存储，**必须**为配置的每个自定义保留期限添加生命周期规则。例如，将工作区设置为 90 天保留期意味着 blob 数据会写入 `ttl_90d/` 前缀，这需要匹配的生命周期规则才能自动清理。有关详细信息和示例，请参阅 [blob 存储 TTL 配置](/langsmith/self-host-blob-storage#custom-workspace-level-retention-prefixes)。
+</Warning>
+
+要为自托管部署配置此功能，请参阅[自托管 TTL 文档](/langsmith/self-host-ttl)了解传统的系统范围方法，或联系[支持团队](https://support.langchain.com)。
+
+## 跟踪数据删除
+
+您可以使用 API 完成跟踪数据的删除。API 支持两种删除跟踪数据的方法：
+
+1. **按跟踪 ID 和会话 ID**：通过提供跟踪 ID 列表及其对应的会话 ID 来删除特定的跟踪数据（每个请求最多 1000 条跟踪数据）
+2. **按元数据**：删除工作区内匹配任何指定元数据键值对的跟踪数据
+
+更多详细信息，请参阅 [API 规范](https://api.smith.langchain.com/redoc#tag/run/operation/delete_runs_api_v1_runs_delete_post)。
+
+<Warning>
+所有跟踪数据删除操作都将删除所有数据存储中的相关实体，如反馈、聚合和统计信息。
+</Warning>
+
+### 删除时间线
+
+跟踪数据删除在非高峰使用时段处理，并非即时完成。LangChain 在周末运行删除作业。删除操作没有确认信息——您需要重新查询数据以验证其是否已被移除。
+
+### 删除特定跟踪数据
+
+要通过跟踪 ID 从单个会话中删除特定的跟踪数据：
+
+<Note>
+`session_id` 是您要删除的跟踪数据所属项目的 ID。您可以在 LangSmith UI 的跟踪项目页面上找到它。
+</Note>
+
+```bash
+curl -X POST "https://api.smith.langchain.com/api/v1/runs/delete" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "trace_ids": ["trace-id-1", "trace-id-2", "trace-id-3"],
+    "session_id": "session-id-1"
+  }'
+```
+
+### 按元数据删除
+
+按元数据删除时：
+
+- 接受一个键/值对的 `metadata` 对象。键值对匹配使用 **或** 条件。如果跟踪数据具有元数据中指定的**任何**键值对（非全部），则匹配
+- 按元数据删除时无需指定会话 ID。删除操作将应用于整个工作区。
+
+要基于元数据在工作区内删除跟踪数据（匹配**任何**元数据键值对）：
+
+```bash
+curl -X POST "https://api.smith.langchain.com/api/v1/runs/delete" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "user_id": "user123",
+      "environment": "staging"
+    }
+  }'
+```
+
+这将删除元数据中包含 `user_id: "user123"` **或** `environment: "staging"` 的跟踪数据。
+
+<Warning>
+请记住，每个请求每个会话最多只能安排删除 1000 条跟踪数据。对于更大的删除操作，您需要进行多次请求。
+</Warning>
+
+## 数据集示例删除
+
+您可以通过我们的 API 自助删除数据集示例，该 API 根据您的数据保留需求支持软删除和硬删除两种方法。
+
+<Warning>
+硬删除将永久移除指定示例在所有数据集版本中的输入、输出和元数据。
+</Warning>
+
+### 删除示例是一个两步过程
+
+对于批量操作，示例删除遵循两步流程：
+
+#### 1. 按元数据搜索示例
+
+查找工作区内所有数据集中具有匹配元数据的示例。
+
+[GET /examples](https://api.smith.langchain.com/redoc#tag/examples/operation/read_examples_api_v1_examples_get)
+
+- `as_of` 必须明确指定为时间戳。仅返回在 `as_of` 日期之前创建的示例
+
+```bash
+curl -X GET "https://api.smith.langchain.com/api/v1/examples?as_of=2024-01-01T00:00:00Z" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "user_id": "user123",
+      "environment": "staging"
+    }
+  }'
+```
+
+这将返回您工作区内所有数据集中元数据包含 `user_id: "user123"` **或** `environment: "staging"` 的示例。
+
+#### 2. 硬删除示例
+
+获取示例 ID 后，发送删除请求。这将清空该示例在所有数据集版本中的输入、输出和元数据。
+
+[POST /v1/platform/datasets/examples/delete/](https://api.smith.langchain.com/redoc?#tag/examples/paths/~1v1~1platform~1datasets~1examples~1delete/post)
+
+- 在请求体中指定 `example_ids`（示例 ID 列表）和 `hard_delete`（布尔值）
+
+```bash
+curl -X POST "https://api.smith.langchain.com/v1/platform/datasets/examples/delete/" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "example_ids": ["example-id-1", "example-id-2", "example-id-3"],
+    "hard_delete": true
+  }'
+```
+
+### 删除类型
+
+#### 软删除（默认）
+
+- 在数据集中创建输入/输出为 NULL 的墓碑条目
+- 保留历史数据并维护数据集版本控制
+- 仅影响数据集的当前版本
+
+#### 硬删除
+
+- 永久移除所有数据集版本中的输入、输出和元数据
+- 当合规性要求在所有版本中完全清空数据时进行彻底的数据移除
+- 在请求体中设置 `"hard_delete": true`

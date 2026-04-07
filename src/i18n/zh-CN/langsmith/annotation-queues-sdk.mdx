@@ -1,0 +1,442 @@
+---
+title: 以编程方式管理反馈与标注队列
+sidebarTitle: 管理反馈与标注队列
+icon: "code"
+tag: "SDK"
+---
+
+使用 LangSmith SDK 以编程方式管理反馈配置和[标注队列](/langsmith/evaluation-concepts#human)的评分标准。在组织级别定义可复用的反馈模式（如准确度分数或通过/失败判断），然后将其分配到具有自定义指令的特定队列中。这支持版本控制、跨项目自动化以及一致性——特别适用于 CI/CD 流水线或在不同环境间复制评估设置。
+
+<Callout icon="code">
+本指南使用 Python 和 TypeScript SDK。关于安装和设置，请参考 [Python SDK 文档](https://reference.langchain.com/python/langsmith) 和 [TypeScript SDK 文档](https://reference.langchain.com/javascript/modules/langsmith.html)。
+</Callout>
+
+## 反馈层级
+
+LangSmith 为结构化人工反馈采用三层架构：
+
+1.  **反馈配置**：组织范围内反馈键的定义，用于建立评估指标的架构。例如，您可以将“准确度”定义为 0-1 的连续分数，或将“正确性”定义为通过/失败的分类选择。这些配置可在您组织内的所有标注队列中复用。
+2.  **标注队列评分项**：队列特定的分配，决定标注员在特定队列中审阅[运行记录](/langsmith/observability-concepts#runs)时必须填写的反馈配置。每个评分项可以包含自定义描述、特定分数值的指导，以及反馈是必需还是可选的。
+3.  **反馈**：标注员在特定[运行记录](/langsmith/observability-concepts#runs)上提交的单个分数和值。这是使用您定义的架构收集的实际评估数据。了解更多关于 [LangSmith 中的反馈](/langsmith/observability-concepts#feedback)。
+
+## 反馈配置
+
+### 创建反馈配置
+
+反馈配置定义反馈键的架构——无论是连续分数、分类选择还是自由格式文本。一个唯一的键在您的组织内标识每个配置，并指定标注员如何为该指标提交反馈。
+
+<Note>
+使用已存在的相同配置调用 @[`create_feedback_config`] 会返回现有配置。如果同一键已存在不同的配置，系统将引发 400 错误。
+</Note>
+
+<CodeGroup>
+```python Python
+from langsmith import Client
+
+client = Client()
+
+# 连续分数
+client.create_feedback_config(
+    "accuracy",
+    feedback_config={
+        "type": "continuous",
+        "min": 0,
+        "max": 1,
+    },
+    is_lower_score_better=False,
+)
+
+# 分类
+client.create_feedback_config(
+    "correctness",
+    feedback_config={
+        "type": "categorical",
+        "categories": [
+            {"value": 1, "label": "Pass"},
+            {"value": 0, "label": "Fail"},
+        ],
+    },
+)
+
+# 自由格式文本
+client.create_feedback_config(
+    "notes",
+    feedback_config={"type": "freeform"},
+)
+```
+```typescript TypeScript
+import { Client } from "langsmith";
+
+const client = new Client();
+
+// 连续分数
+await client.createFeedbackConfig({
+  feedbackKey: "accuracy",
+  feedbackConfig: { type: "continuous", min: 0, max: 1 },
+  isLowerScoreBetter: false,
+});
+
+// 分类
+await client.createFeedbackConfig({
+  feedbackKey: "correctness",
+  feedbackConfig: {
+    type: "categorical",
+    categories: [
+      { value: 1, label: "Pass" },
+      { value: 0, label: "Fail" },
+    ],
+  },
+});
+
+// 自由格式文本
+await client.createFeedbackConfig({
+  feedbackKey: "notes",
+  feedbackConfig: { type: "freeform" },
+});
+```
+</CodeGroup>
+
+-   **连续** (`"accuracy"`)：定义从 0 到 1 的数字刻度。`is_lower_score_better` 参数指示较低的值是否代表更好的性能。将连续配置用于评分量表或基于百分比的指标。
+-   **分类** (`"correctness"`)：提供具有关联值的预定义选项。每个类别需要一个 `value`（用于评分和分析）和一个 `label`（显示给标注员）。将分类配置用于二元选择或多类别分类。
+-   **自由格式** (`"notes"`)：允许无预定义结构的开放式文本输入。将自由格式配置用于定性观察或解释。
+
+### 列出反馈配置
+
+使用 @[`list_feedback_configs`] 检索反馈配置，以查看您组织中可用的评估标准。您可以列出所有配置或按特定键过滤。每个返回的配置对象包括键、类型、配置详细信息（如 `min`/`max` 或 `categories`）以及元数据如 `is_lower_score_better`：
+
+<CodeGroup>
+```python Python
+# 列出所有配置
+for config in client.list_feedback_configs():
+    print(f"{config.feedback_key}: {config.feedback_config}")
+
+# 按特定键过滤
+for config in client.list_feedback_configs(
+    feedback_key=["accuracy", "correctness"]
+):
+    print(config.feedback_key)
+```
+```typescript TypeScript
+// 列出所有配置
+for await (const config of client.listFeedbackConfigs()) {
+  console.log(`${config.feedback_key}: ${JSON.stringify(config.feedback_config)}`);
+}
+
+// 按特定键过滤
+for await (const config of client.listFeedbackConfigs({
+  feedbackKeys: ["accuracy", "correctness"],
+})) {
+  console.log(config.feedback_key);
+}
+```
+</CodeGroup>
+
+### 更新反馈配置
+
+使用 @[`update_feedback_config`] 通过更新特定字段来修改现有反馈配置。该方法仅更改您提供的字段——其余部分保持不变。这是一个保留其他配置设置的局部更新：
+
+<CodeGroup>
+```python Python
+client.update_feedback_config(
+    "accuracy",
+    is_lower_score_better=True,
+)
+```
+```typescript TypeScript
+await client.updateFeedbackConfig("accuracy", {
+  isLowerScoreBetter: true,
+});
+```
+</CodeGroup>
+
+### 删除反馈配置
+
+使用 @[`delete_feedback_config`] 从您的组织中移除反馈配置。这执行软删除，将配置标记为已删除，但不会从系统中永久移除。如果需要，您可以稍后重新创建具有相同键的配置：
+
+<CodeGroup>
+```python Python
+client.delete_feedback_config("accuracy")
+```
+```typescript TypeScript
+await client.deleteFeedbackConfig("accuracy");
+```
+</CodeGroup>
+
+## 标注队列评分项
+
+评分项将反馈配置分配到特定的标注队列。它们控制标注员在该队列中审阅[运行记录](/langsmith/observability-concepts#runs)时看到的反馈表单，以及每个表单是必需还是可选的。
+
+### 创建带有评分项的队列
+
+使用 @[`create_annotation_queue`] 创建标注队列，并通过评分项将反馈配置分配给它。每个评分项通过其键引用一个反馈配置，并自定义它在该特定队列中向标注员显示的方式。
+
+该示例创建了一个包含三个评分项的队列。队列级别的 `rubric_instructions` 提供显示在标注界面顶部的通用指导：
+
+<CodeGroup>
+```python Python
+queue = client.create_annotation_queue(
+    name="QA 审阅队列",
+    description="审阅 LLM 输出的准确性和正确性",
+    rubric_instructions="为每个回答评分。对任何异常情况添加备注。",
+    rubric_items=[
+        {
+            "feedback_key": "accuracy",
+            "description": "回答的准确度如何？",
+            "score_descriptions": {
+                "0": "完全错误",
+                "1": "完全准确",
+            },
+            "is_required": True,
+        },
+        {
+            "feedback_key": "correctness",
+            "description": "回答是通过还是失败？",
+            "value_descriptions": {
+                "Pass": "事实正确",
+                "Fail": "包含错误",
+            },
+            "is_required": True,
+        },
+        {
+            "feedback_key": "notes",
+            "description": "任何额外的观察",
+            "is_required": False,
+        },
+    ],
+)
+```
+```typescript TypeScript
+const queue = await client.createAnnotationQueue({
+  name: "QA 审阅队列",
+  description: "审阅 LLM 输出的准确性和正确性",
+  rubricInstructions: "为每个回答评分。对任何异常情况添加备注。",
+  rubricItems: [
+    {
+      feedback_key: "accuracy",
+      description: "回答的准确度如何？",
+      score_descriptions: { "0": "完全错误", "1": "完全准确" },
+      is_required: true,
+    },
+    {
+      feedback_key: "correctness",
+      description: "回答是通过还是失败？",
+      value_descriptions: { Pass: "事实正确", Fail: "包含错误" },
+      is_required: true,
+    },
+    {
+      feedback_key: "notes",
+      description: "任何额外的观察",
+      is_required: false,
+    },
+  ],
+});
+```
+</CodeGroup>
+
+-   `feedback_key`：现有反馈配置的键（请先创建此配置）。
+-   `description`：针对此指标给标注员的队列特定指导。
+-   `score_descriptions` / `value_descriptions`：可选标签，解释特定值的含义（对连续配置使用 `score_descriptions`，对分类配置使用 `value_descriptions`）。
+-   `is_required`：标注员在提交前是否必须完成此反馈。
+
+### 更新现有队列的评分项
+
+使用 @[`update_annotation_queue`] 修改分配给标注队列的评分项。此操作会替换整个评分项列表，因此您必须包含所有想要保留的项——该操作会移除您未包含的任何项。
+
+您需要队列 ID，您可以在创建队列时获得，或通过列出队列获得：
+
+<Note>
+更新评分项会替换整个列表。请包含所有您想要保留的项。
+</Note>
+
+<CodeGroup>
+```python Python
+client.update_annotation_queue(
+    queue.id,
+    rubric_items=[
+        {"feedback_key": "accuracy", "is_required": True},
+        {"feedback_key": "correctness", "is_required": True},
+        {
+            "feedback_key": "tone",
+            "description": "语气是否合适？",
+            "is_required": False,
+        },
+    ],
+)
+```
+```typescript TypeScript
+await client.updateAnnotationQueue(queue.id, {
+  rubricItems: [
+    { feedback_key: "accuracy", is_required: true },
+    { feedback_key: "correctness", is_required: true },
+    { feedback_key: "tone", description: "语气是否合适？", is_required: false },
+  ],
+});
+```
+</CodeGroup>
+
+## 反馈配置类型（详细）
+
+### 连续
+
+连续配置定义具有最小值和最大值的数字评分刻度。标注员可以选择范围内的任何值，这使其非常适合用于在数字刻度上对准确性、质量或相关性等维度进行评分：
+
+<CodeGroup>
+```python Python
+# 简单的连续分数
+client.create_feedback_config(
+    "accuracy",
+    feedback_config={
+        "type": "continuous",
+        "min": 0,
+        "max": 1,
+    },
+)
+
+# 在刻度上带有标记点的连续配置
+client.create_feedback_config(
+    "quality",
+    feedback_config={
+        "type": "continuous",
+        "min": 1,
+        "max": 5,
+        "categories": [
+            {"value": 1, "label": "差"},
+            {"value": 3, "label": "一般"},
+            {"value": 5, "label": "优秀"},
+        ],
+    },
+)
+```
+```typescript TypeScript
+await client.createFeedbackConfig({
+  feedbackKey: "accuracy",
+  feedbackConfig: { type: "continuous", min: 0, max: 1 },
+});
+
+await client.createFeedbackConfig({
+  feedbackKey: "quality",
+  feedbackConfig: {
+    type: "continuous",
+    min: 1,
+    max: 5,
+    categories: [
+      { value: 1, label: "差" },
+      { value: 3, label: "一般" },
+      { value: 5, label: "优秀" },
+    ],
+  },
+});
+```
+</CodeGroup>
+
+第一个示例显示了一个没有标签的 0-1 刻度。第二个示例演示了在刻度上添加带有标记锚点（如“差”、“一般”、“优秀”）的 `categories`，以帮助标注员理解不同值代表什么。这些标签是可选的，但可以提高标注员解释刻度的一致性。
+
+### 分类
+
+分类配置提供一组离散的预定义选项供标注员选择。每个类别必须有一个 `value`（用于评分和分析的数字标识符）和一个 `label`（显示给标注员的文本）。您必须至少定义 2 个类别。
+
+将分类配置用于二元决策（通过/失败、正确/错误）、多类别分类（情感、主题类别）或任何具有固定离散选项集的评估。请勿为分类配置设置 `min` 或 `max`：
+
+<CodeGroup>
+```python Python
+# 二元通过/失败
+client.create_feedback_config(
+    "correctness",
+    feedback_config={
+        "type": "categorical",
+        "categories": [
+            {"value": 1, "label": "Pass"},
+            {"value": 0, "label": "Fail"},
+        ],
+    },
+)
+
+# 多类别
+client.create_feedback_config(
+    "sentiment",
+    feedback_config={
+        "type": "categorical",
+        "categories": [
+            {"value": 0, "label": "Negative"},
+            {"value": 1, "label": "Neutral"},
+            {"value": 2, "label": "Positive"},
+        ],
+    },
+)
+```
+```typescript TypeScript
+await client.createFeedbackConfig({
+  feedbackKey: "correctness",
+  feedbackConfig: {
+    type: "categorical",
+    categories: [
+      { value: 1, label: "Pass" },
+      { value: 0, label: "Fail" },
+    ],
+  },
+});
+
+await client.createFeedbackConfig({
+  feedbackKey: "sentiment",
+  feedbackConfig: {
+    type: "categorical",
+    categories: [
+      { value: 0, label: "Negative" },
+      { value: 1, label: "Neutral" },
+      { value: 2, label: "Positive" },
+    ],
+  },
+});
+```
+</CodeGroup>
+
+第一个示例显示了一个二元通过/失败配置。第二个示例演示了一个包含三个选项的情感多类别配置。数字值允许您计算分类反馈的聚合分数。
+
+### 自由格式
+
+自由格式配置允许标注员提供无任何预定义结构或约束的开放式文本反馈。此类型没有 `min`、`max` 或 `categories` 字段——标注员可以输入他们想要的任何文本。
+
+自由格式反馈对于捕捉细微的见解很有价值，但与结构化反馈类型相比，更难聚合和分析：
+
+<CodeGroup>
+```python Python
+client.create_feedback_config(
+    "notes",
+    feedback_config={"type": "freeform"},
+)
+```
+```typescript TypeScript
+await client.createFeedbackConfig({
+  feedbackKey: "notes",
+  feedbackConfig: { type: "freeform" },
+});
+```
+</CodeGroup>
+
+## 验证规则
+
+| 类型 | min/max | categories | 约束条件 |
+|------|---------|-----------|-------------|
+| `continuous` | 可选 | 可选（标记的刻度点） | `min < max`；类别值在 [`min`, `max`] 范围内 |
+| `categorical` | 不得设置 | 必需，至少 2 个 | 唯一的值和标签 |
+| `freeform` | 不得设置 | 不得设置 | 不适用 |
+
+## 参考
+
+### 反馈配置类型
+
+| 类型 | 字段 | 描述 |
+|------|--------|-------------|
+| `continuous` | `min`, `max` | 范围内的数字分数 |
+| `categorical` | categories (`{value, label}` 列表) | 从预定义选项中选择 |
+| `freeform` | 无 | 自由文本输入 |
+
+### 评分项字段
+
+| 字段 | 类型 | 描述 |
+|-------|------|-------------|
+| `feedback_key` | `string` | 必需。必须匹配现有的反馈配置键。 |
+| `description` | `string` | 向标注员显示此项目的指导。 |
+| `score_descriptions` | `Record<string, string>` | 特定分数值的标签（连续）。 |
+| `value_descriptions` | `Record<string, string>` | 特定类别值的标签（分类）。 |
+| `is_required` | `boolean` | 标注员在提交前是否必须完成此项。默认为 false。 |

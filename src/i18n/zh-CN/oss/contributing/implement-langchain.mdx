@@ -1,0 +1,98 @@
+---
+title: 实现 LangChain 集成
+sidebarTitle: 实现
+---
+
+集成包是用户可以安装并在其项目中使用的 Python 包。它们实现了一个或多个符合 LangChain 接口标准的组件。
+
+LangChain 组件是 [`langchain-core`](https://github.com/langchain-ai/langchain/tree/master/libs/core) 中基类的子类。示例包括[聊天模型](/oss/integrations/chat)、[工具](/oss/integrations/tools)、[检索器](/oss/integrations/retrievers)等。
+
+您的集成包通常将实现至少一个此类组件的子类。展开下方选项卡以查看每个组件的详细信息。
+
+<Tabs>
+    <Tab title="聊天模型">
+        聊天模型是 @[`BaseChatModel`] 类的子类。它们实现了生成聊天补全、处理消息格式和管理模型参数的方法。
+
+        <Warning>
+            :::python
+            聊天模型集成指南目前正在编写中。在此期间，请阅读[聊天模型概念指南](/oss/langchain/models)以了解 LangChain 聊天模型的工作原理。您也可以参考 [LangChain 仓库](https://github.com/langchain-ai/langchain/tree/master/libs/partners)中的现有集成。
+            :::
+            :::js
+            聊天模型集成指南目前正在编写中。在此期间，请阅读[聊天模型概念指南](/oss/langchain/models)以了解 LangChain 聊天模型的工作原理。您也可以参考 [LangChain 仓库](https://github.com/langchain-ai/langchainjs/tree/main/libs/providers)中的现有集成。
+            :::
+        </Warning>
+    </Tab>
+    <Tab title="嵌入模型">
+        嵌入模型是 @[`Embeddings`] 类的子类。
+
+        <Warning>
+            嵌入模型集成指南目前正在编写中。在此期间，请阅读[嵌入模型概念指南](/oss/integrations/embeddings)以了解 LangChain 嵌入模型的工作原理。
+        </Warning>
+    </Tab>
+    <Tab title="工具">
+        工具主要有两种使用方式：
+
+        1.  定义一个“输入模式”或“参数模式”，将其与文本请求一起传递给聊天模型的工具调用功能，以便聊天模型可以生成“工具调用”或调用工具所需的参数。
+        2.  接收上述生成的“工具调用”，执行某些操作并返回一个可以作为 ToolMessage 传回给聊天模型的响应。
+
+        Tools 类必须继承自 @[`BaseTool`] 基类。该接口有 3 个属性和 2 个方法，应在子类中实现。
+
+        <Warning>
+            工具集成指南目前正在编写中。在此期间，请阅读[工具概念指南](/oss/langchain/tools)以了解 LangChain 工具的工作原理。
+        </Warning>
+    </Tab>
+    <Tab title="中间件">
+        [中间件](/oss/langchain/middleware/overview) 允许您通过挂钩到模型调用、工具调用和代理生命周期事件来自定义代理行为。中间件类是 @[`AgentMiddleware`] 基类的子类。
+
+        在构建集成之前，请阅读[自定义中间件指南](/oss/langchain/middleware/custom)以了解钩子、状态更新和中间件模式。
+
+        中间件集成通常分为两类：
+
+        | 类型 | 描述 | 示例 |
+        |------|-------------|---------|
+        | **特定于提供商** | 利用提供商的独特功能 | 提示缓存、原生工具执行、内容审核 |
+        | **跨提供商** | 可与任何模型或工具配合使用 | 速率限制、PII 检测、日志记录、防护栏 |
+
+        特定于提供商的中间件位于提供商的集成包中（例如 `langchain-anthropic`）。跨提供商的中间件可以作为独立的包发布。
+
+        您也可以参考这些现有的中间件集成：
+
+        :::python
+        <CardGroup cols={2}>
+            <Card title="OpenAI 内容审核" icon="shield" href="/oss/integrations/middleware/openai">
+                具有配置选项和退出行为的单一中间件。
+            </Card>
+            <Card title="Anthropic 中间件" icon="robot" href="/oss/integrations/middleware/anthropic">
+                用于提示缓存、工具、内存和文件搜索的多个中间件类。
+            </Card>
+            <Card title="AWS 提示缓存" icon="cloud" href="/oss/integrations/middleware/aws">
+                具有模型行为表的特定于提供商的提示缓存。
+            </Card>
+            <Card title="自定义中间件指南" icon="code" href="/oss/langchain/middleware/custom">
+                钩子、状态更新和模式的完整参考。
+            </Card>
+        </CardGroup>
+        :::
+        :::js
+        <CardGroup cols={2}>
+            <Card title="Anthropic 中间件" icon="robot" href="/oss/integrations/middleware/anthropic">
+                用于提示缓存、工具、内存和文件搜索的多个中间件类。
+            </Card>
+            <Card title="自定义中间件指南" icon="code" href="/oss/langchain/middleware/custom">
+                钩子、状态更新和模式的完整参考。
+            </Card>
+        </CardGroup>
+        :::
+
+    </Tab>
+    <Tab title="检查点管理器">
+        检查点管理器支持 LangGraph 中的[持久化](/oss/langgraph/persistence)，允许代理在交互过程中保存和恢复状态。
+
+        有关实现示例，请参阅 [LangGraph 仓库](https://github.com/langchain-ai/langgraph/tree/main/libs)中的现有检查点管理器集成。
+    </Tab>
+    <Tab title="沙盒">
+        沙盒集成使[深度代理](/oss/deepagents/overview)能够在隔离环境中运行代码。
+
+        **参考实现：** 有关结构和模式，请参阅 [Daytona 合作伙伴集成](https://github.com/langchain-ai/deepagents/tree/main/libs/partners/daytona)。
+    </Tab>
+</Tabs>

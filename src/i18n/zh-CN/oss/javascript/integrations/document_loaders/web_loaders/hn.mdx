@@ -1,0 +1,22 @@
+---
+title: "Hacker News 集成"
+description: "使用 LangChain JavaScript 集成 Hacker News 文档加载器。"
+---
+
+本示例介绍如何使用 Cheerio 从 Hacker News 网站加载数据。每个页面将创建一个文档。
+
+## 安装
+
+```bash npm
+npm install @langchain/community @langchain/core cheerio
+```
+
+## 使用方式
+
+```typescript
+import { HNLoader } from "@langchain/community/document_loaders/web/hn";
+
+const loader = new HNLoader("https://news.ycombinator.com/item?id=34817881");
+
+const docs = await loader.load();
+```

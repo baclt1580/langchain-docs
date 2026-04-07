@@ -1,0 +1,110 @@
+---
+title: "GitHub 集成"
+description: "使用 LangChain Python 集成 GitHub 文档加载器。"
+---
+
+本笔记本展示了如何加载 [GitHub](https://github.com/) 上指定仓库的议题（issues）和拉取请求（PRs）。同时演示了如何加载 [GitHub](https://github.com/) 上指定仓库的文件。我们将以 LangChain Python 仓库为例。
+
+## 设置访问令牌
+
+要访问 GitHub API，你需要一个个人访问令牌——你可以在此处设置：[github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)。你可以将此令牌设置为环境变量 `GITHUB_PERSONAL_ACCESS_TOKEN`，它将自动被读取；或者你也可以在初始化时直接通过 `access_token` 命名参数传入。
+
+```python
+# 如果你没有将访问令牌设置为环境变量，请在此处传入。
+from getpass import getpass
+
+ACCESS_TOKEN = getpass()
+```
+
+## 加载议题和 PRs
+
+```python
+from langchain_community.document_loaders import GitHubIssuesLoader
+```
+
+```python
+loader = GitHubIssuesLoader(
+    repo="langchain-ai/langchain",
+    access_token=ACCESS_TOKEN,  # 如果你已将访问令牌设置为环境变量，请删除或注释掉此参数。
+    creator="UmerHA",
+)
+```
+
+让我们加载由 "UmerHA" 创建的所有议题和 PRs。
+
+以下是你可以使用的所有筛选条件列表：
+
+- include_prs
+- milestone
+- state
+- assignee
+- creator
+- mentioned
+- labels
+- sort
+- direction
+- since
+
+更多信息，请参阅 [docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#list-repository-issues](https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#list-repository-issues)。
+
+```python
+docs = loader.load()
+```
+
+```python
+print(docs[0].page_content)
+print(docs[0].metadata)
+```
+
+## 仅加载议题
+
+默认情况下，GitHub API 将拉取请求也视为议题。要仅获取“纯”议题（即不包括拉取请求），请使用 `include_prs=False`
+
+```python
+loader = GitHubIssuesLoader(
+    repo="langchain-ai/langchain",
+    access_token=ACCESS_TOKEN,  # 如果你已将访问令牌设置为环境变量，请删除或注释掉此参数。
+    creator="UmerHA",
+    include_prs=False,
+)
+docs = loader.load()
+```
+
+```python
+print(docs[0].page_content)
+print(docs[0].metadata)
+```
+
+## 加载 GitHub 文件内容
+
+以下代码加载仓库 `langchain-ai/langchain` 中的所有 Markdown 文件。
+
+```python
+from langchain_community.document_loaders import GithubFileLoader
+```
+
+```python
+loader = GithubFileLoader(
+    repo="langchain-ai/langchain",  # 仓库名称
+    branch="master",  # 分支名称
+    access_token=ACCESS_TOKEN,
+    github_api_url="https://api.github.com",
+    file_filter=lambda file_path: file_path.endswith(
+        ".md"
+    ),  # 加载所有 Markdown 文件。
+)
+documents = loader.load()
+```
+
+单个文档的示例输出：
+
+```json
+document.metadata:
+    {
+      "path": "README.md",
+      "sha": "82f1c4ea88ecf8d2dfsfx06a700e84be4",
+      "source": "https://github.com/langchain-ai/langchain/blob/master/README.md"
+    }
+document.content:
+    mock content
+```

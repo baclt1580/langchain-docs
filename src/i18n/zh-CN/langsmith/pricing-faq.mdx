@@ -1,0 +1,108 @@
+---
+title: 常见问题
+sidebarTitle: 定价常见问题
+---
+
+import FleetPricing from '/snippets/langsmith/fleet-pricing.mdx';
+
+<Info>
+查看我们的[定价](https://www.langchain.com/pricing)页面，了解更多关于定价计划的信息。
+</Info>
+
+## 我在定价生效前就开始使用 LangSmith。我的账户何时开始计费？
+
+如果您之前已经在使用 LangSmith，您的使用将从 2024 年 7 月开始计费。届时，如果您想增加席位或使用超过每月免费追踪额度，您需要在 LangSmith 中添加信用卡或联系销售。如果您对具有更高速率限制和特殊部署选项的企业版计划感兴趣，可以通过[联系我们的销售团队](https://www.langchain.com/contact-sales)了解更多信息或进行购买。
+
+## 哪个计划适合我？
+
+如果您是个人开发者，开发者计划是小型项目的理想选择。
+
+对于希望在 LangSmith 中协作的团队，请查看 Plus 计划。**如果您是正在构建 AI 应用的早期初创公司**，您可能有资格申请我们的初创公司计划，享受折扣价格和丰厚的月度免费追踪额度。请通过我们的[初创公司联系表](https://airtable.com/app8ZrGLtHAtFVO1o/pagfLAmdTz4ep7TGu/form)了解更多详情。
+
+如果您需要更高级的管理、身份验证和授权、部署选项、支持或年度发票，企业版计划适合您。请通过我们的[销售联系表](https://www.langchain.com/contact-sales)了解更多详情。
+
+## 什么是席位？
+
+一个席位是您组织中的一个独立用户。我们根据用户总数（包括受邀用户）来确定计费的席位数量。
+
+## 什么是追踪？
+
+一次追踪是您的应用链或智能体、评估器运行或 Playground 运行的一次完整调用。这是一个[示例](https://smith.langchain.com/public/17c24270-9f74-47e7-b70c-d508afc448fa/r)。
+
+## 什么是部署运行？
+
+一次部署运行是通过 LangSmith 部署的 LangGraph 智能体的一次端到端调用。单个智能体执行中的节点和子图不会单独计费。对其他 LangGraph 智能体的调用（通过 RemoteGraph、LangGraph SDK 或直接通过 API）会单独计费，费用由托管被调用智能体的部署承担。人机交互的中断在恢复时会创建一个单独的部署运行。
+
+部署运行按每次 0.005 美元计费。对于高用量场景，请[联系我们的销售团队](https://www.langchain.com/pricing)讨论定制定价选项。
+
+## 什么是摄取事件？
+
+摄取事件是发送到 LangSmith 的任何独立的、与追踪相关的数据。这包括：
+
+*   在追踪中运行步骤开始时发送的输入、输出和元数据
+*   在追踪中运行步骤结束时发送的输入、输出和元数据
+*   对运行步骤或追踪的反馈
+
+## 我达到了速率或使用量限制。该怎么办？
+
+首次注册 LangSmith 账户时，您会获得一个个人组织，每月限制为 5000 次追踪。达到此限制后要继续发送追踪，请通过添加信用卡升级到开发者或 Plus 计划。前往[计划与账单](https://smith.langchain.com/settings/payments)进行升级。
+
+同样，如果您达到了当前计划的速率限制，可以升级到更高计划以获得更高限制，或通过 [support.langchain.com](https://support.langchain.com) 联系支持人员咨询问题。
+
+## 我有一个开发者账户，可以升级到 Plus 或企业版计划吗？
+
+是的，开发者计划用户可以轻松地在[计划与账单](https://smith.langchain.com/settings/payments)页面升级到 Plus 计划。对于企业版计划，请[联系我们的销售团队](https://www.langchain.com/contact-sales)讨论您的需求。
+
+## 计费是如何工作的？
+
+**席位**
+
+席位每月第一天按月度计费。月中购买的额外席位将按比例计费，并在购买后一天内完成计费。月中移除的席位不会获得退款。
+
+**追踪**
+
+只要您的账户中存有信用卡，我们将处理您的追踪，并在每月第一天为您上个月提交的追踪计费。您可以根据需要设置使用量限制，以控制任何给定月份可能产生的最大费用。
+
+## 我可以限制在追踪上的花费吗？
+
+您可以在[使用量配置](https://smith.langchain.com/settings/payments)页面设置每月可发送到 LangSmith 的追踪数量限制。
+
+<Note>
+虽然为了方便起见，我们会向您显示使用量限制对应的美元金额，但此限制是根据追踪数量而非美元金额来评估的。例如，如果您获批我们的初创公司计划层级，获得了丰厚的免费追踪额度，您的使用量限制不会自动改变。
+
+目前您无法在产品中设置支出限额。
+</Note>
+
+## 如何查看本月至今的使用情况？
+
+在您组织的设置部分，您会看到**使用量**子版块。在那里，您可以查看过去 30、60 或 90 天内每日可计费 LangSmith 追踪数量的图表。请注意，此数据有 1-2 小时的延迟，因此当天的数据可能略低于您的实际运行次数。
+
+## 我对账单有疑问...
+
+开发者计划和 Plus 计划层级的客户应通过 [support.langchain.com](https://support.langchain.com) 联系支持人员。企业版计划的客户应直接联系其销售代表。
+
+企业版计划客户按年度发票计费。
+
+## 我能获得怎样的支持？
+
+在开发者计划中，可通过 [LangChain 社区 Slack](https://www.langchain.com/join-community) 获得基于社区的支持。
+
+在 Plus 计划中，您还将通过 [support.langchain.com](https://support.langchain.com) 获得针对 LangSmith 相关问题的优先支持，我们将尽力在下一个工作日内回复。
+
+在企业版计划中，您将获得全方位支持，包括 Slack 频道、专属客户成功经理以及每月一次的 LangSmith 和 LangChain 问题沟通。我们可以协助调试、智能体和 RAG 技术、评估方法以及认知架构审查等各个方面。如果您购买了在您环境中运行 LangSmith 的附加服务，我们的基础设施工程团队还将提供部署和新版本发布的随叫随到支持。
+
+## 我的数据存储在哪里？
+
+您可以选择在美国或欧盟区域注册。详情请参阅[云架构参考](/langsmith/cloud#cloud-architecture-and-scalability)。如果您使用的是企业版计划，我们可以将 LangSmith 部署到您在 AWS、GCP 或 Azure 的 Kubernetes 集群上运行，确保数据永不离开您的环境。
+
+## LangSmith 符合哪些安全框架？
+
+我们符合 SOC 2 Type II、GDPR 和 HIPAA 标准。
+
+您可以在 [trust.langchain.com](https://trust.langchain.com) 请求获取有关我们安全政策和状况的更多信息。请注意，我们仅与企业版计划的客户签订业务伙伴协议（BAA）。
+
+## 你们会使用我发送给 LangSmith 的数据进行训练吗？
+
+我们不会使用您的数据进行训练，您拥有数据的所有权利。更多信息请参阅 [LangSmith 服务条款](https://langchain.dev/terms-of-service)。
+
+<FleetPricing />

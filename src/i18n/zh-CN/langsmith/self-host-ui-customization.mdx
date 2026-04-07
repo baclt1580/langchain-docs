@@ -1,0 +1,33 @@
+---
+title: 自定义错误支持信息
+sidebarTitle: 自定义界面
+description: 为自托管部署在 LangSmith 前端自定义支持联系信息。
+---
+
+## 自定义错误支持信息
+
+默认情况下，LangSmith 中的错误信息会引导用户联系 `support@langchain.dev`。你可以将其替换为你自己的支持联系信息。
+
+设置后，整个用户界面中的所有错误和支持信息都将显示你自定义的文本，而非默认的 LangChain 支持邮箱。
+
+<Note>
+自定义信息仅以**纯文本**形式渲染。HTML 标签不会被解析，将直接显示为字面文本。
+</Note>
+
+<CodeGroup>
+
+```yaml Helm
+config:
+  customErrorSupportMessage: "如需帮助，请联系内部 IT 团队：helpdesk@example.com"
+```
+
+```yaml Docker Compose
+services:
+  langchain-frontend:
+    environment:
+      - CUSTOM_ERROR_SUPPORT_MESSAGE=如需帮助，请联系内部 IT 团队：helpdesk@example.com
+```
+
+</CodeGroup>
+
+若要恢复默认行为，请删除此设置或将其设为空字符串。

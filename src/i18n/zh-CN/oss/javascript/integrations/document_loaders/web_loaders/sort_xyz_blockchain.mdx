@@ -1,0 +1,95 @@
+---
+title: "区块链数据集成"
+description: "使用 LangChain JavaScript 集成区块链数据文档加载器。"
+---
+
+本示例展示了如何通过 sort.xyz SQL API 加载区块链数据，包括合约地址的 NFT 元数据和交易记录。
+
+你需要一个免费的 Sort API 密钥，访问 sort.xyz 获取。
+
+```typescript
+import { SortXYZBlockchainLoader } from "@langchain/community/document_loaders/web/sort_xyz_blockchain";
+import { OpenAI } from "@langchain/openai";
+
+/**
+ * 参见 https://docs.sort.xyz/docs/api-keys 获取免费的 Sort API 密钥。
+ * 参见 https://docs.sort.xyz 了解可用的查询类型。
+ * 参见 https://docs.sort.xyz/reference 获取 Sort REST API 的详细信息。
+ */
+
+/**
+ * 运行示例。
+ */
+export const run = async () => {
+  // 初始化 OpenAI 模型。使用 /examples 目录下 .env 文件中的 OPENAI_API_KEY
+  const model = new OpenAI({ temperature: 0.9 });
+
+  const apiKey = "YOUR_SORTXYZ_API_KEY";
+  const contractAddress =
+    "0x887F3909C14DAbd9e9510128cA6cBb448E932d7f".toLowerCase();
+
+  /*
+  从以太坊区块链加载 NFT 元数据。提示：如需按特定 ID 加载，请参考下方的 SQL 查询示例。
+  */
+
+  const nftMetadataLoader = new SortXYZBlockchainLoader({
+    apiKey,
+    query: {
+      type: "NFTMetadata",
+      blockchain: "ethereum",
+      contractAddress,
+    },
+  });
+
+  const nftMetadataDocs = await nftMetadataLoader.load();
+
+  const nftPrompt =
+    "根据以下 JSON 文档中的属性，用 4 句话描述该角色并编成一个小故事。";
+  const nftResponse = await model.invoke(
+    nftPrompt + JSON.stringify(nftMetadataDocs[0], null, 2)
+  );
+  console.log(`用户 > ${nftPrompt}`);
+  console.log(`chatgpt > ${nftResponse}`);
+
+  /*
+    从以太坊区块链加载合约地址的最新交易记录。
+  */
+  const latestTransactionsLoader = new SortXYZBlockchainLoader({
+    apiKey,
+    query: {
+      type: "latestTransactions",
+      blockchain: "ethereum",
+      contractAddress,
+    },
+  });
+
+  const latestTransactionsDocs = await latestTransactionsLoader.load();
+
+  const latestPrompt =
+    "仅用每份文档 4 句话描述以下 JSON 文档。尽可能包含更多细节。";
+  const latestResponse = await model.invoke(
+    latestPrompt + JSON.stringify(latestTransactionsDocs[0], null, 2)
+  );
+  console.log(`\n\n用户 > ${nftPrompt}`);
+  console.log(`chatgpt > ${latestResponse}`);
+
+  /*
+    通过原始 SQL 和 NFT 索引加载特定 NFT 的元数据。参见 https://docs.sort.xyz 了解如何构建 SQL 查询。
+  */
+
+  const sqlQueryLoader = new SortXYZBlockchainLoader({
+    apiKey,
+    query: `SELECT * FROM ethereum.nft_metadata WHERE contract_address = '${contractAddress}' AND token_id = 1 LIMIT 1`,
+  });
+
+  const sqlDocs = await sqlQueryLoader.load();
+
+  const sqlPrompt =
+    "根据以下 JSON 文档中的属性，描述该角色并用于一家新咖啡店的广告中。";
+  const sqlResponse = await model.invoke(
+    sqlPrompt + JSON.stringify(sqlDocs[0], null, 2)
+  );
+  console.log(`\n\n用户 > ${sqlPrompt}`);
+  console.log(`chatgpt > ${sqlResponse}`);
+};
+```

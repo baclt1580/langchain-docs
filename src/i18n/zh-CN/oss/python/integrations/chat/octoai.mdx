@@ -1,0 +1,49 @@
+---
+title: "ChatOctoAI 集成"
+description: "使用 LangChain Python 与 ChatOctoAI 聊天模型集成。"
+---
+
+[OctoAI](https://docs.octoai.cloud/docs) 提供便捷的高效计算访问，使用户能够将自选的 AI 模型集成到应用程序中。`OctoAI` 计算服务帮助您轻松运行、调优和扩展 AI 应用。
+
+本笔记本演示了如何使用 `langchain.chat_models.ChatOctoAI` 连接 [OctoAI 端点](https://octoai.cloud/text)。
+
+## 设置
+
+要运行我们的示例应用，只需两个简单步骤：
+
+1. 从 [您的 OctoAI 账户页面](https://octoai.cloud/settings) 获取 API 令牌。
+
+2. 将 API 令牌粘贴到下面的代码单元格中，或使用 `octoai_api_token` 关键字参数。
+
+注意：如果您想使用不同于 [可用模型](https://octoai.cloud/text?selectedTags=Chat) 的模型，可以按照 [从 Python 构建容器](https://octo.ai/docs/bring-your-own-model/advanced-build-a-container-from-scratch-in-python) 和 [从容器创建自定义端点](https://octo.ai/docs/bring-your-own-model/create-custom-endpoints-from-a-container/create-custom-endpoints-from-a-container) 的指南，将模型容器化并自行创建自定义 OctoAI 端点，然后更新您的 `OCTOAI_API_BASE` 环境变量。
+
+```python
+import os
+
+os.environ["OCTOAI_API_TOKEN"] = "OCTOAI_API_TOKEN"
+```
+
+```python
+from langchain_community.chat_models import ChatOctoAI
+from langchain.messages import HumanMessage, SystemMessage
+```
+
+## 示例
+
+```python
+chat = ChatOctoAI(max_tokens=300, model_name="mixtral-8x7b-instruct")
+```
+
+```python
+messages = [
+    SystemMessage(content="你是一个乐于助人的助手。"),
+    HumanMessage(content="请简要介绍列奥纳多·达·芬奇。"),
+]
+print(chat(messages).content)
+```
+
+列奥纳多·达·芬奇（1452-1519）是一位意大利博学者，常被认为是历史上最伟大的画家之一。然而，他的天才远不止于艺术领域。他还是一位科学家、发明家、数学家、工程师、解剖学家、地质学家和制图师。
+
+达·芬奇最著名的画作包括《蒙娜丽莎》、《最后的晚餐》和《岩间圣母》。他的科学研究领先于他的时代，他的笔记本中包含了各种机器、人体解剖和自然现象的详细绘图与描述。
+
+尽管从未接受过正规教育，达·芬奇永不满足的好奇心和观察力使他在许多领域成为先驱。他的作品至今仍在激励和影响着艺术家、科学家和思想家。

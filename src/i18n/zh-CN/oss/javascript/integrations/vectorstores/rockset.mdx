@@ -1,0 +1,78 @@
+---
+title: "Rockset 集成"
+description: "使用 LangChain JavaScript 与 Rockset 向量存储进行集成。"
+---
+
+Rockset（已被 OpenAI 收购）是一款运行在云端的实时分析 SQL 数据库。
+Rockset 以 SQL 函数的形式提供向量搜索功能，以支持依赖文本相似度的 AI 应用。
+
+## 设置
+
+安装 rockset 客户端。
+
+```bash
+yarn add @rockset/client
+```
+
+### 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/core @langchain/community
+```
+
+```typescript
+import * as rockset from "@rockset/client";
+import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import { RocksetStore } from "@langchain/community/vectorstores/rockset";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { readFileSync } from "fs";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { createStuffDocumentsChain } from "@langchain/classic/chains/combine_documents";
+import { createRetrievalChain } from "@langchain/classic/chains/retrieval";
+
+const store = await RocksetStore.withNewCollection(new OpenAIEmbeddings(), {
+  client: rockset.default.default(
+    process.env.ROCKSET_API_KEY ?? "",
+    `https://api.${process.env.ROCKSET_API_REGION ?? "usw2a1"}.rockset.com`
+  ),
+  collectionName: "langchain_demo",
+});
+
+const model = new ChatOpenAI({ model: "gpt-3.5-turbo-1106" });
+const questionAnsweringPrompt = ChatPromptTemplate.fromMessages([
+  [
+    "system",
+    "根据以下上下文回答用户的问题：\n\n{context}",
+  ],
+  ["human", "{input}"],
+]);
+
+const combineDocsChain = await createStuffDocumentsChain({
+  llm: model,
+  prompt: questionAnsweringPrompt,
+});
+
+const chain = await createRetrievalChain({
+  retriever: store.asRetriever(),
+  combineDocsChain,
+});
+
+const text = readFileSync("state_of_the_union.txt", "utf8");
+const docs = await new RecursiveCharacterTextSplitter().createDocuments([text]);
+
+await store.addDocuments(docs);
+const response = await chain.invoke({
+  input: "美国是什么时候建立的？",
+});
+console.log(response.answer);
+await store.destroy();
+```
+
+## 相关
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

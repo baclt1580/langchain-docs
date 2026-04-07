@@ -1,0 +1,138 @@
+---
+title: "Cassandra 键值存储集成"
+description: "使用 LangChain JavaScript 与 Cassandra 键值存储集成。"
+---
+
+本示例演示了如何使用 `CassandraKVStore` @[`BaseStore`] 集成来设置聊天历史存储。请注意，还有一个 `CassandraChatMessageHistory` 集成，可能更易于用于聊天历史存储；而 `CassandraKVStore` 适用于需要更通用的、支持前缀键的键值存储的场景。
+
+## 设置
+
+```bash npm
+npm install @langchain/community @langchain/core cassandra-driver
+```
+根据您的数据库提供商，连接数据库的具体方式会有所不同。我们将创建一个文档 `configConnection`，它将作为存储配置的一部分使用。
+
+### Apache Cassandra®
+
+存储附加索引（由 `yieldKeys` 使用）在 [Apache Cassandra® 5.0](https://cassandra.apache.org/_/blog/Apache-Cassandra-5.0-Features-Storage-Attached-Indexes.html) 及更高版本中受支持。您可以使用标准的连接文档，例如：
+
+```typescript
+const configConnection = {
+  contactPoints: ['h1', 'h2'],
+  localDataCenter: 'datacenter1',
+  credentials: {
+    username: <...> as string,
+    password: <...> as string,
+  },
+};
+```
+### Astra DB
+
+Astra DB 是一个云原生的 Cassandra 即服务平台。
+
+1. 创建一个 [Astra DB 账户](https://astra.datastax.com/register)。
+2. 创建一个 [支持向量的数据库](https://astra.datastax.com/createDatabase)。
+3. 为您的数据库创建一个 [令牌](https://docs.datastax.com/en/astra/docs/manage-application-tokens.html)。
+
+```typescript
+const configConnection = {
+  serviceProviderArgs: {
+    astra: {
+      token: <...> as string,
+      endpoint: <...> as string,
+    },
+  },
+};
+```
+
+除了 `endpoint:`，您也可以提供属性 `datacenterID:` 和可选的 `regionName:`。
+
+## 使用
+
+```typescript
+import { CassandraKVStore } from "@langchain/community/storage/cassandra";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
+
+// 此文档是 Cassandra 驱动程序的连接文档；示例针对 AstraDB，但
+// 任何有效的 Cassandra 连接都可以使用。
+const configConnection = {
+  serviceProviderArgs: {
+    astra: {
+      token: "YOUR_TOKEN_OR_LOAD_FROM_ENV" as string,
+      endpoint: "YOUR_ENDPOINT_OR_LOAD_FROM_ENV" as string,
+    },
+  },
+};
+
+const store = new CassandraKVStore({
+  ...configConnection,
+  keyspace: "test", // 键空间必须存在
+  table: "test_kv", // 表如果不存在将被创建
+  keyDelimiter: ":", // 可选，默认为 "/"
+});
+
+// 定义我们的编码器/解码器，用于在字符串和 Uint8Arrays 之间转换
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+/**
+ * 在这里，您将定义您的 LLM 和聊天链，调用
+ * LLM 并最终获得消息列表。
+ * 对于此示例，我们假设我们已经有一个列表。
+ */
+const messages = Array.from({ length: 5 }).map((_, index) => {
+  if (index % 2 === 0) {
+    return new AIMessage("ai stuff...");
+  }
+  return new HumanMessage("human stuff...");
+});
+
+// 将您的消息存储在存储中
+// 键将以 `message:id:` 为前缀，并以索引结尾。
+await store.mset(
+  messages.map((message, index) => [
+    `message:id:${index}`,
+    encoder.encode(JSON.stringify(message)),
+  ])
+);
+
+// 现在您可以从存储中获取您的消息
+const retrievedMessages = await store.mget(["message:id:0", "message:id:1"]);
+// 确保解码值
+console.log(retrievedMessages.map((v) => decoder.decode(v)));
+
+/**
+[
+  '{"id":["langchain","AIMessage"],"kwargs":{"content":"ai stuff..."}}',
+  '{"id":["langchain","HumanMessage"],"kwargs":{"content":"human stuff..."}}'
+]
+ */
+
+// 或者，如果您想获取所有键，可以调用
+// `yieldKeys` 方法。
+// 可选地，您可以传递一个键前缀，只获取
+// 匹配该前缀的键。
+const yieldedKeys = [];
+for await (const key of store.yieldKeys("message:id:")) {
+  yieldedKeys.push(key);
+}
+
+// 键未编码，因此无需解码
+console.log(yieldedKeys);
+/**
+[
+  'message:id:2',
+  'message:id:1',
+  'message:id:3',
+  'message:id:0',
+  'message:id:4'
+]
+ */
+
+// 最后，让我们从存储中删除这些键
+await store.mdelete(yieldedKeys);
+```
+
+## 相关
+
+- [键值存储概念指南](/oss/integrations/stores)

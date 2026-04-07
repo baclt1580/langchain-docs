@@ -1,0 +1,59 @@
+---
+title: MESSAGE_COERCION_FAILURE
+---
+
+当消息对象不符合预期格式时，会发生此错误。
+
+:::python
+## 接受的消息格式
+
+LangChain 模块接受 `MessageLikeRepresentation`，其定义如下：
+
+```python
+from typing import Union
+
+from langchain_core.prompts.chat import (
+    BaseChatPromptTemplate,
+    BaseMessage,
+    BaseMessagePromptTemplate,
+)
+
+MessageLikeRepresentation = Union[
+    Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate],
+    tuple[
+        Union[str, type],
+        Union[str, list[dict], list[object]],
+    ],
+    str,
+]
+```
+
+这包括 OpenAI 风格的消息对象（`{ role: "user", content: "Hello world!" }`）、元组以及纯字符串（这些会被转换为 @[`HumanMessage`] 对象）。
+
+如果模块接收到不属于这些格式之一的值，你将收到错误：
+
+```python
+from langchain_anthropic import ChatAnthropic
+
+uncoercible_message = {"role": "HumanMessage", "random_field": "random value"}
+
+model = ChatAnthropic(model="claude-sonnet-4-6")
+
+model.invoke([uncoercible_message])
+```
+
+```text
+ValueError: 消息字典必须包含 'role' 和 'content' 键，但收到 {'role': 'HumanMessage', 'random_field': 'random value'}
+```
+:::
+:::js
+TODO: 添加 JS 示例
+:::
+
+## 故障排除
+
+要解决此错误：
+
+1. **确保格式正确**：聊天模型的所有输入必须是 LangChain 消息类的数组或受支持的消息类格式
+2. 验证你的消息没有发生意外的字符串化或转换
+3. 检查错误的堆栈跟踪，并在消息传递给模型之前添加日志语句来检查消息对象

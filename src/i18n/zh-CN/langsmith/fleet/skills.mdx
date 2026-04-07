@@ -1,0 +1,152 @@
+---
+title: 技能
+description: 使用技能为你的智能体提供特定能力。
+---
+
+技能是可复用的能力，为你的智能体提供专业化工作流程和领域知识。每个技能都存储在智能体的长期记忆中，路径为 `memories/skills/<技能名称>`。技能的名称和描述会在智能体启动时加载。基于这些信息，智能体可以决定是否使用该技能。完整的技能文件仅在智能体判定其与当前任务相关时才会加载。任何引用的额外资源也可能在变得相关时被智能体加载。
+
+使用技能有助于：
+
+- 通过仅提供与当前任务相关的上下文来节省令牌使用量。
+- 防止智能体的系统提示中包含过多上下文，这可能导致幻觉和错误响应。
+
+<Info>
+Fleet 技能基于 [Deep Agents](/oss/deepagents/skills) 构建，并遵循 [Agent Skills 规范](https://agentskills.io/specification)。有关技能结构、`SKILL.md` 格式以及编写最佳实践的详细信息，请参阅 [Deep Agents 技能文档](/oss/deepagents/skills)。
+</Info>
+
+## 私有技能与共享技能
+
+技能可以是**私有**于单个智能体，也可以在整个工作区**共享**：
+
+- **私有技能**：仅属于其所属的智能体，存储在智能体的长期记忆中。
+- **共享技能**：与工作区共享，并列出在 [**技能**](https://smith.langchain.com/agents/skills) 页面。
+    - 对工作区中的所有智能体可见。
+    - 只有创建该技能的用户可以编辑或删除它。
+    - 可以添加到工作区中的任何智能体，并在技能更新时保持同步。
+    - 通用聊天功能会自动访问。
+
+## 创建技能
+
+你可以通过两种方式创建技能：
+
+- **使用 AI**：使用自然语言描述技能，智能体会为你创建。你也可以添加额外资源。任何额外文件必须在 `SKILL.md` 中引用，智能体才能感知到它们。
+- **手动创建**：通过创建 `SKILL.md` 文件来创建技能。
+
+<Note>
+默认情况下，技能**私有**于其所属的智能体，并存储在智能体的长期记忆中。你可以[将技能共享到工作区](#share-a-skill)。
+</Note>
+
+<Tabs>
+    <Tab title="使用 AI">
+    在 [Fleet](https://smith.langchain.com/agents) 中，选择一个智能体并提示它创建技能：
+
+    <Prompt description="创建一个帮助智能体使用网络研究主题的技能。">
+    创建一个帮助智能体使用网络研究主题的技能。当被要求研究一个主题、人物、公司、技术、事件或任何需要从网络收集和综合信息的问题时使用。涵盖新闻查找、竞争分析、背景研究和事实查找任务。对于大多数查询，优先使用 `tavily_web_search`。
+    </Prompt>
+
+    你也可以随时将之前的对话转化为可复用的技能。
+
+    </Tab>
+    <Tab title="从模板创建">
+
+    1. 导航到 [**Fleet > 技能**](https://smith.langchain.com/agents/skills)。
+    1. 浏览可用模板并选择一个添加到你的智能体。
+
+    </Tab>
+
+    <Tab title="手动创建">
+
+    1. 在 [Fleet](https://smith.langchain.com/agents) 中选择一个智能体。
+    1. 点击 <Icon icon="pencil"/> **编辑智能体**。
+    1. 在**技能**部分，点击**创建**。
+    1. 输入技能名称、描述和指令。
+    1. 点击**保存更改**。
+
+    </Tab>
+</Tabs>
+
+<Tip>
+当你创建新智能体时，如果智能体能从中受益，Fleet 会自动生成相关技能。这些技能默认是私有的。你可以从智能体编辑器中[将它们共享到你的工作区](#share-a-skill)。
+</Tip>
+
+## 编辑私有技能
+
+1. 在 [Fleet](https://smith.langchain.com/agents) 中选择一个智能体。
+1. 点击 <Icon icon="pencil"/> **编辑智能体**。
+1. 在**技能**部分，选择要编辑的技能。
+1. 更新技能名称、描述或指令。
+1. 点击**保存更改**。
+
+## 编辑共享技能
+
+<Note>
+只有创建共享技能的用户可以编辑它。
+</Note>
+
+1. 导航到 [**Fleet > 技能**](https://smith.langchain.com/agents/skills)。
+1. 选择要编辑的技能。
+1. 更新技能名称、描述或指令。
+1. 点击**保存更改**。
+
+## 共享技能
+
+1. 在 [Fleet](https://smith.langchain.com/agents) 中选择一个智能体。
+1. 点击 <Icon icon="pencil"/> **编辑智能体**。
+1. 在图视图的**技能**部分，选择要共享的技能。
+1. 点击 <Icon icon="share"/>**共享**。
+
+共享后，该技能会出现在 [**技能**](https://smith.langchain.com/agents/skills) 页面。你可以从智能体编辑器中将共享技能添加到工作区中的任何智能体，通用聊天功能会自动获取它们。
+
+<Note>
+只有共享技能的创建者可以编辑或删除它。
+</Note>
+
+## 删除私有技能
+
+删除私有技能会永久移除它，因为它存储在该智能体的内存中。
+
+1. 在 [Fleet](https://smith.langchain.com/agents) 中选择智能体。
+1. 点击 <Icon icon="pencil"/> **编辑智能体**。
+1. 在**技能**部分，点击要删除技能旁边的 <Icon icon="trash"/> 图标。
+
+## 删除共享技能
+
+只有创建共享技能的用户可以删除它。
+
+<Warning>
+删除技能会将其从工作区以及所有使用它的智能体中移除。此操作无法撤销。
+</Warning>
+
+1. 导航到 [**Fleet > 技能**](https://smith.langchain.com/agents/skills)。
+1. 选择要删除的技能。
+1. 点击 <Icon icon="trash"/> **删除技能** 图标。
+
+## 在本地开发中使用 Fleet 技能
+
+使用 LangSmith CLI 从你的 Fleet 工作区下载技能，并在本地安装，以便在 Claude Code、Cursor 或 Codex 等编码智能体中使用。
+
+默认情况下，文件会保存到 `~/.agents/skills/[技能名称]/` 并符号链接到 `~/.claude/skills/[技能名称]/`。
+
+```bash
+langsmith fleet skills pull [技能名称] [标志]
+```
+
+| 标志 | 描述 |
+|------|-------------|
+| `--global=false` | 安装到项目级目录（`.agents/` 和 `.claude/`）而不是主目录。 |
+| `--agent` | 指定目标智能体（`claude`、`cursor`、`codex`）。 |
+| `--copy` | 复制文件而不是创建符号链接。 |
+| `--format pretty` | 显示已安装技能的文件树。 |
+
+例如：
+
+```bash
+$ langsmith fleet skills pull web-research --format pretty
+已安装技能 "web-research" 到 ~/.agents/skills/web-research
+  已链接：~/.claude/skills/web-research
+
+web-research/
+├── SKILL.md
+└── references/
+    └── search-tips.md
+```

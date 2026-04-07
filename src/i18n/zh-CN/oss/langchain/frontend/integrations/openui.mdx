@@ -1,0 +1,506 @@
+---
+title: OpenUI
+description: 使用 OpenUI 组件库和 openui-lang 生成完整、交互式的仪表板和报告
+---
+
+[OpenUI](https://github.com/openuidev) 是一个生成式 UI 库，它允许语言模型以一种名为 **openui-lang** 的声明式格式生成完整、交互式的 UI。代理不是返回聊天消息，而是返回一个包含卡片、图表、表格、标签页和表单的组件树，`Renderer` 会将其转换为真实的 React UI。
+
+这种集成非常适合数据丰富的输出，如报告、仪表板和数据探索器，其中模型既是数据分析师又是 UI 设计师。
+
+import { ExampleEmbed } from "/snippets/example-embed.jsx"
+
+<ExampleEmbed example="openui" minHeight={700} />
+
+## 工作原理
+
+1.  **生成系统提示：** 在启动时调用一次 `openuiLibrary.prompt()`；它会生成一个完整的 openui-lang 参考，模型使用它来编写有效的组件树。
+2.  **在第一条消息中注入：** 当新对话开始时，将系统提示作为开头的系统消息发送。
+3.  **模型编写 openui-lang：** 模型以类似 `root = Stack([header, kpis, chart])` 的程序形式响应，而不是散文。
+4.  **使用 `Renderer` 渲染：** 将文本传递给 OpenUI 的 `Renderer` 和组件库；它会解析并渲染组件树。
+
+```mermaid
+%%{
+  init: {
+    "fontFamily": "monospace",
+    "flowchart": {
+      "curve": "curve"
+    }
+  }
+}%%
+graph LR
+  PROMPT["openuiLibrary.prompt()"]
+  AGENT["createAgent()"]
+  STREAM["useStream()"]
+  RENDERER["Renderer"]
+
+  PROMPT --"系统消息"--> AGENT
+  AGENT --"openui-lang 文本"--> STREAM
+  STREAM --"AI 消息内容"--> RENDERER
+```
+
+## 安装
+
+```bash
+npm install @langchain/react @openuidev/react-ui @openuidev/react-headless @openuidev/react-lang
+```
+
+<Tip>
+OpenUI 需要 React 19+ 和 [`zustand`](https://www.npmjs.com/package/zustand)。前端代码仅限 React；LangGraph 代理后端可以用 TypeScript 或 Python 编写。
+</Tip>
+
+## 导入组件样式
+
+在你的 CSS 入口点或根组件中直接导入 OpenUI 的捆绑样式：
+
+```css
+@import "@openuidev/react-ui/components.css";
+@import "@openuidev/react-ui/styles/index.css";
+```
+
+## 生成系统提示
+
+OpenUI 提供了一个 `openuiLibrary.prompt()` 函数，用于生成完整的 openui-lang 参考，包含所有组件签名、语法规则、流式处理技巧和示例。在模块加载时调用一次：
+
+```ts
+import { openuiLibrary, openuiPromptOptions } from "@openuidev/react-ui/genui-lib";
+
+// 生成完整的 openui-lang 系统提示。在启动时调用一次，
+// 不要在组件内部调用，以避免每次渲染都重新计算。
+const SYSTEM_PROMPT = openuiLibrary.prompt({
+  ...openuiPromptOptions,
+  preamble:
+    "你是一个报告生成器。当被要求生成报告时，使用 openui-lang 生成详细、" +
+    "数据丰富的报告：执行摘要、KPI 卡片、图表、表格和多个部分。你的整个响应必须是原始的 openui-lang " +
+    "—— 没有代码块、没有 Markdown、没有散文。",
+});
+```
+
+`preamble` 覆盖了默认的角色设定。添加 `additionalRules` 来注入特定任务的约束：
+
+```ts
+const SYSTEM_PROMPT = openuiLibrary.prompt({
+  ...openuiPromptOptions,
+  preamble: "你是一个报告生成器...",
+  additionalRules: [
+    ...(openuiPromptOptions.additionalRules ?? []),
+    "始终使用 " +
+    "Button({ type: 'continue_conversation' }, 'secondary') 在 " +
+    "Card([CardHeader('探索更多'), Buttons([...])], 'sunk') 内部，以 3–4 个后续查询按钮结束报告。",
+  ],
+});
+```
+
+## 通过 useStream 注入系统提示
+
+将系统提示作为每个新线程的第一条消息发送。检查 `stream.messages.length === 0` 以检测新线程，并前置一条 `system` 消息：
+
+```tsx
+import { useCallback } from "react";
+import { useStream } from "@langchain/react";
+
+const SYSTEM_PROMPT = openuiLibrary.prompt({ ... });
+
+export function App() {
+  const stream = useStream({
+    apiUrl: import.meta.env.VITE_LANGGRAPH_API_URL ?? "/api/langgraph",
+    assistantId: "my_agent",
+    reconnectOnMount: true,
+    fetchStateHistory: true,
+  });
+
+  const handleSubmit = useCallback(
+    (text: string) => {
+      // 仅在新线程的第一条消息上注入系统提示。
+      // 后续消息的持久化历史中已经包含它。
+      const isNewThread = stream.messages.length === 0;
+      stream.submit({
+        messages: [
+          ...(isNewThread
+            ? [{ type: "system", content: SYSTEM_PROMPT }]
+            : []),
+          { type: "human", content: text },
+        ],
+      });
+    },
+    [stream],
+  );
+
+  // ...
+}
+```
+
+## 使用 Renderer 渲染
+
+将 AI 消息的文本内容直接传递给 `Renderer`，同时传递 `openuiLibrary`：
+
+```tsx
+import { Renderer } from "@openuidev/react-lang";
+import { openuiLibrary } from "@openuidev/react-ui/genui-lib";
+import { AIMessage } from "langchain";
+
+function MessageList({ messages, isLoading }) {
+  const lastAiIdx = messages.reduce(
+    (acc, msg, i) => (AIMessage.isInstance(msg) ? i : acc),
+    -1,
+  );
+
+  return messages.map((msg, i) => {
+    if (AIMessage.isInstance(msg)) {
+      const text = typeof msg.content === "string" ? msg.content : "";
+      return (
+        <Renderer
+          key={msg.id ?? i}
+          response={text}
+          library={openuiLibrary}
+          isStreaming={isLoading && i === lastAiIdx}
+        />
+      );
+    }
+    // ... 人类消息气泡
+  });
+}
+```
+
+在活动流期间传递 `isStreaming={true}`，以便 Renderer 在定义到达时优雅地处理未解析的引用。
+
+## openui-lang 格式
+
+模型编写的是程序，而不是 JSON 规范。每个语句都是一个赋值；`root` 是入口点。官方提示教会模型这种格式，包括提升 —— 先写 `root`，以便 UI 外壳立即出现：
+
+```
+root = Stack([header, execSummary, kpis, marketSection])
+
+header    = CardHeader("2025 年 AI 发展状况", "综合分析")
+execSummary = MarkDownRenderer("## 执行摘要\n\nAI 市场已达到...")
+
+kpi1 = Card([CardHeader("8260 亿美元", "全球市场"), TextContent("42% 年增长率", "small")], "sunk")
+kpi2 = Card([CardHeader("78%",   "采用率"),       TextContent("财富 500 强",  "small")], "sunk")
+kpis = Stack([kpi1, kpi2], "row", "m", "stretch", "start", true)
+
+col1 = Col("细分市场", "string")
+col2 = Col("收入（十亿美元）", "number")
+tbl  = Table([col1, col2], [["生成式 AI", 286], ["ML 基础设施", 198]])
+s1   = Series("收入", [286, 198, 147])
+ch1  = BarChart(["生成式 AI", "ML 基础设施", "视觉"], [s1])
+marketSection = Card([CardHeader("市场细分"), tbl, ch1])
+```
+
+启用提升（推荐）后，`root` 行会首先写入，因此页面结构会立即出现，每个部分在模型定义时逐步填充。
+
+## 渐进式渲染工具
+
+直接将 `useStream` 连接到 `Renderer` 会导致每个流式令牌都重新渲染，并且每次响应会产生数百次无操作的重解析。这会导致图表组件在其数据尚未到达时崩溃。以下工具解决了这些问题：
+
+| 问题 | 解决方案 |
+| --- | --- |
+| **部分字符串字面量** | `truncateAtOpenString` / `closeOrTruncateOpenString` —— 在解析之前丢弃或关闭不完整的字符串 |
+| **中间令牌抖动** | `useStableText` —— 在完整的语句边界（`name = Expr(…)`）上控制 Renderer 更新，而不是每个令牌 |
+| **图表空数据崩溃** | `chartDataRefsResolved` —— 在将图表包含在快照中之前，验证其 `Series` 和标签数组是否已定义 |
+| **尚无 `root` / 回退** | `buildProgressiveRoot` —— 当模型尚未写入 `root` 时，从顶级变量合成一个 `root = Stack([…])` |
+| **Snake_case 标识符** | `sanitizeIdentifiers` —— 解析器只接受 camelCase；转换模型发出的任何 `snake_case` 名称 |
+
+将完整代码块复制到你的项目中，并将 `stable` 传递给 `<Renderer>`：
+
+```tsx expandable
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  type ActionEvent,
+  BuiltinActionType,
+  Renderer,
+} from "@openuidev/react-lang";
+import { openuiLibrary } from "@openuidev/react-ui/genui-lib";
+
+/** 去除模型可能发出的任何 Markdown 代码块标记。 */
+function stripCodeFence(text: string): string {
+  return text
+    .replace(/^```[a-z]*\r?\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
+}
+
+/**
+ * openui-lang 解析器只接受 camelCase 标识符。
+ * 转换模型发出的任何 snake_case 变量名；字符串内容保持不变。
+ */
+function sanitizeIdentifiers(text: string): string {
+  const toCamel = (s: string) =>
+    s.replace(/_([a-zA-Z0-9])/g, (_, c: string) => c.toUpperCase());
+
+  const snakeVars: string[] = [];
+  for (const m of text.matchAll(/^([a-zA-Z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+)\s*=/gm)) {
+    if (!snakeVars.includes(m[1])) snakeVars.push(m[1]);
+  }
+  if (snakeVars.length === 0) return text;
+
+  let result = "";
+  let inStr = false;
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === "\\" && inStr) { result += text[i] + (text[i + 1] ?? ""); i += 2; continue; }
+    if (text[i] === '"') { inStr = !inStr; result += text[i++]; continue; }
+    if (!inStr) {
+      let replaced = false;
+      for (const v of snakeVars) {
+        if (text.startsWith(v, i) && !/[a-zA-Z0-9_]/.test(text[i + v.length] ?? "")) {
+          result += toCamel(v); i += v.length; replaced = true; break;
+        }
+      }
+      if (!replaced) result += text[i++];
+    } else {
+      result += text[i++];
+    }
+  }
+  return result;
+}
+
+/**
+ * 遍历文本，跟踪打开的字符串。如果文本在字符串中间结束，则截断到
+ * 最后一个安全换行符 —— 这可以防止部分字符串字面量消耗
+ * 我们稍后合成的任何 `root = Stack(…)` 行。
+ */
+function truncateAtOpenString(text: string): string {
+  let inStr = false;
+  let lastSafeNewline = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "\\" && inStr) { i++; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (ch === "\n" && !inStr) lastSafeNewline = i;
+  }
+  return inStr ? text.slice(0, lastSafeNewline) : text;
+}
+
+/**
+ * 类似于 truncateAtOpenString，但当部分行是 TextContent 语句时，
+ * 会合成一个闭合的 `")`。这使得文本可以按令牌渲染，而
+ * 所有其他部分字符串行仍然被截断。
+ */
+function closeOrTruncateOpenString(text: string): string {
+  let inStr = false;
+  let lastSafeNewline = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "\\" && inStr) { i++; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (ch === "\n" && !inStr) lastSafeNewline = i;
+  }
+  if (!inStr) return text;
+
+  const safeText = lastSafeNewline > 0 ? text.slice(0, lastSafeNewline) : "";
+  const partialLine = text.slice(lastSafeNewline > 0 ? lastSafeNewline + 1 : 0);
+
+  if (/^[a-zA-Z][a-zA-Z0-9]*\s*=\s*TextContent\(/.test(partialLine)) {
+    return (lastSafeNewline > 0 ? safeText + "\n" : "") + partialLine + '")';
+  }
+  return safeText;
+}
+
+/** 计算形成以 `)` 或 `]` 结尾的完整赋值的行数。 */
+function countCompleteStatements(text: string): number {
+  let count = 0;
+  for (const line of text.split("\n")) {
+    const t = line.trimEnd();
+    if ((t.endsWith(")") || t.endsWith("]")) && /^[a-zA-Z]/.test(t)) count++;
+  }
+  return count;
+}
+
+const CHART_TYPES = new Set([
+  "BarChart", "LineChart", "AreaChart", "RadarChart",
+  "HorizontalBarChart", "PieChart", "RadialChart",
+  "SingleStackedBarChart", "ScatterChart",
+]);
+
+const OPENUI_KEYWORDS = new Set([
+  "true", "false", "null", "grouped", "stacked", "linear", "natural", "step",
+  "pie", "donut", "string", "number", "action", "row", "column", "card", "sunk",
+  "clear", "info", "warning", "error", "success", "neutral", "danger", "start",
+  "end", "center", "between", "around", "evenly", "stretch", "baseline",
+  "small", "default", "large", "none", "xs", "s", "m", "l", "xl",
+  "horizontal", "vertical",
+]);
+
+/**
+ * 图表组件（recharts）在其标签或系列属性未解析时，会因 `.map() on null` 而崩溃。
+ * 在提交稳定快照之前，验证文本中的每个图表是否已定义其所有数据变量。
+ */
+function chartDataRefsResolved(text: string): boolean {
+  const lines = text.split("\n");
+  const complete = new Set<string>();
+  for (const line of lines) {
+    const t = line.trimEnd();
+    const m = t.match(/^([a-zA-Z][a-zA-Z0-9]*)\s*=/);
+    if (m && (t.endsWith(")") || t.endsWith("]"))) complete.add(m[1]);
+  }
+  for (const line of lines) {
+    const t = line.trimEnd();
+    const m = t.match(/^([a-zA-Z][a-zA-Z0-9]*)\s*=\s*([A-Z][a-zA-Z0-9]*)\(/);
+    if (!m || !CHART_TYPES.has(m[2]) || !t.endsWith(")")) continue;
+    const rhs = t.slice(t.indexOf("=") + 1).replace(/"(?:[^"\\]|\\.)*"/g, '""');
+    for (const [, name] of rhs.matchAll(/\b([a-zA-Z][a-zA-Z0-9]*)\b/g)) {
+      if (/^[a-z]/.test(name) && !OPENUI_KEYWORDS.has(name) && !complete.has(name))
+        return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * 如果模型尚未写入 `root = Stack(…)`，则从顶级变量（已定义但未在任何其他表达式中引用的变量）合成一个。
+ * 这使得即使模型最后写入 root，也能进行渐进式渲染。
+ */
+function buildProgressiveRoot(text: string): string {
+  if (!text) return text;
+  const safe = truncateAtOpenString(text);
+  if (/^root\s*=/m.test(safe)) return safe;
+
+  const defs: string[] = [];
+  const seen = new Set<string>();
+  for (const m of safe.matchAll(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=/gm)) {
+    if (!seen.has(m[1])) { defs.push(m[1]); seen.add(m[1]); }
+  }
+  if (defs.length === 0) return safe;
+
+  const referenced = new Set<string>();
+  for (const line of safe.split("\n")) {
+    const thisVar = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=/)?.[1];
+    const stripped = line.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+    for (const v of defs) {
+      if (v !== thisVar && new RegExp(`\\b${v}\\b`).test(stripped)) referenced.add(v);
+    }
+  }
+
+  const topLevel = defs.filter((v) => !referenced.has(v));
+  const rootVars = topLevel.length > 0 ? topLevel : defs;
+  return `${safe.trimEnd()}\nroot = Stack([${rootVars.join(", ")}], "column", "l")`;
+}
+
+/**
+ * 将 Renderer 更新控制在至少有一个新的*完整*语句到达的时刻。
+ * 这消除了流式传输期间数百次无操作的重解析。
+ *
+ * 特殊情况：TextContent 行按令牌更新（通过 closeOrTruncate），
+ * 因此文本可以渐进式渲染，而无需等待整行完成。
+ */
+function useStableText(raw: string, isStreaming: boolean): string {
+  const [stable, setStable] = useState<string>("");
+  const lastCount = useRef(0);
+
+  useEffect(() => {
+    const safe = truncateAtOpenString(raw);         // 严格模式 —— 仅用于计数
+    const enhanced = closeOrTruncateOpenString(raw); // 显示模式 —— 关闭部分 TextContent
+
+    if (!isStreaming) { setStable(enhanced); return; }
+
+    const count = countCompleteStatements(safe);
+    const newComplete = count > lastCount.current && chartDataRefsResolved(safe);
+    const partialTextContent = enhanced !== safe;
+
+    if (newComplete || partialTextContent) {
+      if (newComplete) lastCount.current = count;
+      setStable(enhanced);
+    }
+  }, [raw, isStreaming]);
+
+  return stable;
+}
+
+function AIMessageView({
+  raw,
+  isStreaming,
+  onSubmit,
+}: {
+  raw: string;
+  isStreaming: boolean;
+  onSubmit: (text: string) => void;
+}) {
+  const stable = useStableText(raw, isStreaming);
+  const processed = useMemo(() => buildProgressiveRoot(stable), [stable]);
+
+  const handleAction = useCallback(
+    (event: ActionEvent) => {
+      if (event.type === BuiltinActionType.ContinueConversation) {
+        onSubmit(event.humanFriendlyMessage);
+      }
+    },
+    [onSubmit],
+  );
+
+  if (!processed) return null;
+
+  return (
+    <Renderer
+      response={processed}
+      library={openuiLibrary}
+      isStreaming={isStreaming}
+      onAction={handleAction}
+    />
+  );
+}
+
+export function MessageList({ messages, isLoading, onSubmit }) {
+  const lastAiIdx = messages.reduce(
+    (acc, msg, i) => (msg.getType() === "ai" ? i : acc),
+    -1,
+  );
+
+  return messages.map((msg, i) => {
+    if (msg.getType() === "human") {
+      return (
+        <div key={msg.id ?? i} className="flex justify-end">
+          <div className="user-bubble">
+            {typeof msg.content === "string" ? msg.content : ""}
+          </div>
+        </div>
+      );
+    }
+
+    if (msg.getType() === "ai") {
+      const raw = sanitizeIdentifiers(
+        stripCodeFence(typeof msg.content === "string" ? msg.content : ""),
+      );
+      if (!raw) return null;
+      return (
+        <div key={msg.id ?? i}>
+          <AIMessageView
+            raw={raw}
+            isStreaming={isLoading && i === lastAiIdx}
+            onSubmit={onSubmit}
+          />
+        </div>
+      );
+    }
+
+    return null;
+  });
+}
+```
+
+## 后续查询
+
+OpenUI 的 `Button` 组件支持 `continue_conversation` 操作类型。当用户点击后续按钮时，`Renderer` 会触发 `onAction`，上面的 `AIMessageView` 会将按钮的标签作为下一条用户消息提交，与在输入框中键入的代码路径完全相同。
+
+通过系统提示中的 `additionalRules` 为每个报告添加“探索更多”部分：
+
+```
+followUp1 = Button("比较 2024 年与 2025 年 AI 领导者", { type: "continue_conversation" }, "secondary")
+followUp2 = Button("全球 AI 投资细分",  { type: "continue_conversation" }, "secondary")
+followUpBtns = Buttons([followUp1, followUp2], "row")
+followUpCard  = Card([CardHeader("探索更多"), followUpBtns], "sunk")
+root = Stack([..., followUpCard])
+```
+
+## 最佳实践
+
+- **在模块加载时生成系统提示：** 不要在 React 组件内部生成；提示有几千字节，应该只计算一次。
+- **仅在新线程上注入系统提示：** 检查 `stream.messages.length === 0`，并在后续轮次中跳过注入，以避免在线程历史中重复提示。
+- **使用提升顺序：** 先写 `root = Stack([...])`；UI 外壳会立即出现，各部分在模型定义时逐步填充。
+- **在完整语句上控制：** 避免在每个令牌上都重新渲染 Renderer；仅在完整语句（`name = ComponentCall(...)`）到达时更新。
+- **在渲染前验证图表数据：** 图表组件需要在其 `Series` 和标签数组定义后，才能包含在稳定快照中。
+- **保持 camelCase 变量名：** openui-lang 解析器只接受 camelCase 标识符；在系统提示的 `additionalRules` 中强化这一点。

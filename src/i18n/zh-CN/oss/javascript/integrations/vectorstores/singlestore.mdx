@@ -1,0 +1,211 @@
+---
+title: "SingleStore 集成"
+description: "使用 LangChain JavaScript 与 SingleStore 集成。"
+---
+
+[SingleStoreDB](https://singlestore.com/) 是一款强大、高性能的分布式 SQL 数据库解决方案，专为在[云端](https://www.singlestore.com/cloud/)和本地环境中卓越运行而设计。它拥有多功能特性集，提供无缝的部署选项，同时提供无与伦比的性能。
+
+SingleStoreDB 的一个突出特点是其对向量存储和操作的高级支持，使其成为需要复杂 AI 功能（如文本相似度匹配）应用的理想选择。凭借内置的向量函数，如 [dot_product](https://docs.singlestore.com/managed-service/en/reference/sql-reference/vector-functions/dot_product.html) 和 [euclidean_distance](https://docs.singlestore.com/managed-service/en/reference/sql-reference/vector-functions/euclidean_distance.html)，SingleStoreDB 使开发者能够高效地实现复杂算法。
+
+对于希望在 SingleStoreDB 中利用向量数据的开发者，有一份全面的教程可供参考，指导他们深入了解[处理向量数据](https://docs.singlestore.com/managed-service/en/developer-resources/functional-extensions/working-with-vector-data.html)的细节。本教程深入探讨了 SingleStoreDB 中的向量存储，展示了其基于向量相似度进行搜索的能力。利用向量索引，查询可以以惊人的速度执行，实现快速检索相关数据。
+
+此外，SingleStoreDB 的向量存储与[基于 Lucene 的全文索引](https://docs.singlestore.com/cloud/developer-resources/functional-extensions/working-with-full-text-search/)无缝集成，支持强大的文本相似度搜索。用户可以根据文档元数据对象的选定字段筛选搜索结果，从而提高查询精度。
+
+SingleStoreDB 的独特之处在于其能够以多种方式结合向量和全文搜索，提供灵活性和多功能性。无论是通过文本或向量相似度进行预筛选并选择最相关的数据，还是采用加权和方法计算最终相似度得分，开发者都有多种选择。
+
+本质上，SingleStoreDB 为管理和查询向量数据提供了一个全面的解决方案，为 AI 驱动的应用提供了无与伦比的性能和灵活性。
+
+<提示>
+**兼容性**
+
+仅适用于 Node.js。
+</提示>
+
+LangChain.js 需要 `mysql2` 库来创建与 SingleStoreDB 实例的连接。
+
+## 设置
+
+1. 建立 SingleStoreDB 环境。您可以选择[云端](https://docs.singlestore.com/managed-service/en/getting-started-with-singlestoredb-cloud.html)或[本地](https://docs.singlestore.com/db/v8.1/en/developer-resources/get-started-using-singlestoredb-for-free.html)版本。
+2. 安装 mysql2 JS 客户端
+
+```bash npm
+npm install -S mysql2
+```
+
+## 使用
+
+`SingleStoreVectorStore` 管理一个连接池。建议在终止应用程序之前调用 `await store.end();`，以确保所有连接正确关闭，防止任何可能的资源泄漏。
+
+### 标准用法
+
+<提示>
+有关安装 LangChain 包的一般说明，请参阅[此部分](/oss/langchain/install)。
+</提示>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+```typescript
+import { SingleStoreVectorStore } from "@langchain/community/vectorstores/singlestore";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+export const run = async () => {
+  const vectorStore = await SingleStoreVectorStore.fromTexts(
+    ["Hello world", "Bye bye", "hello nice world"],
+    [{ id: 2 }, { id: 1 }, { id: 3 }],
+    new OpenAIEmbeddings(),
+    {
+      connectionOptions: {
+        host: process.env.SINGLESTORE_HOST,
+        port: Number(process.env.SINGLESTORE_PORT),
+        user: process.env.SINGLESTORE_USERNAME,
+        password: process.env.SINGLESTORE_PASSWORD,
+        database: process.env.SINGLESTORE_DATABASE,
+      },
+    }
+  );
+
+  const resultOne = await vectorStore.similaritySearch("hello world", 1);
+  console.log(resultOne);
+  await vectorStore.end();
+};
+```
+
+### 元数据过滤
+
+```typescript
+import { SingleStoreVectorStore } from "@langchain/community/vectorstores/singlestore";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+export const run = async () => {
+  const vectorStore = await SingleStoreVectorStore.fromTexts(
+    ["Good afternoon", "Bye bye", "Boa tarde!", "Até logo!"],
+    [
+      { id: 1, language: "English" },
+      { id: 2, language: "English" },
+      { id: 3, language: "Portuguese" },
+      { id: 4, language: "Portuguese" },
+    ],
+    new OpenAIEmbeddings(),
+    {
+      connectionOptions: {
+        host: process.env.SINGLESTORE_HOST,
+        port: Number(process.env.SINGLESTORE_PORT),
+        user: process.env.SINGLESTORE_USERNAME,
+        password: process.env.SINGLESTORE_PASSWORD,
+        database: process.env.SINGLESTORE_DATABASE,
+      },
+      distanceMetric: "EUCLIDEAN_DISTANCE",
+    }
+  );
+
+  const resultOne = await vectorStore.similaritySearch("greetings", 1, {
+    language: "Portuguese",
+  });
+  console.log(resultOne);
+  await vectorStore.end();
+};
+```
+
+### 向量索引
+
+通过利用 [ANN 向量索引](https://docs.singlestore.com/cloud/reference/sql-reference/vector-functions/vector-indexing/)，在 SingleStore DB 版本 8.5 或更高版本中提升搜索效率。
+通过在创建向量存储对象时设置 `useVectorIndex: true`，您可以激活此功能。
+此外，如果您的向量维度与默认的 OpenAI 嵌入大小 1536 不同，请确保相应地指定 `vectorSize` 参数。
+
+### 混合搜索
+
+```typescript
+import { SingleStoreVectorStore } from "@langchain/community/vectorstores/singlestore";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+export const run = async () => {
+  const vectorStore = await SingleStoreVectorStore.fromTexts(
+    [
+      "在干旱的沙漠中，一场突如其来的暴雨带来了缓解，雨滴在干渴的土地上舞动，用甜美的雨后泥土气息使景观焕然一新。",
+      "在熙熙攘攘的城市景观中，雨无情地落下，在人行道上创造出噼啪作响的交响乐，而雨伞像灰色海洋中绽放的彩色花朵。",
+      "在高山上，雨化作了细腻的薄雾，将山峰笼罩在神秘的帷幕中，每一滴雨滴似乎都在向古老的岩石低语秘密。",
+      "雪覆盖了乡村，铺上了一层柔软、纯净的毯子，描绘出一幅宁静的画面，将世界笼罩在宁静的寂静中，精致的雪花像大自然自己的蕾丝一样落在树枝上。",
+      "在城市景观中，雪降临，将繁忙的街道变成了冬季仙境，孩子们的笑声在雪球飞舞和节日灯光闪烁中回荡。",
+      "在崎岖的山峰上，雪以不屈的强度落下，将景观塑造成一个原始的高山天堂，冰冻的晶体在月光下闪烁，对荒野施下了迷人的咒语。",
+    ],
+    [
+      { category: "rain" },
+      { category: "rain" },
+      { category: "rain" },
+      { category: "snow" },
+      { category: "snow" },
+      { category: "snow" },
+    ],
+    new OpenAIEmbeddings(),
+    {
+      connectionOptions: {
+        host: process.env.SINGLESTORE_HOST,
+        port: Number(process.env.SINGLESTORE_PORT),
+        user: process.env.SINGLESTORE_USERNAME,
+        password: process.env.SINGLESTORE_PASSWORD,
+        database: process.env.SINGLESTORE_DATABASE,
+      },
+      distanceMetric: "DOT_PRODUCT",
+      useVectorIndex: true,
+      useFullTextIndex: true,
+    }
+  );
+
+  const resultOne = await vectorStore.similaritySearch(
+    "rainstorm in parched desert, rain",
+    1,
+    { category: "rain" }
+  );
+  console.log(resultOne[0].pageContent);
+
+  await vectorStore.setSearchConfig({
+    searchStrategy: "TEXT_ONLY",
+  });
+  const resultTwo = await vectorStore.similaritySearch(
+    "rainstorm in parched desert, rain",
+    1
+  );
+  console.log(resultTwo[0].pageContent);
+
+  await vectorStore.setSearchConfig({
+    searchStrategy: "FILTER_BY_TEXT",
+    filterThreshold: 0.1,
+  });
+  const resultThree = await vectorStore.similaritySearch(
+    "rainstorm in parched desert, rain",
+    1
+  );
+  console.log(resultThree[0].pageContent);
+
+  await vectorStore.setSearchConfig({
+    searchStrategy: "FILTER_BY_VECTOR",
+    filterThreshold: 0.1,
+  });
+  const resultFour = await vectorStore.similaritySearch(
+    "rainstorm in parched desert, rain",
+    1
+  );
+  console.log(resultFour[0].pageContent);
+
+  await vectorStore.setSearchConfig({
+    searchStrategy: "WEIGHTED_SUM",
+    textWeight: 0.2,
+    vectorWeight: 0.8,
+    vectorselectCountMultiplier: 10,
+  });
+  const resultFive = await vectorStore.similaritySearch(
+    "rainstorm in parched desert, rain",
+    1
+  );
+  console.log(resultFive[0].pageContent);
+
+  await vectorStore.end();
+};
+```
+
+## 相关
+
+- 向量存储[概念指南](/oss/integrations/vectorstores)
+- 向量存储[操作指南](/oss/integrations/vectorstores)

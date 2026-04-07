@@ -1,0 +1,37 @@
+---
+title: "Alibaba tongyi 集成"
+description: "使用 LangChain JavaScript 集成 Alibaba tongyi 嵌入模型。"
+---
+
+`AlibabaTongyiEmbeddings` 类使用 Alibaba Tongyi API 为给定文本生成嵌入向量。
+
+## 设置
+
+你需要注册一个 Alibaba API 密钥，并将其设置为名为 `ALIBABA_API_KEY` 的环境变量。
+
+然后，你需要安装 [`@langchain/community`](https://www.npmjs.com/package/@langchain/community) 包：
+
+<Tip>
+有关安装 LangChain 包的一般说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+## 使用
+
+```typescript
+import { AlibabaTongyiEmbeddings } from "@langchain/community/embeddings/alibaba_tongyi";
+
+const model = new AlibabaTongyiEmbeddings({});
+const res = await model.embedQuery(
+  "一家生产彩色袜子的公司，起什么名字比较好？"
+);
+console.log({ res });
+```
+
+## 相关
+
+- 嵌入模型[概念指南](/oss/integrations/embeddings)
+- 嵌入模型[操作指南](/oss/integrations/embeddings)

@@ -1,0 +1,82 @@
+---
+title: 记录检索器追踪
+sidebarTitle: 记录检索器追踪
+---
+
+<Note>
+即使未以正确格式记录检索器追踪，系统也不会中断，数据仍会被记录。然而，数据将不会以针对检索步骤的特殊方式呈现。
+</Note>
+
+许多LLM应用需要从向量数据库、知识图谱或其他类型的索引中查找文档。检索器追踪是一种记录检索器所获取文档的方法。LangSmith为追踪中的检索步骤提供了特殊渲染，以便更轻松地理解和诊断检索问题。为了使检索步骤正确呈现，需要采取几个小步骤。
+
+1. 使用 `run_type="retriever"` 标注检索步骤。
+
+2. 从检索步骤返回一个Python字典列表或TypeScript对象列表。每个字典应包含以下键：
+
+   * `page_content`：文档的文本内容。
+   * `type`：应始终为 "Document"。
+   * `metadata`：包含文档元数据的Python字典或TypeScript对象。此元数据将在追踪中显示。
+
+以下代码片段展示了如何在Python和TypeScript中记录检索步骤。
+
+<CodeGroup>
+
+```python Python
+from langsmith import traceable
+
+def _convert_docs(results):
+    return [
+        {
+            "page_content": r,
+            "type": "Document",
+            "metadata": {"foo": "bar"}
+        }
+        for r in results
+    ]
+
+@traceable(run_type="retriever")
+def retrieve_docs(query):
+    # Foo检索器返回硬编码的虚拟文档。
+    # 在生产环境中，这可能是真实的向量数据库或其他文档索引。
+    contents = ["Document contents 1", "Document contents 2", "Document contents 3"]
+    return _convert_docs(contents)
+
+retrieve_docs("User query")
+```
+
+```typescript TypeScript
+import { traceable } from "langsmith/traceable";
+
+interface Document {
+    page_content: string;
+    type: string;
+    metadata: { foo: string };
+}
+
+function convertDocs(results: string[]): Document[] {
+    return results.map((r) => ({
+        page_content: r,
+        type: "Document",
+        metadata: { foo: "bar" }
+    }));
+}
+
+const retrieveDocs = traceable((query: string): Document[] => {
+    // Foo检索器返回硬编码的虚拟文档。
+    // 在生产环境中，这可能是真实的向量数据库或其他文档索引。
+    const contents = ["Document contents 1", "Document contents 2", "Document contents 3"];
+    return convertDocs(contents);
+},{
+    name: "retrieveDocs",
+    run_type: "retriever"
+} // traceable的配置
+);
+
+await retrieveDocs("User query");
+```
+
+</CodeGroup>
+
+下图展示了检索步骤在追踪中的呈现方式。每个文档的内容及元数据都会一并显示。
+
+![检索器追踪](/langsmith/images/retriever-trace.png)

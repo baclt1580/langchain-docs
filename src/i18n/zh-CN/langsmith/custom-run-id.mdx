@@ -1,0 +1,88 @@
+---
+title: 指定自定义运行ID
+description: 如何在通过LangSmith进行追踪时指定自定义运行ID。
+---
+
+默认情况下，LangSmith会为每次运行分配一个随机ID。当你需要以下情况时，可以覆盖此默认行为，使用自定义ID：
+
+- 提前知道运行ID（例如，为了在运行后立即附加反馈）。
+- 将LangSmith运行与外部系统的ID关联起来。
+- 通过重用确定性ID使运行具有幂等性。
+
+<Note>
+我们建议使用 **UUID v7** 作为自定义运行ID。UUIDv7嵌入了时间戳，这能确保追踪中运行的正确时间顺序。目前传递非UUIDv7的ID会发出警告，并且在未来版本中将成为强制要求。
+
+LangSmith SDK导出了一个uuid7辅助函数（Python v0.4.43+，JS v0.3.80+）：
+- **Python**：`from langsmith import uuid7`
+- **JS/TS**：`import { uuid7 } from 'langsmith'`
+</Note>
+
+任何UUID v7字符串都是可接受的。你可以传递由LangSmith SDK辅助函数生成的ID，或者如果你的系统已经使用UUID v7标识符，也可以传递你自己的ID。
+
+<Tabs>
+  <Tab title="Python">
+    ### 使用 `@traceable`
+
+    在调用带有 `@[`@traceable`]` 装饰器的函数时，通过 `langsmith_extra` 传递 `run_id`：
+
+    ```python Python
+    from langsmith import traceable, uuid7
+
+    @traceable
+    def my_pipeline(question: str) -> str:
+        return "answer"
+
+    run_id = uuid7()
+    my_pipeline("What is the capital of France?", langsmith_extra={"run_id": run_id})
+
+    # 现在可以使用 run_id 来附加反馈、查询运行等。
+    ```
+
+    ### 使用 `trace` 上下文管理器
+
+    将 `run_id` 直接传递给 @[trace] 上下文管理器的构造函数，为该追踪块设置ID：
+
+    ```python Python
+    from langsmith import trace, uuid7
+
+    run_id = uuid7()
+
+    with trace("my-pipeline", run_id=run_id) as run:
+        result = "answer"
+        run.end(outputs={"result": result})
+
+    # 现在可以使用 run_id 来附加反馈、查询运行等。
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ### 使用 `traceable`
+
+    在传递给 [`traceable`](https://reference.langchain.com/javascript/langsmith/traceable/traceable) 的配置对象中传递 `id`：
+
+    ```typescript TypeScript
+    import { traceable } from "langsmith/traceable";
+    import { uuid7 } from "langsmith";
+
+    const runId = uuid7();
+
+    const myPipeline = traceable(
+      async (question: string) => {
+        return "answer";
+      },
+      { name: "my-pipeline", id: runId }
+    );
+
+    await myPipeline("What is the capital of France?");
+
+    // 现在可以使用 runId 来附加反馈、查询运行等。
+    ```
+
+  </Tab>
+</Tabs>
+
+## 相关链接
+
+- [附加用户反馈](/langsmith/attach-user-feedback)：预先指定运行ID的常见用例。
+- [在追踪函数内访问当前运行（span）](/langsmith/access-current-span)：从追踪内部读取自动分配的ID。
+- [使用LangSmith API进行追踪](/langsmith/trace-with-api)：指定运行ID的低级API方法。
+- [追踪Vercel AI SDK应用程序](/langsmith/trace-with-vercel-ai-sdk)：使用 `wrapAISDK` 指定自定义运行ID。

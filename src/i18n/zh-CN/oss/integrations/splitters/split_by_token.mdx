@@ -1,0 +1,430 @@
+---
+title: "按标记分割 - 文本分割器集成指南"
+---
+
+语言模型有标记数量限制。你不应超过标记限制。因此，当你[将文本分割](/oss/integrations/splitters/)成块时，计算标记数量是一个好主意。存在许多标记化工具。在计算文本中的标记时，应使用与语言模型相同的标记化工具。
+
+:::python
+## tiktoken
+
+<Note>
+**[tiktoken](https://github.com/openai/tiktoken) 是 `OpenAI` 创建的一个快速 `BPE` 标记化工具。**
+</Note>
+
+我们可以使用 `tiktoken` 来估算使用的标记数量。对于 OpenAI 模型，这可能更准确。
+
+1. 文本如何分割：按传入的字符分割。
+2. 块大小如何测量：通过 `tiktoken` 标记化工具。
+
+@[CharacterTextSplitter]、@[RecursiveCharacterTextSplitter] 和 @[TokenTextSplitter] 可以直接与 `tiktoken` 一起使用。
+
+```python
+pip install --upgrade --quiet langchain-text-splitters tiktoken
+```
+
+```python
+from langchain_text_splitters import CharacterTextSplitter
+
+# 这是一个可以分割的长文档。
+with open("state_of_the_union.txt") as f:
+    state_of_the_union = f.read()
+```
+
+要使用 @[CharacterTextSplitter] 进行分割，然后使用 `tiktoken` 合并块，请使用其 `.from_tiktoken_encoder()` 方法。请注意，此方法的分割结果可能大于 `tiktoken` 标记化工具测量的块大小。
+
+`.from_tiktoken_encoder()` 方法接受 `encoding_name`（例如 `cl100k_base`）或 `model_name`（例如 `gpt-4`）作为参数。所有其他参数如 `chunk_size`、`chunk_overlap` 和 `separators` 都用于实例化 `CharacterTextSplitter`：
+
+```python
+text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
+    encoding_name="cl100k_base", chunk_size=100, chunk_overlap=0
+)
+texts = text_splitter.split_text(state_of_the_union)
+```
+
+```python
+print(texts[0])
+```
+```text
+议长女士、副总统女士、第一夫人和第二先生。国会议员和内阁成员。最高法院大法官。我的美国同胞们。
+
+去年，COVID-19 使我们分离。今年我们终于再次相聚。
+
+今晚，我们以民主党人、共和党人和独立人士的身份相聚。但最重要的是，作为美国人。
+
+肩负着对彼此、对美国人民、对宪法的责任。
+```
+
+要对块大小实施硬性约束，我们可以使用 `RecursiveCharacterTextSplitter.from_tiktoken_encoder`，其中每个分割如果大小超过限制，将被递归分割：
+
+```python
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+    model_name="gpt-4",
+    chunk_size=100,
+    chunk_overlap=0,
+)
+```
+
+我们还可以加载 `TokenTextSplitter` 分割器，它直接与 `tiktoken` 配合使用，并确保每个分割都小于块大小。
+
+```python
+from langchain_text_splitters import TokenTextSplitter
+
+text_splitter = TokenTextSplitter(chunk_size=10, chunk_overlap=0)
+
+texts = text_splitter.split_text(state_of_the_union)
+print(texts[0])
+```
+```text
+议长女士、副总统女士、我们的
+```
+
+某些书面语言（例如中文和日文）的字符会编码为两个或更多标记。直接使用 `TokenTextSplitter` 可能会将一个字符的标记分割到两个块中，导致 Unicode 字符损坏。使用 `RecursiveCharacterTextSplitter.from_tiktoken_encoder` 或 `CharacterTextSplitter.from_tiktoken_encoder` 以确保块包含有效的 Unicode 字符串。
+:::
+
+:::js
+## js-tiktoken
+
+<Note>
+**[js-tiktoken](https://github.com/dqbd/tiktoken) 是 `OpenAI` 创建的 `BPE` 标记化工具的 JavaScript 版本。**
+</Note>
+
+我们可以使用 `tiktoken` 通过 @[TokenTextSplitter] 估算使用的标记数量。对于 OpenAI 模型，这可能更准确。
+
+1. 文本如何分割：按传入的字符分割。
+2. 块大小如何测量：通过 `tiktoken` 标记化工具。
+
+<CodeGroup>
+```bash npm
+npm install @langchain/textsplitters
+```
+
+```bash pnpm
+pnpm install @langchain/textsplitters
+```
+
+```bash yarn
+yarn add @langchain/textsplitters
+```
+
+```bash bun
+bun add @langchain/textsplitters
+```
+</CodeGroup>
+
+```ts
+import { TokenTextSplitter } from "@langchain/textsplitters";
+import { readFileSync } from "fs";
+
+// 示例：读取长文档
+const stateOfTheUnion = readFileSync("state_of_the_union.txt", "utf8");
+```
+
+要使用 @[TokenTextSplitter] 进行分割，然后使用 `tiktoken` 合并块，请在初始化 @[TokenTextSplitter] 时传入 `encodingName`（例如 cl100k_base）。请注意，此方法的分割结果可能大于 `tiktoken` 标记化工具测量的块大小。
+
+```ts
+import { TokenTextSplitter } from "@langchain/textsplitters";
+
+// 示例：使用 cl100k_base 编码
+const splitter = new TokenTextSplitter({ encodingName: "cl100k_base", chunkSize: 10, chunkOverlap: 0 });
+
+const texts = splitter.splitText(stateOfTheUnion);
+console.log(texts[0]);
+```
+```text
+议长女士、副总统女士、第一夫人和第二先生。国会议员和内阁成员。最高法院大法官。我的美国同胞们。
+
+去年，COVID-19 使我们分离。今年我们终于再次相聚。
+
+今晚，我们以民主党人、共和党人和独立人士的身份相聚。但最重要的是，作为美国人。
+
+肩负着对彼此、对美国人民、对宪法的责任。
+```
+:::
+
+:::python
+## spaCy
+
+<Note>
+[spaCy](https://spacy.io/) 是一个用于高级自然语言处理的开源软件库，使用 Python 和 Cython 编程语言编写。
+</Note>
+
+LangChain 实现了基于 [spaCy 标记化工具](https://spacy.io/api/tokenizer)的分割器。
+
+1. 文本如何分割：通过 `spaCy` 标记化工具。
+2. 块大小如何测量：按字符数。
+
+```python
+pip install --upgrade --quiet  spacy
+```
+
+```python
+# 这是一个可以分割的长文档。
+with open("state_of_the_union.txt") as f:
+    state_of_the_union = f.read()
+```
+
+```python
+from langchain_text_splitters import SpacyTextSplitter
+
+text_splitter = SpacyTextSplitter(chunk_size=1000)
+
+texts = text_splitter.split_text(state_of_the_union)
+print(texts[0])
+```
+```text
+议长女士、副总统女士、第一夫人和第二先生。
+
+国会议员和内阁成员。
+
+最高法院大法官。
+
+我的美国同胞们。
+
+去年，COVID-19 使我们分离。
+
+今年我们终于再次相聚。
+
+今晚，我们以民主党人、共和党人和独立人士的身份相聚。
+
+但最重要的是，作为美国人。
+
+肩负着对彼此、对美国人民、对宪法的责任。
+
+并以坚定不移的决心，坚信自由终将战胜暴政。
+
+六天前，俄罗斯的弗拉基米尔·普京试图动摇自由世界的根基，以为他能让世界屈服于他的威胁方式。
+
+但他严重误判了。
+
+他以为可以长驱直入乌克兰，而世界会袖手旁观。
+
+相反，他遇到了他从未想象过的力量之墙。
+
+他遇到了乌克兰人民。
+
+从泽连斯基总统到每一个乌克兰人，他们的无畏、勇气和决心激励着世界。
+```
+
+## SentenceTransformers
+
+[`SentenceTransformersTokenTextSplitter`](https://reference.langchain.com/python/langchain-text-splitters/sentence_transformers/SentenceTransformersTokenTextSplitter) 是一个专为 sentence-transformer 模型设计的文本分割器。默认行为是将文本分割成适合你希望使用的 sentence-transformer 模型标记窗口的块。
+
+要根据 sentence-transformers 标记化工具分割文本并约束标记数量，请实例化一个 `SentenceTransformersTokenTextSplitter`。你可以选择指定：
+
+- `chunk_overlap`：标记重叠的整数计数；
+- `model_name`：sentence-transformer 模型名称，默认为 `"sentence-transformers/all-mpnet-base-v2"`；
+- `tokens_per_chunk`：每个块所需的标记数量。
+
+```python
+from langchain_text_splitters import SentenceTransformersTokenTextSplitter
+
+splitter = SentenceTransformersTokenTextSplitter(chunk_overlap=0)
+text = "Lorem "
+
+count_start_and_stop_tokens = 2
+text_token_count = splitter.count_tokens(text=text) - count_start_and_stop_tokens
+print(text_token_count)
+```
+```text
+2
+```
+
+```python
+token_multiplier = splitter.maximum_tokens_per_chunk // text_token_count + 1
+
+# `text_to_split` 无法放入单个块中
+text_to_split = text * token_multiplier
+
+print(f"要分割的文本中的标记数: {splitter.count_tokens(text=text_to_split)}")
+```
+```text
+要分割的文本中的标记数: 514
+```
+
+```python
+text_chunks = splitter.split_text(text=text_to_split)
+
+print(text_chunks[1])
+```
+```text
+lorem
+```
+
+## NLTK
+
+<Note>
+**[自然语言工具包](https://en.wikipedia.org/wiki/Natural_Language_Toolkit)，或更常见的 [NLTK](https://www.nltk.org/)，是一套用于符号和统计自然语言处理（NLP）的库和程序，用 Python 编程语言编写，主要针对英语。**
+</Note>
+
+我们不仅可以根据 "\n\n" 分割，还可以使用 `NLTK` 基于 [NLTK 标记化工具](https://www.nltk.org/api/nltk.tokenize.html)进行分割。
+
+1. 文本如何分割：通过 `NLTK` 标记化工具。
+2. 块大小如何测量：按字符数。
+
+```python
+# pip install nltk
+```
+
+```python
+# 这是一个可以分割的长文档。
+with open("state_of_the_union.txt") as f:
+    state_of_the_union = f.read()
+```
+
+```python
+from langchain_text_splitters import NLTKTextSplitter
+
+text_splitter = NLTKTextSplitter(chunk_size=1000)
+```
+
+```python
+texts = text_splitter.split_text(state_of_the_union)
+print(texts[0])
+```
+```text
+议长女士、副总统女士、第一夫人和第二先生。
+
+国会议员和内阁成员。
+
+最高法院大法官。
+
+我的美国同胞们。
+
+去年，COVID-19 使我们分离。
+
+今年我们终于再次相聚。
+
+今晚，我们以民主党人、共和党人和独立人士的身份相聚。
+
+但最重要的是，作为美国人。
+
+肩负着对彼此、对美国人民、对宪法的责任。
+
+并以坚定不移的决心，坚信自由终将战胜暴政。
+
+六天前，俄罗斯的弗拉基米尔·普京试图动摇自由世界的根基，以为他能让世界屈服于他的威胁方式。
+
+但他严重误判了。
+
+他以为可以长驱直入乌克兰，而世界会袖手旁观。
+
+相反，他遇到了他从未想象过的力量之墙。
+
+他遇到了乌克兰人民。
+
+从泽连斯基总统到每一个乌克兰人，他们的无畏、勇气和决心激励着世界。
+
+公民团体用身体阻挡坦克。
+```
+
+## KoNLPY
+
+<Note>
+[KoNLPy: Python 中的韩语自然语言处理](https://konlpy.org/en/latest/) 是一个用于韩语自然语言处理（NLP）的 Python 包。
+</Note>
+
+标记分割涉及将文本分割成更小、更易管理的单元，称为标记。这些标记通常是单词、短语、符号或其他对进一步处理和分析至关重要的有意义的元素。在英语等语言中，标记分割通常涉及按空格和标点符号分隔单词。标记分割的有效性在很大程度上取决于标记化工具对语言结构的理解，确保生成有意义的标记。由于为英语设计的标记化工具无法理解其他语言（如韩语）的独特语义结构，因此不能有效地用于韩语处理。
+
+### 使用 KoNLPy 的 kkma 分析器进行韩语标记分割
+对于韩语文本，KoNLPY 包含一个称为 `Kkma`（韩语知识形态分析器）的形态分析器。`Kkma` 提供韩语文本的详细形态分析。它将句子分解为单词，并将单词分解为各自的形态素，识别每个标记的词性。它可以将文本块分割成单独的句子，这对于处理长文本特别有用。
+
+### 使用注意事项
+虽然 `Kkma` 以其详细分析而闻名，但需要注意的是，这种精确性可能会影响处理速度。因此，`Kkma` 最适合那些分析深度优先于快速文本处理的应用场景。
+
+```python
+# pip install konlpy
+```
+
+```python
+# 这是一个我们想要分割成其组成句子的长韩语文档。
+with open("./your_korean_doc.txt") as f:
+    korean_document = f.read()
+```
+
+```python
+from langchain_text_splitters import KonlpyTextSplitter
+
+text_splitter = KonlpyTextSplitter()
+```
+
+```python
+texts = text_splitter.split_text(korean_document)
+# 句子用 "\n\n" 字符分割。
+print(texts[0])
+```
+```text
+春香传 从前，在南原有一个叫李道令的官吏的儿子。
+
+他的外貌如明月般英俊，他的学识和技艺也胜过他人。
+
+与此同时，这个村子里住着一位叫春香的绝世佳人。
+
+春香的美貌如花，深受村民们的喜爱。
+
+某个春日，道令和朋友外出游玩时遇到了春香，一见钟情。
+
+两人相爱了，并立即交换了秘密的爱情誓言。
+
+但美好的日子并没有持续太久。
+
+道令的父亲被调往其他地方，道令也不得不离开。
+
+在离别的痛苦中，两人约定重逢，并承诺彼此信任和等待。
+
+然而，新上任的官衙使道对春香的美貌起了贪念，开始强迫她。
+
+春香为了守护对道令的爱情，坚决拒绝了使道的要求。
+
+愤怒的使道将春香关进监狱，并施以残酷的刑罚。
+
+故事以李道令升任高官后救出春香而结束。
+
+两人历经漫长考验后重逢，他们的爱情传遍全世界，并流传后世。
+
+- 春香传 (The Tale of Chunhyang)
+```
+
+## Hugging Face 标记化工具
+
+[Hugging Face](https://huggingface.co/docs/tokenizers/index) 有许多标记化工具。
+
+我们使用 Hugging Face 标记化工具，即 [GPT2TokenizerFast](https://huggingface.co/Ransaka/gpt2-tokenizer-fast) 来计算文本的标记长度。
+
+1. 文本如何分割：按传入的字符分割。
+2. 块大小如何测量：通过 `Hugging Face` 标记化工具计算的标记数量。
+
+```python
+from transformers import GPT2TokenizerFast
+
+tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+```
+
+```python
+# 这是一个可以分割的长文档。
+with open("state_of_the_union.txt") as f:
+    state_of_the_union = f.read()
+from langchain_text_splitters import CharacterTextSplitter
+```
+
+```python
+text_splitter = CharacterTextSplitter.from_huggingface_tokenizer(
+    tokenizer, chunk_size=100, chunk_overlap=0
+)
+texts = text_splitter.split_text(state_of_the_union)
+```
+
+```python
+print(texts[0])
+```
+```text
+议长女士、副总统女士、第一夫人和第二先生。国会议员和内阁成员。最高法院大法官。我的美国同胞们。
+
+去年，COVID-19 使我们分离。今年我们终于再次相聚。
+
+今晚，我们以民主党人、共和党人和独立人士的身份相聚。但最重要的是，作为美国人。
+
+肩负着对彼此、对美国人民、对宪法的责任。
+```
+:::

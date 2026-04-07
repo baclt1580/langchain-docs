@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 from pathlib import Path
+from typing import ClassVar
 
 import yaml
 from tqdm import tqdm
@@ -774,7 +775,7 @@ class DocumentationBuilder:
             return True
 
         # Directories whose contents should be shared
-        shared_dirs = {"images", "snippets", ".well-known", "fonts"}
+        shared_dirs = {"images", "snippets", ".well-known", "fonts", "i18n"}
         if shared_dirs & set(relative_path.parts):
             return True
 
@@ -824,14 +825,14 @@ class DocumentationBuilder:
         logger.info("✅ Shared files copied: %d files", copied_count)
 
     # Maps npm dist filenames to their output names in build/snippets/
-    _NPM_SNIPPET_FILES: dict[str, str] = {
+    _NPM_SNIPPET_FILES: ClassVar[dict[str, str]] = {
         "ChatLangChainEmbed.jsx": "chat-langchain-embed.jsx",
         "PatternEmbed.jsx": "pattern-embed.jsx",
         "ExampleEmbed.jsx": "example-embed.jsx",
     }
 
     # Maps npm dist filenames to their output names in build/ (served at site root).
-    _NPM_BUILD_FILES: dict[str, str] = {
+    _NPM_BUILD_FILES: ClassVar[dict[str, str]] = {
         "ChatLangChainEmbed.js": "ChatLangChainEmbed.js",
     }
 

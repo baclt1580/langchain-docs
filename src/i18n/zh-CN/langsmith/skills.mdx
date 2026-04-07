@@ -1,0 +1,85 @@
+---
+title: LangSmith 技能
+sidebarTitle: 技能
+icon: puzzle
+description: 使用 Agent Skills 从您的编码智能体中处理 LangSmith 的追踪记录、数据集和评估器。
+---
+
+Agent Skills 是可复用、按需调用的能力集合，包含指令及可选的辅助脚本。本页面汇总了面向 LangSmith 的技能，您可以将其添加到兼容的编码智能体中，以查询追踪记录、生成数据集和定义评估器。若要从终端直接处理相同的 LangSmith 数据，请使用 [LangSmith CLI](/langsmith/langsmith-cli)。
+
+<Note>
+这些技能遵循 Agent Skills 规范，并维护在 [`langsmith-skills` GitHub 仓库](https://github.com/langchain-ai/langsmith-skills)中。您可以将 `SKILL.md` 以及引用的 `scripts/` 目录复制到您智能体的技能目录中。下方的安装程序仅安装 LangSmith 相关技能（追踪、数据集、评估器）。
+</Note>
+
+## 快速安装
+
+使用 `npx skills` 仅安装 LangSmith 技能（追踪、数据集、评估器）：
+
+<CodeGroup>
+```bash 本地（当前项目）
+npx skills add langchain-ai/langsmith-skills --skill '*' --yes
+```
+
+```bash 全局（所有项目）
+npx skills add langchain-ai/langsmith-skills --skill '*' --yes --global
+```
+
+```bash 链接到特定智能体（例如 Claude Code）
+npx skills add langchain-ai/langsmith-skills --agent claude-code --skill '*' --yes --global
+```
+</CodeGroup>
+
+<Tip>
+如需更新，请重新运行命令。如果目标技能文件夹已存在，请先将其删除（例如 `rm -rf ~/.claude/skills/langsmith-*`）。
+</Tip>
+
+## 配置环境
+
+安装技能后，设置所有 LangSmith 技能、辅助脚本以及 [LangSmith CLI](/langsmith/langsmith-cli) 使用的环境变量：
+
+```bash
+export LANGSMITH_API_KEY=<您的密钥>
+# 可选默认值
+export LANGSMITH_PROJECT=<默认项目>
+# 高级：仅适用于多工作区或某些自托管设置
+# export LANGSMITH_WORKSPACE_ID=<工作区ID>
+```
+
+## 这些技能涵盖的内容
+
+- [追踪记录](/langsmith/observability-concepts#traces)：为应用添加追踪；列出、筛选、检查和导出追踪记录以进行调试和分析。
+- [数据集](/langsmith/evaluation-concepts#datasets)：将追踪记录转换为评估数据集（final_response、single_step、trajectory、RAG），并可选择上传到 LangSmith。
+- [评估器](/langsmith/evaluation-concepts#evaluators)：定义代码或 LLM 作为评判者的评估器，并将其附加到数据集（离线）或项目（在线）。
+
+每个技能目录都包含一个 `SKILL.md` 文件以及可选的 `scripts/` 辅助脚本，您可以运行或适配这些脚本。这些技能设计用于接入兼容的编码智能体（如 Claude Code 或 DeepAgents CLI），但如果您不希望配置完整的智能体，也可以直接复用这些辅助脚本。对于更重的查询、导出或自动化任务，您可以结合使用这些技能与 [LangSmith CLI](/langsmith/langsmith-cli)，从终端对相同的项目、数据集和评估器进行脚本操作。
+
+## 手动安装
+
+克隆仓库并运行安装脚本以获取更多选项：
+
+```bash
+git clone https://github.com/langchain-ai/langsmith-skills.git
+cd langsmith-skills
+
+# 在当前目录为 Claude Code 安装（默认）
+./install.sh
+
+# 为 Claude Code 全局安装
+./install.sh --global
+
+# 在当前目录为 DeepAgents CLI 安装
+./install.sh --deepagents
+
+# 为 DeepAgents CLI 全局安装（包含智能体角色）
+./install.sh --deepagents --global
+
+# 仅安装 LangSmith 技能（任何目标）
+./install.sh --langsmith
+```
+
+如果您希望仅复制特定技能，请将 `config/skills/` 中所需的目录复制到您智能体的技能文件夹中。
+
+包含的 LangSmith 技能：
+- langsmith-trace — 追踪记录（查询/导出）
+- langsmith-dataset — 数据集（生成/上传）
+- langsmith-evaluator — 评估器（创建/附加）

@@ -1,0 +1,76 @@
+---
+title: "Friendli 集成"
+description: "使用 LangChain JavaScript 与 Friendli LLM 集成。"
+---
+
+> [Friendli](https://friendli.ai/) 通过可扩展、高效的部署选项提升 AI 应用性能并优化成本节约，专为高需求的 AI 工作负载量身定制。
+
+本教程将指导您如何将 `Friendli` 与 LangChain 集成。
+
+## 设置
+
+确保已安装 `@langchain/community`。
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+登录 [Friendli Suite](https://suite.friendli.ai/) 创建个人访问令牌，并将其设置为 `FRIENDLI_TOKEN` 环境变量。
+您可以将团队 ID 设置为 `FRIENDLI_TEAM` 环境变量。
+
+您可以通过选择要使用的模型来初始化 Friendli 聊天模型。默认模型为 `mixtral-8x7b-instruct-v0-1`。您可以在 [docs.friendli.ai](https://docs.friendli.ai/guides/serverless_endpoints/pricing#text-generation-models) 查看可用模型。
+
+## 使用
+
+```typescript
+import { Friendli } from "@langchain/community/llms/friendli";
+
+const model = new Friendli({
+  model: "mixtral-8x7b-instruct-v0-1", // 默认值
+  friendliToken: process.env.FRIENDLI_TOKEN,
+  friendliTeam: process.env.FRIENDLI_TEAM,
+  maxTokens: 18,
+  temperature: 0.75,
+  topP: 0.25,
+  frequencyPenalty: 0,
+  stop: [],
+});
+
+const response = await model.invoke(
+  "检查语法：She dont like to eat vegetables, but she loves fruits."
+);
+
+console.log(response);
+
+/*
+正确：She doesn't like to eat vegetables, but she loves fruits
+*/
+
+const stream = await model.stream(
+  "检查语法：She dont like to eat vegetables, but she loves fruits."
+);
+
+for await (const chunk of stream) {
+  console.log(chunk);
+}
+
+/*
+Cor
+rect
+:
+ She
+ doesn
+...
+she
+ loves
+ fruits
+*/
+```
+
+## 相关
+
+- [模型指南](/oss/langchain/models)

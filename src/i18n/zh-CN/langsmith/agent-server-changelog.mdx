@@ -1,0 +1,656 @@
+: Agent Server 更新日志
+sidebarTitle: Agent Server 更新日志
+rss: true
+---
+
+<Callout icon="rss" color="#4F46E5" iconType="regular">
+**订阅**：我们的更新日志包含 [RSS 订阅源](https://docs.langchain.com/langsmith/agent-server-changelog/rss.xml)，可集成到 [Slack](https://slack.com/help/articles/218688467-Add-RSS-feeds-to-Slack)、[电子邮件](https://zapier.com/apps/email/integrations/rss/1441/send-new-rss-feed-entries-via-email)、Discord 机器人（如 [Readybot](https://readybot.io/) 或 [RSS Feeds to Discord Bot](https://rss.app/en/bots/rssfeeds-discord-bot)）以及其他订阅工具中。
+</Callout>
+
+[Agent Server](/langsmith/agent-server) 是一个用于创建和管理基于代理的应用程序的 API 平台。它提供内置的持久化、任务队列，并支持大规模部署、配置和运行助手（代理工作流）。本更新日志记录了 Agent Server 版本的所有显著更新、功能和修复。
+
+<Update label="2026-03-27" tags={["agent-server"]}>
+## v0.7.90
+
+- 改进了 DR 流程中的错误处理，并为测试设置了 30 秒的默认超时，以确保及时跟踪 CI 失败。
+- 将 picomatch 从 4.0.3 升级到 4.0.4，以解决关键的安全漏洞。
+</Update>
+
+<Update label="2026-03-25" tags={["agent-server"]}>
+## v0.7.89
+
+- 增强了队列服务器指标，并确立了对 OpenTelemetry SDK 的要求。
+- 为 `COUNTER_RUN_FAILED_AFTER_RETRY` 指标添加了缺失的标签，以提高监控准确性。
+</Update>
+
+<Update label="2026-03-24" tags={["agent-server"]}>
+## v0.7.87
+
+- 实现了因 Redis 相关流错误导致的运行失败重试，并添加了警告日志以提高可见性。
+</Update>
+
+<Update label="2026-03-23" tags={["agent-server"]}>
+## v0.7.86
+
+- 在所有镜像中将默认的 `DD_TRACE_ENABLED` 设置为 `false`，以减少非 Datadog 部署中 Orchestrion 的日志噪音。
+</Update>
+
+<Update label="2026-03-23" tags={["agent-server"]}>
+## v0.7.84
+
+- 将嘈杂的警告级别日志降级为信息级别，以减少日志混乱，重点关注诸如许可证精简模式和跟踪禁用等信息状态消息。
+- 使用 Orchestrion DD APM 跟踪增强了 Go `core-api-grpc`，以实现自动仪表化和改进的跟踪上下文传播。
+</Update>
+
+<Update label="2026-03-19" tags={["agent-server"]}>
+## v0.7.82
+
+- 通过保留 `kind` 判别器并在所有客户端方法名称格式的响应中使用小写状态/角色，确保符合 A2A 协议。
+</Update>
+
+<Update label="2026-03-18" tags={["agent-server"]}>
+## v0.7.79
+
+- 引入了 `swr` 函数的测试版，以改进数据获取能力。
+- 将所有 Dockerfile 和 `go.mod` 中的 Go 运行时升级到版本 1.25.8，以解决多个 CVE。
+</Update>
+
+<Update label="2026-03-17" tags={["agent-server"]}>
+## v0.7.77
+
+- 引入了 `HTTP_MAX_REQUEST_BODY_BYTES` 配置，将 HTTP 请求体大小限制为 300MB，对超大请求返回 413 错误，以防止内存耗尽。
+- 在 JS 图工厂中增加了通过配置访问存储和检查点的支持，以促进深度代理初始化。
+- 将 `pyasn1` 依赖从 0.6.2 版本更新到 0.6.3，以增强安全性并修复解析问题。
+- 添加了用于记录流式端点的首字节时间 (TTFB) 和响应大小的检测工具，改进了访问日志详情。
+</Update>
+
+<Update label="2026-03-17" tags={["agent-server"]}>
+## v0.7.76
+
+- 放宽了 `starlette-sse` 的版本限制，以改善依赖兼容性。
+</Update>
+
+<Update label="2026-03-17" tags={["agent-server"]}>
+## v0.7.75
+
+- 正确关闭了 `Runs.Enter` 中的流以防止缓冲区问题，并添加了可配置的窗口大小环境变量。
+</Update>
+
+<Update label="2026-03-16" tags={["agent-server"]}>
+## v0.7.74
+
+- 清理了队列关闭操作期间的一些错误日志。
+</Update>
+
+<Update label="2026-03-16" tags={["agent-server"]}>
+## v0.7.73
+
+- 通过避免对大型 JSONB 值进行不必要的解压，改进了使用 `extract` 的线程搜索性能。
+</Update>
+
+<Update label="2026-03-13" tags={["agent-server"]}>
+## v0.7.72
+
+- 将 undici 包从 7.22.0 版本更新到 7.24.0，以解决多个安全漏洞。
+</Update>
+
+<Update label="2026-03-13" tags={["agent-server"]}>
+## v0.7.71
+
+- 通过从线程状态检查点和运行创建方法中移除未使用的参数，清理了 API。
+- 修复了 `POST /threads/prune` 与 `strategy=delete` 的问题，确保线程记录被完全移除，而不仅仅是检查点数据。
+- 为响应对象添加了 A2A 1.0 `kind` 判别器，移除了 `{"task": ...}` 包装器，并修复了 Anthropic 流式传输元数据问题。
+- 添加了对 Redis 队列中自定义加密的支持，以增强数据安全性。
+</Update>
+
+<Update label="2026-03-11" tags={["agent-server"]}>
+## v0.7.69
+
+- 为 cron 添加了可选的 `timezone` 字段，允许在用户指定的时区中计算 `next_run_date`，默认为 UTC。
+- 纠正了身份验证异常中 401 状态码的处理，防止错误地默认为 403。
+</Update>
+
+<Update label="2026-03-10" tags={["agent-server"]}>
+## v0.7.68
+
+- 修复了非 DR 检查点 AES JSON 的问题，以改进功能并扩展测试覆盖范围。
+- 修复了 A2A 流式传输，以根据规范正确地将中断工件作为单独的 `artifact-update` 事件发出。
+- 通过仅提取经过验证和安全的成员，确保安全的 tarfile 提取，防止任意文件写入漏洞。
+- 通过在身份验证中间件中要求 `noauth` 路径完全匹配来增强安全性。
+- 修复了在多任务策略中回滚期间将过时检查点值写入线程状态的问题。
+</Update>
+
+<Update label="2026-03-06" tags={["agent-server"]}>
+## v0.7.66
+
+- 当 `LANGGRAPH_CHECKPOINTER` 未设置时，添加了回退到 `LS_CHECKPOINTER_BACKEND` 以进行默认检查点配置。
+</Update>
+
+<Update label="2026-03-05" tags={["agent-server"]}>
+## v0.7.65
+
+- 修复了 `messages-tuple` 流式传输模式中的一个错误，该错误导致 `tool_call_chunks` 包含 `args_json` 而不是 `args`，从而阻止消息重建并导致错误。
+</Update>
+
+<Update label="2026-03-05" tags={["agent-server"]}>
+## v0.7.64
+
+- 启用了通过 `LS_MONGODB_URI` 或 `MONGODB_URI` 环境变量设置 MongoDB 检查点 URI，并具有优先级规则。
+</Update>
+
+<Update label="2026-03-04" tags={["agent-server"]}>
+## v0.7.63
+
+- 修复了一个可能导致无效运行耗尽工作线程从而死锁队列实例的错误。
+</Update>
+
+<Update label="2026-03-02" tags={["agent-server"]}>
+## v0.7.61
+
+- 修复了一个竞争条件，以确保健康检查和指标服务器的优雅关闭。
+</Update>
+
+<Update label="2026-02-27" tags={["agent-server"]}>
+## v0.7.59
+
+- 更新了 Redis 队列以使用带有线程的 zset，将 CPU 使用率降低了 25%，并通过消除不必要的锁定和优化索引来提高性能。
+</Update>
+
+<Update label="2026-02-26" tags={["agent-server"]}>
+## v0.7.58
+
+- 将 `storage_postgres/uv.lock` 中的 `langgraph-checkpoint` 升级到 4.0.0，以解决 CVE-2026-27794，并对依赖固定问题进行了调整。
+</Update>
+
+<Update label="2026-02-26" tags={["agent-server"]}>
+## v0.7.57
+
+- 修复了一个阻止所有用户创建与系统图关联的 cron 的回归问题。
+</Update>
+
+<Update label="2026-02-25" tags={["agent-server"]}>
+## v0.7.56
+
+- 在存储 HTTP API 端点中添加了对 `ttl`、`index` 和 `refresh_ttl` 参数的支持，以与 SDK 和进程内存储接口保持一致。
+- 在 `GET /threads/{thread_id}` 端点中添加了对 `?include=ttl` 查询参数的支持，以返回 TTL 信息。
+- 更新了指标报告，以准确统计 PostgreSQL 和 Redis 连接，确保 GRPC 和 Python 指标之间的统计信息一致。
+</Update>
+
+<Update label="2026-02-25" tags={["agent-server"]}>
+## v0.7.55
+
+- 修复了在新的 cron 调度器后端中导致重复运行调度的问题。
+- 重构了 `GET /docs` 端点，使其从静态 OpenAPI 规范中读取，以提高与自定义入口配置的兼容性。
+</Update>
+
+<Update label="2026-02-24" tags={["agent-server"]}>
+## v0.7.54
+
+- 解决了由于硬编码值导致 gRPC 服务的自定义加密上下文无法正确加载的问题。
+</Update>
+
+<Update label="2026-02-24" tags={["agent-server"]}>
+## v0.7.52
+
+- 在提供 `feedback_keys` 时，向 `/wait` 和 `/join` 端点的响应中添加了位于 `__feedback__` 键下的反馈 URL。
+- 向分布式运行时添加了 feedback_keys 支持，包括使用 langsmith-go SDK 生成预签名反馈令牌。
+- 将 Werkzeug 从 3.1.5 版本升级到 3.1.6，以解决 Windows 上多段路径中特殊设备名称的安全问题。
+- 将 Go 运行时升级到 1.25.7，以解决漏洞扫描中发现的关键和高严重性 CVE。
+</Update>
+
+<Update label="2026-02-22" tags={["agent-server"]}>
+## v0.7.51
+
+- 改进了上游中断期间许可证检查的弹性，包括缓存回退、24 小时宽限期以及 Redis 条目的自动清理。
+- 确保当 `LANGSERVE_GRAPHS` 配置更改时，在启动时同步助手描述和名称。
+- 通过引入两级协议层次结构并修复能力检测以直接支持扩展方法，增强了检查点 API。
+</Update>
+
+<Update label="2026-02-20" tags={["agent-server"]}>
+## v0.7.49
+
+- 请求负载中的保留元数据键现在会被静默剥离，而不是导致 422 错误，从而改善用户体验。
+- 修复了在没有显式 TTL 参数的情况下写入项时，存储默认 TTL 未被应用的问题。
+</Update>
+
+<Update label="2026-02-19" tags={["agent-server"]}>
+## v0.7.46
+
+- Webhook 中的结构化错误负载现在包含 `error` 和 `message` 字段，取代了之前的纯字符串格式，这可能会影响解析 `error` 字段的系统。
+- 使用命名空间重写扩展了存储身份验证测试，以增强命名空间处理和跨用户隔离。
+</Update>
+
+<Update label="2026-02-19" tags={["agent-server"]}>
+## v0.7.45
+
+- 在所有处理路径中用 U+FFFD 替换空字节，以防止键冲突。
+</Update>
+
+<Update label="2026-02-19" tags={["agent-server"]}>
+## v0.7.44
+- 增加数据库 URI 解析器的灵活性
+- 对一些负载添加额外的验证
+</Update>
+
+<Update label="2026-02-18" tags={["agent-server"]}>
+## v0.7.40
+
+- 修复了助手创建中的一个回归问题，确保当未提供 `metadata` 和 `config` 时，它们被填充为空对象 `{}` 而不是 `null`。
+</Update>
+
+<Update label="2026-02-17" tags={["agent-server"]}>
+## v0.7.39
+
+- 确保在分布式运行时操作中正确传递身份验证配置，以改进执行器功能。
+- 为使用基于 RHEL 容器的企业客户添加了对基于 Red Hat UBI-9 的 Docker 镜像的支持。
+- 为分布式运行时添加了优雅关闭交接，允许进行中的运行转移到下一个 Pod，而无需使用重试尝试。
+</Update>
+
+<Update label="2026-02-17" tags={["agent-server"]}>
+## v0.7.38
+
+- 向线程添加了 `state_updated_at` 字段，用于跟踪有意义的状态更改，允许基于这些更改进行过滤和排序。
+- 添加了在核心系统中调度 cron 的支持。
+- 确保使用 x-forwarded-proto 标头在代理卡中准确显示 `https` 协议，以实现正确的 A2A 客户端功能。
+</Update>
+
+<Update label="2026-02-15" tags={["agent-server"]}>
+## v0.7.37
+
+- 在 BYOC 检查点适配器中为 `acopy_thread`、`aprune` 和 `adelete_for_runs` 添加了通用回退，简化了自定义检查点的实现。
+</Update>
+
+<Update label="2026-02-13" tags={["agent-server"]}>
+## v0.7.36
+
+- 将 A2A 协议支持更新到 v1.0 RC，重命名了 JSON-RPC 方法，添加了 ListTasks 处理程序，并增强了角色、状态和部分格式，以改进集成和合规性。
+- 改进了 `Crons.search()` 和 `Crons.count()` 的身份验证过滤，以防止未经授权的线程信息访问。
+- 修复了 BYOC 检查点在复制、回滚和命名空间过滤操作中的缺口，确保在不同存储后端之间正确处理。
+</Update>
+
+<Update label="2026-02-13" tags={["agent-server"]}>
+## v0.7.35
+
+- 向 MCP `tools/call` 和 A2A `message/send` 及 `message/stream` 端点添加了一个可选的 `context` 参数，使中间件能够从标头注入运行时上下文。
+</Update>
+
+<Update label="2026-02-13" tags={["agent-server"]}>
+## v0.7.33
+
+- 通过移除自定义检查点测试跳过、改进类型序列化以及添加缺失的 Redis 方法，增强了 Redis 测试夹具。
+- 通过清理单引号 HTML onload 属性中的消息名称，解决了 handle_ui 端点中存储的 XSS 漏洞。
+- 修复了 `put_item` 中的授权绕过问题，以确保身份验证处理程序正确重写命名空间。
+- 在运行创建期间强制执行助手所有权检查，防止在非拥有的助手上执行，同时确保系统助手对所有经过身份验证的用户保持可访问。
+- 当使用 LANGGRAPH_AES_KEY 时，在 Go 检查点中为检查点 blob 和写入实现了 AES 加密。
+- 使用所有必要的方法和转换辅助工具实现了初始检查点 gRPC 服务程序。
+</Update>
+
+<Update label="2026-02-11" tags={["agent-server"]}>
+## v0.7.32
+
+- 清理了流和 A2A 响应中的错误消息，以保护敏感信息，如数据库连接字符串和内部主机名。
+- 修复了 `join_run_stream` 中的一个错误，以正确处理多个 `stream_mode` 参数，确保正确解析字符串化的 JSON 列表。
+- 为 Node.js 24 镜像添加了构建、测试和发布流程，支持最新的 LTS 版本。
+- 使用新功能和改进的元数据丰富功能增强了自定义检查点适配器，以实现一致的 API 响应。
+- 为执行器 Docker 镜像中的 langgraph 库添加了更严格的版本约束，以防止意外升级。
+- 通过清理 SSE 事件和 id 字段，增强了安全性，防止 CR/LF 注入。
+- 修复了一个导致由 cron 创建的运行使用默认加密上下文而不是正确传播指定上下文的问题。
+</Update>
+
+<Update label="2026-02-11" tags={["agent-server"]}>
+## v0.7.31
+
+- 纠正了元数据读取功能，以确保准确的数据处理。
+</Update>
+
+<Update label="2026-02-10" tags={["agent-server"]}>
+## v0.7.30
+
+- 传播了 cron 元数据，以提供更全面的调度信息。
+- 在 `PATCH` 请求中合并 cron 元数据，通过保留现有数据来与其他端点保持一致。
+</Update>
+
+<Update label="2026-02-10" tags={["agent-server"]}>
+## v0.7.29
+
+- 细化了 cron 创建的身份验证语义，以防止权限提升，并确保对 cron、线程和助手进行独立的过滤。
+- 验证了 tar 文件条目，以防止 cloudflared 下载过程中的目录遍历漏洞。
+- 向 `SearchThreadsRequest` 添加了 IDs 过滤器，以简化线程端点操作。
+- 更新了回退机制，使用 Python Postgres 连接来处理线程状态，修复了工作线程完成检查点的问题。
+- 引入了一个功能标志下的 Redis 队列实现的初始版本，并持续更新。
+</Update>
+
+<Update label="2026-02-07" tags={["agent-server"]}>
+## v0.7.28
+
+- MCP 和 gRPC 的内部维护和稳定性改进。
+</Update>
+
+<Update label="2026-02-07" tags={["agent-server"]}>
+## v0.7.27
+
+- 通过移除常见的消息类型，改进了 MCP 工具输入模式，使工具定义更清晰。
+- 为 MCP 工具添加了名称清理功能，以确保有效的工具名称。
+</Update>
+
+<Update label="2026-02-07" tags={["agent-server"]}>
+## v0.7.26
+
+- 为入口的系统键添加了验证。
+</Update>
+
+<Update label="2026-02-06" tags={["agent-server"]}>
+## v0.7.25
+
+- 切换了 Python 队列工作线程以使用核心 go `Runs.next()`。
+- 修复了长查询监控器中的一个监控问题。
+</Update>
+
+<Update label="2026-02-06" tags={["agent-server"]}>
+## v0.7.24
+
+- 优化了 Postgres 连接处理，以防止在高负载下达到连接限制，并移除了不必要的错误日志。
+- 切换到使用 gRPC 进行运行管理和流式传输的新后端。
+</Update>
+
+<Update label="2026-02-05" tags={["agent-server"]}>
+## v0.7.23
+
+- 纠正了 `RunCommand` 中 `input` 字段的解组过程，以确保准确的数据映射，并启用了一个之前被门控的 JS 测试。
+- 通过在开始执行之前完全订阅，确保了运行流式传输的竞争条件处理，并添加了对 `FF_LOG_DROPPED_EVENTS` 环境变量的支持。
+</Update>
+
+<Update label="2026-02-04" tags={["agent-server"]}>
+## v0.7.22
+
+- 确保 `get_store()` 在自定义路由中工作，从而允许从用户定义的 Starlette 端点访问存储。
+</Update>
+
+<Update label="2026-02-05" tags={["agent-server"]}>
+## v0.7.21
+
+- 支持 PATCH /crons/{cron_id}
+</Update>
+
+<Update label="2026-02-04" tags={["agent-server"]}>
+## v0.7.19
+
+- 核心 API 的自定义加密改进。
+</Update>
+
+<Update label="2026-02-04" tags={["agent-server"]}>
+## v0.7.18
+
+- 更新了核心 API 使用的线程流式传输。
+</Update>
+
+<Update label="2026-02-03" tags={["agent-server"]}>
+## v0.7.17
+
+- OTEL 的检测现在需要使用 `LS_APM_OTEL_ENABLED=true` 显式选择加入，以实现更好的控制。
+</Update>
+
+<Update label="2026-02-03" tags={["agent-server"]}>
+## v0.7.16
+
+- 将线程流式传输切换到新的 gRPC 后端，以提高性能。
+- 在 DR 中引入了副本跟踪，以增强 Studio 中的评估能力。
+</Update>
+
+<Update label="2026-02-03" tags={["agent-server"]}>
+## v0.7.15
+
+- 添加了使用新 `is_enabled` 字段暂停 cron 的支持，只允许执行启用的 cron。
+- 引入了对 JSON 加密和解密操作的 gRPC 服务器支持。
+</Update>
+
+<Update label="2026-02-02" tags={["agent-server"]}>
+## v0.7.14
+
+- 确保选定的系统字段被排除在自定义加密之外，以防止对非敏感数据进行不必要的加密。
+- 引入了一个自定义检查点适配器，并附带单元测试以验证实现检查。
+</Update>
+
+<Update label="2026-01-29" tags={["agent-server"]}>
+## v0.7.13
+
+- 修复了一个错误，当设置了挂载前缀时，应用程序状态未能通过请求正确保留。
+</Update>
+
+<Update label="2026-01-28" tags={["agent-server"]}>
+## v0.7.11
+
+- 添加了配置来控制哪些负载字段可以暴露给 webhook。
+- 将 `/api/langgraph_api/js` 组中的所有依赖项（包括 `@langchain/core`、`hono`、`@types/react` 和 `prettier`）更新到最新版本，以提高性能和安全性。
+- 将 `hono` 从 4.11.4 版本升级到 4.11.7，以解决中间件中的多个安全漏洞。
+</Update>
+
+<Update label="2026-01-27" tags={["agent-server"]} rss={{ title: "2026-01-27 - agent-server" }}>
+## v0.7.10
+
+- 将 gRPC 服务器启动超时时间增加到 1 分钟，以防止与核心服务器偶尔出现连接超时。
+- 将 @langchain/langgraph 从 1.1.0 版本更新到 1.1.2，引入了对 StateGraph 的混合模式支持以及 GraphNode 和 ConditionalEdgeRouter 实用工具的类型包模式。
+</Update>
+
+<Update label="2026-01-23" tags={["agent-server"]} rss={{ title: "2026-01-23 - agent-server" }}>
+## v0.7.9
+
+- A2A `messageId` 现在被映射到 LangChain 消息 ID，以便跨协议正确跟踪消息。
+</Update>
+
+<Update label="2026-01-22" tags={["agent-server"]} rss={{ title: "2026-01-22 - agent-server" }}>
+## v0.7.7
+
+- 确保在 gRPC 序列化期间保留检查点元数据中的自定义可配置字段。
+</Update>
+
+<Update label="2026-01-21" tags={["agent-server"]} rss={{ title: "2026-01-21 - agent-server" }}>
+## v0.7.5
+
+- 在设置线程状态时，强制对值、中断和错误进行自定义加密，解决了先前的不一致问题。
+- 在 `message/stream` 和 `message/send` 路由中为 `parts`、`role` 和 `messageId` 字段添加了 A2A 验证检查。
+- 添加了原生 A2A 中断支持：当图被中断时，现在返回 `input-required` 状态。使用 `message/stream` 和 `message/send` 请求中的新 `command` 参数，以使用 `Command` 负载恢复。
+- 在 `/a2a/{assistant_id}/` 下挂载了 `.well-known/agent-card.json`，用于 A2A 代理发现。
+- 为 `tasks/cancel` 中的任务存在性检查添加了正确的 A2A 错误代码。
+</Update>
+
+<Update label="2026-01-21" tags={["agent-server"]} rss={{ title: "2026-01-21 - agent-server" }}>
+## v0.7.4
+
+- 修复了 Redis URL 解析 `ssl_cert_reqs` 字段的一个错误，确保与 redis-go 的兼容性。
+- 添加了一个用于流式传输运行的 gRPC 客户端，由 `FF_USE_CORE_API` 功能标志控制。
+</Update>
+
+<Update label="2026-01-20" tags={["agent-server"]} rss={{ title: "2026-01-20 - agent-server" }}>
+## v0.7.2
+
+- 将 `@langchain/langgraph` 更新到 1.1.0 版本，引入了用于图节点和条件边的类型实用工具，以增强 TypeScript 的人体工程学。
+</Update>
+
+<Update label="2026-01-17" tags={["agent-server"]} rss={{ title: "2026-01-17 - agent-server" }}>
+## v0.7.0
+
+- 默认切换到使用 Go 助手实现，以提高性能。
+- 添加了 `LANGGRAPH_AES_JSON_KEYS` 配置，以使用键名允许列表对指定的 JSON 字段启用 AES 加密。
+</Update>
+
+<Update label="2026-01-16" tags={["agent-server"]} rss={{ title: "2026-01-16 - agent-server" }}>
+## v0.6.39
+
+- 向 Python `core-api` 添加了 `Threads.State()` 的 gRPC 客户端支持，改进了线程 ID 和运行计数操作。
+</Update>
+
+<Update label="2026-01-15" tags={["agent-server"]} rss={{ title: "2026-01-15 - agent-server" }}>
+## v0.6.36
+
+- 验证了身份验证过滤器中 `$and` 和 `$or` 的长度，并优化了不必要的根级过滤器。
+</Update>
+
+<Update label="2026-01-12" tags={["agent-server"]} rss={{ title: "2026-01-12 - agent-server" }}>
+## v0.6.35
+
+- 通过移除 `code` 字段并标准化所有错误以返回带有 `detail` 字段的 JSON，统一了错误格式。
+</Update>
+
+<Update label="2026-01-12" tags={["agent-server"]} rss={{ title: "2026-01-12 - agent-server" }}>
+## v0.6.34
+- 对功能标志的内部环境进行了小修复（未发布）。
+</Update>
+
+<Update label="2026-01-12" tags={["agent-server"]} rss={{ title: "2026-01-12 - agent-server" }}>
+## v0.6.33
+- 对功能标志的内部环境进行了小修复（未发布）。
+</Update>
+
+<Update label="2026-01-11" tags={["agent-server"]} rss={{ title: "2026-01-11 - agent-server" }}>
+## v0.6.32
+- 对功能标志的内部环境进行了小修复（未发布）。
+</Update>
+
+<Update label="2026-01-11" tags={["agent-server"]} rss={{ title: "2026-01-11 - agent-server" }}>
+## v0.6.31
+
+- 正确遵守了 disable_a2a 设置，以确保准确的配置处理。
+</Update>
+
+<Update label="2026-01-09" tags={["agent-server"]} rss={{ title: "2026-01-09 - agent-server" }}>
+## v0.6.29
+
+- 修复小错误。
+</Update>
+
+<Update label="2026-01-09" tags={["agent-server"]} rss={{ title: "2026-01-09 - agent-server" }}>
+## v0.6.28
+
+- 添加了对 `ParentCommand` 的支持，以正确地将控制权传播给父图，增强了命令处理和导航。
+- 添加了一个用于管理运行操作的 Python gRPC 客户端，增强了 Go 和 Python 实现之间的一致性。
+</Update>
+
+<Update label="2026-01-08" tags={["agent-server"]} rss={{ title: "2026-01-08 - agent-server" }}>
+## v0.6.27
+
+- 修复了处理空线程元数据的一个回归问题。
+</Update>
+
+<Update label="2026-01-08" tags={["agent-server"]} rss={{ title: "2026-01-08 - agent-server" }}>
+## v0.6.26
+
+- 修复了持久化 gRPC 服务器的端口配置问题。
+</Update>
+
+<Update label="2026-01-08" tags={["agent-server"]} rss={{ title: "2026-01-08 - agent-server" }}>
+## v0.6.25
+
+- 在执行器层运行 core-api gRPC 服务器，以支持图中的环回 API 调用，并移除了禁用服务器的无用配置。
+</Update>
+
+<Update label="2026-01-07" tags={["agent-server"]} rss={{ title: "2026-01-07 - agent-server" }}>
+## v0.6.24
+
+- 修复了执行器层中存活探针的行为，解决了 0.6.23 版本中的问题。
+</Update>
+
+<Update label="2026-01-07" tags={["agent-server"]} rss={{ title: "2026-01-07 - agent-server" }}>
+## v0.6.23
+
+- 将 gRPC 服务器健康检查与存活探针中的 `/ok` 端点集成，以确保正确的启动协调。
+- 回滚了之前禁用检查点的更改，并添加了一个条件，仅在测试期间启用 RemoteCheckpointer。
+- 抑制了检查点元数据中的 `langgraph_auth_*` 和 `langgraph_request_id` 字段，以防止包含瞬态用户数据。
+</Update>
+
+<Update label="2026-01-06" tags={["agent-server"]} rss={{ title: "2026-01-06 - agent-server" }}>
+## v0.6.22
+
+- 解决了使用仅 blob 自定义加密时因缺少加密上下文导致的错误，确保无错误地正常运行。
+</Update>
+
+<Update label="2026-01-06" tags={["agent-server"]} rss={{ title: "2026-01-06 - agent-server" }}>
+## v0.6.21
+
+- 引入了一个用于运行操作的 Python gRPC 客户端，包括 `Search`、`Get`、`Delete`、`Cancel`、`Stats` 和 `Sweep`，并附带了更新的 API 实现和用于枚举映射的新单元测试套件。
+</Update>
+
+<Update label="2026-01-06" tags={["agent-server"]} rss={{ title: "2026-01-06 - agent-server" }}>
+## v0.6.19
+
+- 在引擎服务器中复现了 `get_state` 和 `update_state` 的 OSS 实现，并重新启用了 `test_weather_subgraph`。
+</Update>
+
+<Update label="2026-01-05" tags={["agent-server"]} rss={{ title: "2026-01-05 - agent-server" }}>
+## v0.6.18
+
+- 添加了功能，为自托管企业用户强制执行特定的许可证声明，使其能够远程禁用 Agent Builder 产品。
+- 添加了一个新的 Prune 端点，以改善资源管理。
+- 将 Pregel 中的图配置与调用配置合并，优先考虑调用设置。
+- 向 GET /threads/{id} 端点引入了 `include=ttl` 查询参数，用于在不影响标准读取性能的情况下可选地检索 TTL 信息。
+- 引入了一个 `keep_latest` TTL 策略，通过核心 API 在修剪旧检查点的同时保留最新状态。
+</Update>
+
+<Update label="2025-12-31" tags={["agent-server"]} rss={{ title: "2025-12-31 - agent-server" }}>
+## v0.6.17
+
+- 确保在删除代理时停止正在进行的运行，以防止进程残留。
+</Update>
+
+<Update label="2025-12-30" tags={["agent-server"]} rss={{ title: "2025-12-30 - agent-server" }}>
+## v0.6.16
+
+- 精简并合并了 Go 持久化层中的运行操作，提高了跨包的效率和一致性。
+</Update>
+
+<Update label="2025-12-26" tags={["agent-server"]} rss={{ title: "2025-12-26 - agent-server" }}>
+## v0.6.15
+
+- 改进了将自定义路由文档字符串转换为 OpenAPI 模式内容的实用工具，在解析文档字符串时添加了错误处理，适用于使用自定义 Starlette 应用程序的用户。
+</Update>
+
+<Update label="2025-12-23" tags={["agent-server"]} rss={{ title: "2025-12-23 - agent-server" }}>
+## v0.6.12
+
+- 改进了 resolve_embeddings 使其更健壮，允许多次调用而不出错。
+- 将 `@langchain/langgraph` 从 1.0.4 版本更新到 1.0.7，增加了对远程图上 resumableStreams 的支持，并取消了对 toolsCondition 的弃用。
+- 实现了 `RemoteCheckpointer` 以启用子图检查点，增强了任务执行可靠性。
+</Update>
+
+<Update label="2025-12-20" tags={["agent-server"]} rss={{ title: "2025-12-20 - agent-server" }}>
+## v0.6.11
+
+- 使最大重试次数可配置，以增强定制化。
+</Update>
+
+<Update label="2025-12-20" tags={["agent-server"]} rss={{ title: "2025-12-20 - agent-server" }}>
+## v0.6.10
+
+- 确保运行取消仅处理 'message' 类型的 Redis 事件，提高了 pubsub 客户端的可靠性。
+- 为存储 API `value` 字段添加了自定义加密，允许用户选择要加密的键以增强安全性。
+- 通过更新 TeeStream 以单独处理事件类型，启用了子图自定义事件的流式传输。
+</Update>
+
+<Update label="2025-12-18" tags={["agent-server"]} rss={{ title: "2025-12-18 - agent-server" }}>
+## v0.6.9
+
+- 为自定义加密强制执行了稳定的 JSON 键，移除了特定于模型类型的自定义 JSON 函数，并改进了双重加密场景的错误处理。
+</Update>
+
+<Update label="2025-12-18" tags={["agent-server"]} rss={{ title: "2025-12-18 - agent-server" }}>
+## v0.6.8
+
+- 添加了性能分析功能，以增强性能分析和监控。
+</Update>
+
+<Update label="2025-12-18" tags={["agent-server"]} rss={{ title: "2025-12-18 - agent-server" }}>
+## v0.6.7
+
+- 记录了服务器启动时间，以改进监控和诊断。
+</Update>
+
+<Update label="2025-12-17" tags={["agent-server"]} rss={{ title: "2025-12-17 - agent-server" }}>
+## v0.6.5
+
+- 添加了一个在导入时触发的警告日志，以提高可见性。
+</Update>
+
+<Update label="2025-12-16" tags={["agent-server"]} rss={{ title: "2025-12-16 - agent-server" }}>
+## v0.6.4
+
+- 通过并行化元数据和配置过程增强了自定义加密，添加了对 thread.config 和某些

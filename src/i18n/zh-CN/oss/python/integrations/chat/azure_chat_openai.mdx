@@ -1,0 +1,191 @@
+---
+title: "AzureChatOpenAI 集成"
+description: "使用 LangChain Python 集成 AzureChatOpenAI 聊天模型。"
+---
+
+你可以在 [Azure 文档](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) 中找到关于 Azure OpenAI 最新模型及其成本、上下文窗口和受支持输入类型的信息。
+
+<Info>
+    **Azure OpenAI 与 OpenAI**
+
+    Azure OpenAI 指的是托管在 [Microsoft Azure 平台](https://azure.microsoft.com/en-us/products/ai-services/openai-service) 上的 OpenAI 模型。OpenAI 也提供其自己的模型 API。要直接访问 OpenAI 服务，请使用 [`ChatOpenAI` 集成](/oss/integrations/chat/openai/)。
+</Info>
+
+<Info>
+    **Azure OpenAI v1 API**
+
+    Azure OpenAI 的 [v1 API](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle?tabs=python#next-generation-api-1)（自 2025 年 8 月起正式发布）允许你直接使用 `ChatOpenAI` 与 Azure 端点交互。这提供了一个统一的接口，并原生支持 Microsoft Entra ID 认证和自动令牌刷新。
+
+    有关将 `ChatOpenAI` 与 Azure v1 API 结合使用的详细信息，请参阅 [ChatOpenAI Azure 部分](/oss/integrations/chat/openai#using-with-azure-openai)。
+
+    `AzureChatOpenAI` 目前仍受支持，适用于传统的 Azure OpenAI API 版本以及需要 Azure 特定配置的场景，但我们建议未来使用 `ChatOpenAI` 或 [LangChain Azure AI](https://docs.langchain.com/oss/python/integrations/providers/azure_ai) 中的 `AzureAIOpenAIApiChatModel`。
+</Info>
+
+<Note>
+    @[`AzureChatOpenAI`] 与 @[`ChatOpenAI`] 共享相同的基础实现，后者直接与 OpenAI 服务交互。
+
+    本页面作为快速入门，指导你如何认证并将你的 Azure OpenAI 服务连接到 LangChain 聊天模型。
+
+    有关可用功能的详细信息，请访问 [`ChatOpenAI` 文档](/oss/integrations/chat/openai/)，或前往 @[`AzureChatOpenAI`] API 参考。
+</Note>
+
+<Tip>
+    **API 参考**
+
+    有关所有功能和配置选项的详细文档，请前往 @[`AzureChatOpenAI`] API 参考。
+</Tip>
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | JS/TS 支持 | 下载量 | 最新版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| @[`AzureChatOpenAI`] | @[`langchain-openai`] | beta | ✅ [(npm)](https://js.langchain.com/docs/integrations/chat/openai) | <a href="https://pypi.org/project/langchain-openai/" target="_blank"><img src="https://static.pepy.tech/badge/langchain-openai/month" alt="Downloads per month" noZoom height="100" class="rounded" /></a> | <a href="https://pypi.org/project/langchain-openai/" target="_blank"><img src="https://img.shields.io/pypi/v/langchain-openai?style=flat-square&label=%20&color=orange" alt="PyPI - Latest version" noZoom height="100" class="rounded" /></a> |
+
+### 模型特性
+
+| [工具调用](/oss/langchain/tools) | [结构化输出](/oss/langchain/structured-output) | [图像输入](/oss/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/langchain/streaming/) | 原生异步 | [令牌使用量](/oss/langchain/models#token-usage) | [对数概率](/oss/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+
+## 设置
+
+要访问 @[`AzureChatOpenAI`] 模型，你需要创建一个 Azure 账户，部署一个 Azure OpenAI 模型，获取部署的名称和端点，获取一个 Azure OpenAI API 密钥，并安装 `langchain-openai` 集成包。
+
+### 安装
+
+<CodeGroup>
+    ```bash pip
+    pip install -U langchain-openai
+    ```
+    ```bash uv
+    uv add langchain-openai
+    ```
+</CodeGroup>
+
+### 凭证
+
+前往 [Azure 文档](https://learn.microsoft.com/en-us/azure/ai-services/openai/chatgpt-quickstart?tabs=command-line%2Cpython-new&pivots=programming-language-python) 创建你的部署并生成 API 密钥。完成后，设置 `AZURE_OPENAI_API_KEY` 和 `AZURE_OPENAI_ENDPOINT` 环境变量：
+
+```python
+import getpass
+import os
+
+if "AZURE_OPENAI_API_KEY" not in os.environ:
+    os.environ["AZURE_OPENAI_API_KEY"] = getpass.getpass(
+        "输入你的 AzureOpenAI API 密钥: "
+    )
+os.environ["AZURE_OPENAI_ENDPOINT"] = "https://YOUR-ENDPOINT.openai.azure.com/"
+```
+
+要启用模型调用的自动追踪，请设置你的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入你的 LangSmith API 密钥: ")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+## 实例化
+
+现在我们可以实例化我们的模型对象并生成聊天补全。
+
+- 将 `azure_deployment` 替换为你的部署名称。
+- 你可以在此处找到最新支持的 `api_version`：[learn.microsoft.com/en-us/azure/ai-services/openai/reference](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference)。
+
+```python
+from langchain_openai import AzureChatOpenAI
+
+llm = AzureChatOpenAI(
+    azure_deployment="gpt-35-turbo",  # 或你的部署
+    api_version="2023-06-01-preview",  # 或你的 API 版本
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+    # 其他参数...
+)
+```
+
+## 调用
+
+```python
+messages = [
+    (
+        "system",
+        "你是一个将英语翻译成法语的助手。翻译用户的句子。",
+    ),
+    ("human", "I love programming."),
+]
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+```text
+AIMessage(content="J'adore la programmation.", response_metadata={'token_usage': {'completion_tokens': 8, 'prompt_tokens': 31, 'total_tokens': 39}, 'model_name': 'gpt-35-turbo', 'system_fingerprint': None, 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'finish_reason': 'stop', 'logprobs': None, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}, id='run-bea4b46c-e3e1-4495-9d3a-698370ad963d-0', usage_metadata={'input_tokens': 31, 'output_tokens': 8, 'total_tokens': 39})
+```
+
+```python
+print(ai_msg.content)
+```
+
+```text
+J'adore la programmation.
+```
+
+## 流式传输使用量元数据
+
+OpenAI 的聊天补全 API 默认不流式传输令牌使用量统计信息（参见 [OpenAI API 参考中的流选项](https://platform.openai.com/docs/api-reference/completions/create#completions-create-stream_options)）。
+
+要在使用 @[`ChatOpenAI`] 或 `AzureChatOpenAI` 进行流式传输时恢复令牌计数，请将 `stream_usage=True` 设置为初始化参数或在调用时设置：
+
+```python
+from langchain_openai import AzureChatOpenAI
+
+llm = AzureChatOpenAI(model="gpt-4.1-mini", stream_usage=True)  # [!code highlight]
+```
+
+## 指定模型版本
+
+Azure OpenAI 响应包含 `model_name` 响应元数据属性，这是用于生成响应的模型名称。但与原生 OpenAI 响应不同，它不包含模型的具体版本（该版本在 Azure 的部署中设置）。例如，它不区分 `gpt-35-turbo-0125` 和 `gpt-35-turbo-0301`。这使得很难知道生成响应时使用的是哪个模型版本，这可能导致例如使用 `OpenAICallbackHandler` 计算总成本时出错。
+
+为了解决这个问题，你可以向 @[`AzureChatOpenAI`] 类传递 `model_version` 参数，该参数将被添加到 llm 输出中的模型名称里。这样你就可以轻松区分不同版本的模型。
+
+```python
+pip install -qU langchain-community
+```
+
+```python
+from langchain_community.callbacks import get_openai_callback
+
+with get_openai_callback() as cb:
+    llm.invoke(messages)
+    print(
+        f"总成本 (USD): ${format(cb.total_cost, '.6f')}"
+    )  # 未指定模型版本时，使用每 1k 输入和输出令牌 0.002 美元的固定费率
+```
+
+```text
+总成本 (USD): $0.000063
+```
+
+```python
+llm_0301 = AzureChatOpenAI(
+    azure_deployment="gpt-35-turbo",  # 或你的部署
+    api_version="2023-06-01-preview",  # 或你的 API 版本
+    model_version="0301",
+)
+with get_openai_callback() as cb:
+    llm_0301.invoke(messages)
+    print(f"总成本 (USD): ${format(cb.total_cost, '.6f')}")
+```
+
+```text
+总成本 (USD): $0.000074
+```
+
+---
+
+## API 参考
+
+有关所有功能和配置选项的详细文档，请前往 @[`AzureChatOpenAI`] API 参考。

@@ -1,0 +1,222 @@
+---
+title: Studio 中的可观测性
+sidebarTitle: 追踪、数据集、提示词
+---
+
+LangSmith [Studio](/langsmith/studio) 提供了超越单纯执行层面的工具，用于检查、调试和改进你的应用。通过处理追踪、数据集和提示词，你可以详细了解应用程序的行为，衡量其性能，并优化其输出：
+
+- [迭代提示词](#迭代提示词)：直接在图的节点内或通过 Playground 修改提示词。
+- [在数据集上运行实验](#在数据集上运行实验)：在 LangSmith 数据集上执行你的助手，以评分和比较结果。
+- [调试 LangSmith 追踪](#调试-langsmith-追踪)：将追踪的运行导入 Studio，并可选择将其克隆到你的本地代理中。
+- [将节点添加到数据集](#将节点添加到数据集)：将线程历史记录的部分内容转换为数据集示例，用于评估或进一步分析。
+
+## 迭代提示词
+
+Studio 支持以下方法来修改图中的提示词：
+
+- [直接节点编辑](#直接节点编辑)
+- [Playground 界面](#playground)
+
+### 直接节点编辑
+
+Studio 允许你直接从图界面编辑单个节点内部使用的提示词。
+
+### 图配置
+
+定义你的[配置](/oss/langgraph/use-graph-api#add-runtime-configuration)，使用 `langgraph_nodes` 和 `langgraph_type` 键来指定提示词字段及其关联的节点。
+
+#### `langgraph_nodes`
+
+- **描述**：指定配置字段与图中哪些节点相关联。
+- **值类型**：字符串数组，每个字符串是图中一个节点的名称。
+- **使用上下文**：包含在 Pydantic 模型的 `json_schema_extra` 字典中，或 dataclasses 的 `metadata["json_schema_extra"]` 字典中。
+- **示例**：
+  ```python
+  system_prompt: str = Field(
+      default="You are a helpful AI assistant.",
+      json_schema_extra={"langgraph_nodes": ["call_model", "other_node"]},
+  )
+  ```
+
+#### `langgraph_type`
+
+- **描述**：指定配置字段的类型，这决定了它在 UI 中的处理方式。
+- **值类型**：字符串
+- **支持的值**：
+  * `"prompt"`：表示该字段包含提示词文本，应在 UI 中特殊对待。
+- **使用上下文**：包含在 Pydantic 模型的 `json_schema_extra` 字典中，或 dataclasses 的 `metadata["json_schema_extra"]` 字典中。
+- **示例**：
+  ```python
+  system_prompt: str = Field(
+      default="You are a helpful AI assistant.",
+      json_schema_extra={
+          "langgraph_nodes": ["call_model"],
+          "langgraph_type": "prompt",
+      },
+  )
+  ```
+
+<Accordion title="完整配置示例">
+
+```python
+## 使用 Pydantic
+from pydantic import BaseModel, Field
+from typing import Annotated, Literal
+
+class Configuration(BaseModel):
+    """代理的配置。"""
+
+    system_prompt: str = Field(
+        default="You are a helpful AI assistant.",
+        description="用于代理交互的系统提示词。"
+        "此提示词为代理设置上下文和行为。",
+        json_schema_extra={
+            "langgraph_nodes": ["call_model"],
+            "langgraph_type": "prompt",
+        },
+    )
+
+    model: Annotated[
+        Literal[
+            "anthropic/claude-sonnet-4-6",
+            "anthropic/claude-haiku-4-5-20251001",
+            "openai/o1",
+            "openai/gpt-4.1-mini",
+            "openai/o1-mini",
+            "openai/o3-mini",
+        ],
+        {"__template_metadata__": {"kind": "llm"}},
+    ] = Field(
+        default="openai/gpt-4.1-mini",
+        description="用于代理主要交互的语言模型名称。"
+        "格式应为：provider/model-name。",
+        json_schema_extra={"langgraph_nodes": ["call_model"]},
+    )
+
+## 使用 Dataclasses
+from dataclasses import dataclass, field
+
+@dataclass(kw_only=True)
+class Configuration:
+    """代理的配置。"""
+
+    system_prompt: str = field(
+        default="You are a helpful AI assistant.",
+        metadata={
+            "description": "用于代理交互的系统提示词。"
+            "此提示词为代理设置上下文和行为。",
+            "json_schema_extra": {"langgraph_nodes": ["call_model"]},
+        },
+    )
+
+    model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
+        default="anthropic/claude-3-5-sonnet-20240620",
+        metadata={
+            "description": "用于代理主要交互的语言模型名称。"
+            "格式应为：provider/model-name。",
+            "json_schema_extra": {"langgraph_nodes": ["call_model"]},
+        },
+    )
+
+```
+
+</Accordion>
+
+#### 在 UI 中编辑提示词
+
+1. 在具有关联配置字段的节点上找到齿轮图标。
+1. 点击打开配置模态框。
+1. 编辑值。
+1. 保存以更新当前助手版本或创建新版本。
+
+### Playground
+
+[Playground](/langsmith/create-a-prompt) 界面允许在不运行完整图的情况下测试单个 LLM 调用：
+
+1. 选择一个线程。
+1. 在节点上点击 **View LLM Runs**。这将列出节点内部进行的所有 LLM 调用（如果有）。
+1. 选择一个 LLM 运行以在 Playground 中打开。
+1. 修改提示词并测试不同的模型和工具设置。
+1. 将更新后的提示词复制回你的图。
+
+## 在数据集上运行实验
+
+Studio 允许你通过针对预定义的 LangSmith [数据集](/langsmith/evaluation-concepts#datasets) 执行你的助手来运行[评估](/langsmith/evaluation-concepts)。这使你能够测试各种输入下的性能，将输出与参考答案进行比较，并使用配置的[评估器](/langsmith/evaluation-concepts#evaluators)对结果进行评分。
+
+本指南向你展示如何直接从 Studio 运行完整的端到端实验。
+
+### 先决条件
+
+在运行实验之前，请确保你具备以下条件：
+
+- **一个 LangSmith 数据集**：你的数据集应包含要测试的输入，并可选择包含用于比较的参考输出。输入的架构必须与助手所需的输入架构匹配。有关架构的更多信息，请参阅[图 API 架构文档](/oss/langgraph/graph-api#schema)。有关创建数据集的更多信息，请参阅[如何管理数据集](/langsmith/manage-datasets-in-application#create-a-dataset-and-add-examples)。
+- **（可选）评估器**：你可以在 LangSmith 中将评估器（例如，LLM-as-a-Judge、启发式方法或自定义函数）附加到你的数据集。这些将在图处理完所有输入后自动运行。
+- **一个正在运行的应用程序**：实验可以针对以下对象运行：
+  - 部署在 [LangSmith](/langsmith/deployment) 上的应用程序。
+  - 通过 [langgraph-cli](/langsmith/local-dev-testing) 启动的本地运行应用程序。
+
+<Note>
+Studio 实验遵循与其他实验相同的[数据保留](/langsmith/administration-overview#data-retention)规则。默认情况下，追踪具有基础层保留期（14 天）。但是，如果向追踪添加了反馈，它们将自动升级为扩展层保留期（400 天）。可以通过以下两种方式之一添加反馈：
+
+- [数据集配置了评估器](/langsmith/bind-evaluator-to-dataset)。
+- 手动向追踪添加[反馈](/langsmith/observability-concepts#feedback)。
+
+这种自动升级会增加追踪的保留期和成本。更多详情，请参阅[数据保留自动升级](/langsmith/administration-overview#how-it-works)。
+</Note>
+
+### 实验设置
+
+1. 启动实验。点击 Studio 页面右上角的 **Run experiment** 按钮。
+1. 选择你的数据集。在出现的模态框中，选择用于实验的数据集（或特定的数据集分割），然后点击 **Start**。
+1. 监控进度。数据集中的所有输入现在都将针对活动助手运行。通过右上角的徽章监控实验进度。
+1. 你可以在实验在后台运行时继续在 Studio 中工作。随时点击箭头图标按钮导航到 LangSmith 并查看详细的实验结果。
+
+## 调试 LangSmith 追踪
+
+本指南解释了如何在 Studio 中打开 LangSmith 追踪以进行交互式调查和调试。
+
+### 打开已部署的线程
+
+1. 打开 LangSmith 追踪，选择根运行。
+1. 点击 **Run in Studio**。
+
+这将打开连接到相关部署的 Studio，并选中追踪的父线程。
+
+### 使用远程追踪测试本地代理
+
+本节解释了如何使用来自 LangSmith 的远程追踪来测试本地代理。这使你能够将生产追踪用作本地测试的输入，从而在开发环境中调试和验证代理修改。
+
+#### 先决条件
+
+- 一个 LangSmith 追踪的线程
+- 一个[本地运行的代理](/langsmith/local-dev-testing)。
+
+<Info>
+**本地代理要求**
+* langgraph>=0.3.18
+* langgraph-api>=0.0.32
+* 包含远程追踪中存在的相同节点集
+</Info>
+
+#### 克隆线程
+
+1. 打开 LangSmith 追踪，选择根运行。
+2. 点击 **Run in Studio** 旁边的下拉菜单。
+3. 输入你的本地代理的 URL。
+4. 选择 **Clone thread locally**。
+5. 如果存在多个图，请选择目标图。
+
+你的本地代理中将创建一个新线程，其线程历史记录是从远程线程推断和复制的，并且你将导航到本地运行应用程序的 Studio。
+
+## 将节点添加到数据集
+
+从线程日志中的节点向 [LangSmith 数据集](/langsmith/manage-datasets) 添加[示例](/langsmith/evaluation-concepts#examples)。这对于评估代理的单个步骤非常有用。
+
+1. 选择一个线程。
+1. 点击 **Add to Dataset**。
+1. 选择要将其输入/输出添加到数据集的节点。
+1. 对于每个选定的节点，选择要创建示例的目标数据集。默认情况下，将选择特定助手和节点的数据集。如果此数据集尚不存在，则会创建它。
+1. 在将示例添加到数据集之前，根据需要编辑示例的输入/输出。
+1. 选择页面底部的 **Add to dataset**，将所有选定的节点添加到它们各自的数据集中。
+
+更多详情，请参阅[如何评估应用程序的中间步骤](/langsmith/evaluate-on-intermediate-steps)。

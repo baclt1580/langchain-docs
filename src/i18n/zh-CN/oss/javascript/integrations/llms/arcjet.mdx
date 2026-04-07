@@ -1,0 +1,98 @@
+---
+title: "Arcjet 信息脱敏集成"
+description: "使用 LangChain JavaScript 集成 Arcjet 信息脱敏 LLM。"
+---
+
+[Arcjet](https://arcjet.com) 信息脱敏集成允许您在将提示发送给 LLM 之前，从中脱敏敏感的用户信息。
+
+Arcjet Redact 完全在您自己的机器上运行，从不将数据发送到任何其他地方，确保一流的隐私保护和性能。
+
+Arcjet Redact 对象本身不是一个 LLM，而是包装一个 LLM。它会脱敏输入的文本，然后在返回之前，对被包装的 LLM 的输出进行反脱敏处理。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | Python 支持 | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |  :---: | :---: | :---: |
+| Arcjet | @langchain/community | ❌ | ✅ | ❌ | ![NPM - Downloads](https://img.shields.io/npm/dm/@langchain/community?style=flat-square&label=%20&) | ![NPM - Version](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+### 安装
+
+安装 Arcjet 信息脱敏库：
+
+<CodeGroup>
+```bash npm
+npm install @arcjet/redact
+```
+```bash yarn
+yarn add @arcjet/redact
+```
+```bash pnpm
+pnpm add @arcjet/redact
+```
+</CodeGroup>
+
+并安装 LangChain Community：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/core
+```
+```bash yarn
+yarn add @langchain/community @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/core
+```
+</CodeGroup>
+
+现在您已准备好开始使用 Arcjet Redaction 来保护您的 LLM 调用！
+
+## 使用方式
+
+```typescript
+import {
+  ArcjetRedact,
+  ArcjetSensitiveInfoType,
+} from "@langchain/community/llms/arcjet";
+import { OpenAI } from "@langchain/openai";
+
+// 创建一个供 Arcjet 包装的其他 LLM 实例
+const openai = new OpenAI({
+  modelName: "gpt-3.5-turbo-instruct",
+  openAIApiKey: process.env.OPENAI_API_KEY,
+});
+
+const arcjetRedactOptions = {
+  // 指定 Arcjet Redact 在脱敏输入后将调用的 LLM。
+  llm: openai,
+
+  // 指定应被脱敏的实体列表。
+  // 如果未指定，则将脱敏所有实体。
+  entities: ["email", "phone-number", "ip-address", "credit-card"] as ArcjetSensitiveInfoType[],
+
+  // 您可以提供一个自定义检测函数，以检测我们尚未支持的实体。
+  // 它接收一个令牌列表，您需要返回一个已识别类型的列表或 undefined。
+  // 您返回的 undefined 类型如果被使用，应添加到 entities 列表中。
+  detect: (tokens: string[]) => {
+    return tokens.map((t) => t === "some-sensitive-info" ? "custom-entity" : undefined)
+  },
+
+  // 提供给自定义检测函数的令牌数量。默认为 1。
+  // 可用于在检测自定义实体类型时提供额外的上下文。
+  contextWindowSize: 1,
+
+  // 这允许您在脱敏时提供自定义替换内容。请确保
+  // 替换内容是唯一的，以便反脱敏能按预期工作。
+  replace: (identifiedType: string) => {
+    return identifiedType === "email" ? "redacted@example.com" : undefined;
+  },
+
+};
+
+const arcjetRedact = new ArcjetRedact(arcjetRedactOptions);
+const response = await arcjetRedact.invoke(
+  "我的邮箱地址是 test@example.com，这里有一些敏感信息"
+);
+```

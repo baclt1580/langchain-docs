@@ -1,0 +1,263 @@
+---
+title: 并发入队
+sidebarTitle: 入队
+---
+
+本指南假设您已了解什么是双文本处理，您可以在[双文本处理概念指南](/langsmith/double-texting)中学习相关内容。
+
+本指南涵盖双文本处理的 `enqueue` 选项，该选项将中断添加到队列中，并按客户端接收的顺序执行它们。以下是使用 `enqueue` 选项的简单示例。
+
+在[智能体服务器](/langsmith/agent-server)中创建运行时，入队是默认的双文本处理（多任务）策略。
+
+## 设置
+
+首先，我们将定义一个快速辅助函数，用于打印 JS 和 CURL 模型输出（如果使用 Python，可以跳过此步骤）：
+
+<Tabs>
+    <Tab title="Javascript">
+    ```js
+    function prettyPrint(m) {
+      const padded = " " + m['type'] + " ";
+      const sepLen = Math.floor((80 - padded.length) / 2);
+      const sep = "=".repeat(sepLen);
+      const secondSep = sep + (padded.length % 2 ? "=" : "");
+
+      console.log(`${sep}${padded}${secondSep}`);
+      console.log("\n\n");
+      console.log(m.content);
+    }
+    ```
+    </Tab>
+    <Tab title="CURL">
+    ```bash
+    # 将此内容保存到名为 pretty_print.sh 的文件中
+    pretty_print() {
+      local type="$1"
+      local content="$2"
+      local padded=" $type "
+      local total_width=80
+      local sep_len=$(( (total_width - ${#padded}) / 2 ))
+      local sep=$(printf '=%.0s' $(eval "echo {1.."${sep_len}"}"))
+      local second_sep=$sep
+      if (( (total_width - ${#padded}) % 2 )); then
+        second_sep="${second_sep}="
+      fi
+
+      echo "${sep}${padded}${second_sep}"
+      echo
+      echo "$content"
+    }
+    ```
+    </Tab>
+</Tabs>
+
+然后，导入所需的包并实例化客户端、智能体和线程：
+
+<Tabs>
+    <Tab title="Python">
+    ```python
+    import asyncio
+
+    import httpx
+    from langchain_core.messages import convert_to_messages
+    from langgraph_sdk import get_client
+
+    client = get_client(url=<DEPLOYMENT_URL>)
+    # 使用名为 "agent" 的已部署图
+    assistant_id = "agent"
+    thread = await client.threads.create()
+    ```
+    </Tab>
+    <Tab title="Javascript">
+    ```js
+    import { Client } from "@langchain/langgraph-sdk";
+
+
+    const client = new Client({ apiUrl: <DEPLOYMENT_URL> });
+    // 使用名为 "agent" 的已部署图
+    const assistantId = "agent";
+    const thread = await client.threads.create();
+    ```
+    </Tab>
+    <Tab title="CURL">
+    ```bash
+    curl --request POST \
+      --url <DEPLOYMENT_URL>/threads \
+      --header 'Content-Type: application/json' \
+      --data '{}'
+    ```
+    </Tab>
+</Tabs>
+
+## 创建运行
+
+现在启动两个运行，第二个运行使用 "enqueue" 多任务策略中断第一个运行：
+
+<Tabs>
+    <Tab title="Python">
+    ```python
+    first_run = await client.runs.create(
+        thread["thread_id"],
+        assistant_id,
+        input={"messages": [{"role": "user", "content": "what's the weather in sf?"}]},
+    )
+    second_run = await client.runs.create(
+        thread["thread_id"],
+        assistant_id,
+        input={"messages": [{"role": "user", "content": "what's the weather in nyc?"}]},
+        multitask_strategy="enqueue",
+    )
+    ```
+    </Tab>
+    <Tab title="Javascript">
+    ```js
+    const firstRun = await client.runs.create(
+      thread["thread_id"],
+      assistantId,
+      input={"messages": [{"role": "user", "content": "what's the weather in sf?"}]},
+    )
+
+    const secondRun = await client.runs.create(
+      thread["thread_id"],
+      assistantId,
+      input={"messages": [{"role": "user", "content": "what's the weather in nyc?"}]},
+      multitask_strategy="enqueue",
+    )
+    ```
+    </Tab>
+    <Tab title="CURL">
+    ```bash
+    curl --request POST \
+    --url <DEPLOY<ENT_URL>>/threads/<THREAD_ID>/runs \
+    --header 'Content-Type: application/json' \
+    --data "{
+      \"assistant_id\": \"agent\",
+      \"input\": {\"messages\": [{\"role\": \"human\", \"content\": \"what\'s the weather in sf?\"}]},
+    }" && curl --request POST \
+    --url <DEPLOY<ENT_URL>>/threads/<THREAD_ID>/runs \
+    --header 'Content-Type: application/json' \
+    --data "{
+      \"assistant_id\": \"agent\",
+      \"input\": {\"messages\": [{\"role\": \"human\", \"content\": \"what\'s the weather in nyc?\"}]},
+      \"multitask_strategy\": \"enqueue\"
+    }"
+    ```
+    </Tab>
+</Tabs>
+
+## 查看运行结果
+
+验证线程是否包含两个运行的数据：
+
+<Tabs>
+    <Tab title="Python">
+    ```python
+    # 等待第二个运行完成
+    await client.runs.join(thread["thread_id"], second_run["run_id"])
+
+    state = await client.threads.get_state(thread["thread_id"])
+
+    for m in convert_to_messages(state["values"]["messages"]):
+        m.pretty_print()
+    ```
+    </Tab>
+    <Tab title="Javascript">
+    ```js
+    await client.runs.join(thread["thread_id"], secondRun["run_id"]);
+
+    const state = await client.threads.getState(thread["thread_id"]);
+
+    for (const m of state["values"]["messages"]) {
+      prettyPrint(m);
+    }
+    ```
+    </Tab>
+    <Tab title="CURL">
+    ```bash
+    source pretty_print.sh && curl --request GET \
+    --url <DEPLOYMENT_URL>/threads/<THREAD_ID>/runs/<RUN_ID>/join && \
+    curl --request GET --url <DEPLOYMENT_URL>/threads/<THREAD_ID>/state | \
+    jq -c '.values.messages[]' | while read -r element; do
+        type=$(echo "$element" | jq -r '.type')
+        content=$(echo "$element" | jq -r '.content | if type == "array" then tostring else . end')
+        pretty_print "$type" "$content"
+    done
+    ```
+    </Tab>
+</Tabs>
+
+输出：
+
+```
+================================ Human Message =================================
+
+what's the weather in sf?
+================================== Ai Message ==================================
+
+[{'id': 'toolu_01Dez1sJre4oA2Y7NsKJV6VT', 'input': {'query': 'weather in san francisco'}, 'name': 'tavily_search_results_json', 'type': 'tool_use'}]
+工具调用：
+tavily_search_results_json (toolu_01Dez1sJre4oA2Y7NsKJV6VT)
+调用 ID：toolu_01Dez1sJre4oA2Y7NsKJV6VT
+参数：
+query: weather in san francisco
+================================= Tool Message =================================
+名称：tavily_search_results_json
+
+[{"url": "https://www.accuweather.com/en/us/san-francisco/94103/weather-forecast/347629", "content": "获取旧金山当前和未来的天气状况，包括温度、降水、风力、空气质量等。查看每小时和10天展望、雷达图、警报和过敏信息。"}]
+================================== Ai Message ==================================
+
+根据 AccuWeather 的数据，旧金山当前的天气状况如下：
+
+温度：57°F (14°C)
+天气状况：大部分晴朗
+风力：西南偏西风 10 英里/小时
+湿度：72%
+
+未来几天的天气预报显示部分晴朗，最高气温在 57-64°F (14-18°C) 之间，最低气温在 47-52°F (9-11°C) 之间。这是旧金山这个季节典型的温和干燥天气。
+
+AccuWeather 预报中的一些关键细节：
+
+今天：大部分晴朗，最高 62°F (17°C)
+今晚：部分多云，最低 49°F (9°C)
+明天：部分晴朗，最高 59°F (15°C)
+周六：大部分晴朗，最高 64°F (18°C)
+周日：部分晴朗，最高 61°F (16°C)
+
+总之，预计未来几天旧金山将迎来适中的春季天气，晴雨相间，夜间气温在 47°F 左右，白天在 60°F 左右。典型的干燥天气，预报无雨。
+================================ Human Message =================================
+
+what's the weather in nyc?
+================================== Ai Message ==================================
+
+[{'text': '以下是纽约市当前的天气状况和预报：', 'type': 'text'}, {'id': 'toolu_01FFft5Sx9oS6AdVJuRWWcGp', 'input': {'query': 'weather in new york city'}, 'name': 'tavily_search_results_json', 'type': 'tool_use'}]
+工具调用：
+tavily_search_results_json (toolu_01FFft5Sx9oS6AdVJuRWWcGp)
+调用 ID：toolu_01FFft5Sx9oS6AdVJuRWWcGp
+参数：
+query: weather in new york city
+================================= Tool Message =================================
+名称：tavily_search_results_json
+
+[{"url": "https://www.weatherapi.com/", "content": "{'location': {'name': 'New York', 'region': 'New York', 'country': 'United States of America', 'lat': 40.71, 'lon': -74.01, 'tz_id': 'America/New_York', 'localtime_epoch': 1718734479, 'localtime': '2024-06-18 14:14'}, 'current': {'last_updated_epoch': 1718733600, 'last_updated': '2024-06-18 14:00', 'temp_c': 29.4, 'temp_f': 84.9, 'is_day': 1, 'condition': {'text': 'Sunny', 'icon': '//cdn.weatherapi.com/weather/64x64/day/113.png', 'code': 1000}, 'wind_mph': 2.2, 'wind_kph': 3.6, 'wind_degree': 158, 'wind_dir': 'SSE', 'pressure_mb': 1025.0, 'pressure_in': 30.26, 'precip_mm': 0.0, 'precip_in': 0.0, 'humidity': 63, 'cloud': 0, 'feelslike_c': 31.3, 'feelslike_f': 88.3, 'windchill_c': 28.3, 'windchill_f': 82.9, 'heatindex_c': 29.6, 'heatindex_f': 85.3, 'dewpoint_c': 18.4, 'dewpoint_f': 65.2, 'vis_km': 16.0, 'vis_miles': 9.0, 'uv': 7.0, 'gust_mph': 16.5, 'gust_kph': 26.5}}"}]
+================================== Ai Message ==================================
+
+根据 WeatherAPI 的天气数据：
+
+纽约市当前状况（截至当地时间下午 2:00）：
+
+* 温度：85°F (29°C)
+* 天气状况：晴朗
+* 风力：东南偏南风 2 英里/小时 (4 公里/小时)
+* 湿度：63%
+* 体感温度：85°F (30°C)
+
+预报显示未来几天将持续晴朗温暖的天气：
+
+今天：晴朗，最高 85°F (29°C)
+今晚：晴朗，最低 68°F (20°C)
+明天：晴朗，最高 88°F (31°C)
+周四：大部分晴朗，最高 90°F (32°C)
+周五：部分多云，最高 87°F (31°C)
+
+纽约市正迎来美丽的晴朗天气，气温适中，在华氏 85°F 左右（约 30°C）。湿度适中，在 60% 左右。总体而言，未来几天城市户外活动将迎来理想的晚春/初夏天气条件。
+```

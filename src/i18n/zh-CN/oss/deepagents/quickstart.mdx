@@ -1,0 +1,393 @@
+---
+title: 快速开始
+description: 在几分钟内构建你的第一个深度智能体
+---
+
+本指南将引导你创建一个具备规划、文件系统工具和子智能体能力的首个深度智能体。你将构建一个能够进行研究并撰写报告的研究智能体。
+
+<Tip>
+    **正在使用 AI 编程助手？**
+
+    - 安装 [LangChain Docs MCP 服务器](/use-these-docs)，让你的智能体能够访问最新的 LangChain 文档和示例。
+    - 安装 [LangChain Skills](https://github.com/langchain-ai/langchain-skills)，以提升你的智能体在 LangChain 生态系统任务上的表现。
+</Tip>
+
+## 先决条件
+
+开始之前，请确保你拥有来自模型提供商（例如 Anthropic、OpenAI）的 API 密钥。
+
+<Note>
+    深度智能体需要一个支持 [工具调用](/oss/langchain/models#tool-calling) 的模型。有关如何配置你的模型，请参阅 [自定义](/oss/deepagents/customization#model)。
+</Note>
+
+### 步骤 1：安装依赖项
+
+:::python
+<CodeGroup>
+    ```bash pip
+    pip install deepagents tavily-python
+    ```
+
+    ```bash uv
+    uv init
+    uv add deepagents tavily-python
+    uv sync
+    ```
+</CodeGroup>
+:::
+
+:::js
+<CodeGroup>
+    ```bash npm
+    npm install deepagents langchain @langchain/core @langchain/tavily
+    ```
+
+    ```bash yarn
+    yarn add deepagents langchain @langchain/core @langchain/tavily
+    ```
+
+    ```bash pnpm
+    pnpm add deepagents langchain @langchain/core @langchain/tavily
+    ```
+</CodeGroup>
+:::
+
+<Note>
+    本指南使用 [Tavily](https://tavily.com/) 作为示例搜索提供商，但你可以替换为任何搜索 API（例如 DuckDuckGo、SerpAPI、Brave Search）。
+</Note>
+
+### 步骤 2：设置你的 API 密钥
+
+<Tabs>
+    <Tab title="Anthropic">
+        ```bash
+        export ANTHROPIC_API_KEY="your-api-key"
+        export TAVILY_API_KEY="your-tavily-api-key"
+        ```
+    </Tab>
+    <Tab title="OpenAI">
+        ```bash
+        export OPENAI_API_KEY="your-api-key"
+        export TAVILY_API_KEY="your-tavily-api-key"
+        ```
+    </Tab>
+    <Tab title="Google">
+        ```bash
+        export GOOGLE_API_KEY="your-api-key"
+        export TAVILY_API_KEY="your-tavily-api-key"
+        ```
+    </Tab>
+    <Tab title="OpenRouter">
+        ```bash
+        export OPENROUTER_API_KEY="your-api-key"
+        export TAVILY_API_KEY="your-tavily-api-key"
+        ```
+    </Tab>
+    <Tab title="Fireworks">
+        ```bash
+        export FIREWORKS_API_KEY="your-api-key"
+        export TAVILY_API_KEY="your-tavily-api-key"
+        ```
+    </Tab>
+    <Tab title="Baseten">
+        ```bash
+        export BASETEN_API_KEY="your-api-key"
+        export TAVILY_API_KEY="your-tavily-api-key"
+        ```
+    </Tab>
+    <Tab title="Ollama">
+        ```bash
+        # 本地：Ollama 必须正在运行 (https://ollama.com)
+        # 云端：为托管推理设置你的 Ollama API 密钥
+        export OLLAMA_API_KEY="your-api-key"
+        export TAVILY_API_KEY="your-tavily-api-key"
+        ```
+    </Tab>
+</Tabs>
+
+### 步骤 3：创建一个搜索工具
+
+:::python
+```python
+import os
+from typing import Literal
+from tavily import TavilyClient
+from deepagents import create_deep_agent
+
+tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+
+def internet_search(
+    query: str,
+    max_results: int = 5,
+    topic: Literal["general", "news", "finance"] = "general",
+    include_raw_content: bool = False,
+):
+    """运行网页搜索"""
+    return tavily_client.search(
+        query,
+        max_results=max_results,
+        include_raw_content=include_raw_content,
+        topic=topic,
+    )
+```
+:::
+
+:::js
+```typescript
+import { tool } from "langchain";
+import { TavilySearch } from "@langchain/tavily";
+import { z } from "zod";
+
+const internetSearch = tool(
+  async ({
+    query,
+    maxResults = 5,
+    topic = "general",
+    includeRawContent = false,
+  }: {
+    query: string;
+    maxResults?: number;
+    topic?: "general" | "news" | "finance";
+    includeRawContent?: boolean;
+  }) => {
+    const tavilySearch = new TavilySearch({
+      maxResults,
+      tavilyApiKey: process.env.TAVILY_API_KEY,
+      includeRawContent,
+      topic,
+    });
+    return await tavilySearch._call({ query });
+  },
+  {
+    name: "internet_search",
+    description: "运行网页搜索",
+    schema: z.object({
+      query: z.string().describe("搜索查询"),
+      maxResults: z
+        .number()
+        .optional()
+        .default(5)
+        .describe("返回的最大结果数"),
+      topic: z
+        .enum(["general", "news", "finance"])
+        .optional()
+        .default("general")
+        .describe("搜索主题类别"),
+      includeRawContent: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("是否包含原始内容"),
+    }),
+  },
+);
+```
+:::
+
+### 步骤 4：创建一个深度智能体
+
+:::python
+```python
+# 系统提示，引导智能体成为专家研究员
+research_instructions = """你是一位专家研究员。你的工作是进行深入研究，然后撰写一份精炼的报告。
+
+你可以使用互联网搜索工具作为收集信息的主要手段。
+
+## `internet_search`
+
+使用此工具运行给定查询的互联网搜索。你可以指定要返回的最大结果数、主题以及是否包含原始内容。
+"""
+```
+
+从你的提供商中选择一个模型。默认情况下，`create_deep_agent` 使用 `claude-sonnet-4-6`。传递一个 `model` 字符串以使用不同的提供商——完整列表请参阅 [推荐模型](/oss/deepagents/models#suggested-models)。
+
+<Tabs>
+    <Tab title="Anthropic">
+        ```python
+        agent = create_deep_agent(
+            model="anthropic:claude-sonnet-4-6",
+            tools=[internet_search],
+            system_prompt=research_instructions,
+        )
+        ```
+    </Tab>
+    <Tab title="OpenAI">
+        ```python
+        agent = create_deep_agent(
+            model="openai:gpt-5.4",
+            tools=[internet_search],
+            system_prompt=research_instructions,
+        )
+        ```
+    </Tab>
+    <Tab title="Google">
+        ```python
+        agent = create_deep_agent(
+            model="google_genai:gemini-3.1-pro-preview",
+            tools=[internet_search],
+            system_prompt=research_instructions,
+        )
+        ```
+    </Tab>
+    <Tab title="OpenRouter">
+        ```python
+        agent = create_deep_agent(
+            model="openrouter:anthropic/claude-sonnet-4-6",
+            tools=[internet_search],
+            system_prompt=research_instructions,
+        )
+        ```
+    </Tab>
+    <Tab title="Fireworks">
+        ```python
+        agent = create_deep_agent(
+            model="fireworks:accounts/fireworks/models/qwen3p5-397b-a17b",
+            tools=[internet_search],
+            system_prompt=research_instructions,
+        )
+        ```
+    </Tab>
+    <Tab title="Baseten">
+        ```python
+        agent = create_deep_agent(
+            model="baseten:zai-org/GLM-5",
+            tools=[internet_search],
+            system_prompt=research_instructions,
+        )
+        ```
+    </Tab>
+    <Tab title="Ollama">
+        ```python
+        agent = create_deep_agent(
+            model="ollama:devstral-2",
+            tools=[internet_search],
+            system_prompt=research_instructions,
+        )
+        ```
+    </Tab>
+</Tabs>
+:::
+
+:::js
+```typescript
+import { createDeepAgent } from "deepagents";
+
+// 系统提示，引导智能体成为专家研究员
+const researchInstructions = `你是一位专家研究员。你的工作是进行深入研究，然后撰写一份精炼的报告。
+
+你可以使用互联网搜索工具作为收集信息的主要手段。
+
+## \`internet_search\`
+
+使用此工具运行给定查询的互联网搜索。你可以指定要返回的最大结果数、主题以及是否包含原始内容。
+`;
+```
+
+从你的提供商中选择一个模型。默认情况下，`createDeepAgent` 使用 `claude-sonnet-4-6`。传递一个 `model` 字符串以使用不同的提供商——完整列表请参阅 [推荐模型](/oss/deepagents/models#suggested-models)。
+
+<Tabs>
+    <Tab title="Anthropic">
+        ```typescript
+        const agent = createDeepAgent({
+          model: "anthropic:claude-sonnet-4-6",
+          tools: [internetSearch],
+          systemPrompt: researchInstructions,
+        });
+        ```
+    </Tab>
+    <Tab title="OpenAI">
+        ```typescript
+        const agent = createDeepAgent({
+          model: "openai:gpt-5.4",
+          tools: [internetSearch],
+          systemPrompt: researchInstructions,
+        });
+        ```
+    </Tab>
+    <Tab title="Google">
+        ```typescript
+        const agent = createDeepAgent({
+          model: "google-genai:gemini-3.1-pro-preview",
+          tools: [internetSearch],
+          systemPrompt: researchInstructions,
+        });
+        ```
+    </Tab>
+    <Tab title="OpenRouter">
+        ```typescript
+        const agent = createDeepAgent({
+          model: "openrouter:anthropic/claude-sonnet-4-6",
+          tools: [internetSearch],
+          systemPrompt: researchInstructions,
+        });
+        ```
+    </Tab>
+    <Tab title="Fireworks">
+        ```typescript
+        const agent = createDeepAgent({
+          model: "fireworks:accounts/fireworks/models/qwen3p5-397b-a17b",
+          tools: [internetSearch],
+          systemPrompt: researchInstructions,
+        });
+        ```
+    </Tab>
+    <Tab title="Ollama">
+        ```typescript
+        const agent = createDeepAgent({
+          model: "ollama:devstral-2",
+          tools: [internetSearch],
+          systemPrompt: researchInstructions,
+        });
+        ```
+    </Tab>
+</Tabs>
+:::
+
+### 步骤 5：运行智能体
+
+:::python
+```python
+result = agent.invoke({"messages": [{"role": "user", "content": "What is langgraph?"}]})
+
+# 打印智能体的响应
+print(result["messages"][-1].content)
+```
+:::
+
+:::js
+```typescript
+const result = await agent.invoke({
+  messages: [{ role: "user", content: "What is langgraph?" }],
+});
+
+// 打印智能体的响应
+console.log(result.messages[result.messages.length - 1].content);
+```
+:::
+
+## 工作原理
+
+你的深度智能体会自动：
+
+1.  **规划其方法**：使用内置的 [`write_todos`](/oss/deepagents/harness#planning-capabilities) 工具来分解研究任务。
+2.  **进行研究**：通过调用 `internet_search` 工具来收集信息。
+3.  **管理上下文**：使用文件系统工具（[`write_file`](/oss/deepagents/harness#virtual-filesystem-access)、[`read_file`](/oss/deepagents/harness#virtual-filesystem-access)）来卸载大型搜索结果。
+4.  **生成子智能体**：根据需要将复杂的子任务委托给专门的子智能体。
+5.  **综合报告**：将发现整理成连贯的响应。
+
+## 示例
+
+有关你可以使用深度智能体构建的智能体、模式和应用，请参阅 [示例](https://github.com/langchain-ai/deepagents/tree/main/examples)。
+
+## 流式传输
+
+深度智能体内置了 [流式传输](/oss/langchain/streaming/overview) 功能，可通过 LangGraph 实时更新智能体执行状态。
+这允许你逐步观察输出，并审查和调试智能体及子智能体的工作，例如工具调用、工具结果和 LLM 响应。
+
+## 后续步骤
+
+现在你已经构建了第一个深度智能体：
+
+-   **自定义你的智能体**：了解 [自定义选项](/oss/deepagents/customization)，包括自定义系统提示、工具和子智能体。
+-   **添加长期记忆**：启用跨对话的 [持久记忆](/oss/deepagents/memory)。
+-   **部署到生产环境**：了解 LangGraph 应用的 [部署选项](/oss/langgraph/deploy)。

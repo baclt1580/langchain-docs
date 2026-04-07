@@ -1,0 +1,200 @@
+---
+title: "Cheerio 集成"
+description: "使用 LangChain JavaScript 集成 Cheerio 文档加载器。"
+---
+
+本笔记本提供了快速入门 `CheerioWebBaseLoader` [文档加载器](/oss/integrations/document_loaders/) 的概述。有关 `CheerioWebBaseLoader` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/document_loaders/web/cheerio/CheerioWebBaseLoader)。
+
+## 概述
+
+### 集成详情
+
+本示例介绍如何使用 Cheerio 从网页加载数据。每个网页将创建一个文档。
+
+Cheerio 是一个快速轻量的库，允许您使用类似 jQuery 的语法解析和遍历 HTML 文档。您可以使用 Cheerio 从网页提取数据，而无需在浏览器中渲染它们。
+
+然而，Cheerio 不模拟网页浏览器，因此无法在页面上执行 JavaScript 代码。这意味着它无法从需要 JavaScript 渲染的动态网页提取数据。为此，您可以使用 [`PlaywrightWebBaseLoader`](/oss/integrations/document_loaders/web_loaders/web_playwright) 或 [`PuppeteerWebBaseLoader`](/oss/integrations/document_loaders/web_loaders/web_puppeteer)。
+
+| 类 | 包 | 本地 | 可序列化 | Python 支持 |
+| :--- | :--- | :---: | :---: | :---: |
+| [`CheerioWebBaseLoader`](https://reference.langchain.com/javascript/langchain-community/document_loaders/web/cheerio/CheerioWebBaseLoader) | @langchain/community | ✅ | ✅ | ❌ |
+
+### 加载器特性
+
+| 来源 | 网页支持 | Node 支持 |
+| :---: | :---: | :---: |
+| `CheerioWebBaseLoader` | ✅ | ✅ |
+
+## 设置
+
+要访问 `CheerioWebBaseLoader` 文档加载器，您需要安装 `@langchain/community` 集成包以及 `cheerio` 对等依赖项。
+
+### 凭证
+
+如果您希望获取模型调用的自动跟踪，还可以通过取消注释以下内容来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```bash
+# export LANGSMITH_TRACING="true"
+# export LANGSMITH_API_KEY="your-api-key"
+```
+
+### 安装
+
+LangChain CheerioWebBaseLoader 集成位于 `@langchain/community` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/core cheerio
+```
+```bash yarn
+yarn add @langchain/community @langchain/core cheerio
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/core cheerio
+```
+</CodeGroup>
+
+## 实例化
+
+现在我们可以实例化模型对象并加载文档：
+
+```typescript
+import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio"
+
+const loader = new CheerioWebBaseLoader("https://news.ycombinator.com/item?id=34817881", {
+  // 可选参数：...
+})
+```
+
+## 加载
+
+```typescript
+const docs = await loader.load()
+docs[0]
+```
+
+```javascript
+Document {
+  pageContent: '\n' +
+    '        \n' +
+    '                  Hacker News\n' +
+    '                            new | past | comments | ask | show | jobs | submit            \n' +
+    '                              login\n' +
+    '                          \n' +
+    '              \n' +
+    '\n' +
+    '        \n' +
+    '            What Lights the Universe’s Standard Candles? (quantamagazine.org)\n' +
+    '          75 points by Amorymeltzer on Feb 17, 2023  | hide | past | favorite | 6 comments        \n' +
+    '              \n' +
+    '        \n' +
+    '                  \n' +
+    '          \n' +
+    '          delta_p_delta_x on Feb 17, 2023           \n' +
+    '             | next [–]          \n' +
+    '                  \n' +
+    "                  Astrophysical and cosmological simulations are often insightful. They're also very cross-disciplinary; besides the obvious astrophysics, there's networking and sysadmin, parallel computing and algorithm theory (so that the simulation programs are actually fast but still accurate), systems design, and even a bit of graphic design for the visualisations.Some of my favourite simulation projects:- IllustrisTNG: https://www.tng-project.org/- SWIFT: https://swift.dur.ac.uk/- CO5BOLD: https://www.astro.uu.se/~bf/co5bold_main.html (which produced these animations of a red-giant star: https://www.astro.uu.se/~bf/movie/AGBmovie.html)- AbacusSummit: https://abacussummit.readthedocs.io/en/latest/And I can add the simulations in the article, too.\n" +
+    '                      \n' +
+    '                  \n' +
+    '      \n' +
+    '        \n' +
+    '                      \n' +
+    '          \n' +
+    '          froeb on Feb 18, 2023           \n' +
+    '             | parent | next [–]          \n' +
+    '                  \n' +
+    "                  Supernova simulations are especially interesting too. I have heard them described as the only time in physics when all 4 of the fundamental forces are important. The explosion can be quite finicky too. If I remember right, you can't get supernova to explode properly in 1D simulations, only in higher dimensions. This was a mystery until the realization that turbulence is necessary for supernova to trigger--there is no turbulent flow in 1D.\n" +
+    '                      \n' +
+    '                  \n' +
+    '      \n' +
+    '        \n' +
+    '                        \n' +
+    '          \n' +
+    '          andrewflnr on Feb 17, 2023           \n' +
+    '             | prev | next [–]          \n' +
+    '                  \n' +
+    "                  Whoa. I didn't know the accretion theory of Ia supernovae was dead, much less that it had been since 2011.\n" +
+    '                      \n' +
+    '                  \n' +
+    '      \n' +
+    '        \n' +
+    '                  \n' +
+    '          \n' +
+    '          andreareina on Feb 17, 2023           \n' +
+    '             | prev | next [–]          \n' +
+    '                  \n' +
+    '                  This seems  to be the paper https://academic.oup.com/mnras/article/517/4/5260/6779709\n' +
+    '                      \n' +
+    '                  \n' +
+    '      \n' +
+    '        \n' +
+    '                  \n' +
+    '          \n' +
+    '          andreareina on Feb 17, 2023           \n' +
+    '             | prev [–]          \n' +
+    '                  \n' +
+    "                  Wouldn't double detonation show up as variance in the brightness?\n" +
+    '                      \n' +
+    '                  \n' +
+    '      \n' +
+    '        \n' +
+    '                      \n' +
+    '          \n' +
+    '          yencabulator on Feb 18, 2023           \n' +
+    '             | parent [–]          \n' +
+    '                  \n' +
+    '                  Or widening of the peak. If one type Ia supernova goes 1,2,3,2,1, the sum of two could go    1+0=1\n' +
+    '    2+1=3\n' +
+    '    3+2=5\n' +
+    '    2+3=5\n' +
+    '    1+2=3\n' +
+    '    0+1=1\n' +
+    '                      \n' +
+    '                  \n' +
+    '      \n' +
+    '        \n' +
+    '                  \n' +
+    '  \n' +
+    '\n' +
+    '\n' +
+    'Guidelines | FAQ | Lists | API | Security | Legal | Apply to YC | Contact\n' +
+    'Search:       \n' +
+    '      \n' +
+    '  \n',
+  metadata: { source: 'https://news.ycombinator.com/item?id=34817881' },
+  id: undefined
+}
+```
+
+```typescript
+console.log(docs[0].metadata)
+```
+
+```javascript
+{ source: 'https://news.ycombinator.com/item?id=34817881' }
+```
+
+## 额外配置
+
+`CheerioWebBaseLoader` 在实例化加载器时支持额外配置。以下是一个使用 `selector` 字段的示例，使其仅从提供的 HTML 类名加载内容：
+
+```typescript
+import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio"
+
+const loaderWithSelector = new CheerioWebBaseLoader("https://news.ycombinator.com/item?id=34817881", {
+  selector: "p",
+});
+
+const docsWithSelector = await loaderWithSelector.load();
+docsWithSelector[0].pageContent;
+```
+
+```text
+Some of my favourite simulation projects:- IllustrisTNG: https://www.tng-project.org/- SWIFT: https://swift.dur.ac.uk/- CO5BOLD: https://www.astro.uu.se/~bf/co5bold_main.html (which produced these animations of a red-giant star: https://www.astro.uu.se/~bf/movie/AGBmovie.html)- AbacusSummit: https://abacussummit.readthedocs.io/en/latest/And I can add the simulations in the article, too.
+```
+
+---
+
+## API 参考
+
+有关 `CheerioWebBaseLoader` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/document_loaders/web/cheerio/CheerioWebBaseLoader)。

@@ -1,0 +1,34 @@
+---
+title: "Roam 集成"
+description: "使用 LangChain Python 与 Roam 文档加载器集成。"
+---
+
+>[ROAM](https://roamresearch.com/) 是一款用于网络化思考的笔记工具，旨在创建个人知识库。
+
+本笔记本介绍了如何从 Roam 数据库中加载文档。这很大程度上受到了 [Roam QA 示例仓库](https://github.com/JimmyLv/roam-qa) 的启发。
+
+## 🧑 导入自有数据集的说明
+
+从 Roam Research 导出你的数据集。你可以通过点击右上角的三个点，然后点击 `导出` 来完成此操作。
+
+导出时，请确保选择 `Markdown & CSV` 格式选项。
+
+这将在你的下载文件夹中生成一个 `.zip` 文件。将 `.zip` 文件移动到此仓库中。
+
+运行以下命令来解压 zip 文件（请根据需要将 `Export...` 替换为你自己的文件名）。
+
+```shell
+unzip Roam-Export-1675782732639.zip -d Roam_DB
+```
+
+```python
+from langchain_community.document_loaders import RoamLoader
+```
+
+```python
+loader = RoamLoader("Roam_DB")
+```
+
+```python
+docs = loader.load()
+```

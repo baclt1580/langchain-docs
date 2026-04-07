@@ -1,0 +1,73 @@
+---
+title: "Streamlit 集成"
+description: "使用 LangChain Python 与 Streamlit 回调进行集成。"
+---
+
+> **[Streamlit](https://streamlit.io/) 是一种更快地构建和分享数据应用的方式。**
+> Streamlit 能在几分钟内将数据脚本转化为可分享的 Web 应用。完全使用纯 Python，无需前端经验。
+> 更多示例请访问 [streamlit.io/generative-ai](https://streamlit.io/generative-ai)。
+
+[![在 GitHub Codespaces 中打开](https://github.com/codespaces/badge.svg)](https://codespaces.new/langchain-ai/streamlit-agent?quickstart=1)
+
+在本指南中，我们将演示如何使用 `StreamlitCallbackHandler` 在交互式 Streamlit 应用中展示智能体的思考与行动过程。您可以通过下方正在运行的 MRKL 智能体应用来体验：
+
+<iframe loading="lazy" src="https://langchain-mrkl.streamlit.app/?embed=true&embed_options=light_theme"
+        style={{ width: 100 + '%', border: 'none', marginBottom: 1 + 'rem', height: 600 }}
+        allow="camera;clipboard-read;clipboard-write;"
+></iframe>
+
+## 安装与设置
+
+```bash
+pip install langchain streamlit
+```
+
+您可以运行 `streamlit hello` 来加载示例应用并验证安装是否成功。完整说明请参阅 Streamlit 的[入门文档](https://docs.streamlit.io/library/get-started)。
+
+## 展示思考与行动过程
+
+要创建 `StreamlitCallbackHandler`，您只需提供一个父容器来渲染输出内容。
+
+```python
+from langchain_community.callbacks.streamlit import (
+    StreamlitCallbackHandler,
+)
+import streamlit as st
+
+st_callback = StreamlitCallbackHandler(st.container())
+```
+
+用于自定义显示行为的其他关键字参数在 [API 参考](https://reference.langchain.com/python/langchain-classic/callbacks/streamlit/StreamlitCallbackHandler) 中有详细说明。
+
+### 场景 1：使用带有工具的智能体
+
+目前主要支持的使用场景是可视化带有工具（或智能体执行器）的智能体的行动过程。您可以在 Streamlit 应用中创建一个智能体，并简单地将 `StreamlitCallbackHandler` 传递给 `agent.run()`，即可在应用中实时可视化其思考与行动过程。
+
+```python
+import streamlit as st
+from langchain_classic import hub
+from langchain.agents import AgentExecutor, create_agent, load_tools
+from langchain_openai import OpenAI
+
+llm = OpenAI(temperature=0, streaming=True)
+tools = load_tools(["ddg-search"])
+prompt = hub.pull("hwchase17/react")
+agent = create_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+if prompt := st.chat_input():
+    st.chat_message("user").write(prompt)
+    with st.chat_message("assistant"):
+        st_callback = StreamlitCallbackHandler(st.container())
+        response = agent_executor.invoke(
+            {"input": prompt}, {"callbacks": [st_callback]}
+        )
+        st.write(response["output"])
+```
+
+**注意：** 您需要设置 `OPENAI_API_KEY` 才能使上述应用代码成功运行。
+最简单的方法是通过 [Streamlit secrets.toml](https://docs.streamlit.io/library/advanced-features/secrets-management) 或任何其他本地环境变量管理工具进行设置。
+
+### 其他场景
+
+目前 `StreamlitCallbackHandler` 主要面向与 LangChain 智能体执行器一起使用。未来将增加对其他智能体类型的支持，以及直接与链（Chains）等结合使用的功能。

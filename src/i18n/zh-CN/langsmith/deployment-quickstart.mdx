@@ -1,0 +1,208 @@
+---
+title: 将应用部署到云端
+sidebarTitle: 快速开始
+description: 使用 LangGraph CLI 将你的第一个应用程序部署到 LangSmith Cloud。
+icon: "rocket"
+---
+
+本快速入门将展示如何使用 [`langgraph deploy`](/langsmith/cli#deploy) 命令将应用程序部署到 LangSmith Cloud。
+
+<Tip>
+如需包含基于 GitHub 的部署和所有配置选项的完整 Cloud 部署指南，请参阅 [Cloud 部署设置指南](/langsmith/deploy-to-cloud)。
+</Tip>
+
+<Note>
+`langgraph deploy` 命令目前处于 **测试版**。
+</Note>
+
+## 先决条件
+
+开始之前，请确保你已具备：
+
+- 一个 [LangSmith 账户](https://smith.langchain.com/)，且订阅了 [Plus 或更高版本计划](https://www.langchain.com/pricing)，并拥有一个 [API 密钥](/langsmith/create-account-api-key)。
+- 已安装并运行 [Docker](https://docs.docker.com/get-docker/)。可通过 `docker ps` 命令验证。
+- 在 Apple Silicon (M1/M2/M3) 上：需要 [Docker Buildx](https://docs.docker.com/build/install-buildx/) 以交叉编译到 `linux/amd64`。
+- 已安装 [LangGraph CLI](/langsmith/cli)：
+
+  ```shell
+  uv tool install langgraph-cli
+  ```
+
+## 1. 创建 LangGraph 应用
+
+从 [`new-langgraph-project-python` 模板](https://github.com/langchain-ai/new-langgraph-project)创建一个新应用：
+
+```shell
+langgraph new path/to/your/app --template new-langgraph-project-python
+cd path/to/your/app
+```
+
+<Tip>
+不带 `--template` 参数运行 `langgraph new` 可以查看可用模板的交互式菜单。
+</Tip>
+
+## 2. 设置你的 API 密钥
+
+将你的 LangSmith API 密钥添加到项目根目录的 `.env` 文件中：
+
+```shell
+LANGSMITH_API_KEY=lsv2_...
+```
+
+`langgraph deploy` 命令会自动读取此文件。或者，也可以内联传递：
+
+```shell
+LANGSMITH_API_KEY=lsv2_... langgraph deploy
+```
+
+## 3. 部署
+
+从你的项目目录运行部署命令：
+
+```shell
+langgraph deploy
+```
+
+默认情况下，这会创建一个名为你的项目目录的 `dev` 部署。可以使用 `--name` 或 `--deployment-type prod` 来覆盖默认设置。
+
+<Tip>
+在对代码进行更改后，要更新现有部署，请重新运行 `langgraph deploy`。它会按名称找到现有部署并就地更新。
+</Tip>
+
+你还可以使用 `langgraph deploy list` 查看所有部署，`langgraph deploy logs` 来跟踪运行时日志，以及 `langgraph deploy delete <ID>` 来删除部署。详情请参阅 [CLI 参考](/langsmith/cli#deploy)。
+
+## 4. 在 Studio 中测试
+
+[Studio](/langsmith/studio) 是一个直接连接到你的部署的交互式智能体 IDE。你可以用它来发送消息、检查每个节点的中间状态、在运行中编辑状态，以及从任何先前的检查点重放，而无需编写代码。
+
+部署准备就绪后：
+
+1. 前往 [LangSmith](https://smith.langchain.com/)，在左侧边栏中选择 **Deployments**。
+1. 选择你的部署以查看其详细信息。
+1. 点击右上角的 **Studio** 以打开 [Studio](/langsmith/studio)。
+
+## 5. 测试 API
+
+从部署详情页面复制 **API URL**，然后使用它来调用你的应用程序：
+
+<Tabs>
+    <Tab title="Python SDK (异步)">
+    1. 安装 LangGraph Python SDK：
+        ```shell
+        pip install langgraph-sdk
+        ```
+    2. 向助手发送消息（无状态运行）：
+        ```python
+        from langgraph_sdk import get_client
+
+        client = get_client(url="your-deployment-url", api_key="your-langsmith-api-key")
+
+        async for chunk in client.runs.stream(
+            None,  # 无线程运行
+            "agent", # 助手名称。在 langgraph.json 中定义。
+            input={
+                "messages": [{
+                    "role": "human",
+                    "content": "什么是 LangGraph？",
+                }],
+            },
+            stream_mode="updates",
+        ):
+            print(f"接收到类型为 {chunk.event} 的新事件...")
+            print(chunk.data)
+            print("\n\n")
+        ```
+    </Tab>
+    <Tab title="Python SDK (同步)">
+    1. 安装 LangGraph Python SDK：
+        ```shell
+        pip install langgraph-sdk
+        ```
+    2. 向助手发送消息（无线程运行）：
+        ```python
+        from langgraph_sdk import get_sync_client
+
+        client = get_sync_client(url="your-deployment-url", api_key="your-langsmith-api-key")
+
+        for chunk in client.runs.stream(
+            None,  # 无线程运行
+            "agent", # 助手名称。在 langgraph.json 中定义。
+            input={
+                "messages": [{
+                    "role": "human",
+                    "content": "什么是 LangGraph？",
+                }],
+            },
+            stream_mode="updates",
+        ):
+            print(f"接收到类型为 {chunk.event} 的新事件...")
+            print(chunk.data)
+            print("\n\n")
+        ```
+    </Tab>
+    <Tab title="JavaScript SDK">
+    1. 安装 LangGraph JS SDK：
+        ```shell
+        npm install @langchain/langgraph-sdk
+        ```
+    2. 向助手发送消息（无线程运行）：
+        ```js
+        const { Client } = await import("@langchain/langgraph-sdk");
+
+        const client = new Client({ apiUrl: "your-deployment-url", apiKey: "your-langsmith-api-key" });
+
+        const streamResponse = client.runs.stream(
+            null, // 无线程运行
+            "agent", // 助手 ID
+            {
+                input: {
+                    "messages": [
+                        { "role": "user", "content": "什么是 LangGraph？"}
+                    ]
+                },
+                streamMode: "messages",
+            }
+        );
+
+        for await (const chunk of streamResponse) {
+            console.log(`接收到类型为 ${chunk.event} 的新事件...`);
+            console.log(JSON.stringify(chunk.data));
+            console.log("\n\n");
+        }
+        ```
+    </Tab>
+    <Tab title="Rest API">
+    ```bash
+    curl -s --request POST \
+        --url <DEPLOYMENT_URL>/runs/stream \
+        --header 'Content-Type: application/json' \
+        --header "X-Api-Key: <LANGSMITH API KEY>" \
+        --data "{
+            \"assistant_id\": \"agent\",
+            \"input\": {
+                \"messages\": [
+                    {
+                        \"role\": \"human\",
+                        \"content\": \"什么是 LangGraph？\"
+                    }
+                ]
+            },
+            \"stream_mode\": \"updates\"
+        }"
+    ```
+    </Tab>
+</Tabs>
+
+## 后续步骤
+
+<CardGroup cols={3}>
+  <Card title="助手" icon="robot" href="/langsmith/assistants">
+    为每个助手部署具有不同模型、提示词或工具的相同图。
+  </Card>
+  <Card title="线程" icon="messages" href="/langsmith/use-threads">
+    在多次运行间持久化状态，使你的智能体能在交互间记住上下文。
+  </Card>
+  <Card title="运行" icon="player-play" href="/langsmith/background-run">
+    为长时间运行的任务启动后台运行，并将结果流式传输回你的客户端。
+  </Card>
+</CardGroup>

@@ -1,0 +1,511 @@
+---
+title: 使用时间旅行
+sidebarTitle: 时间旅行
+description: 在 LangGraph 中重放过去的执行记录，或通过分叉探索替代路径
+---
+
+## 概述
+
+LangGraph 通过[检查点](/oss/langgraph/persistence#checkpoints)支持时间旅行：
+
+- **[重放](#重放)**：从先前的检查点重新执行。
+- **[分叉](#分叉)**：从先前的检查点分支，并修改状态以探索替代路径。
+
+两者都通过从先前的检查点恢复执行来实现。检查点之前的节点不会重新执行（结果已保存）。检查点之后的节点会重新执行，包括任何 LLM 调用、API 请求和[中断](/oss/langgraph/interrupts)（这些操作可能产生不同的结果）。
+
+## 重放
+
+使用先前检查点的配置调用图，即可从该点开始重放。
+
+<Warning>
+
+重放会重新执行节点——而不仅仅是读取缓存。LLM 调用、API 请求和[中断](/oss/langgraph/interrupts)会再次触发，并可能返回不同的结果。从最终检查点（没有 `next` 节点）重放是无操作。
+
+</Warning>
+
+![重放](/oss/images/re_play.png)
+
+:::python
+使用 @[`get_state_history`] 查找要重放的检查点，然后使用该检查点的配置调用 @[`invoke`][CompiledStateGraph.invoke]：
+
+```python
+from langgraph.graph import StateGraph, START
+from langgraph.checkpoint.memory import InMemorySaver
+from typing_extensions import TypedDict, NotRequired
+import uuid
+
+class State(TypedDict):
+    topic: NotRequired[str]
+    joke: NotRequired[str]
+
+
+def generate_topic(state: State):
+    return {"topic": "socks in the dryer"}
+
+
+def write_joke(state: State):
+    return {"joke": f"Why do {state['topic']} disappear? They elope!"}
+
+
+checkpointer = InMemorySaver()
+graph = (
+    StateGraph(State)
+    .add_node("generate_topic", generate_topic)
+    .add_node("write_joke", write_joke)
+    .add_edge(START, "generate_topic")
+    .add_edge("generate_topic", "write_joke")
+    .compile(checkpointer=checkpointer)
+)
+
+# 步骤 1：运行图
+config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+result = graph.invoke({}, config)
+
+# 步骤 2：查找要重放的检查点
+history = list(graph.get_state_history(config))
+# 历史记录按时间倒序排列
+for state in history:
+    print(f"next={state.next}, checkpoint_id={state.config['configurable']['checkpoint_id']}")
+
+# 步骤 3：从特定检查点重放
+# 找到 write_joke 之前的检查点
+before_joke = next(s for s in history if s.next == ("write_joke",))
+replay_result = graph.invoke(None, before_joke.config)
+# write_joke 重新执行（再次运行），generate_topic 不会
+```
+:::
+
+:::js
+使用 @[`getStateHistory`] 查找要重放的检查点，然后使用该检查点的配置调用 @[`invoke`][CompiledStateGraph.invoke]：
+
+```typescript
+import { v4 as uuidv4 } from "uuid";
+import { StateGraph, MemorySaver, START } from "@langchain/langgraph";
+
+const StateAnnotation = Annotation.Root({
+  topic: Annotation<string>(),
+  joke: Annotation<string>(),
+});
+
+function generateTopic(state: typeof StateAnnotation.State) {
+  return { topic: "socks in the dryer" };
+}
+
+function writeJoke(state: typeof StateAnnotation.State) {
+  return { joke: `Why do ${state.topic} disappear? They elope!` };
+}
+
+const checkpointer = new MemorySaver();
+const graph = new StateGraph(StateAnnotation)
+  .addNode("generateTopic", generateTopic)
+  .addNode("writeJoke", writeJoke)
+  .addEdge(START, "generateTopic")
+  .addEdge("generateTopic", "writeJoke")
+  .compile({ checkpointer });
+
+// 步骤 1：运行图
+const config = { configurable: { thread_id: uuidv4() } };
+const result = await graph.invoke({}, config);
+
+// 步骤 2：查找要重放的检查点
+const states = [];
+for await (const state of graph.getStateHistory(config)) {
+  states.push(state);
+}
+
+// 步骤 3：从特定检查点重放
+const beforeJoke = states.find((s) => s.next.includes("writeJoke"));
+const replayResult = await graph.invoke(null, beforeJoke.config);
+// writeJoke 重新执行（再次运行），generateTopic 不会
+```
+:::
+
+## 分叉
+
+分叉从过去的检查点创建一个新分支，并修改状态。在先前检查点上调用 @[`update_state`] 以创建分叉，然后使用 `None` 调用 @[`invoke`][CompiledStateGraph.invoke] 以继续执行。
+
+![分叉](/oss/images/checkpoints_full_story.jpg)
+
+<Warning>
+
+`update_state` **不会**回滚线程。它会创建一个从指定点分支的新检查点。原始执行历史记录保持不变。
+
+</Warning>
+
+:::python
+```python
+# 找到 write_joke 之前的检查点
+history = list(graph.get_state_history(config))
+before_joke = next(s for s in history if s.next == ("write_joke",))
+
+# 分叉：更新状态以更改主题
+fork_config = graph.update_state(
+    before_joke.config,
+    values={"topic": "chickens"},
+)
+
+# 从分叉处恢复 — write_joke 使用新主题重新执行
+fork_result = graph.invoke(None, fork_config)
+print(fork_result["joke"])  # 关于鸡的笑话，而不是袜子
+```
+:::
+
+:::js
+```typescript
+// 找到 writeJoke 之前的检查点
+const states = [];
+for await (const state of graph.getStateHistory(config)) {
+  states.push(state);
+}
+const beforeJoke = states.find((s) => s.next.includes("writeJoke"));
+
+// 分叉：更新状态以更改主题
+const forkConfig = await graph.updateState(
+  beforeJoke.config,
+  { topic: "chickens" },
+);
+
+// 从分叉处恢复 — writeJoke 使用新主题重新执行
+const forkResult = await graph.invoke(null, forkConfig);
+console.log(forkResult.joke); // 关于鸡的笑话，而不是袜子
+```
+:::
+
+### 从特定节点
+
+当您调用 @[`update_state`] 时，值会使用指定节点的写入器（包括[归约器](/oss/langgraph/graph-api#reducers)）进行应用。检查点记录该节点产生了更新，并从该节点的后继节点恢复执行。
+
+默认情况下，LangGraph 从检查点的版本历史推断 `as_node`。当从特定检查点分叉时，这种推断几乎总是正确的。
+
+在以下情况下显式指定 `as_node`：
+
+- **并行分支**：多个节点在同一步骤中更新了状态，且 LangGraph 无法确定哪个是最后一个（`InvalidUpdateError`）。
+- **无执行历史**：在新线程上设置状态（常见于[测试](/oss/langgraph/test)）。
+- **跳过节点**：将 `as_node` 设置为较晚的节点，使图认为该节点已经运行。
+
+:::python
+```python
+# 图：generate_topic -> write_joke
+
+# 将此更新视为 generate_topic 产生的。
+# 执行在 write_joke 处恢复（generate_topic 的后继节点）。
+fork_config = graph.update_state(
+    before_joke.config,
+    values={"topic": "chickens"},
+    as_node="generate_topic",
+)
+```
+:::
+
+:::js
+```typescript
+// 图：generateTopic -> writeJoke
+
+// 将此更新视为 generateTopic 产生的。
+// 执行在 writeJoke 处恢复（generateTopic 的后继节点）。
+const forkConfig = await graph.updateState(
+  beforeJoke.config,
+  { topic: "chickens" },
+  { asNode: "generateTopic" },
+);
+```
+:::
+
+## 中断
+
+如果您的图使用 @[`interrupt`] 实现[人机交互](/oss/langgraph/interrupts)工作流，则在时间旅行期间中断总是会重新触发。包含中断的节点会重新执行，并且 `interrupt()` 会暂停以等待新的 `Command(resume=...)`。
+
+:::python
+```python
+from langgraph.types import interrupt, Command
+
+class State(TypedDict):
+    value: list[str]
+
+def ask_human(state: State):
+    answer = interrupt("What is your name?")
+    return {"value": [f"Hello, {answer}!"]}
+
+def final_step(state: State):
+    return {"value": ["Done"]}
+
+graph = (
+    StateGraph(State)
+    .add_node("ask_human", ask_human)
+    .add_node("final_step", final_step)
+    .add_edge(START, "ask_human")
+    .add_edge("ask_human", "final_step")
+    .compile(checkpointer=InMemorySaver())
+)
+
+config = {"configurable": {"thread_id": "1"}}
+
+# 首次运行：遇到中断
+graph.invoke({"value": []}, config)
+# 恢复并回答
+graph.invoke(Command(resume="Alice"), config)
+
+# 从 ask_human 之前重放
+history = list(graph.get_state_history(config))
+before_ask = [s for s in history if s.next == ("ask_human",)][-1]
+
+replay_result = graph.invoke(None, before_ask.config)
+# 在中断处暂停 — 等待新的 Command(resume=...)
+
+# 从 ask_human 之前分叉
+fork_config = graph.update_state(before_ask.config, {"value": ["forked"]})
+fork_result = graph.invoke(None, fork_config)
+# 在中断处暂停 — 等待新的 Command(resume=...)
+
+# 使用不同的答案恢复分叉的中断
+graph.invoke(Command(resume="Bob"), fork_config)
+# 结果：{"value": ["forked", "Hello, Bob!", "Done"]}
+```
+:::
+
+:::js
+```typescript
+import { interrupt, Command } from "@langchain/langgraph";
+
+function askHuman(state: { value: string[] }) {
+  const answer = interrupt("What is your name?");
+  return { value: [`Hello, ${answer}!`] };
+}
+
+function finalStep(state: { value: string[] }) {
+  return { value: ["Done"] };
+}
+
+// ... 使用检查点构建图 ...
+
+// 首次运行：遇到中断
+await graph.invoke({ value: [] }, config);
+// 恢复并回答
+await graph.invoke(new Command({ resume: "Alice" }), config);
+
+// 从 askHuman 之前重放
+const states = [];
+for await (const state of graph.getStateHistory(config)) {
+  states.push(state);
+}
+const beforeAsk = states.filter((s) => s.next.includes("askHuman")).pop();
+
+const replayResult = await graph.invoke(null, beforeAsk.config);
+// 在中断处暂停 — 等待新的 Command({ resume: ... })
+
+// 从 askHuman 之前分叉
+const forkConfig = await graph.updateState(beforeAsk.config, { value: ["forked"] });
+const forkResult = await graph.invoke(null, forkConfig);
+// 在中断处暂停 — 等待新的 Command({ resume: ... })
+
+// 使用不同的答案恢复分叉的中断
+await graph.invoke(new Command({ resume: "Bob" }), forkConfig);
+// 结果：{ value: ["forked", "Hello, Bob!", "Done"] }
+```
+:::
+
+### 多个中断
+
+如果您的图在多个点收集输入（例如，多步骤表单），您可以在中断之间分叉，以更改后续答案而无需重新询问之前的问题。
+
+:::python
+```python
+def ask_name(state):
+    name = interrupt("What is your name?")
+    return {"value": [f"name:{name}"]}
+
+def ask_age(state):
+    age = interrupt("How old are you?")
+    return {"value": [f"age:{age}"]}
+
+# 图：ask_name -> ask_age -> final
+# 完成两个中断后：
+
+# 从两个中断之间分叉（ask_name 之后，ask_age 之前）
+history = list(graph.get_state_history(config))
+between = [s for s in history if s.next == ("ask_age",)][-1]
+
+fork_config = graph.update_state(between.config, {"value": ["modified"]})
+result = graph.invoke(None, fork_config)
+# ask_name 的结果保留（"name:Alice"）
+# ask_age 在中断处暂停 — 等待新答案
+```
+:::
+
+:::js
+```typescript
+// 从两个中断之间分叉（askName 之后，askAge 之前）
+const states = [];
+for await (const state of graph.getStateHistory(config)) {
+  states.push(state);
+}
+const between = states.filter((s) => s.next.includes("askAge")).pop();
+
+const forkConfig = await graph.updateState(between.config, { value: ["modified"] });
+const result = await graph.invoke(null, forkConfig);
+// askName 的结果保留（"name:Alice"）
+// askAge 在中断处暂停 — 等待新答案
+```
+:::
+
+## 子图
+
+使用[子图](/oss/langgraph/use-subgraphs)进行时间旅行取决于子图是否拥有自己的检查点器。这决定了您可以进行时间旅行的检查点粒度。
+
+<Tabs>
+<Tab title="继承的检查点器（默认）">
+
+默认情况下，子图继承父图的检查点器。父图将整个子图视为**单个超级步骤**——整个子图执行只有一个父级检查点。从子图之前进行时间旅行会从头重新执行子图。
+
+您无法在默认子图中定位到节点*之间*的点进行时间旅行——只能从父级进行时间旅行。
+
+:::python
+```python
+# 没有自己检查点器的子图（默认）
+subgraph = (
+    StateGraph(State)
+    .add_node("step_a", step_a)       # 包含 interrupt()
+    .add_node("step_b", step_b)       # 包含 interrupt()
+    .add_edge(START, "step_a")
+    .add_edge("step_a", "step_b")
+    .compile()  # 无检查点器 — 从父图继承
+)
+
+graph = (
+    StateGraph(State)
+    .add_node("subgraph_node", subgraph)
+    .add_edge(START, "subgraph_node")
+    .compile(checkpointer=InMemorySaver())
+)
+
+config = {"configurable": {"thread_id": "1"}}
+
+# 完成两个中断
+graph.invoke({"value": []}, config)            # 遇到 step_a 中断
+graph.invoke(Command(resume="Alice"), config)  # 遇到 step_b 中断
+graph.invoke(Command(resume="30"), config)     # 完成
+
+# 从子图之前进行时间旅行
+history = list(graph.get_state_history(config))
+before_sub = [s for s in history if s.next == ("subgraph_node",)][-1]
+
+fork_config = graph.update_state(before_sub.config, {"value": ["forked"]})
+result = graph.invoke(None, fork_config)
+# 整个子图从头重新执行
+# 无法定位到 step_a 和 step_b 之间的点进行时间旅行
+```
+:::
+
+:::js
+```typescript
+// 没有自己检查点器的子图（默认）
+const subgraph = new StateGraph(StateAnnotation)
+  .addNode("stepA", stepA)       // 包含 interrupt()
+  .addNode("stepB", stepB)       // 包含 interrupt()
+  .addEdge(START, "stepA")
+  .addEdge("stepA", "stepB")
+  .compile();  // 无检查点器 — 从父图继承
+
+const graph = new StateGraph(StateAnnotation)
+  .addNode("subgraphNode", subgraph)
+  .addEdge(START, "subgraphNode")
+  .compile({ checkpointer });
+
+// 完成两个中断
+await graph.invoke({ value: [] }, config);
+await graph.invoke(new Command({ resume: "Alice" }), config);
+await graph.invoke(new Command({ resume: "30" }), config);
+
+// 从子图之前进行时间旅行
+const states = [];
+for await (const state of graph.getStateHistory(config)) {
+  states.push(state);
+}
+const beforeSub = states.filter((s) => s.next.includes("subgraphNode")).pop();
+
+const forkConfig = await graph.updateState(beforeSub.config, { value: ["forked"] });
+const result = await graph.invoke(null, forkConfig);
+// 整个子图从头重新执行
+// 无法定位到 stepA 和 stepB 之间的点进行时间旅行
+```
+:::
+
+</Tab>
+<Tab title="子图检查点器">
+
+在子图上设置 `checkpointer=True` 以赋予其自己的检查点历史记录。这会在子图**内部**的每个步骤创建检查点，允许您从子图内的特定点进行时间旅行——例如，在两个中断之间。
+
+使用 @[`get_state`] 并设置 `subgraphs=True` 以访问子图自己的检查点配置，然后从中分叉：
+
+:::python
+```python
+# 拥有自己检查点器的子图
+subgraph = (
+    StateGraph(State)
+    .add_node("step_a", step_a)       # 包含 interrupt()
+    .add_node("step_b", step_b)       # 包含 interrupt()
+    .add_edge(START, "step_a")
+    .add_edge("step_a", "step_b")
+    .compile(checkpointer=True)  # 自己的检查点历史记录
+)
+
+graph = (
+    StateGraph(State)
+    .add_node("subgraph_node", subgraph)
+    .add_edge(START, "subgraph_node")
+    .compile(checkpointer=InMemorySaver())
+)
+
+config = {"configurable": {"thread_id": "1"}}
+
+# 运行到 step_a 中断
+graph.invoke({"value": []}, config)
+
+# 恢复 step_a -> 遇到 step_b 中断
+graph.invoke(Command(resume="Alice"), config)
+
+# 获取子图自己的检查点（step_a 和 step_b 之间）
+parent_state = graph.get_state(config, subgraphs=True)
+sub_config = parent_state.tasks[0].state.config
+
+# 从子图检查点分叉
+fork_config = graph.update_state(sub_config, {"value": ["forked"]})
+result = graph.invoke(None, fork_config)
+# step_b 重新执行，step_a 的结果保留
+```
+:::
+
+:::js
+```typescript
+// 拥有自己检查点器的子图
+const subgraph = new StateGraph(StateAnnotation)
+  .addNode("stepA", stepA)       // 包含 interrupt()
+  .addNode("stepB", stepB)       // 包含 interrupt()
+  .addEdge(START, "stepA")
+  .addEdge("stepA", "stepB")
+  .compile({ checkpointer: true });  // 自己的检查点历史记录
+
+const graph = new StateGraph(StateAnnotation)
+  .addNode("subgraphNode", subgraph)
+  .addEdge(START, "subgraphNode")
+  .compile({ checkpointer });
+
+// 运行到 stepA 中断，然后恢复 -> 遇到 stepB 中断
+await graph.invoke({ value: [] }, config);
+await graph.invoke(new Command({ resume: "Alice" }), config);
+
+// 获取子图自己的检查点（stepA 和 stepB 之间）
+const parentState = await graph.getState(config, { subgraphs: true });
+const subConfig = parentState.tasks[0].state.config;
+
+// 从子图检查点分叉
+const forkConfig = await graph.updateState(subConfig, { value: ["forked"] });
+const result = await graph.invoke(null, forkConfig);
+// stepB 重新执行，stepA 的结果保留
+```
+:::
+
+</Tab>
+</Tabs>
+
+有关配置子图检查点器的更多信息，请参阅[子图持久化](/oss/langgraph/use-subgraphs#subgraph-persistence)。

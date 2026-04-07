@@ -1,0 +1,63 @@
+---
+title: 如何创建复合评估器
+sidebarTitle: 复合评估器
+---
+
+_复合评估器_ 是一种将多个评估器得分合并为单一 [得分](/langsmith/evaluation-concepts#evaluator-outputs) 的方法。当您希望评估应用的多个方面并将结果合并为单一结果时，这非常有用。
+
+本指南将向您展示如何使用 [LangSmith UI](https://smith.langchain.com) 定义 [复合评估器](/langsmith/evaluation-concepts#llm-as-judge)。
+
+<Note>
+如需使用 SDK 以编程方式创建复合评估器，请参阅 [如何创建复合评估器 (SDK)](/langsmith/composite-evaluators-sdk)。
+</Note>
+
+## 创建复合评估器
+
+您可以在 [追踪项目](/langsmith/observability-concepts#projects)（用于 [在线评估](/langsmith/evaluation-concepts#online-evaluations)）或 [数据集](/langsmith/evaluation-concepts#datasets)（用于 [离线评估](/langsmith/evaluation-concepts#offline-evaluations)）上创建复合评估器。通过 UI 中的复合评估器，您可以计算多个评估器得分的加权平均值或加权总和，并配置权重。
+
+<div style={{ textAlign: 'center' }}>
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/create_composite_evaluator-light.png"
+    alt="LangSmith UI 界面显示一个名为 ChatOpenAI 的 LLM 调用追踪，包含系统输入、人类输入和 AI 输出。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/create_composite_evaluator-dark.png"
+    alt="LangSmith UI 界面显示一个名为 ChatOpenAI 的 LLM 调用追踪，包含系统输入、人类输入和 AI 输出。"
+/>
+</div>
+
+### 1. 导航到追踪项目或数据集
+
+要开始配置复合评估器，请导航至 **追踪项目** 或 **数据集与实验** 标签页，并选择一个项目或数据集。
+- 在追踪项目内：**+ 新建** > **评估器** > **复合得分**
+- 在数据集内：**+ 评估器** > **复合得分**
+
+### 2. 配置复合评估器
+
+1. 为您的评估器命名。
+2. 选择聚合方法：**平均值** 或 **总和**。
+    - **平均值**：∑(权重*得分) / ∑(权重)。
+    - **总和**：∑(权重*得分)。
+3. 添加您希望包含在复合得分中的反馈键。
+4. 为反馈键添加权重。默认情况下，每个反馈键的权重相等。调整权重可以增加或减少特定反馈键在最终得分中的重要性。
+5. 点击 **创建** 以保存评估器。
+
+<Tip> 如果您需要调整复合得分的权重，可以在评估器创建后进行更新。配置了该评估器的所有运行的结果得分都将被更新。 </Tip>
+
+### 3. 查看复合评估器结果
+
+复合得分会作为 **反馈** 附加到运行上，类似于单个评估器的反馈。查看方式取决于评估运行的位置：
+
+**在追踪项目上**：
+- 复合得分会作为运行上的反馈显示。
+- [筛选](/langsmith/filter-traces-in-application) 具有复合得分的运行，或复合得分达到特定阈值的运行。
+- [创建图表](/langsmith/dashboards#custom-dashboards) 以可视化复合得分随时间的变化趋势。
+
+**在数据集上**：
+- 在实验标签页中查看复合得分。您还可以根据实验运行的平均复合得分进行筛选和排序。
+- 点击进入实验，查看每个运行的复合得分。
+
+<Note> 如果运行中未配置任何组成评估器，则不会为该运行计算复合得分。 </Note>

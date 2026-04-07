@@ -1,0 +1,30 @@
+---
+title: "Huggingfaceinference 集成"
+description: "使用 LangChain JavaScript 与 Huggingfaceinference LLM 集成。"
+---
+
+以下是一个调用 HuggingFaceInference 模型作为 LLM 的示例：
+
+```bash npm
+npm install @langchain/community @langchain/core @huggingface/inference@4
+```
+
+<Tip>
+我们正在统一所有包中的模型参数。现在建议使用 `model` 代替 `modelName`，并使用 `apiKey` 设置 API 密钥。
+</Tip>
+
+```typescript
+import { HuggingFaceInference } from "@langchain/community/llms/hf";
+
+const model = new HuggingFaceInference({
+  model: "gpt2",
+  apiKey: "YOUR-API-KEY", // 在 Node.js 中默认为 process.env.HUGGINGFACEHUB_API_KEY
+});
+const res = await model.invoke("1 + 1 =");
+console.log({ res });
+```
+
+## 相关链接
+
+
+- [模型指南](/oss/langchain/models)

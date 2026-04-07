@@ -1,0 +1,427 @@
+---
+title: 为规模化配置 LangSmith
+sidebarTitle: 规模化配置
+---
+
+<Warning>
+本页的规模化指导及示例配置适用于 **LangSmith 版本 v0.13.0 或更高**。
+</Warning>
+
+自托管的 LangSmith 实例可以处理大量的追踪记录和用户。自托管部署的默认配置已能承受相当大的负载，您还可以配置您的部署以实现更高的规模。本页描述了规模化考量因素，并提供了一些示例来帮助配置您的自托管实例。
+
+关于示例配置，请参阅[规模化 LangSmith 示例配置](#example-langsmith-configurations-for-scale)。
+
+## 概述
+
+下表概述了针对不同负载模式（读取/写入）的 LangSmith 配置对比：
+
+|  | **[低读取/低写入](#low-reads-low-writes)** | **[低读取/高写入](#low-reads-high-writes)** | **[高读取/低写入](#high-reads-low-writes)** | **[中读取/中写入](#medium-reads-medium-writes)** | **[高读取/高写入](#high-reads-high-writes)** |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| <Tooltip tip="在前端主动查看追踪记录的用户数量">并发前端用户数</Tooltip> | 5 | 5 | 50 | 20 | 50 |
+| <Tooltip tip="通过 SDK 或 API 端点接收的追踪记录数量">每秒提交的追踪记录数</Tooltip> | 10 | 1000 | 10 | 100 | 1000 |
+| **前端副本数**<br />(每副本 500m CPU, 1Gi) | 1 (默认) | 4 | 2 | 2 | 4 |
+| **平台后端副本数**<br />(每副本 1 CPU, 2Gi) | 3 (默认) | 20 | 3 (默认) | 3 (默认) | 20 |
+| **接收队列副本数**<br />(每副本 1 CPU, 2Gi) | 3 (默认) | 24 | 3 (默认) | 6 | 24 |
+| **后端副本数**<br />(每副本 1 CPU, 2Gi) | 2 (默认) | 5 | 40 | 16 | 50 |
+| **Redis 资源** | 8 Gi (默认) | 26 Gi 外部 | 8 Gi (默认) | 13Gi 外部 | 26 Gi 外部 |
+| **ClickHouse 资源** | 4 CPU<br />16 Gi (默认) | 10 CPU<br />32Gi 内存 | 8 CPU<br />每副本 16 Gi | 16 CPU<br />24Gi 内存 | 14 CPU<br />每副本 24 Gi |
+| **ClickHouse 设置** | 单实例 | 单实例 | 3节点 <Tooltip tip="建议用于高读取负载以防止性能下降。另一种选择是[托管 clickhouse](/langsmith/self-host-external-clickhouse#langsmith-managed-clickhouse)。">复制集群</Tooltip> | 单实例 | 3节点 <Tooltip tip="建议用于高读取负载以防止性能下降。另一种选择是[托管 clickhouse](/langsmith/self-host-external-clickhouse#langsmith-managed-clickhouse)。">复制集群</Tooltip> |
+| <Tooltip tip="我们建议使用外部实例并为磁盘启用自动扩展，以处理不断增长的数据需求。">Postgres 资源</Tooltip> | 2 CPU<br />8 GB 内存<br />10 GB 存储 (外部) | 2 CPU<br />8 GB 内存<br />10 GB 存储 (外部) | 2 CPU<br />8 GB 内存<br />10 GB 存储 (外部) | 2 CPU<br />8 GB 内存<br />10 GB 存储 (外部) | 2 CPU<br />8 GB 内存<br />10 GB 存储 (外部) |
+| **Blob 存储** | 禁用 | 启用 | 启用 | 启用 | 启用 |
+
+下面我们将更详细地介绍读取和写入路径，并为您的自托管 LangSmith 实例提供一个 `values.yaml` 片段作为起点。
+
+## 追踪记录接收（写入路径）
+
+对写入路径产生负载的常见用法：
+
+- 通过 Python 或 JavaScript LangSmith SDK 接收追踪记录
+- 通过 `@traceable` 包装器接收追踪记录
+- 通过 `/runs/multipart` 端点提交追踪记录
+
+在追踪记录接收中起主要作用的服务：
+
+- 平台后端服务：接收接收追踪记录的初始请求，并将追踪记录放入 Redis 队列
+- Redis 缓存：用于队列化需要持久化的追踪记录
+- 接收队列服务：持久化追踪记录以供查询
+- ClickHouse：用于存储追踪记录的持久化存储
+
+在扩展写入路径（追踪记录接收）时，监控上述四个服务/资源会很有帮助。以下是一些通常有助于提高追踪记录接收性能的调整：
+
+- 如果 ClickHouse 接近资源限制，请为其分配更多资源（CPU 和内存）。
+- 如果接收请求响应时间过长，请增加平台后端 Pod 的数量。
+- 如果追踪记录从 Redis 处理得不够快，请增加接收队列服务 Pod 的副本数。
+- 如果发现当前 Redis 实例达到资源限制，请使用更大的 Redis 缓存。这也可能是接收请求耗时较长的原因。
+
+## 追踪记录查询（读取路径）
+
+对读取路径产生负载的常见用法：
+
+- 用户在前端查看追踪项目或单个追踪记录
+- 用于查询追踪信息的脚本
+- 访问 `/runs/query` 或 `/runs/<run-id>` API 端点
+
+在查询追踪记录中起主要作用的服务：
+
+- 后端服务：接收请求并向 ClickHouse 提交查询，然后响应请求
+- ClickHouse：追踪记录的持久化存储。这是请求追踪信息时查询的主要数据库。
+
+在扩展读取路径（追踪记录查询）时，监控上述两个服务/资源会很有帮助。以下是一些通常有助于提高追踪记录查询性能的调整：
+
+- 增加后端服务 Pod 的数量。如果后端服务 Pod 的 CPU 使用率达到 1 核，这将产生最大影响。
+- 为 ClickHouse 分配更多资源（CPU 或内存）。ClickHouse 可能非常消耗资源，但这应该会带来更好的性能。
+- 迁移到[复制的 ClickHouse 集群](/langsmith/self-host-external-clickhouse#ha-replicated-clickhouse-cluster)。添加 ClickHouse 副本有助于提高读取性能，但我们建议副本数保持在 5 个以下（从 3 个开始）。
+
+关于如何将其转换为 Helm chart 值的更精确指导，请参考以下[章节](#example-langsmith-configurations-for-scale)中的示例。如果不确定您的 LangSmith 实例为何无法处理特定负载模式，请联系 LangChain 团队。
+
+## LangSmith 队列的 KEDA 自动扩缩容
+
+<Note>
+在 LangSmith v0.13.0 及更高版本中可用。
+</Note>
+
+我们强烈建议在您的集群上安装 [KEDA](https://keda.sh/)（Kubernetes 事件驱动自动扩缩容）。KEDA 使 `queue` 和 `ingest-queue` 服务能够基于其队列积压大小以及 CPU 和内存自动扩缩容。这可以实现更高效的资源利用和更好地处理流量峰值。
+
+### 安装 KEDA
+
+```bash
+helm repo add kedacore https://kedacore.github.io/charts
+helm install keda kedacore/keda --namespace keda --create-namespace
+```
+
+### 配置 KEDA 自动扩缩容
+
+安装 KEDA 后，您可以在 `values.yaml` 中为 `queue` 和 `ingest-queue` 服务启用基于 KEDA 的自动扩缩容：
+
+```yaml
+queue:
+  autoscaling:
+    keda:
+      enabled: true
+
+ingestQueue:
+  autoscaling:
+    keda:
+      enabled: true
+```
+
+启用 KEDA 后，队列服务将在其积压增长时自动扩容，并在积压处理完毕后自动缩容。这对于处理可变的追踪记录接收负载而无需过度配置资源特别有用。
+
+<Note>
+您也可以为其他服务（`backend`、`platformBackend` 等）启用 KEDA，但它们仍将仅基于 CPU 和内存进行扩缩容。
+</Note>
+
+## 规模化 LangSmith 示例配置
+
+下面我们根据预期的读取和写入负载提供一些 LangSmith 示例配置。
+
+对于读取负载（追踪记录查询）：
+
+- 低：大约 5 个用户同时查看追踪记录（约每秒 10 个请求）
+- 中：大约 20 个用户同时查看追踪记录（约每秒 40 个请求）
+- 高：大约 50 个用户同时查看追踪记录（约每秒 100 个请求）
+
+对于写入负载（追踪记录接收）：
+
+- 低：每秒最多提交 10 条追踪记录
+- 中：每秒最多提交 100 条追踪记录
+- 高：每秒最多提交 1000 条追踪记录
+
+<Note>
+确切的最佳配置取决于您的使用情况和追踪记录负载。请结合上述信息及您的具体使用情况，使用下面的示例来更新您的 LangSmith 配置。如有任何疑问，请联系 LangChain 团队。
+</Note>
+
+### 低读取，低写入 <a name="low-reads-low-writes"></a>
+
+默认的 LangSmith 配置将处理此负载。此处无需自定义资源配置。
+
+### 低读取，高写入 <a name="low-reads-high-writes"></a>
+
+您有非常高的追踪记录接收规模，但前端同时查询追踪记录的用户数为个位数。
+
+为此，我们建议如下配置：
+
+```yaml
+config:
+  blobStorage:
+    # 请同时设置其他键以连接到您的 blob 存储。请参阅配置部分。
+    enabled: true
+  settings:
+    redisRunsExpirySeconds: "3600"
+# ttl:
+#   enabled: true
+#   ttl_period_seconds:
+#     longlived: "7776000"  # 90 天（默认为 400 天）
+#     shortlived: "604800"  # 7 天（默认为 14 天）
+
+frontend:
+  deployment:
+    replicas: 4 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 2
+#     maxReplicas: 4
+
+platformBackend:
+  deployment:
+    replicas: 20 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 8
+#     maxReplicas: 20
+
+ingestQueue:
+  deployment:
+    replicas: 24 # 或者启用下面的 KEDA 自动扩缩容
+# autoscaling:
+#   keda:
+#     enabled: true
+#     minReplicaCount: 8
+#     maxReplicaCount: 24
+
+backend:
+  deployment:
+    replicas: 5 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 3
+#     maxReplicas: 5
+
+## 确保您的 Redis 缓存至少为 26 GB，以支持高写入规模
+redis:
+  external:
+    enabled: true
+    existingSecretName: langsmith-redis-secret # 设置您外部 Redis 实例的连接 URL（26+ GB）
+
+clickhouse:
+  statefulSet:
+    persistence:
+      # 这可能取决于您配置的 TTL（请参阅配置部分）。
+      # 如果持续以此规模运行，我们建议为每个短期 TTL 天配置 600Gi。
+      size: 4200Gi # 此配置假设 TTL 为 7 天，且持续以此规模运行。
+    resources:
+      requests:
+        cpu: "10"
+        memory: "32Gi"
+      limits:
+        cpu: "16"
+        memory: "48Gi"
+
+commonEnv:
+  - name: "CLICKHOUSE_ASYNC_INSERT_WAIT_PCT_FLOAT"
+    value: "0"
+```
+
+### 高读取，低写入 <a name="high-reads-low-writes"></a>
+
+您的追踪记录接收规模相对较低，但有许多前端用户查询追踪记录和/或频繁访问 `/runs/query` 或 `/runs/<run-id>` 端点的脚本。
+
+**为此，我们强烈建议设置一个复制的 ClickHouse 集群，以在低延迟下实现高读取规模。** 请参阅我们的[外部 ClickHouse 文档](/langsmith/self-host-external-clickhouse#ha-replicated-clickhouse-cluster)，了解如何设置复制 ClickHouse 集群的更多指导。对于此负载模式，我们建议使用 3 节点复制设置，其中集群中的每个副本应具有 8+ 核心和 16+ GB 内存的资源请求，以及 12 核心和 32 GB 内存的资源限制。
+
+为此，我们建议如下配置：
+
+```yaml
+config:
+  blobStorage:
+    # 请同时设置其他键以连接到您的 blob 存储。请参阅配置部分。
+    enabled: true
+
+frontend:
+  deployment:
+    replicas: 2
+
+ingestQueue:
+  deployment:
+    replicas: 3 # 或者启用下面的 KEDA 自动扩缩容
+# autoscaling:
+#   keda:
+#     enabled: true
+#     minReplicaCount: 2
+#     maxReplicaCount: 3
+
+backend:
+  deployment:
+    replicas: 40 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 16
+#     maxReplicas: 40
+
+# 我们强烈建议为此负载设置一个复制的 clickhouse 集群。
+# 根据需要更新这些值以连接到您的复制 clickhouse 集群。
+clickhouse:
+  external:
+    # 如果使用 3 节点复制设置，集群中的每个副本应具有 8+ 核心和 16+ GB 内存的资源请求，以及 12 核心和 32 GB 内存的资源限制。
+    enabled: true
+    host: langsmith-ch-clickhouse-replicated.default.svc.cluster.local
+    port: "8123"
+    nativePort: "9000"
+    user: "default"
+    password: "password"
+    database: "default"
+    cluster: "replicated"
+```
+
+### 中读取，中写入 <a name="medium-reads-medium-writes"></a>
+
+这是一个很好的通用配置，应该能够处理 LangSmith 的大多数使用模式。在内部测试中，此配置使我们能够扩展到每秒接收 100 条追踪记录和每秒 40 个读取请求。
+
+为此，我们建议如下配置：
+
+```yaml
+config:
+  blobStorage:
+    # 请同时设置其他键以连接到您的 blob 存储。请参阅配置部分。
+    enabled: true
+  settings:
+    redisRunsExpirySeconds: "3600"
+
+frontend:
+  deployment:
+    replicas: 2
+
+ingestQueue:
+  deployment:
+    replicas: 6 # 或者启用下面的 KEDA 自动扩缩容
+# autoscaling:
+#   keda:
+#     enabled: true
+#     minReplicaCount: 3
+#     maxReplicaCount: 6
+
+backend:
+  deployment:
+    replicas: 16 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 8
+#     maxReplicas: 16
+
+redis:
+  statefulSet:
+    resources:
+      requests:
+        memory: 13Gi
+      limits:
+        memory: 13Gi
+
+  # -- 对于外部 redis，请使用类似下面的配置 --
+  # external:
+  #   enabled: true
+  #   connectionUrl: "<URL>" 或 existingSecretName: "<SECRET-NAME>"
+
+clickhouse:
+  statefulSet:
+    persistence:
+      # 这可能取决于您配置的 TTL。
+      # 如果持续以此规模运行，我们建议为每个短期 TTL 天配置 60Gi。
+      size: 420Gi # 此配置假设 TTL 为 7 天，且持续以此规模运行。
+    resources:
+      requests:
+        cpu: "16"
+        memory: "24Gi"
+      limits:
+        cpu: "28"
+        memory: "40Gi"
+
+commonEnv:
+  - name: "CLICKHOUSE_ASYNC_INSERT_WAIT_PCT_FLOAT"
+    value: "0"
+```
+
+<Warning>
+如果使用上述配置后仍发现读取缓慢，我们建议迁移到[复制的 Clickhouse 集群设置](/langsmith/self-host-external-clickhouse#ha-replicated-clickhouse-cluster)。
+</Warning>
+
+### 高读取，高写入 <a name="high-reads-high-writes"></a>
+
+您的追踪记录接收速率非常高（接近每秒提交 1000 条追踪记录），并且还有许多用户在前端查询追踪记录（超过 50 个用户）和/或持续向 `/runs/query` 或 `/runs/<run-id>` 端点发出请求的脚本。
+
+**为此，我们非常强烈建议设置一个复制的 ClickHouse 集群，以防止在高写入规模下读取性能下降。** 请参阅我们的[外部 ClickHouse 文档](/langsmith/self-host-external-clickhouse#ha-replicated-clickhouse-cluster)，了解如何设置复制 ClickHouse 集群的更多指导。对于此负载模式，我们建议使用 3 节点复制设置，其中集群中的每个副本应具有 14+ 核心和 24+ GB 内存的资源请求，以及 20 核心和 48 GB 内存的资源限制。我们还建议 ClickHouse 的每个节点/实例为您启用的每个 TTL 天配置 600 Gi 的卷存储（如下方配置所示）。
+
+总体而言，我们建议如下配置：
+
+```yaml
+config:
+  blobStorage:
+    # 请同时设置其他键以连接到您的 blob 存储。请参阅配置部分。
+    enabled: true
+  settings:
+    redisRunsExpirySeconds: "3600"
+# ttl:
+#   enabled: true
+#   ttl_period_seconds:
+#     longlived: "7776000"  # 90 天（默认为 400 天）
+#     shortlived: "604800"  # 7 天（默认为 14 天）
+
+frontend:
+  deployment:
+    replicas: 4 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 2
+#     maxReplicas: 4
+
+platformBackend:
+  deployment:
+    replicas: 20 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 8
+#     maxReplicas: 20
+
+ingestQueue:
+  deployment:
+    replicas: 24 # 或者启用下面的 KEDA 自动扩缩容
+# autoscaling:
+#   keda:
+#     enabled: true
+#     minReplicaCount: 8
+#     maxReplicaCount: 24
+
+backend:
+  deployment:
+    replicas: 50 # 或者启用下面的自动扩缩容
+# autoscaling:
+#   hpa:
+#     enabled: true
+#     minReplicas: 20
+#     maxReplicas: 50
+
+## 确保您的 Redis 缓存至少为 26 GB，以支持高写入规模
+redis:
+  external:
+    enabled: true
+    existingSecretName: langsmith-redis-secret # 设置您外部 Redis 实例的连接 URL（26+ GB）
+
+# 我们强烈建议为此负载设置一个复制的 clickhouse 集群。
+# 根据需要更新这些值以连接到您的复制 clickhouse 集群。
+clickhouse:
+  external:
+    # 如果使用 3 节点复制设置，集群中的每个副本应具有 14+ 核心和 24+ GB 内存的资源请求，以及 20 核心和 48 GB 内存的资源限制。
+    enabled: true
+    host: langsmith-ch-clickhouse-replicated.default.svc.cluster.local
+    port: "8123"
+    nativePort: "9000"
+    user: "default"
+    password: "password"
+    database: "default"
+    cluster: "replicated"
+
+commonEnv:
+  - name: "CLICKHOUSE_ASYNC_INSERT_WAIT_PCT_FLOAT"
+    value: "0"
+```
+
+<Note>
+确保 Kubernetes 集群配置了足够的资源以扩展到推荐的大小。部署后，Kubernetes 集群中的所有 Pod 都应处于 `Running` 状态。卡在 `Pending` 状态的 Pod 可能表明您已达到节点池限制或需要更大的节点。
+
+同时，确保集群上部署的任何入口控制器能够处理所需的负载，以防止瓶颈。
+</Note>

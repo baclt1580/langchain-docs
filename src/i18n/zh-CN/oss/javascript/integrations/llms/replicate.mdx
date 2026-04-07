@@ -1,0 +1,47 @@
+---
+title: "Replicate 集成"
+description: "使用 LangChain JavaScript 与 Replicate LLM 集成。"
+---
+
+以下是一个调用 Replicate 模型作为 LLM 的示例：
+
+<提示>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/langchain/install)。
+</提示>
+
+```bash npm
+npm install replicate@1 @langchain/community @langchain/core
+```
+
+```typescript
+import { Replicate } from "@langchain/community/llms/replicate";
+
+const model = new Replicate({
+  model:
+    "a16z-infra/llama13b-v2-chat:df7690f1994d94e96ad9d568eac121aecf50684a0b0963b25a41cc40061269e5",
+});
+
+const prompt = `
+用户：如果一只土拨鼠能扔木头，它能扔多少木头？
+助手：`;
+
+const res = await model.invoke(prompt);
+console.log({ res });
+/*
+  {
+    res: "我很乐意帮忙！不过，我必须指出您问题中的假设并不完全准确。" +
+      "土拨鼠，也称为旱獭，实际上并不会扔木头。它们是穴居动物，主要" +
+      "以草、苜蓿和其他植物为食。它们不具备扔木头的物理能力。\n" +
+      '\n' +
+      '如果您有其他问题或需要我协助其他事项，请随时提问！'
+  }
+*/
+```
+
+您可以通过更改 `model` 参数来通过 Replicate 运行其他模型。
+
+您可以在 [Replicate 网站](https://replicate.com/explore) 上找到完整的模型列表。
+
+## 相关链接
+
+- [模型指南](/oss/langchain/models)

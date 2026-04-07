@@ -1,0 +1,84 @@
+---
+title: 追踪 Google ADK 应用
+sidebarTitle: Google ADK
+---
+
+import InstallGoogleAdk from '/snippets/langsmith/integrations/google-adk/install.mdx';
+import SetupGoogleAdk from '/snippets/langsmith/integrations/google-adk/setup.mdx';
+import ExampleQuickstart from '/snippets/langsmith/integrations/google-adk/example-quickstart.mdx';
+import ExampleMultiAgent from '/snippets/langsmith/integrations/google-adk/example-multi-agent.mdx';
+
+本指南将展示如何在 LangSmith 中追踪 [Google Agent Development Kit (ADK)](https://github.com/google/adk-python) 智能体。您将为 ADK 应用配置自动追踪功能，以捕获智能体调用、工具调用和 LLM 交互。
+
+## 安装
+
+使用您偏好的包管理器安装所需包：
+
+<InstallGoogleAdk/>
+
+## 设置
+
+设置您的 [API 密钥](/langsmith/create-account-api-key)：
+
+<SetupGoogleAdk/>
+
+要创建 Google API 密钥，请参考 [Google AI Studio](https://aistudio.google.com/api-keys)。
+
+## 配置追踪
+
+要追踪 ADK 智能体，请使用 LangSmith SDK 中的 `configure_google_adk()` 函数。在创建任何 ADK 智能体之前，在应用启动时调用此函数一次：
+
+```python
+from langsmith.integrations.google_adk import configure_google_adk
+
+configure_google_adk(
+    project_name="my-adk-project",  # 可选：默认为 LANGSMITH_PROJECT 环境变量
+)
+```
+
+该函数接受以下可选参数：
+
+- `project_name`：发送追踪数据的 LangSmith 项目。默认为 `LANGSMITH_PROJECT` 环境变量。
+- `name`：根追踪的名称。默认为 `"google_adk.session"`。
+- `metadata`：用于附加上下文的键值对字典。
+- `tags`：用于分类追踪的字符串列表。
+
+## 示例
+
+此示例创建一个带有工具的天气智能体，然后在启用追踪的情况下运行它：
+
+<ExampleQuickstart/>
+
+## 在 LangSmith 中查看追踪
+
+运行应用后，您可以在 [LangSmith UI](https://smith.langchain.com) 中查看追踪数据，包括：
+
+- **智能体调用**：通过 ADK 智能体的完整流程
+- **工具调用**：智能体进行的单个函数调用
+- **LLM 交互**：与 Gemini 模型的请求和响应
+- **多智能体工作流**：来自顺序和并行智能体组合的追踪
+
+![显示 Google ADK 智能体执行的 LangSmith 追踪视图](/langsmith/images/adk.png)
+
+## 自定义元数据和标签
+
+在配置追踪时添加元数据和标签，以分类和筛选追踪：
+
+```python
+from langsmith.integrations.google_adk import configure_google_adk
+
+configure_google_adk(
+    project_name="production-agents",
+    metadata={
+        "environment": "production",
+        "team": "ml-platform",
+    },
+    tags=["adk", "weather", "v2"],
+)
+```
+
+## 多智能体工作流
+
+该集成会自动追踪多智能体工作流，包括顺序和并行智能体组合：
+
+<ExampleMultiAgent/>

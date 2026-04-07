@@ -1,0 +1,53 @@
+---
+title: 启用 Polly
+sidebarTitle: Polly
+---
+
+[Polly](/langsmith/polly) 是一个嵌入在 LangSmith 工作空间中的 AI 助手，可帮助您分析追踪记录、线程、提示和实验结果。本页说明如何在 [自托管 LangSmith 实例](/langsmith/self-hosted) 上启用 Polly。
+
+<Info>
+自托管 LangSmith 是企业版计划的附加功能。更多详情请参阅 [定价](https://www.langchain.com/pricing)。如果您希望获取许可证密钥以在您的环境中试用 LangSmith，请 [联系我们的销售团队](https://www.langchain.com/contact-sales)。
+</Info>
+
+## 前提条件
+
+在启用 Polly 之前，请完成以下设置步骤：
+
+1. 安装基础 LangSmith 平台：
+   - [在 Kubernetes 上安装](/langsmith/kubernetes)。
+   - [在 Docker 上安装](/langsmith/docker)。
+1. [启用 LangSmith 部署](/langsmith/deploy-self-hosted-full-platform)（代理部署功能）。
+
+## 组件
+
+Polly 包含两个主要组件：
+
+- `agentBootstrap`：部署 Polly 所需的 [LangSmith 部署](/langsmith/deployment)（代理）的作业。
+- `polly`（代理）：为 LangSmith 中的 Polly 提供支持的主要代理（涵盖可观测性、线程、提示游乐场、实验）。
+
+## 启用 Polly
+
+将以下内容添加到您的 `values.yaml` 文件中：
+
+```yaml
+backend:
+  agentBootstrap:
+    enabled: true
+
+config:
+  polly:
+    enabled: true
+    encryptionKey: "<您的加密密钥>"
+```
+
+### 生成加密密钥
+
+Polly 需要一个 Fernet 加密密钥来安全存储密钥。使用 Python 生成一个：
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+<Note>
+您可以使用 `polly_encryption_key` 参数将加密密钥存储在预定义的 Kubernetes 密钥中。详情请参阅 [使用现有密钥](/langsmith/self-host-using-an-existing-secret#parameters)。
+</Note>

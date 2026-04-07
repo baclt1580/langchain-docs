@@ -1,0 +1,39 @@
+---
+title: "Bge on Hugging Face 集成"
+description: "使用 LangChain Python 集成 Hugging Face 上的 Bge 嵌入模型。"
+---
+
+>[HuggingFace 上的 BGE 模型](https://huggingface.co/BAAI/bge-large-en-v1.5) 是 [最佳开源嵌入模型之一](https://huggingface.co/spaces/mteb/leaderboard)。
+>BGE 模型由 [北京智源人工智能研究院 (BAAI)](https://en.wikipedia.org/wiki/Beijing_Academy_of_Artificial_Intelligence) 创建。`BAAI` 是一家从事人工智能研究与开发的私营非营利组织。
+
+本笔记本展示了如何通过 `Hugging Face` 使用 `BGE Embeddings`。
+
+```python
+pip install -qU  sentence_transformers
+```
+
+```python
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+
+model_name = "BAAI/bge-small-en"
+model_kwargs = {"device": "cpu"}
+encode_kwargs = {"normalize_embeddings": True}
+hf = HuggingFaceBgeEmbeddings(
+    model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+)
+```
+
+请注意，对于 `model_name="BAAI/bge-m3"`，您需要传递 `query_instruction=""`，详见 [FAQ BGE M3](https://huggingface.co/BAAI/bge-m3#faq)。
+
+```python
+embedding = hf.embed_query("hi this is harrison")
+len(embedding)
+```
+
+```text
+384
+```
+
+```python
+
+```
