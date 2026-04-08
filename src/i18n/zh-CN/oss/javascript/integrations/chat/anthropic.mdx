@@ -1,0 +1,1025 @@
+---
+title: "ChatAnthropic 集成"
+sidebarTitle: "聊天"
+description: "使用 LangChain JavaScript 集成 ChatAnthropic 聊天模型。"
+---
+
+[Anthropic](https://www.anthropic.com/) 是一家专注于人工智能安全与研究的公司。他们是 Claude 的创造者。
+
+本文将帮助您快速上手使用 `ChatAnthropic` [聊天模型](/oss/langchain/models)。关于所有 `ChatAnthropic` 功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-anthropic/ChatAnthropic)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | [Python 支持](https://python.langchain.com/docs/integrations/chat/anthropic/) | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| [`ChatAnthropic`](https://reference.langchain.com/javascript/langchain-anthropic/ChatAnthropic) | [`@langchain/anthropic`](https://www.npmjs.com/package/@langchain/anthropic) | ✅ | ✅ | ![NPM - 下载量](https://img.shields.io/npm/dm/@langchain/anthropic?style=flat-square&label=%20&) | ![NPM - 版本](https://img.shields.io/npm/v/@langchain/anthropic?style=flat-square&label=%20&) |
+
+### 模型功能
+
+请参阅下表标题中的链接，了解如何使用特定功能的指南。
+
+| [工具调用](/oss/langchain/tools) | [结构化输出](/oss/langchain/structured-output) | [图像输入](/oss/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/langchain/streaming/) | [令牌使用量](/oss/langchain/models#token-usage) | [对数概率](/oss/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: |
+| ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
+
+## 设置
+
+您需要注册并获取 [Anthropic API 密钥](https://www.anthropic.com/)，然后安装 `@langchain/anthropic` 集成包。
+
+### 凭据
+
+前往 [Anthropic 网站](https://www.anthropic.com/) 注册 Anthropic 并生成 API 密钥。完成后，设置 `ANTHROPIC_API_KEY` 环境变量：
+
+```bash
+export ANTHROPIC_API_KEY="your-api-key"
+```
+
+如果您想自动跟踪模型调用，还可以通过取消下面的注释来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```bash
+# export LANGSMITH_TRACING="true"
+# export LANGSMITH_API_KEY="your-api-key"
+```
+
+### 安装
+
+LangChain `ChatAnthropic` 集成位于 `@langchain/anthropic` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/anthropic @langchain/core
+```
+```bash yarn
+yarn add @langchain/anthropic @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/anthropic @langchain/core
+```
+</CodeGroup>
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic"
+
+const llm = new ChatAnthropic({
+    model: "claude-haiku-4-5-20251001",
+    temperature: 0,
+    maxTokens: undefined,
+    maxRetries: 2,
+    // 其他参数...
+});
+```
+
+## 调用
+
+```typescript
+const aiMsg = await llm.invoke([
+    [
+        "system",
+        "You are a helpful assistant that translates English to French. Translate the user sentence.",
+    ],
+    ["human", "I love programming."],
+])
+aiMsg
+```
+
+```text
+AIMessage {
+  "id": "msg_013WBXXiggy6gMbAUY6NpsuU",
+  "content": "Voici la traduction en français :\n\nJ'adore la programmation.",
+  "additional_kwargs": {
+    "id": "msg_013WBXXiggy6gMbAUY6NpsuU",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-haiku-4-5-20251001",
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 29,
+      "output_tokens": 20
+    }
+  },
+  "response_metadata": {
+    "id": "msg_013WBXXiggy6gMbAUY6NpsuU",
+    "model": "claude-haiku-4-5-20251001",
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 29,
+      "output_tokens": 20
+    },
+    "type": "message",
+    "role": "assistant"
+  },
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 29,
+    "output_tokens": 20,
+    "total_tokens": 49
+  }
+}
+```
+
+```typescript
+console.log(aiMsg.content)
+```
+
+```text
+Voici la traduction en français :
+
+J'adore la programmation.
+```
+
+## 内容块
+
+Anthropic 模型与其他大多数模型的一个关键区别在于，单个 Anthropic `AIMessage` 的内容可以是单个字符串，也可以是**内容块列表**。例如，当 Anthropic 模型[调用工具](/oss/langchain/tools)时，工具调用是消息内容的一部分（同时也在标准化的 `AIMessage.tool_calls` 字段中公开）：
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import * as z from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
+const calculatorSchema = z.object({
+  operation: z
+    .enum(["add", "subtract", "multiply", "divide"])
+    .describe("要执行的操作类型。"),
+  number1: z.number().describe("要操作的第一个数字。"),
+  number2: z.number().describe("要操作的第二个数字。"),
+});
+
+const calculatorTool = {
+  name: "calculator",
+  description: "一个简单的计算器工具",
+  input_schema: zodToJsonSchema(calculatorSchema),
+};
+
+const toolCallingLlm = new ChatAnthropic({
+  model: "claude-haiku-4-5-20251001",
+}).bindTools([calculatorTool]);
+
+const toolPrompt = ChatPromptTemplate.fromMessages([
+  [
+    "system",
+    "你是一个总是需要使用计算器的助手。",
+  ],
+  ["human", "{input}"],
+]);
+
+// 将提示和模型链接在一起
+const toolCallChain = toolPrompt.pipe(toolCallingLlm);
+
+await toolCallChain.invoke({
+  input: "2 + 2 等于多少？",
+});
+```
+
+```text
+AIMessage {
+  "id": "msg_01DZGs9DyuashaYxJ4WWpWUP",
+  "content": [
+    {
+      "type": "text",
+      "text": "以下是 2 + 2 的计算结果："
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_01SQXBamkBr6K6NdHE7GWwF8",
+      "name": "calculator",
+      "input": {
+        "number1": 2,
+        "number2": 2,
+        "operation": "add"
+      }
+    }
+  ],
+  "additional_kwargs": {
+    "id": "msg_01DZGs9DyuashaYxJ4WWpWUP",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-haiku-4-5-20251001",
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 449,
+      "output_tokens": 100
+    }
+  },
+  "response_metadata": {
+    "id": "msg_01DZGs9DyuashaYxJ4WWpWUP",
+    "model": "claude-haiku-4-5-20251001",
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 449,
+      "output_tokens": 100
+    },
+    "type": "message",
+    "role": "assistant"
+  },
+  "tool_calls": [
+    {
+      "name": "calculator",
+      "args": {
+        "number1": 2,
+        "number2": 2,
+        "operation": "add"
+      },
+      "id": "toolu_01SQXBamkBr6K6NdHE7GWwF8",
+      "type": "tool_call"
+    }
+  ],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 449,
+    "output_tokens": 100,
+    "total_tokens": 549
+  }
+}
+```
+
+## 自定义请求头
+
+您可以像这样在请求中传递自定义请求头：
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+
+const llmWithCustomHeaders = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+  maxTokens: 1024,
+  clientOptions: {
+    defaultHeaders: {
+      "X-Api-Key": process.env.ANTHROPIC_API_KEY,
+    },
+  },
+});
+
+await llmWithCustomHeaders.invoke("为什么天空是蓝色的？");
+```
+
+```text
+AIMessage {
+  "id": "msg_019z4nWpShzsrbSHTWXWQh6z",
+  "content": "天空呈现蓝色是由于一种称为瑞利散射的现象。简要解释如下：\n\n1) 阳光由不同波长的可见光组成，包含彩虹的所有颜色。\n\n2) 当阳光穿过大气层时，气体（主要是氮气和氧气）会使较短波长的光（如紫光和蓝光）比较长波长的光（如红光和橙光）更容易发生散射。\n\n3) 这些较短的蓝色波长被大气中的气体分子向各个方向散射。\n\n4) 我们的眼睛对散射的蓝光比对散射的紫光更敏感，因此我们将天空感知为蓝色。\n\n5) 对于在大气中传播更远距离的光，散射效应更明显。这就是为什么看向地平线时天空看起来颜色更深蓝。\n\n因此，大气中的气体对阳光中较短的蓝色波长的选择性散射，正是导致我们在白天看到天空呈现蓝色的原因。",
+  "additional_kwargs": {
+    "id": "msg_019z4nWpShzsrbSHTWXWQh6z",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-3-sonnet-20240229",
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 13,
+      "output_tokens": 236
+    }
+  },
+  "response_metadata": {
+    "id": "msg_019z4nWpShzsrbSHTWXWQh6z",
+    "model": "claude-3-sonnet-20240229",
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 13,
+      "output_tokens": 236
+    },
+    "type": "message",
+    "role": "assistant"
+  },
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 13,
+    "output_tokens": 236,
+    "total_tokens": 249
+  }
+}
+```
+
+## 提示缓存
+
+<Warning>
+**兼容性**：此功能目前处于测试阶段。
+</Warning>
+
+Anthropic 支持[缓存部分提示](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)，以降低需要长上下文的使用场景的成本。您可以缓存工具以及整个消息和单个块。
+
+包含一个或多个带有 `"cache_control": { "type": "ephemeral" }` 字段的块或工具定义的初始请求将自动缓存该部分提示。此初始缓存步骤会产生额外费用，但后续请求将按较低费率计费。缓存的生存期为 5 分钟，但每次命中缓存时都会刷新此生存期。
+
+此外，当前存在一个最小可缓存提示长度，该长度因模型而异。更多信息，请参阅[提示缓存详情](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#structuring-your-prompt)。
+
+这目前需要您使用 beta 请求头初始化模型。以下是一个缓存系统消息部分的示例，该消息包含 LangChain [概念文档](/oss/concepts/)：
+
+```typescript
+let CACHED_TEXT = "...";
+```
+
+```typescript
+// @lc-docs-hide-cell
+
+CACHED_TEXT = `## 组件
+
+LangChain 为标准、可扩展的接口和外部集成提供了各种组件，这些组件对于使用 LLM 进行构建非常有用。
+某些组件由 LangChain 实现，某些组件我们依赖第三方集成，还有一些则是混合模式。
+
+### 聊天模型
+
+<span data-heading-keywords="chat model,chat models"></span>
+
+使用消息序列作为输入并返回聊天消息作为输出的语言模型（与使用纯文本相反）。
+这些通常是较新的模型（较旧的模型通常是 \`LLM\`，见下文）。
+聊天模型支持为对话消息分配不同的角色，有助于区分来自 AI、用户和系统消息等指令的消息。
+
+尽管底层模型是消息输入、消息输出，但 LangChain 包装器也允许这些模型将字符串作为输入。
+这使它们具有与 LLM 相同的接口（并且更易于使用）。
+当传入字符串作为输入时，它将在传递给底层模型之前转换为 \`HumanMessage\`。
+
+LangChain 不托管任何聊天模型，而是依赖第三方集成。
+
+我们在构建 ChatModels 时有一些标准化参数：
+
+- \`model\`：模型的名称
+
+ChatModels 还接受特定于该集成的其他参数。
+
+<Warning>
+**一些聊天模型已针对**工具调用**进行了微调，并为此提供了专用 API。**
+
+通常，此类模型比未经微调的模型更擅长工具调用，并且推荐用于需要工具调用的用例。
+更多信息，请参阅[工具调用部分](/oss/langchain/tools)。
+</Warning>
+
+有关如何使用聊天模型的详细信息，请参阅[此处的相关操作指南](/oss/langchain/models)。
+
+#### 多模态
+
+一些聊天模型是多模态的，可以接受图像、音频甚至视频作为输入。
+这些仍然不太常见，意味着模型提供商尚未标准化定义 API 的“最佳”方式。
+多模态输出甚至更不常见。因此，我们保持多模态抽象相对轻量，
+并计划随着该领域的发展进一步巩固多模态 API 和交互模式。
+
+在 LangChain 中，大多数支持多模态输入的聊天模型也接受 OpenAI 内容块格式中的这些值。
+到目前为止，这仅限于图像输入。对于像 Gemini 这样支持视频和其他字节输入的模型，API 也支持本地的、特定于模型的表示形式。
+
+有关如何使用多模态模型的详细信息，请参阅[此处的相关操作指南](/oss/how-to/#multimodal)。
+
+### LLM
+
+<span data-heading-keywords="llm,llms"></span>
+
+<Warning>
+**纯文本输入/文本输出的 LLM 往往是较旧或较低级的。许多流行模型最好用作[聊天补全模型](/oss/langchain/models)，**
+
+即使对于非聊天用例也是如此。
+
+您可能正在寻找[上面的部分](/oss/langchain/models)。
+</Warning>
+
+接受字符串作为输入并返回字符串的语言模型。
+这些传统上是较旧的模型（较新的模型通常是[聊天模型](/oss/langchain/models)，见上文）。
+
+尽管底层模型是字符串输入、字符串输出，但 LangChain 包装器也允许这些模型将消息作为输入。
+这使它们具有与[聊天模型](/oss/langchain/models)相同的接口。
+当传入消息作为输入时，它们将在传递给底层模型之前格式化为字符串。
+
+LangChain 不托管任何 LLM，而是依赖第三方集成。
+
+有关如何使用 LLM 的详细信息，请参阅[此处的相关操作指南](/oss/langchain/models)。
+
+### 消息类型
+
+一些语言模型接受消息数组作为输入并返回一条消息。
+有几种不同类型的消息。
+所有消息都有 \`role\`（角色）、\`content\`（内容）和 \`response_metadata\`（响应元数据）属性。
+
+\`role\` 描述的是谁在发送消息。
+LangChain 针对不同角色有不同的消息类。
+
+\`content\` 属性描述消息的内容。
+这可以是几种不同形式：
+
+- 一个字符串（大多数模型处理这种类型的内容）
+- 一个对象列表（用于多模态输入，其中对象包含有关该输入类型和该输入位置的信息）
+
+#### HumanMessage
+
+这表示来自用户的消息。
+
+#### AIMessage
+
+这表示来自模型的消息。除了 \`content\` 属性外，这些消息还有：
+
+**\`response_metadata\`**
+
+\`response_metadata\` 属性包含有关响应的附加元数据。这里的数据通常特定于每个模型提供商。
+此处可能存储诸如对数概率和令牌使用量之类的信息。
+
+**\`tool_calls\`**
+
+这些表示语言模型调用工具的决定。它们作为 \`AIMessage\` 输出的一部分包含在内。
+可以通过 \`.tool_calls\` 属性从那里访问它们。
+
+此属性返回一个 \`ToolCall\` 列表。\`ToolCall\` 是一个具有以下参数的对象：
+
+- \`name\`：应调用的工具的名称。
+- \`args\`：该工具的参数。
+- \`id\`：该工具调用的 ID。
+
+#### SystemMessage
+
+这表示系统消息，它告诉模型如何行为。并非每个模型提供商都支持此功能。
+
+#### ToolMessage
+
+这表示工具调用的结果。除了 \`role\` 和 \`content\` 之外，此消息还有：
+
+- 一个 \`tool_call_id\` 字段，用于传达产生此结果所调用的工具调用的 ID。
+- 一个 \`artifact\` 字段，可用于传递工具执行的任意工件，这些工件便于跟踪但不应发送给模型。
+
+#### (Legacy) FunctionMessage
+
+这是一个遗留消息类型，对应于 OpenAI 的遗留函数调用 API。应使用 \`ToolMessage\` 来对应更新的工具调用 API。
+
+这表示函数调用的结果。除了 \`role\` 和 \`content\` 之外，此消息还有一个 \`name\` 参数，用于传达产生此结果所调用的函数的名称。
+
+### 提示模板
+
+<span data-heading-keywords="prompt,prompttemplate,chatprompttemplate"></span>
+
+提示模板有助于将用户输入和参数转换为语言模型的指令。
+这可用于指导模型的响应，帮助它理解上下文并生成相关且连贯的基于语言的输出。
+
+提示模板接受一个对象作为输入，其中每个键代表提示模板中要填充的变量。
+
+提示模板输出一个 PromptValue。此 PromptValue 可以传递给 LLM 或 ChatModel，也可以转换为字符串或消息数组。
+PromptValue 存在的原因是便于在字符串和消息之间切换。
+
+有几种不同类型的提示模板：
+
+#### 字符串 PromptTemplate
+
+这些提示模板用于格式化单个字符串，通常用于较简单的输入。
+例如，构造和使用 PromptTemplate 的常见方式如下：
+
+\`\`\`typescript
+import { PromptTemplate } from "@langchain/core/prompts";
+
+const promptTemplate = PromptTemplate.fromTemplate(
+  "给我讲一个关于 {topic} 的笑话"
+);
+
+await promptTemplate.invoke({ topic: "猫" });
+\`\`\`
+
+#### ChatPromptTemplate
+
+这些提示模板用于格式化消息数组。这些“模板”本身由模板数组组成。
+例如，构造和使用 ChatPromptTemplate 的常见方式如下：
+
+\`\`\`typescript
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+
+const promptTemplate = ChatPromptTemplate.fromMessages([
+  ["system", "你是一个乐于助人的助手"],
+  ["user", "给我讲一个关于 {topic} 的笑话"],
+]);
+
+await promptTemplate.invoke({ topic: "猫" });
+\`\`\`
+
+在上面的示例中，此 ChatPromptTemplate 在被调用时将构造两条消息。
+第一条是系统消息，没有需要格式化的变量。
+第二条是 HumanMessage，并将根据用户传入的 \`topic\` 变量进行格式化。
+
+#### MessagesPlaceholder
+
+<span data-heading-keywords="messagesplaceholder"></span>
+
+此提示模板负责在特定位置添加消息数组。
+在上面的 ChatPromptTemplate 中，我们看到如何格式化两条消息，每条都是一个字符串。
+但是如果用户想要传入一个消息数组，并将其插入到特定位置呢？
+这就是 MessagesPlaceholder 的用法。
+
+\`\`\`typescript
+import {
+  ChatPromptTemplate,
+  MessagesPlaceholder,
+} from "@langchain/core/prompts";
+import { HumanMessage } from "@langchain/core/messages";
+
+const promptTemplate = ChatPromptTemplate.fromMessages([
+  ["system", "你是一个乐于助人的助手"],
+  new MessagesPlaceholder("msgs"),
+]);
+
+promptTemplate.invoke({ msgs: [new HumanMessage({ content: "你好！" })] });
+\`\`\`
+
+这将生成一个包含两条消息的数组，第一条是系统消息，第二条是我们传入的 HumanMessage。
+如果我们传入了 5 条消息，那么它将总共生成 6 条消息（系统消息加上传入的 5 条）。
+这对于让消息数组插入到特定位置非常有用。
+
+另一种无需显式使用 \`MessagesPlaceholder\` 类即可完成相同操作的方法是：
+
+\`\`\`typescript
+const promptTemplate = ChatPromptTemplate.fromMessages([
+  ["system", "你是一个乐于助人的助手"],
+  ["placeholder", "{msgs}"], // <-- 这是更改的部分
+]);
+\`\`\`
+
+有关如何使用提示模板的详细信息，请参阅[此处的相关操作指南](/oss/how-to/#prompt-templates)。
+
+### 示例选择器
+
+为获得更好性能的一种常见提示技术是在提示中包含示例。
+这为语言模型提供了它应该如何行为的具体示例。
+有时这些示例被硬编码到提示中，但对于更高级的情况，动态选择它们可能更好。
+示例选择器是负责选择示例并将其格式化为提示的类。
+
+有关如何使用示例选择器的详细信息，请参阅[此处的相关操作指南](/oss/how-to/#example-selectors)。
+
+### 输出解析器
+
+<span data-heading-keywords="output parser"></span>
+
+<Note>
+**此处信息指的是解析器，它接收模型的文本输出并尝试将其解析为更结构化的表示。**
+
+越来越多的模型支持函数（或工具）调用，这可以自动处理此问题。
+建议使用函数/工具调用而不是输出解析。
+请参阅 [LangChain 工具文档](/oss/langchain/tools)。
+
+</Note>
+
+负责接收模型的输出并将其转换为更适合下游任务的格式。
+当您使用 LLM 生成结构化数据，或标准化来自聊天模型和 LLM 的输出时非常有用。
+
+输出解析器必须实现两个主要方法：
+
+- "获取格式指令"：一个返回字符串的方法，该字符串包含有关语言模型输出应如何格式化的指令。
+- "解析"：一个接收字符串（假定为语言模型的响应）并将其解析为某种结构的方法。
+
+以及一个可选方法：
+
+- "带提示解析"：一个接收字符串（假定为语言模型的响应）和一个提示（假定为生成该响应的提示）并将其解析为某种结构的方法。提供提示主要是为了让 OutputParser 想要以某种方式重试或修复输出时，需要从提示中获取信息。
+
+输出解析器接受字符串或 \`BaseMessage\` 作为输入，并可返回任意类型。
+
+LangChain 有许多不同类型的输出解析器。这是 LangChain 支持的输出解析器列表。下表包含各种信息：
+
+**名称**：输出解析器的名称
+
+**支持流式传输**：输出解析器是否支持流式传输。
+
+**输入类型**：预期的输入类型。大多数输出解析器适用于字符串和消息，但有些（如 OpenAI Functions）需要带有特定参数的消息。
+
+**输出类型**：解析器返回的对象的输出类型。
+
+**描述**：我们对这个输出解析器及其使用场景的评论。
+
+当前日期是 ${new Date().toISOString()}`;
+
+// 无操作语句以隐藏输出
+void 0;
+```
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+
+const modelWithCaching = new ChatAnthropic({
+  model: "claude-haiku-4-5-20251001",
+  clientOptions: {
+    defaultHeaders: {
+      "anthropic-beta": "prompt-caching-2024-07-31",
+    },
+  },
+});
+
+const LONG_TEXT = `你是一个海盗。始终用海盗方言回复。
+
+回答问题时使用以下内容作为上下文：
+
+${CACHED_TEXT}`;
+
+const messages = [
+  {
+    role: "system",
+    content: [
+      {
+        type: "text",
+        text: LONG_TEXT,
+        // 告诉 Anthropic 缓存此块
+        cache_control: { type: "ephemeral" },
+      },
+    ],
+  },
+  {
+    role: "user",
+    content: "LangChain 支持哪些类型的消息？",
+  },
+];
+
+const res = await modelWithCaching.invoke(messages);
+
+console.log("使用量:", res.response_metadata.usage);
+```
+
+```text
+USAGE: {
+  input_tokens: 19,
+  cache_creation_input_tokens: 2921,
+  cache_read_input_tokens: 0,
+  output_tokens: 355
+}
+```
+
+我们可以看到，从 Anthropic 返回的原始使用量字段中有一个名为 `cache_creation_input_tokens` 的新字段。
+
+如果我们再次使用相同的消息，可以看到长文本的输入令牌是从缓存中读取的：
+
+```typescript
+const res2 = await modelWithCaching.invoke(messages);
+
+console.log("使用量:", res2.response_metadata.usage);
+```
+
+```text
+USAGE: {
+  input_tokens: 19,
+  cache_creation_input_tokens: 0,
+  cache_read_input_tokens: 2921,
+  output_tokens: 357
+}
+```
+
+### 工具缓存
+
+您还可以通过在工具定义中设置相同的 `"cache_control": { "type": "ephemeral" }` 来缓存工具。这目前要求您以 [Anthropic 的原始工具格式](https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview)绑定工具。示例如下：
+
+```typescript
+const SOME_LONG_DESCRIPTION = "...";
+
+// Anthropic 格式的工具
+const anthropicTools = [{
+  name: "get_weather",
+  description: SOME_LONG_DESCRIPTION,
+  input_schema: {
+    type: "object",
+    properties: {
+      location: {
+        type: "string",
+        description: "获取天气的位置",
+      },
+      unit: {
+        type: "string",
+        description: "返回的温度单位",
+      },
+    },
+    required: ["location"],
+  },
+  // 告诉 Anthropic 缓存此工具
+  cache_control: { type: "ephemeral" },
+}]
+
+const modelWithCachedTools = modelWithCaching.bindTools(anthropicTools);
+
+await modelWithCachedTools.invoke("旧金山的天气怎么样？");
+```
+
+有关提示缓存工作原理的更多信息，请参阅 [Anthropic 的文档](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#how-prompt-caching-works)。
+
+## 自定义客户端
+
+Anthropic 模型[可以托管在诸如 Google Vertex 之类的云服务上](https://platform.claude.com/docs/en/build-with-claude/claude-on-vertex-ai)，这些服务依赖于具有与主 Anthropic 客户端相同接口的不同底层客户端。您可以通过提供一个 `createClient` 方法来访问这些服务，该方法返回一个已初始化的 Anthropic 客户端实例。示例如下：
+
+```typescript
+import { AnthropicVertex } from "@anthropic-ai/vertex-sdk";
+
+const customClient = new AnthropicVertex();
+
+const modelWithCustomClient = new ChatAnthropic({
+  modelName: "claude-3-sonnet@20240229",
+  maxRetries: 0,
+  createClient: () => customClient,
+});
+
+await modelWithCustomClient.invoke([{ role: "user", content: "你好！" }]);
+```
+
+## 引用
+
+Anthropic 支持[引用](https://platform.claude.com/docs/en/build-with-claude/citations)功能，允许 Claude 根据用户提供的源材料将其答案附加上下文。此源材料可以作为[文档内容块](https://platform.claude.com/docs/en/build-with-claude/citations#document-types)（描述完整文档）或[搜索结果](https://platform.claude.com/docs/en/build-with-claude/search-results)（描述从检索系统返回的相关段落或片段）提供。当查询中包含 `"citations": { "enabled": true }` 时，Claude 可能会在其响应中生成对提供材料的直接引用。
+
+### 文档示例
+
+在此示例中，我们传递一个[纯文本文档](https://platform.claude.com/docs/en/build-with-claude/citations#plain-text-documents)。在后台，Claude [自动将输入文本分块](https://platform.claude.com/docs/en/build-with-claude/citations#plain-text-documents)为句子，用于生成引用。
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+
+const citationsModel = new ChatAnthropic({
+  model: "claude-haiku-4-5-20251001",
+});
+
+const messagesWithCitations = [
+  {
+    role: "user",
+    content: [
+      {
+        type: "document",
+        source: {
+          type: "text",
+          media_type: "text/plain",
+          data: "草是绿的。天空是蓝的。",
+        },
+        title: "我的文档",
+        context: "这是一个值得信赖的文档。",
+        citations: {
+          enabled: true,
+        },
+      },
+      {
+        type: "text",
+        text: "草和天空是什么颜色？",
+      },
+    ],
+  }
+];
+
+const responseWithCitations = await citationsModel.invoke(messagesWithCitations);
+
+console.log(JSON.stringify(responseWithCitations.content, null, 2));
+```
+
+```json
+[
+  {
+    "type": "text",
+    "text": "根据文档，我可以告诉你：\n\n- "
+  },
+  {
+    "type": "text",
+    "text": "草是绿的",
+    "citations": [
+      {
+        "type": "char_location",
+        "cited_text": "草是绿的。 ",
+        "document_index": 0,
+        "document_title": "我的文档",
+        "start_char_index": 0,
+        "end_char_index": 20
+      }
+    ]
+  },
+  {
+    "type": "text",
+    "text": "\n- "
+  },
+  {
+    "type": "text",
+    "text": "天空是蓝的",
+    "citations": [
+      {
+        "type": "char_location",
+        "cited_text": "天空是蓝的。",
+        "document_index": 0,
+        "document_title": "我的文档",
+        "start_char_index": 20,
+        "end_char_index": 36
+      }
+    ]
+  }
+]
+```
+
+### 搜索结果示例
+
+在此示例中，我们将[搜索结果](https://platform.claude.com/docs/en/build-with-claude/search-results)作为消息内容的一部分传入。这允许 Claude 在其响应中引用您自己的检索系统中的特定段落或片段。
+
+当您希望 Claude 引用特定知识集中的信息，但希望直接提供您自己预取/缓存的内容，而不是让模型自动搜索或检索它们时，此方法很有帮助。
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+
+const citationsModel = new ChatAnthropic({
+  model: "claude-haiku-4-5-20251001",
+});
+
+const messagesWithCitations = [
+  {
+    type: "user",
+    content: [
+      {
+        type: "search_result",
+        title: "法国历史",
+        source: "https://some-uri.com",
+        citations: { enabled: true },
+        content: [
+          {
+            type: "text",
+            text: "法国的首都是巴黎。",
+          },
+          {
+            type: "text",
+            text: "法国的旧首都是里昂。",
+          },
+        ],
+      },
+      {
+        type: "text",
+        text: "法国的首都是哪里？",
+      },
+    ],
+  },
+];
+
+const responseWithCitations = await citationsModel.invoke(messagesWithCitations);
+
+console.log(JSON.stringify(responseWithCitations.content, null, 2));
+```####工具提供的搜索结果
+
+您也可以使用工具来提供搜索结果，让模型在回复中引用这些结果。这非常适合 RAG（或[检索增强生成](https://en.wikipedia.org/wiki/Retrieval-augmented_generation)）工作流，Claude 可以自行决定何时从何处检索信息。当以[搜索结果](https://platform.claude.com/docs/en/build-with-claude/search-results)的形式返回这些信息时，Claude 能够根据工具返回的材料创建引用。
+
+以下是如何创建一个工具，以 Anthropic 的引用 API 所期望的格式返回搜索结果：
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+import { tool } from "@langchain/core/tools";
+
+// 创建一个返回搜索结果的工具
+const ragTool = tool(
+  () => [
+    {
+      type: "search_result",
+      title: "法国历史",
+      source: "https://some-uri.com",
+      citations: { enabled: true },
+      content: [
+        {
+          type: "text",
+          text: "法国的首都是巴黎。",
+        },
+        {
+          type: "text",
+          text: "法国的旧都曾是里昂。",
+        },
+      ],
+    },
+    {
+      type: "search_result",
+      title: "法国地理",
+      source: "https://some-uri.com",
+      citations: { enabled: true },
+      content: [
+        {
+          type: "text",
+          text: "法国是一个欧洲国家。",
+        },
+        {
+          type: "text",
+          text: "法国的首都是巴黎。",
+        },
+      ],
+    },
+  ],
+  {
+    name: "my_rag_tool",
+    description: "访问我知识库的检索系统。",
+    schema: z.object({
+      query: z.string().describe("在知识库中搜索的查询"),
+    }),
+  }
+);
+
+// 创建带有搜索结果测试版标头的模型
+const model = new ChatAnthropic({
+  model: "claude-haiku-4-5-20251001",
+}).bindTools([ragTool]);
+
+const result = await model.invoke([
+  {
+    role: "user",
+    content: "法国的首都是什么？",
+  },
+]);
+
+console.log(JSON.stringify(result.content, null, 2));
+
+```
+
+了解更多关于 [LangChain 中 RAG 的工作原理](https://js.langchain.com/docs/concepts/rag/)
+
+[了解有关工具调用的更多信息](/oss/langchain/tools)
+
+### 与文本分割器一起使用
+
+Anthropic 还允许您使用[自定义文档](https://platform.claude.com/docs/en/build-with-claude/citations#custom-content-documents)类型来指定自己的分割。LangChain 的文本分割器可用于为此目的生成有意义的片段。请参见下面的示例，我们将 LangChain.js README（一个 markdown 文档）进行分割，并将其作为上下文传递给 Claude：
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+import { MarkdownTextSplitter } from "@langchain/classic/text_splitter";
+
+function formatToAnthropicDocuments(documents: string[]) {
+  return {
+    type: "document",
+    source: {
+      type: "content",
+      content: documents.map((document) => ({ type: "text", text: document })),
+    },
+    citations: { enabled: true },
+  };
+}
+
+// 拉取 readme
+const readmeResponse = await fetch(
+  "https://raw.githubusercontent.com/langchain-ai/langchainjs/master/README.md"
+);
+
+const readme = await readmeResponse.text();
+
+// 分割成块
+const splitter = new MarkdownTextSplitter({
+  chunkOverlap: 0,
+  chunkSize: 50,
+});
+const documents = await splitter.splitText(readme);
+
+// 构建消息
+const messageWithSplitDocuments = {
+  role: "user",
+  content: [
+    formatToAnthropicDocuments(documents),
+    { type: "text", text: "给我一个 LangChain 教程的链接。引用你的来源" },
+  ],
+};
+
+// 查询 LLM
+const citationsModelWithSplits = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+const resWithSplits = await citationsModelWithSplits.invoke([messageWithSplitDocuments]);
+
+console.log(JSON.stringify(resWithSplits.content, null, 2));
+```
+
+```json
+[
+  {
+    "type": "text",
+    "text": "根据文档，我可以为您提供 LangChain 教程的链接：\n\n"
+  },
+  {
+    "type": "text",
+    "text": "教程可以在以下网址找到：https://js.langchain.com/docs/tutorials/",
+    "citations": [
+      {
+        "type": "content_block_location",
+        "cited_text": "[教程](https://js.langchain.com/docs/tutorials/) 演练",
+        "document_index": 0,
+        "document_title": null,
+        "start_block_index": 191,
+        "end_block_index": 194
+      }
+    ]
+  }
+]
+```
+
+## 上下文管理
+
+Anthropic 支持上下文编辑功能，该功能将自动管理模型的上下文窗口（例如，通过清除工具结果）。
+
+有关详细信息和配置选项，请参阅 [Anthropic 文档](https://platform.claude.com/docs/en/build-with-claude/context-editing)。
+
+<Info>
+    **自 `@langchain/anthropic@0.3.29` 起支持上下文管理**
+</Info>
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+  clientOptions: {
+    defaultHeaders: {
+      "anthropic-beta": "context-management-2025-06-27",
+    },
+  },
+  contextManagement: { edits: [{ type: "clear_tool_uses_20250919" }] },
+)
+const llmWithTools = llm.bindTools([{ type: "web_search_20250305", name: "web_search" }]);
+const response = await llmWithTools.invoke("搜索人工智能的最新发展");
+```
+
+---
+
+## API 参考
+
+有关所有 `ChatAnthropic` 功能和配置的详细文档，请访问 [API 参考](https://reference.langchain.com/javascript/langchain-anthropic/ChatAnthropic)。

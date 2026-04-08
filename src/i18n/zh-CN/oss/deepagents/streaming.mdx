@@ -1,0 +1,931 @@
+---
+title: 流式传输
+description: 从深度智能体运行和子智能体执行中流式传输实时更新
+---
+
+深度智能体构建在 LangGraph 的流式传输基础设施之上，并为一流的子智能体流提供支持。当深度智能体将工作委派给子智能体时，您可以独立地从每个子智能体流式传输更新——实时跟踪进度、LLM 令牌和工具调用。
+
+深度智能体流式传输可以实现：
+
+* <Icon icon="diagram-subtask" size={16} /> [**流式子智能体进度**](#子智能体进度)——在每个子智能体并行运行时跟踪其执行情况。
+* <Icon icon="square-binary" size={16} /> [**流式传输 LLM 令牌**](#llm-令牌)——从主智能体和每个子智能体流式传输令牌。
+* <Icon icon="screwdriver-wrench" size={16} /> [**流式传输工具调用**](#工具调用)——查看子智能体执行过程中的工具调用及结果。
+* <Icon icon="table" size={16} /> [**流式传输自定义更新**](#自定义更新)——从子智能体节点内部发出用户定义的信号。
+
+## 启用子图流式传输
+
+深度智能体使用 LangGraph 的子图流式传输来呈现子智能体执行中的事件。要接收子智能体事件，请在流式传输时启用 `stream_subgraphs`。
+
+:::python
+```python
+from deepagents import create_deep_agent
+
+agent = create_deep_agent(
+    system_prompt="你是一个有用的研究助手",
+    subagents=[
+        {
+            "name": "researcher",
+            "description": "深度研究一个主题",
+            "system_prompt": "你是一个细致的研究者。",
+        },
+    ],
+)
+
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "研究量子计算进展"}]},
+    stream_mode="updates",
+    subgraphs=True,  # [!code highlight]
+    version="v2",  # [!code highlight]
+):
+    if chunk["type"] == "updates":
+        if chunk["ns"]:
+            # 子智能体事件 - 命名空间标识来源
+            print(f"[子智能体: {chunk['ns']}]")
+        else:
+            # 主智能体事件
+            print("[主智能体]")
+        print(chunk["data"])
+```
+:::
+
+:::js
+```typescript
+import { createDeepAgent } from "deepagents";
+
+const agent = createDeepAgent({
+  systemPrompt: "你是一个有用的研究助手",
+  subagents: [
+    {
+      name: "researcher",
+      description: "深度研究一个主题",
+      systemPrompt: "你是一个细致的研究者。",
+    },
+  ],
+});
+
+for await (const [namespace, chunk] of await agent.stream(
+  { messages: [{ role: "user", content: "研究量子计算进展" }] },
+  {
+    streamMode: "updates",
+    subgraphs: true,  // [!code highlight]
+  }
+)) {
+  if (namespace.length > 0) {
+    // 子智能体事件 - 命名空间标识来源
+    console.log(`[子智能体: ${namespace.join("|")}]`);
+  } else {
+    // 主智能体事件
+    console.log("[主智能体]");
+  }
+  console.log(chunk);
+}
+```
+:::
+
+## 命名空间
+
+当启用 `subgraphs` 时，每个流式事件都包含一个**命名空间**，用于标识产生该事件的智能体。命名空间是一个由节点名称和任务 ID 组成的路径，表示智能体的层级结构。
+
+| 命名空间 | 来源 |
+| --------- | ------ |
+| `()` (空) | 主智能体 |
+| `("tools:abc123",)` | 由主智能体的 `task` 工具调用 `abc123` 生成的子智能体 |
+| `("tools:abc123", "model_request:def456")` | 子智能体内部的模型请求节点 |
+
+使用命名空间将事件路由到正确的 UI 组件：
+
+:::python
+```python
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "规划我的假期"}]},
+    stream_mode="updates",
+    subgraphs=True,
+    version="v2",
+):
+    if chunk["type"] == "updates":
+        # 检查此事件是否来自子智能体
+        is_subagent = any(
+            segment.startswith("tools:") for segment in chunk["ns"]
+        )
+
+        if is_subagent:
+            # 从命名空间中提取工具调用 ID
+            tool_call_id = next(
+                s.split(":")[1] for s in chunk["ns"] if s.startswith("tools:")
+            )
+            print(f"子智能体 {tool_call_id}: {chunk['data']}")
+        else:
+            print(f"主智能体: {chunk['data']}")
+```
+:::
+
+:::js
+```typescript
+for await (const [namespace, chunk] of await agent.stream(
+  { messages: [{ role: "user", content: "规划我的假期" }] },
+  { streamMode: "updates", subgraphs: true }
+)) {
+  // 检查此事件是否来自子智能体
+  const isSubagent = namespace.some(
+    (segment: string) => segment.startsWith("tools:")
+  );
+
+  if (isSubagent) {
+    // 从命名空间中提取工具调用 ID
+    const toolCallId = namespace
+      .find((s: string) => s.startsWith("tools:"))
+      ?.split(":")[1];
+    console.log(`子智能体 ${toolCallId}:`, chunk);
+  } else {
+    console.log("主智能体:", chunk);
+  }
+}
+```
+:::
+
+## 子智能体进度
+
+使用 `stream_mode="updates"` 在每个步骤完成时跟踪子智能体的进度。这对于显示哪些子智能体处于活动状态以及它们完成了哪些工作非常有用。
+
+:::python
+```python
+from deepagents import create_deep_agent
+
+agent = create_deep_agent(
+    system_prompt=(
+        "你是一个项目协调员。始终使用 task 工具将研究任务委派给 "
+        "你的研究员子智能体。将你的最终回答控制在一句话以内。"
+    ),
+    subagents=[
+        {
+            "name": "researcher",
+            "description": "彻底研究主题",
+            "system_prompt": (
+                "你是一个细致的研究者。研究给定的主题 "
+                "并提供 2-3 句话的简洁总结。"
+            ),
+        },
+    ],
+)
+
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "写一篇关于 AI 安全的简短总结"}]},
+    stream_mode="updates",
+    subgraphs=True,
+    version="v2",
+):
+    if chunk["type"] == "updates":
+        # 主智能体更新（空命名空间）
+        if not chunk["ns"]:
+            for node_name, data in chunk["data"].items():
+                if node_name == "tools":
+                    # 返回给主智能体的子智能体结果
+                    for msg in data.get("messages", []):
+                        if msg.type == "tool":
+                            print(f"\n子智能体完成: {msg.name}")
+                            print(f"  结果: {str(msg.content)[:200]}...")
+                else:
+                    print(f"[主智能体] 步骤: {node_name}")
+
+        # 子智能体更新（非空命名空间）
+        else:
+            for node_name, data in chunk["data"].items():
+                print(f"  [{chunk['ns'][0]}] 步骤: {node_name}")
+```
+
+```shell title="输出"
+[主智能体] 步骤: model_request
+  [tools:call_abc123] 步骤: model_request
+  [tools:call_abc123] 步骤: tools
+  [tools:call_abc123] 步骤: model_request
+
+子智能体完成: task
+  结果: ## AI 安全报告...
+[主智能体] 步骤: model_request
+```
+:::
+
+:::js
+```typescript
+import { createDeepAgent } from "deepagents";
+
+const agent = createDeepAgent({
+  systemPrompt:
+    "你是一个项目协调员。始终使用 task 工具将研究任务委派给 " +
+    "你的研究员子智能体。将你的最终回答控制在一句话以内。",
+  subagents: [
+    {
+      name: "researcher",
+      description: "彻底研究主题",
+      systemPrompt:
+        "你是一个细致的研究者。研究给定的主题 " +
+        "并提供 2-3 句话的简洁总结。",
+    },
+  ],
+});
+
+for await (const [namespace, chunk] of await agent.stream(
+  {
+    messages: [
+      { role: "user", content: "写一篇关于 AI 安全的简短总结" },
+    ],
+  },
+  { streamMode: "updates", subgraphs: true },
+)) {
+  // 主智能体更新（空命名空间）
+  if (namespace.length === 0) {
+    for (const [nodeName, data] of Object.entries(chunk)) {
+      if (nodeName === "tools") {
+        // 返回给主智能体的子智能体结果
+        for (const msg of (data as any).messages ?? []) {
+          if (msg.type === "tool") {
+            console.log(`\n子智能体完成: ${msg.name}`);
+            console.log(`  结果: ${String(msg.content).slice(0, 200)}...`);
+          }
+        }
+      } else {
+        console.log(`[主智能体] 步骤: ${nodeName}`);
+      }
+    }
+  }
+  // 子智能体更新（非空命名空间）
+  else {
+    for (const [nodeName] of Object.entries(chunk)) {
+      console.log(`  [${namespace[0]}] 步骤: ${nodeName}`);
+    }
+  }
+}
+```
+
+```shell title="输出"
+主智能体步骤: model_request
+  [tools:call_abc123] 步骤: model_request
+  [tools:call_abc123] 步骤: tools
+  [tools:call_abc123] 步骤: model_request
+子智能体完成: task
+结果: ## AI 安全报告...
+主智能体步骤: model_request
+  [tools:call_def456] 步骤: model_request
+  [tools:call_def456] 步骤: model_request
+子智能体完成: task
+结果: # 关于 AI 安全的综合报告...
+主智能体步骤: model_request
+```
+:::
+
+## LLM 令牌
+
+使用 `stream_mode="messages"` 从主智能体和子智能体流式传输单个令牌。每个消息事件都包含标识来源智能体的元数据。
+
+:::python
+```python
+current_source = ""
+
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "研究量子计算进展"}]},
+    stream_mode="messages",
+    subgraphs=True,
+    version="v2",
+):
+    if chunk["type"] == "messages":
+        token, metadata = chunk["data"]
+
+        # 检查此事件是否来自子智能体（命名空间包含 "tools:"）
+        is_subagent = any(s.startswith("tools:") for s in chunk["ns"])
+
+        if is_subagent:
+            # 来自子智能体的令牌
+            subagent_ns = next(s for s in chunk["ns"] if s.startswith("tools:"))
+            if subagent_ns != current_source:
+                print(f"\n\n--- [子智能体: {subagent_ns}] ---")
+                current_source = subagent_ns
+            if token.content:
+                print(token.content, end="", flush=True)
+        else:
+            # 来自主智能体的令牌
+            if "main" != current_source:
+                print("\n\n--- [主智能体] ---")
+                current_source = "main"
+            if token.content:
+                print(token.content, end="", flush=True)
+
+print()
+```
+:::
+
+:::js
+```typescript
+let currentSource = "";
+
+for await (const [namespace, chunk] of await agent.stream(
+  {
+    messages: [
+      {
+        role: "user",
+        content: "研究量子计算进展",
+      },
+    ],
+  },
+  { streamMode: "messages", subgraphs: true },
+)) {
+  const [message] = chunk;
+
+  // 检查此事件是否来自子智能体（命名空间包含 "tools:"）
+  const isSubagent = namespace.some((s: string) => s.startsWith("tools:"));
+
+  if (isSubagent) {
+    // 来自子智能体的令牌
+    const subagentNs = namespace.find((s: string) => s.startsWith("tools:"))!;
+    if (subagentNs !== currentSource) {
+      process.stdout.write(`\n\n--- [子智能体: ${subagentNs}] ---\n`);
+      currentSource = subagentNs;
+    }
+    if (message.text) {
+      process.stdout.write(message.text);
+    }
+  } else {
+    // 来自主智能体的令牌
+    if ("main" !== currentSource) {
+      process.stdout.write(`\n\n--- [主智能体] ---\n`);
+      currentSource = "main";
+    }
+    if (message.text) {
+      process.stdout.write(message.text);
+    }
+  }
+}
+
+process.stdout.write("\n");
+```
+:::
+
+## 工具调用
+
+当子智能体使用工具时，您可以流式传输工具调用事件来显示每个子智能体正在做什么。工具调用块出现在 `messages` 流模式中。
+
+:::python
+```python
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "研究近期量子计算进展"}]},
+    stream_mode="messages",
+    subgraphs=True,
+    version="v2",
+):
+    if chunk["type"] == "messages":
+        token, metadata = chunk["data"]
+
+        # 标识来源："main" 或子智能体命名空间段
+        is_subagent = any(s.startswith("tools:") for s in chunk["ns"])
+        source = next((s for s in chunk["ns"] if s.startswith("tools:")), "main") if is_subagent else "main"
+
+        # 工具调用块（流式工具调用）
+        if token.tool_call_chunks:
+            for tc in token.tool_call_chunks:
+                if tc.get("name"):
+                    print(f"\n[{source}] 工具调用: {tc['name']}")
+                # 参数分块流式传输——增量写入
+                if tc.get("args"):
+                    print(tc["args"], end="", flush=True)
+
+        # 工具结果
+        if token.type == "tool":
+            print(f"\n[{source}] 工具结果 [{token.name}]: {str(token.content)[:150]}")
+
+        # 常规 AI 内容（跳过工具调用消息）
+        if token.type == "ai" and token.content and not token.tool_call_chunks:
+            print(token.content, end="", flush=True)
+
+print()
+```
+:::
+
+:::js
+```typescript
+import { AIMessageChunk, ToolMessage } from "langchain";
+
+for await (const [namespace, chunk] of await agent.stream(
+  {
+    messages: [
+      {
+        role: "user",
+        content: "研究近期量子计算进展",
+      },
+    ],
+  },
+  { streamMode: "messages", subgraphs: true },
+)) {
+  const [message] = chunk;
+
+  // 标识来源："main" 或子智能体命名空间段
+  const isSubagent = namespace.some((s: string) => s.startsWith("tools:"));
+  const source = isSubagent
+    ? namespace.find((s: string) => s.startsWith("tools:"))!
+    : "main";
+
+  // 工具调用块（流式工具调用）
+  if (AIMessageChunk.isInstance(message) && message.tool_call_chunks?.length) {
+    for (const tc of message.tool_call_chunks) {
+      if (tc.name) {
+        console.log(`\n[${source}] 工具调用: ${tc.name}`);
+      }
+      // 参数分块流式传输——增量写入
+      if (tc.args) {
+        process.stdout.write(tc.args);
+      }
+    }
+  }
+
+  // 工具结果
+  if (ToolMessage.isInstance(message)) {
+    console.log(
+      `\n[${source}] 工具结果 [${message.name}]: ${message.text?.slice(0, 150)}`,
+    );
+  }
+
+  // 常规 AI 内容（跳过工具调用消息）
+  if (
+    AIMessageChunk.isInstance(message) &&
+    message.text &&
+    !message.tool_call_chunks?.length
+  ) {
+    process.stdout.write(message.text);
+  }
+}
+
+process.stdout.write("\n");
+```
+:::
+
+## 自定义更新
+
+:::python
+在子智能体工具内部使用 @[`get_stream_writer`] 来发出自定义进度事件：
+:::
+
+:::js
+在子智能体工具内部使用 `config.writer` 来发出自定义进度事件：
+:::
+
+:::python
+```python
+import time
+from langchain.tools import tool
+from langgraph.config import get_stream_writer
+from deepagents import create_deep_agent
+
+
+@tool
+def analyze_data(topic: str) -> str:
+    """对给定主题运行数据分析。
+
+    此工具执行实际分析并发出进度更新。
+    对于任何分析请求，你必须调用此工具。
+    """
+    writer = get_stream_writer()
+
+    writer({"status": "starting", "topic": topic, "progress": 0})
+    time.sleep(0.5)
+
+    writer({"status": "analyzing", "progress": 50})
+    time.sleep(0.5)
+
+    writer({"status": "complete", "progress": 100})
+    return (
+        f'对 "{topic}" 的分析：客户情绪 85% 为正面，'
+        "主要受产品质量和支持响应时间驱动。"
+    )
+
+
+agent = create_deep_agent(
+    system_prompt=(
+        "你是一个协调员。对于任何分析请求，你必须使用 task 工具委派给 "
+        "分析师子智能体。永远不要尝试直接回答。"
+        "收到结果后，用一句话总结。"
+    ),
+    subagents=[
+        {
+            "name": "analyst",
+            "description": "执行带有实时进度跟踪的数据分析",
+            "system_prompt": (
+                "你是一个数据分析师。对于每个分析请求，你必须调用 analyze_data 工具。"
+                "不要使用任何其他工具。"
+                "分析完成后，报告结果。"
+            ),
+            "tools": [analyze_data],
+        },
+    ],
+)
+
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "分析客户满意度趋势"}]},
+    stream_mode="custom",
+    subgraphs=True,
+    version="v2",
+):
+    if chunk["type"] == "custom":
+        is_subagent = any(s.startswith("tools:") for s in chunk["ns"])
+        if is_subagent:
+            subagent_ns = next(s for s in chunk["ns"] if s.startswith("tools:"))
+            print(f"[{subagent_ns}]", chunk["data"])
+        else:
+            print("[main]", chunk["data"])
+```
+
+```shell title="输出"
+[tools:call_abc123] {'status': 'starting', 'topic': 'customer satisfaction trends', 'progress': 0}
+[tools:call_abc123] {'status': 'analyzing', 'progress': 50}
+[tools:call_abc123] {'status': 'complete', 'progress': 100}
+```
+:::
+
+:::js
+```typescript
+import { createDeepAgent } from "deepagents";
+import { tool, type ToolRuntime } from "langchain";
+import { z } from "zod";
+
+/**
+ * 一个通过 config.writer 发出自定义进度事件的工具。
+ * writer 将数据发送到 "custom" 流模式。
+ */
+const analyzeData = tool(
+  async ({ topic }: { topic: string }, config: ToolRuntime) => {
+    const writer = config.writer;
+
+    writer?.({ status: "starting", topic, progress: 0 });
+    await new Promise((r) => setTimeout(r, 500));
+
+    writer?.({ status: "analyzing", progress: 50 });
+    await new Promise((r) => setTimeout(r, 500));
+
+    writer?.({ status: "complete", progress: 100 });
+    return `对 "${topic}" 的分析：客户情绪 85% 为正面，主要受产品质量和支持响应时间驱动。`;
+  },
+  {
+    name: "analyze_data",
+    description:
+      "对给定主题运行数据分析。" +
+      "此工具执行实际分析并发出进度更新。" +
+      "对于任何分析请求，你必须调用此工具。",
+    schema: z.object({
+      topic: z.string().describe("要分析的主题或对象"),
+    }),
+  },
+);
+
+const agent = createDeepAgent({
+  systemPrompt:
+    "你是一个协调员。对于任何分析请求，你必须使用 task 工具委派给 " +
+    "分析师子智能体。永远不要尝试直接回答。" +
+    "收到结果后，用一句话总结。",
+  subagents: [
+    {
+      name: "analyst",
+      description: "执行带有实时进度跟踪的数据分析",
+      systemPrompt:
+        "你是一个数据分析师。对于每个分析请求，你必须调用 analyze_data 工具。" +
+        "不要使用任何其他工具。" +
+        "分析完成后，报告结果。",
+      tools: [analyzeData],
+    },
+  ],
+});
+
+for await (const [namespace, chunk] of await agent.stream(
+  {
+    messages: [
+      {
+        role: "user",
+        content: "分析客户满意度趋势",
+      },
+    ],
+  },
+  { streamMode: "custom", subgraphs: true },
+)) {
+  const isSubagent = namespace.some((s: string) => s.startsWith("tools:"));
+  if (isSubagent) {
+    const subagentNs = namespace.find((s: string) => s.startsWith("tools:"))!;
+    console.log(`[${subagentNs}]`, chunk);
+  } else {
+    console.log("[main]", chunk);
+  }
+}
+```
+
+```shell title="输出"
+[tools:call_abc123] { status: 'fetching', progress: 0 }
+[tools:call_abc123] { status: 'analyzing', progress: 50 }
+[tools:call_abc123] { status: 'complete', progress: 100 }
+```
+:::
+
+## 多模式流式传输
+
+组合多种流模式以获得智能体执行的完整视图：
+
+:::python
+```python
+# 跳过内部中间件步骤——仅显示有意义的节点名称
+INTERESTING_NODES = {"model_request", "tools"}
+
+last_source = ""
+mid_line = False  # 当写入的令牌没有尾随换行符时为 True
+
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "分析远程工作对团队生产力的影响"}]},
+    stream_mode=["updates", "messages", "custom"],
+    subgraphs=True,
+    version="v2",
+):
+    is_subagent = any(s.startswith("tools:") for s in chunk["ns"])
+    source = "子智能体" if is_subagent else "主智能体"
+
+    if chunk["type"] == "updates":
+        for node_name in chunk["data"]:
+            if node_name not in INTERESTING_NODES:
+                continue
+            if mid_line:
+                print()
+                mid_line = False
+            print(f"[{source}] 步骤: {node_name}")
+
+    elif chunk["type"] == "messages":
+        token, metadata = chunk["data"]
+        if token.content:
+            # 当来源更改时打印标题
+            if source != last_source:
+                if mid_line:
+                    print()
+                    mid_line = False
+                print(f"\n[{source}] ", end="")
+                last_source = source
+            print(token.content, end="", flush=True)
+            mid_line = True
+
+    elif chunk["type"] == "custom":
+        if mid_line:
+            print()
+            mid_line = False
+        print(f"[{source}] 自定义事件:", chunk["data"])
+
+print()
+```
+:::
+
+:::js
+```typescript
+// 跳过内部中间件步骤——仅显示有意义的节点名称
+const INTERESTING_NODES = new Set(["model_request", "tools"]);
+
+let lastSource = "";
+let midLine = false; // 当写入的令牌没有尾随换行符时为 true
+
+for await (const [namespace, mode, data] of await agent.stream(
+  {
+    messages: [
+      {
+        role: "user",
+        content: "分析远程工作对团队生产力的影响",
+      },
+    ],
+  },
+  { streamMode: ["updates", "messages", "custom"], subgraphs: true },
+)) {
+  const isSubagent = namespace.some((s: string) => s.startsWith("tools:"));
+  const source = isSubagent ? "子智能体" : "主智能体";
+
+  if (mode === "updates") {
+    for (const nodeName of Object.keys(data)) {
+      if (!INTERESTING_NODES.has(nodeName)) continue;
+      if (midLine) {
+        process.stdout.write("\n");
+        midLine = false;
+      }
+      console.log(`[${source}] 步骤: ${nodeName}`);
+    }
+  } else if (mode === "messages") {
+    const [message] = data;
+    if (message.text) {
+      // 当来源更改时打印标题
+      if (source !== lastSource) {
+        if (midLine) {
+          process.stdout.write("\n");
+          midLine = false;
+        }
+        process.stdout.write(`\n[${source}] `);
+        lastSource = source;
+      }
+      process.stdout.write(message.text);
+      midLine = true;
+    }
+  } else if (mode === "custom") {
+    if (midLine) {
+      process.stdout.write("\n");
+      midLine = false;
+    }
+    console.log(`[${source}] 自定义事件:`, data);
+  }
+}
+
+process.stdout.write("\n");
+```
+:::
+
+## 常见模式
+
+### 跟踪子智能体生命周期
+
+监控子智能体的启动、运行和完成：
+
+:::python
+```python
+active_subagents = {}
+
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "研究最新的 AI 安全发展"}]},
+    stream_mode="updates",
+    subgraphs=True,
+    version="v2",
+):
+    if chunk["type"] == "updates":
+        for node_name, data in chunk["data"].items():
+            # ─── 阶段 1：检测子智能体启动 ────────────────────────
+            # 当主智能体的 model_request 包含 task 工具调用时，
+            # 子智能体已被生成。
+            if not chunk["ns"] and node_name == "model_request":
+                for msg in data.get("messages", []):
+                    for tc in getattr(msg, "tool_calls", []):
+                        if tc["name"] == "task":
+                            active_subagents[tc["id"]] = {
+                                "type": tc["args"].get("subagent_type"),
+                                "description": tc["args"].get("description", "")[:80],
+                                "status": "pending",
+                            }
+                            print(
+                                f'[生命周期] 等待中  → 子智能体 "{tc["args"].get("subagent_type")}" '
+                                f'({tc["id"]})'
+                            )
+
+            # ─── 阶段 2：检测子智能体运行 ─────────────────────────
+            # 当我们从 tools:UUID 命名空间收到事件时，该子智能体正在执行。
+            if chunk["ns"] and chunk["ns"][0].startswith("tools:"):
+                pregel_id = chunk["ns"][0].split(":")[1]
+                # 检查是否有任何等待中的子智能体需要标记为运行中。
+                # 注意：pregel 任务 ID 与 tool_call_id 不同，
+                # 因此我们在第一个子智能体事件上将任何等待中的子智能体标记为运行中。
+                for sub_id, sub in active_subagents.items():
+                    if sub["status"] == "pending":
+                        sub["status"] = "running"
+                        print(
+                            f'[生命周期] 运行中  → 子智能体 "{sub["type"]}" '
+                            f"(pregel: {pregel_id})"
+                        )
+                        break
+
+            # ─── 阶段 3：检测子智能体完成 ──────────────────────
+            # 当主智能体的 tools 节点返回工具消息时，
+            # 子智能体已完成并返回其结果。
+            if not chunk["ns"] and node_name == "tools":
+                for msg in data.get("messages", []):
+                    if msg.type == "tool":
+                        sub = active_subagents.get(msg.tool_call_id)
+                        if sub:
+                            sub["status"] = "complete"
+                            print(
+                                f'[生命周期] 完成 → 子智能体 "{sub["type"]}" '
+                                f"({msg.tool_call_id})"
+                            )
+                            print(f"  结果预览: {str(msg.content)[:120]}...")
+
+# 打印最终状态
+print("\n--- 最终子智能体状态 ---")
+for sub_id, sub in active_subagents.items():
+    print(f"  {sub['type']}: {sub['status']}")
+```
+:::
+
+:::js
+```typescript
+for await (const [namespace, chunk] of await agent.stream(
+  {
+    messages: [
+      { role: "user", content: "研究最新的 AI 安全发展" },
+    ],
+  },
+  { streamMode: "updates", subgraphs: true },
+)) {
+  for (const [nodeName, data] of Object.entries(chunk)) {
+    // ─── 阶段 1：检测子智能体启动 ────────────────────────
+    // 当主智能体的 model_request 包含 task 工具调用时，
+    // 子智能体已被生成。
+    if (namespace.length === 0 && nodeName === "model_request") {
+      for (const msg of (data as any).messages ?? []) {
+        for (const tc of msg.tool_calls ?? []) {
+          if (tc.name === "task") {
+            activeSubagents.set(tc.id, {
+              type: tc.args?.subagent_type,
+              description: tc.args?.description?.slice(0, 80),
+              status: "pending",
+            });
+            console.log(
+              `[生命周期] 等待中  → 子智能体 "${tc.args?.subagent_type}" (${tc.id})`,
+            );
+          }
+        }
+      }
+    }
+
+    // ─── 阶段 2：检测子智能体运行 ─────────────────────────
+    // 当我们从 tools:UUID 命名空间收到事件时，该子智能体正在执行。
+    if (namespace.length > 0 && namespace[0].startsWith("tools:")) {
+      const pregelId = namespace[0].split(":")[1];
+      // 检查是否有任何等待中的子智能体需要标记为运行中。
+      // 注意：pregel 任务 ID 与 tool_call_id 不同，
+      // 因此我们在第一个子智能体事件上将任何等待中的子智能体标记为运行中。
+      for (const [id, sub] of activeSubagents) {
+        if (sub.status === "pending") {
+          sub.status = "running";
+          console.log(
+            `[生命周期] 运行中  → 子智能体 "${sub.type}" (pregel: ${pregelId})`,
+          );
+          break;
+        }
+      }
+    }
+
+    // ─── 阶段 3：检测子智能体完成 ──────────────────────
+    // 当主智能体的 tools 节点返回工具消息时，
+    // 子智能体已完成并返回其结果。
+    if (namespace.length === 0 && nodeName === "tools") {
+      for (const msg of (data as any).messages ?? []) {
+        if (msg.type === "tool") {
+          const subagent = activeSubagents.get(msg.tool_call_id);
+          if (subagent) {
+            subagent.status = "complete";
+            console.log(
+              `[生命周期] 完成 → 子智能体 "${subagent.type}" (${msg.tool_call_id})`,
+            );
+            console.log(
+              `  结果预览: ${String(msg.content).slice(0, 120)}...`,
+            );
+          }
+        }
+      }
+    }
+  }
+}
+
+// 打印最终状态
+console.log("\n--- 最终子智能体状态 ---");
+for (const [id, sub] of activeSubagents) {
+  console.log(`  ${sub.type}: ${sub.status}`);
+}
+```
+:::
+
+:::python
+## v2 流式传输格式
+
+<Note>
+需要 LangGraph >= 1.1。
+</Note>
+
+本页所有示例均使用 v2 流式传输格式（`version="v2"`），这是推荐的方法。每个块都是一个带有 `type`、`ns` 和 `data` 键的 `StreamPart` 字典——无论流模式、模式数量或子图设置如何，其形状都相同。
+
+v2 格式消除了嵌套的元组解包，使得在深度智能体中处理子图流式传输变得简单。比较两种格式：
+
+<CodeGroup>
+```python v2（推荐）
+# 统一格式——无需嵌套元组解包
+for chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "研究量子计算"}]},
+    stream_mode=["updates", "messages", "custom"],
+    subgraphs=True,
+    version="v2",
+):
+    print(chunk["type"])  # "updates", "messages", 或 "custom"
+    print(chunk["ns"])    # () 表示主智能体，("tools:<id>",) 表示子智能体
+    print(chunk["data"])  # 负载
+```
+```python v1（旧版）
+# 必须处理 (namespace, (mode, data)) 嵌套元组
+for namespace, chunk in agent.stream(
+    {"messages": [{"role": "user", "content": "研究量子计算"}]},
+    stream_mode=["updates", "messages", "custom"],
+    subgraphs=True,
+):
+    mode, data = chunk[0], chunk[1]
+    print(mode)       # "updates", "messages", 或 "custom"
+    print(namespace)  # () 表示主智能体，("tools:<id>",) 表示子智能体
+    print(data)       # 负载
+```
+</CodeGroup>
+
+有关 v2 格式的更多详细信息，包括类型收窄和 Pydantic/dataclass 强制转换，请参阅 [LangGraph 流式传输文档](/oss/langgraph/streaming#stream-output-format-v2)。
+:::
+
+## 相关
+
+- [子智能体](/oss/deepagents/subagents)——使用深度智能体配置和使用子智能体
+- [前端流式传输](/oss/deepagents/streaming/frontend)——使用 `useStream` 为深度智能体构建 React UI
+- [LangChain 流式传输概述](/oss/langchain/streaming/overview)——LangChain 智能体的一般流式传输概念

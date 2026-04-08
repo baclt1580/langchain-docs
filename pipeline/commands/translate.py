@@ -59,6 +59,16 @@ class TranslationRunContext:
     concurrency: int
 
 
+@dataclass(frozen=True)
+class TranslationWorkItem:
+    """Prepared translation metadata for a single source file."""
+
+    source_file: Path
+    relative_path: str
+    output_path: Path
+    source_hash: str
+
+
 def translate_command(args: Any) -> int:  # noqa: ANN401
     """Run incremental translation for Markdown/MDX source files."""
     source_path = Path(getattr(args, "path", _SOURCE_DIR_NAME))
@@ -291,39 +301,84 @@ def _translate_language(
     source_files: list[Path],
     context: TranslationRunContext,
 ) -> tuple[int, int]:
-    if context.dry_run or context.concurrency <= 1:
-        return _translate_language_sequential(
-            target_language=target_language,
-            source_files=source_files,
-            context=context,
-        )
-
-    return _translate_language_parallel(
+    pending_items, initial_skipped = _prepare_translation_work_items(
         target_language=target_language,
         source_files=source_files,
         context=context,
     )
 
+    if context.dry_run or context.concurrency <= 1:
+        return _translate_language_sequential(
+            target_language=target_language,
+            total_files=len(source_files),
+            pending_items=pending_items,
+            initial_skipped=initial_skipped,
+            context=context,
+        )
 
-def _translate_language_sequential(
+    return _translate_language_parallel(
+        target_language=target_language,
+        total_files=len(source_files),
+        pending_items=pending_items,
+        initial_skipped=initial_skipped,
+        context=context,
+    )
+
+
+def _prepare_translation_work_items(
     *,
     target_language: LanguageTarget,
     source_files: list[Path],
     context: TranslationRunContext,
-) -> tuple[int, int]:
-    translated_count = 0
+) -> tuple[list[TranslationWorkItem], int]:
+    pending_items: list[TranslationWorkItem] = []
     skipped_count = 0
 
+    for source_file in source_files:
+        source_content = source_file.read_text(encoding="utf-8")
+        source_hash = compute_sha256(source_content)
+        relative_path = source_file.relative_to(context.src_root).as_posix()
+        output_path = context.i18n_root / target_language.code / relative_path
+        stored_hash = context.manifest.get_hash(target_language.code, relative_path)
+
+        if not context.force and stored_hash == source_hash and output_path.exists():
+            skipped_count += 1
+            continue
+
+        pending_items.append(
+            TranslationWorkItem(
+                source_file=source_file,
+                relative_path=relative_path,
+                output_path=output_path,
+                source_hash=source_hash,
+            ),
+        )
+
+    return pending_items, skipped_count
+
+
+def _translate_language_sequential(
+    *,
+    target_language: LanguageTarget,
+    total_files: int,
+    pending_items: list[TranslationWorkItem],
+    initial_skipped: int,
+    context: TranslationRunContext,
+) -> tuple[int, int]:
+    translated_count = 0
+    skipped_count = initial_skipped
+
     with tqdm(
-        total=len(source_files),
+        total=total_files,
+        initial=initial_skipped,
         desc=f"Translating {target_language.code}",
         unit="file",
         leave=False,
         dynamic_ncols=True,
     ) as pbar:
-        for source_file in source_files:
+        for work_item in pending_items:
             translated = _translate_single_file(
-                source_file=source_file,
+                work_item=work_item,
                 target_language=target_language,
                 context=context,
             )
@@ -339,14 +394,17 @@ def _translate_language_sequential(
 def _translate_language_parallel(
     *,
     target_language: LanguageTarget,
-    source_files: list[Path],
+    total_files: int,
+    pending_items: list[TranslationWorkItem],
+    initial_skipped: int,
     context: TranslationRunContext,
 ) -> tuple[int, int]:
     translated_count = 0
-    skipped_count = 0
+    skipped_count = initial_skipped
 
     with tqdm(
-        total=len(source_files),
+        total=total_files,
+        initial=initial_skipped,
         desc=f"Translating {target_language.code}",
         unit="file",
         leave=False,
@@ -355,11 +413,11 @@ def _translate_language_parallel(
         futures = [
             executor.submit(
                 _translate_single_file,
-                source_file=source_file,
+                work_item=work_item,
                 target_language=target_language,
                 context=context,
             )
-            for source_file in source_files
+            for work_item in pending_items
         ]
 
         for future in as_completed(futures):
@@ -375,38 +433,54 @@ def _translate_language_parallel(
 
 def _translate_single_file(
     *,
-    source_file: Path,
+    work_item: TranslationWorkItem,
     target_language: LanguageTarget,
     context: TranslationRunContext,
 ) -> bool:
-    source_content = source_file.read_text(encoding="utf-8")
-    source_hash = compute_sha256(source_content)
-
-    relative_path = source_file.relative_to(context.src_root).as_posix()
-    output_path = context.i18n_root / target_language.code / relative_path
-    stored_hash = context.manifest.get_hash(target_language.code, relative_path)
-
-    if not context.force and stored_hash == source_hash and output_path.exists():
-        return False
-
     if context.dry_run:
-        logger.info("[dry-run] Would translate: %s -> %s", relative_path, output_path)
+        logger.info(
+            "[dry-run] Would translate: %s -> %s",
+            work_item.relative_path,
+            work_item.output_path,
+        )
         return True
 
     if context.translator is None:
         msg = "Translator is required when dry_run is False."
         raise RuntimeError(msg)
 
+    source_content = work_item.source_file.read_text(encoding="utf-8")
+    source_hash = compute_sha256(source_content)
+    stored_hash = context.manifest.get_hash(
+        target_language.code,
+        work_item.relative_path,
+    )
+
+    if (
+        not context.force
+        and stored_hash == source_hash
+        and work_item.output_path.exists()
+    ):
+        return False
+
     translated_content = context.translator.translate_markdown(
         source_content,
         target_language=target_language.label,
     )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(translated_content, encoding="utf-8")
+    work_item.output_path.parent.mkdir(parents=True, exist_ok=True)
+    work_item.output_path.write_text(translated_content, encoding="utf-8")
 
     with context.manifest_lock:
-        context.manifest.set_hash(target_language.code, relative_path, source_hash)
+        context.manifest.set_hash(
+            target_language.code,
+            work_item.relative_path,
+            source_hash,
+        )
         context.manifest.save()
-    logger.debug("Translated: %s -> %s", relative_path, output_path)
+    logger.debug(
+        "Translated: %s -> %s",
+        work_item.relative_path,
+        work_item.output_path,
+    )
     return True

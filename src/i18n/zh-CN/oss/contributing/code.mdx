@@ -1,0 +1,908 @@
+---
+title: 贡献代码
+sidebarTitle: 代码
+---
+
+欢迎贡献代码！无论是修复错误、添加功能还是改进性能，您的贡献都将帮助为数千名开发者提供更好的开发体验。
+
+## 快速入门
+
+如果您正在寻找可以着手的工作，请查看我们仓库中标记为 "help wanted" 的问题：
+
+:::python
+<Columns cols={3}>
+    <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/langchain/labels?q=help+wanted">Labels</Card>
+    <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraph/labels?q=help+wanted">Labels</Card>
+    <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagents/labels?q=help+wanted">Labels</Card>
+</Columns>
+:::
+:::js
+<Columns cols={3}>
+    <Card title="LangChain" icon="link" href="https://github.com/langchain-ai/deepagents/labels?q=help+wanted">Labels</Card>
+    <Card title="LangGraph" icon="topology-ring" href="https://github.com/langchain-ai/langgraphjs/labels?q=help+wanted">Labels</Card>
+    <Card title="Deep Agents" icon="robot" href="https://github.com/langchain-ai/deepagentsjs/labels?q=help+wanted">Labels</Card>
+</Columns>
+:::
+
+<Note>
+    在提交大型**新功能或重构**之前，请先创建一个 issue 或在[论坛](https://forum.langchain.com/)发帖讨论。这有助于确保与项目目标保持一致，并避免重复工作。
+</Note>
+
+### 快速修复：提交错误修复
+
+对于简单的错误修复，您可以立即开始：
+
+<Steps>
+    <Step title="重现问题">
+        在克隆仓库之前，请确保您可以稳定地重现该错误。这有助于确认问题，并为您的修复提供起点。维护者和其他贡献者应该能够根据您的描述重现问题，而无需额外设置或修改。
+    </Step>
+
+    <Step title="复刻仓库">
+        :::python
+        将 [LangChain](https://github.com/langchain-ai/langchain)、[LangGraph](https://github.com/langchain-ai/langgraph) 或 [Deep Agents](https://github.com/langchain-ai/deepagents) 仓库复刻到您的 <Tooltip tip="如果复刻到组织帐户，维护者将无法进行编辑，这可能会显著延迟接受。">个人 GitHub 帐户</Tooltip>
+        :::
+        :::js
+        将 [LangChain](https://github.com/langchain-ai/langchainjs)、[LangGraph](https://github.com/langchain-ai/langgraphjs) 或 [Deep Agents](https://github.com/langchain-ai/deepagentsjs) 仓库复刻到您的 <Tooltip tip="如果复刻到组织帐户，维护者将无法进行编辑，这可能会显著延迟接受。">个人 GitHub 帐户</Tooltip>
+        :::
+    </Step>
+
+    <Step title="克隆与设置">
+        :::python
+
+        ```bash
+        git clone https://github.com/your-username/name-of-forked-repo.git
+
+        # 例如，对于 LangChain：
+        git clone https://github.com/parrot123/langchain.git
+        ```
+
+        ```bash
+        # 在您的仓库内部，初始化环境并安装依赖
+        uv venv && source .venv/bin/activate
+        uv sync --all-groups
+
+        # 或者，仅安装特定组：
+        uv sync --group test
+        ```
+
+        如果您之前没有安装过 [`uv`](https://docs.astral.sh/uv/)，则需要安装它。
+        :::
+        :::js
+
+        ```bash
+        git clone https://github.com/your-username/name-of-forked-repo.git
+
+        # 例如，对于 LangChain：
+        git clone https://github.com/parrot123/langchainjs.git
+
+        # 对于 LangGraph：
+        git clone https://github.com/parrot123/langgraphjs.git
+        ```
+
+        ```bash
+        # 在您的仓库内部，安装依赖
+        pnpm install
+        # 为所有包创建构建以解析工作区依赖
+        pnpm build
+        ```
+        :::
+    </Step>
+
+    <Step title="创建分支">
+        为您的修复创建一个新分支。这有助于保持更改的组织性，并使后续提交拉取请求更加容易。
+
+        ```bash
+        git checkout -b your-username/short-bugfix-name
+        ```
+    </Step>
+
+    <Step title="编写失败的测试">
+        添加在没有您的修复时会失败的[单元测试](#test-writing-guidelines)。这使我们能够验证错误是否已解决，并防止回归。
+    </Step>
+
+    <Step title="进行更改">
+        在遵循我们的[代码质量标准](#code-quality-standards)的同时修复错误。进行**解决问题所必需的最小更改**。我们强烈建议贡献者在开始编码之前先对 issue 发表评论。例如：
+
+        > *“我想解决这个问题。我打算的方法是 [...简要描述...]。这符合维护者的期望吗？”*
+
+        如果您的初始方法是错误的，30 秒的评论通常可以避免浪费精力。
+    </Step>
+
+    :::js
+    <Step title="运行构建">
+        运行构建命令以确保包仍然可以正确构建。
+        ```bash
+        pnpm build
+        # 或构建特定的工作区包
+        pnpm --filter @langchain/core build
+        ```
+    </Step>
+    :::
+
+    <Step title="验证修复">
+        确保测试通过且没有引入回归。在提交 PR 之前，确保所有测试在本地通过。
+
+        :::python
+
+        ```bash
+        make format
+        make lint
+        make test
+
+        # 对于涉及集成的错误修复，还要运行：
+        make integration_tests
+        # （您可能需要设置 API 测试凭据）
+        ```
+        :::
+        :::js
+
+        ```bash
+        pnpm lint
+        pnpm test
+
+        # 对于涉及集成的错误修复，还要运行：
+        pnpm test:int
+
+        # 或者在特定的工作区包中运行测试
+        cd libs/langchain-core
+        pnpm test
+        pnpm lint
+
+        # 或者从仓库根目录为特定包运行测试
+        pnpm --filter @langchain/core test
+        pnpm --filter @langchain/core lint
+        ```
+        :::
+    </Step>
+
+    <Step title="记录更改">
+        如果行为发生变化，请更新文档字符串和/或内联注释。
+    </Step>
+
+    <Step title="提交拉取请求">
+        遵循提供的 PR 模板。如果适用，请使用[关闭关键字](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword)（例如 `Fixes #ISSUE_NUMBER`）引用您正在修复的问题，以便在您的 PR 合并时自动关闭该问题。
+    </Step>
+</Steps>
+
+### 完整开发设置
+
+对于持续开发或较大的贡献：
+
+1. 查看我们的[贡献指南](#contribution-guidelines)（针对功能、错误修复和集成）
+2. 按照下面的[设置指南](#development-environment)设置您的环境
+3. 了解[仓库结构](#repository-structure)和包组织
+4. 学习我们的[开发工作流](#development-workflow)，包括测试和代码检查
+
+---
+
+## 贡献指南
+
+在开始为 LangChain 项目贡献代码之前，请花点时间思考一下您为什么要这样做。如果您唯一的目标是在简历上增加一个“首次贡献”（或者您只是想快速获胜），那么参加训练营或在线教程可能更适合您。
+
+为开源项目贡献代码需要时间和精力，但它也可以帮助您成为更好的开发者并学习新技能。然而，重要的是要知道，这可能比参加培训课程更难、更慢。话虽如此，如果您愿意花时间把事情做好，为开源做贡献是值得的！
+
+### 向后兼容性
+
+<Warning>
+    除关键安全修复外，不允许对公共 API 进行破坏性更改。
+
+    有关主要版本发布的详细信息，请参阅我们的[版本控制政策](/oss/versioning)。
+</Warning>
+
+通过以下方式保持兼容性：
+
+<AccordionGroup>
+    <Accordion title="稳定接口">
+        **始终保留**：
+
+        - 函数签名和参数名称
+        - 类接口和方法名称
+        - 返回值结构和类型
+        - 公共 API 的导入路径
+    </Accordion>
+
+    <Accordion title="安全更改">
+        **可接受的修改**：
+
+        :::python
+        - 添加新的可选参数
+        :::
+        :::js
+        - 添加新的可选参数/类型参数
+        :::
+        - 向类添加新方法
+        - 在不改变行为的情况下提高性能
+        - 添加新模块或函数
+    </Accordion>
+
+    <Accordion title="进行更改之前">
+        - **这会破坏现有的用户代码吗？**
+        - 检查您的目标是否是公开的
+        :::python
+        - 如果需要，它是否在 `__init__.py` 中导出？
+        :::
+        - 测试中是否有现有的使用模式？
+    </Accordion>
+</AccordionGroup>
+
+### 新功能
+
+我们旨在对新功能保持高标准。通常，如果没有现有问题表明对核心抽象有迫切需求，我们不接受外部贡献者提供的新核心抽象。这也适用于对基础设施和依赖项的更改。
+
+通常，功能贡献要求包括：
+
+<Steps>
+    <Step title="设计讨论">
+        打开一个 issue，描述：
+
+        - 您要解决的问题
+        - 提议的 API 设计
+        - 预期的使用模式
+    </Step>
+
+    <Step title="实现">
+        - 遵循现有代码模式
+        - 包含全面的测试和文档
+        - 考虑安全影响
+    </Step>
+
+    <Step title="集成考虑因素">
+        - 这将如何与现有功能交互？
+        - 是否有性能影响？
+        - 这会引入新的依赖项吗？
+
+        我们将会拒绝可能导致安全漏洞或报告的功能。
+    </Step>
+</Steps>
+
+### 安全指南
+
+<Warning>
+    安全至关重要。切勿引入漏洞或不安全的模式。
+</Warning>
+
+安全检查表：
+
+<AccordionGroup>
+    <Accordion title="输入验证">
+        - 验证并清理所有用户输入
+        - 在模板和查询中正确转义数据
+        :::python
+        - 切勿对用户数据使用 `eval()`、`exec()` 或 `pickle`，因为这可能导致任意代码执行漏洞
+        :::
+        :::js
+        - 切勿使用 `eval()`，因为这可能导致任意代码执行漏洞
+        :::
+    </Accordion>
+
+    <Accordion title="错误处理">
+        - 使用特定的异常类型
+        - 不要在错误消息中暴露敏感信息
+        - 实现正确的资源清理
+    </Accordion>
+
+    <Accordion title="依赖项">
+        - 避免添加硬依赖项
+        - 保持可选依赖项最少
+        - 审查第三方包的安全问题
+    </Accordion>
+</AccordionGroup>
+
+---
+
+## 开发环境
+
+<Tip>
+    **使用 AI 编码代理？** 安装 [LangChain Skills](https://github.com/langchain-ai/langchain-skills) 以提高您的代理在 LangChain 生态系统任务上的性能，然后单击本页右上角的“复制页面”按钮，将原始内容粘贴到您的代理中，让它自动设置您的环境。
+</Tip>
+
+:::python
+我们的 Python 项目使用 [`uv`](https://docs.astral.sh/uv/getting-started/installation/) 进行依赖管理。请确保您安装了最新版本。
+
+<Info>
+    我们努力在所有 Python 包中保持设置一致。从包目录中运行：
+
+    ```bash
+    uv sync --all-groups
+    make test  # 在开始开发之前验证单元测试是否通过
+    ```
+</Info>
+
+:::
+:::js
+<Warning>
+    我们的 JS/TS 项目使用 [`pnpm`](https://pnpm.io/) 进行依赖管理。请确保您安装了最新版本，或者在 Node 24+ 上运行 `corepack enable` 来设置所需的 pnpm 版本。
+</Warning>
+
+<Info>
+    我们努力在所有 JS/TS 包中保持设置一致。从仓库根目录运行：
+
+    ```bash
+    pnpm install
+    pnpm --filter {package-name} test  # 在开始开发之前验证测试是否通过
+    ```
+</Info>
+:::
+
+一旦您查看了[贡献指南](#contribution-guidelines)，请在下面的[仓库结构](#repository-structure)部分找到您正在处理的组件的包目录。
+
+---
+
+## 仓库结构
+
+<Tabs>
+    <Tab title="LangChain" icon="link">
+        LangChain 组织为一个包含多个包的 monorepo：
+
+        <AccordionGroup>
+            <Accordion title="核心包" defaultOpen>
+                :::python
+                - **[`langchain`](https://github.com/langchain-ai/langchain/tree/master/libs/langchain#readme)**（位于 `libs/langchain/`）：包含链、代理和检索逻辑的主包
+                - **[`langchain-core`](https://github.com/langchain-ai/langchain/tree/master/libs/core#readme)**（位于 `libs/core/`）：基础接口和核心抽象
+                :::
+                :::js
+                - **[`langchain`](https://github.com/langchain-ai/langchainjs/tree/main/langchain#readme)**（位于 `libs/langchain/`）：包含链、代理和检索逻辑的主包
+                - **[`@langchain/core`](https://github.com/langchain-ai/langchainjs/tree/main/langchain-core#readme)**（位于 `libs/langchain-core/`）：基础接口和核心抽象
+                :::
+            </Accordion>
+
+            <Accordion title="合作伙伴包">
+                :::python
+                位于 `libs/partners/`，这些是独立版本化的特定集成包。例如：
+                - **[`langchain-openai`](https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai#readme)**：[OpenAI](/oss/integrations/providers/openai) 集成
+                - **[`langchain-anthropic`](https://github.com/langchain-ai/langchain/tree/master/libs/partners/anthropic#readme)**：[Anthropic](/oss/integrations/providers/anthropic) 集成
+                - **[`langchain-google-genai`](https://github.com/langchain-ai/langchain-google/)**：[Google Generative AI](/oss/integrations/chat/google_generative_ai) 集成
+
+                许多合作伙伴包位于外部仓库中。请查看[集成列表](/oss/integrations/providers/overview)了解详情。
+                :::
+                :::js
+                位于 `libs/providers/`，这些是独立版本化的特定集成包。例如：
+                - **[`@langchain/openai`](https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-openai#readme)**：[OpenAI](/oss/integrations/providers/openai) 集成
+                - **[`@langchain/anthropic`](https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-anthropic#readme)**：[Anthropic](/oss/integrations/providers/anthropic) 集成
+                - **[`@langchain/google`](https://github.com/langchain-ai/langchainjs/tree/main/libs/providers/langchain-google#readme)**：[Google](/oss/integrations/providers/google) 集成
+                :::
+
+            </Accordion>
+
+            <Accordion title="支持包">
+                :::python
+                - **[`langchain-text-splitters`](https://github.com/langchain-ai/langchain/tree/master/libs/text-splitters#readme)**：文本分割工具
+                - **[`langchain-standard-tests`](https://github.com/langchain-ai/langchain/tree/master/libs/standard-tests#readme)**：集成的标准测试套件
+                - **[`langchain-community`](https://github.com/langchain-ai/langchain-community)**：社区维护的集成（位于单独的仓库中）
+                :::
+                :::js
+                - **[`@langchain/textsplitters`](https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-textsplitters#readme)**：文本分割工具
+                - **[`@langchain/standard-tests`](https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-standard-tests#readme)**：集成的标准测试套件
+                - **[`langchain-community`](https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-community)**：社区维护的集成
+                :::
+
+            </Accordion>
+        </AccordionGroup>
+    </Tab>
+    <Tab title="LangGraph" icon="topology-ring">
+        LangGraph 组织为一个包含多个 Python 包的 monorepo：
+
+        <AccordionGroup>
+            <Accordion title="核心包" defaultOpen>
+                - **[`langgraph`](https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph#readme)**（位于 `libs/langgraph/`）：用于构建有状态多角色代理的核心框架
+                - **[`langgraph-prebuilt`](https://github.com/langchain-ai/langgraph/tree/main/libs/prebuilt#readme)**（位于 `libs/prebuilt/`）：用于创建和运行代理及工具的高级 API
+            </Accordion>
+
+            <Accordion title="检查点包">
+                - **[`langgraph-checkpoint`](https://github.com/langchain-ai/langgraph/tree/main/libs/checkpoint#readme)**（位于 `libs/checkpoint/`）：检查点保存器的基本接口
+                - **[`langgraph-checkpoint-postgres`](https://github.com/langchain-ai/langgraph/tree/main/libs/checkpoint-postgres#readme)**（位于 `libs/checkpoint-postgres/`）：Postgres 实现
+                - **[`langgraph-checkpoint-sqlite`](https://github.com/langchain-ai/langgraph/tree/main/libs/checkpoint-sqlite#readme)**（位于 `libs/checkpoint-sqlite/`）：SQLite 实现
+            </Accordion>
+
+            <Accordion title="SDK 和 CLI">
+                - **[`langgraph-sdk`](https://github.com/langchain-ai/langgraph/tree/main/libs/sdk-py#readme)**（位于 `libs/sdk-py/`）：代理服务器 API 的 Python SDK
+                - **[`langgraph-cli`](https://github.com/langchain-ai/langgraph/tree/main/libs/cli#readme)**（位于 `libs/cli/`）：官方命令行界面
+            </Accordion>
+        </AccordionGroup>
+    </Tab>
+    <Tab title="Deep Agents" icon="robot">
+        Deep Agents 组织为一个包含多个 Python 包的 monorepo：
+
+        <AccordionGroup>
+            <Accordion title="核心包" defaultOpen>
+                - **[`deepagents`](https://github.com/langchain-ai/deepagents/tree/main/libs/deepagents#readme)**（位于 `libs/deepagents/`）：用于构建具有规划、文件系统和子代理能力的深度代理的核心框架
+                - **[`deepagents-cli`](https://github.com/langchain-ai/deepagents/tree/main/libs/cli#readme)**（位于 `libs/cli/`）：具有对话恢复、网络搜索和沙箱功能的交互式终端界面
+            </Accordion>
+
+            <Accordion title="集成包">
+                - **[`deepagents-harbor`](https://github.com/langchain-ai/deepagents/tree/main/libs/harbor#readme)**（位于 `libs/harbor/`）：与 LangSmith 追踪的 Harbor 集成
+                - **[`deepagents-acp`](https://github.com/langchain-ai/deepagents/tree/main/libs/acp#readme)**（位于 `libs/acp/`）：代理客户端协议集成
+            </Accordion>
+        </AccordionGroup>
+    </Tab>
+</Tabs>
+
+---
+
+## 开发工作流
+
+### Pre-commit 钩子
+
+:::python
+[LangChain](https://github.com/langchain-ai/langchain) 和 [Deep Agents](https://github.com/langchain-ai/deepagents) 仓库包含 [pre-commit](https://pre-commit.com/) 钩子，可在每次提交前自动运行格式化、代码检查和验证检查。从仓库根目录安装它们：
+
+```bash
+pip install pre-commit  # 或：uv tool install pre-commit
+pre-commit install
+```
+
+这些钩子强制执行：
+- 不直接提交到受保护分支
+- YAML 和 TOML 语法验证
+- 修复尾随空格和文件结尾
+- 智能引号和非标准空格规范化
+- 每个包的 `make format` 和 `make lint`
+:::
+
+### 运行测试
+
+<Info>
+    目录是相对于您正在处理的包的。
+</Info>
+
+我们尽可能倾向于使用单元测试而不是集成测试。单元测试在每个拉取请求上运行，因此它们应该快速且可靠。集成测试按计划运行并且需要更多设置，因此它们应保留用于确认与外部服务的接口点。
+
+#### 单元测试
+
+:::python
+**位置**：`tests/unit_tests/`
+:::
+:::js
+**位置**：`src/tests/FILENAME_BEING_TESTED.test.ts`
+:::
+
+单元测试涵盖不需要调用外部 API 的模块化逻辑。如果您添加了新逻辑，则应该添加一个单元测试。在单元测试中，检查前/后处理并模拟外部依赖项。
+
+**要求**：
+- 不允许网络调用
+- 测试所有代码路径，包括边缘情况
+- 对外部依赖项使用模拟
+
+运行单元测试：
+
+:::python
+```bash
+make test
+
+# 或直接运行：
+uv run --group test pytest tests/unit_tests
+
+# 运行特定测试：
+TEST_FILE=tests/unit_tests/test_imports.py make test
+```
+:::
+:::js
+```bash
+# 运行整个测试套件
+pnpm test
+
+# 或运行特定的测试文件
+pnpm test src/tests/FILENAME_BEING_TESTED.test.ts
+
+# 或运行特定的测试函数
+pnpm test -t "the test that should be run"
+```
+:::
+
+#### 集成测试
+
+:::python
+**位置**：`tests/integration_tests/`
+:::
+:::js
+**位置**：`src/tests/FILENAME_BEING_TESTED.int.test.ts`
+:::
+
+集成测试涵盖需要调用外部 API（通常是与其它服务集成）的逻辑。
+
+集成测试需要访问外部服务/提供者 API（可能需要付费），因此默认情况下不会运行。
+
+并非每个代码更改都需要集成测试，但请记住，我们将作为审查过程的一部分单独要求/运行集成测试。
+
+**要求**：
+- 测试与外部服务的真实集成
+- 对环境变量使用 API 密钥
+- 如果凭据不可用，则优雅跳过
+
+运行集成测试：
+:::python
+```bash
+make integration_tests
+
+# 或直接运行：
+uv run --group test --group test_integration pytest --retries 3 --retry-delay 1 tests/integration_tests
+
+# 运行特定测试：
+TEST_FILE=tests/integration_tests/test_openai.py make integration_tests
+```
+:::
+:::js
+```bash
+pnpm test:int
+```
+:::
+
+### 代码质量标准
+
+贡献必须遵守以下质量要求：
+
+<Tabs>
+    <Tab title="类型提示">
+        :::python
+        **必需**：所有函数的完整类型注解
+
+        ```python
+        def process_documents(
+            docs: list[Document],
+            processor: DocumentProcessor,
+            *,
+            batch_size: int = 100
+        ) -> ProcessingResult:
+            """批量处理文档。
+
+            Args:
+                docs: 要处理的文档列表。
+                processor: 文档处理实例。
+                batch_size: 每批处理的文档数。
+
+            Returns:
+                包含成功/失败计数的处理结果。
+            """
+        ```
+        :::
+        :::js
+        **必需**：所有函数的完整类型
+
+        ```typescript
+        function processDocuments(
+            docs: Document[],
+            processor: DocumentProcessor,
+            batchSize: number = 100
+        ): ProcessingResult {
+            // ...
+        }
+        ```
+        :::
+    </Tab>
+
+    <Tab title="文档">
+        :::python
+        **必需**：所有公共函数使用 [Google 风格的文档字符串](https://google.github.io/styleguide/pyguide.html)。
+
+        **指导原则**：文档字符串描述“是什么”；本站点上的文档解释“怎么做”和“为什么”。
+
+        | 内容类型 | 位置 | 目的 |
+        |--------------|----------|---------|
+        | 参数类型 | 签名 | 自动生成到 API 参考中 |
+        | 参数描述 | 文档字符串 | 自动生成到 API 参考中 |
+        | 返回类型和异常 | 文档字符串 | API 参考 |
+        | 最小使用示例 | 文档字符串 | 显示基本实例化模式 |
+        | 功能教程 | 本站点 | 深入的操作指南 |
+        | 端到端示例 | 本站点 | 真实世界的使用模式 |
+        | 概念解释 | 本站点 | 理解和上下文 |
+
+        **文档字符串应包含：**
+
+        1. 类/函数功能的一行摘要
+        2. 指向本站点教程、指南和使用模式的链接
+        3. 包含类型和描述的参数文档
+        4. 返回值描述
+        5. 可能引发的异常
+        6. 根据需要提供一个显示基本实例化/用法的最小示例
+
+        <AccordionGroup>
+            <Accordion title="好的文档字符串示例">
+                ````python
+                class ChatAnthropic(BaseChatModel):
+                    """与 Claude 聊天模型的接口。
+
+                    请参阅 [使用指南](https://docs.langchain.com/oss/python/integrations/chat/anthropic)
+                    获取教程、功能演示和示例。
+
+                    Args:
+                        model: 模型标识符（例如 `'claude-sonnet-4-6'`）。
+                        temperature: 介于 `0` 和 `1` 之间的采样温度。
+                        max_tokens: 生成的最大令牌数。
+                        api_key: Anthropic API 密钥。
+
+                            如果未提供，则从 `ANTHROPIC_API_KEY` 环境变量读取。
+                        timeout: 请求超时（秒）。
+                        max_retries: 失败请求的最大重试次数。
+
+                    Returns:
+                        一个可以使用消息调用的聊天模型实例。
+
+                    Raises:
+                        ValueError: 如果模型标识符未被识别。
+                        AuthenticationError: 如果 API 密钥无效。
+
+                    Example:
+                        ```python
+                        from langchain_anthropic import ChatAnthropic
+
+                        model = ChatAnthropic(model="claude-sonnet-4-6")
+                        response = model.invoke("Hello!")
+                        ```
+                    """
+                ````
+            </Accordion>
+            <Accordion title="文档字符串中不应包含的内容">
+                避免重复属于文档字符串的内容：
+
+                - **参数类型**：这些在函数签名中，并自动生成到 API 参考中。
+                - **功能教程**：不要包含扩展的操作指南。相反，链接到本站点：
+
+                    ```python
+                    """
+                    ...
+
+                    请参阅 [扩展思维指南](https://docs.langchain.com/oss/integrations/chat/anthropic#extended-thinking) 了解配置选项。
+                    """
+                    ```
+
+                - **多个示例变体**：包含一个最小示例，然后链接到全面的指南：
+
+                    ```python
+                    """
+                    Example:
+                        \`\`\`python
+                        message = HumanMessage(content=[
+                            {"type": "image", "url": "https://example.com/image.jpg"}
+                        ])
+                        \`\`\`
+
+                    请参阅 [多模态指南](https://docs.langchain.com/oss/integrations/chat/anthropic#multimodal) 了解所有支持的输入格式。
+                    """
+                    ```
+
+                - **概念解释**：坚持使用事实性的参数描述。链接到文档以获取更深入的上下文。
+
+                - **MkDocs 特定语法**：避免在文档字符串中使用 `???+`、手风琴或选项卡。它们在 IDE 中无法渲染。
+            </Accordion>
+        </AccordionGroup>
+        :::
+        :::js
+        **必需**：所有导出函数和接口使用 [JSDoc](https://jsdoc.app/about-getting-started)
+
+        ```typescript
+        /**
+         * 文档处理实例。
+         */
+        interface FooDocumentProcessor {
+            /**
+             * 批量处理文档。
+             *
+             * @param docs - 要处理的文档列表。
+             * @returns 包含成功/失败计数的处理结果。
+             */
+            process(docs: Document[]): ProcessingResult;
+        }
+
+        /**
+         * 批量处理文档。
+         *
+         * @param docs - 要处理的文档列表。
+         * @param processor - 文档处理实例。
+         * @param batchSize - 每批处理的文档数。
+         * @returns 包含成功/失败计数的处理结果。
+         */
+        export function processDocuments(
+            docs: Document[],
+            processor: DocumentProcessor,
+            batchSize: number = 100
+        ): ProcessingResult {
+            // ...
+        }
+        ```
+        :::
+    </Tab>
+
+    <Tab title="代码风格">
+        :::python
+        **自动化**：通过 [`ruff`](https://docs.astral.sh/ruff/) 进行格式化和代码检查
+
+        ```bash
+        make format  # 应用格式化
+        make lint    # 检查风格和类型
+        ```
+        :::
+        :::js
+        **自动化**：格式化和代码检查：
+
+        ```bash
+        pnpm lint    # 检查风格和类型
+        pnpm format  # 应用格式化
+        ```
+        :::
+
+        **标准**：
+        - 描述性变量名
+        - 分解复杂函数（力求少于 20 行）
+        - 遵循代码库中的现有模式
+    </Tab>
+</Tabs>
+
+:::python
+### 依赖项
+
+LangChain 包区分**硬依赖项**和**可选依赖项**，以保持包轻量级并最大限度地减少用户的安装开销。
+
+<Tabs>
+    <Tab title="可选依赖项">
+        几乎所有新依赖项都应该是可选的。在以下情况下使用可选依赖项：
+
+        - 依赖项仅用于特定集成或功能
+        - 用户可以在没有此依赖项的情况下有意义地使用包
+        - 依赖项很大或有许多传递依赖项
+
+        **要求：**
+
+        - 未安装依赖项的用户必须能够**导入**您的代码而没有任何副作用（无警告、无错误、无异常）
+        - `pyproject.toml` 和 `uv.lock` **不**被修改
+
+        **添加可选依赖项：**
+
+        1. 将依赖项添加到适当的测试依赖项文件中（例如 `extended_testing_deps.txt`）
+        2. 添加一个至少尝试导入新代码的单元测试。理想情况下，单元测试使用轻量级夹具来测试代码的逻辑。
+        3. 对任何需要该依赖项的单元测试使用 `@pytest.mark.requires("package_name")` 装饰器。
+    </Tab>
+
+    <Tab title="硬依赖项">
+        当用户安装包时，硬依赖项会自动安装。仅在以下情况下使用硬依赖项：
+
+        - 没有该依赖项，包根本无法运行
+        - 依赖项很小且传递依赖项最少
+        - 没有合理的方法使该功能成为可选的
+
+        <Warning>
+            添加硬依赖项会增加所有用户的安装时间和潜在的版本冲突。
+
+            维护者将仔细审查硬依赖项的添加！
+        </Warning>
+
+        **添加硬依赖项：**
+
+        1. 打开一个 issue 或讨论，解释为什么依赖项必须是硬依赖而不是可选依赖
+        2. 将依赖项添加到 `pyproject.toml` 中的相应部分
+        3. 运行 `uv lock` 以更新锁定文件
+        4. 包含涵盖新功能的全面测试
+    </Tab>
+</Tabs>
+:::
+
+---
+
+### 测试编写指南
+
+为了编写有效的测试，需要遵循一些好的实践：
+
+:::python
+- 在文档字符串中使用自然语言描述测试
+- 使用描述性变量名
+- 详尽地使用断言
+:::
+:::js
+- 将测试封装在描述被测试组件的 `describe` 块中
+- 使用自然语言描述测试名称
+- 详尽地使用断言
+- 仅对大小合理的数据对象使用快照
+:::
+
+<Tabs>
+    <Tab title="单元测试">
+        :::python
+        ```python
+        def test_document_processor_handles_empty_input():
+            """测试处理器优雅地处理空文档列表。"""
+            processor = DocumentProcessor()
+
+            result = processor.process([])
+
+            assert result.success
+            assert result.processed_count == 0
+            assert len(result.errors) == 0
+        ```
+        :::
+        :::js
+        ```typescript
+        describe("DocumentProcessor", () => {
+            it("Should handle empty document list", () => {
+                const processor = new DocumentProcessor();
+                const result = processor.process([]);
+
+                expect(result.success).toBe(true);
+                expect(result.processedCount).toBe(0);
+                expect(result.errors).toHaveLength(0);
+            });
+        });
+        ```
+        :::
+    </Tab>
+
+    <Tab title="集成测试">
+        :::python
+        ```python
+        @pytest.mark.requires("openai")
+        def test_openai_chat_integration():
+            """使用真实 API 测试 OpenAI 聊天集成。"""
+
+            chat = ChatOpenAI()
+            response = chat.invoke("Hello")
+
+            assert isinstance(response.content, str)
+            assert len(response.content) > 0
+        ```
+        :::
+        :::js
+        ```typescript
+        describe("ChatOpenAI", () => {
+            it("Should test with real API", () => {
+                const chat = new ChatOpenAI();
+                const response = chat.invoke("Hello");
+            });
+        });
+        ```
+        :::
+    </Tab>
+
+    <Tab title="模拟使用">
+        :::python
+        ```python
+        def test_retry_mechanism(mocker):
+            """测试重试机制处理瞬时故障。"""
+            mock_client = mocker.Mock()
+            mock_client.call.side_effect = [
+                ConnectionError("Temporary failure"),
+                {"result": "success"}
+            ]
+
+            service = APIService(client=mock_client)
+            result = service.call_with_retry()
+
+            assert result["result"] == "success"
+            assert mock_client.call.call_count == 2
+        ```
+        :::
+        :::js
+        ```typescript
+        describe("APIService", () => {
+            it("Should call with retry", () => {
+                const mockClient = new MockClient();
+                const service = new APIService(client: mockClient);
+                const result = service.callWithRetry();
+            });
+        });
+        ```
+        :::
+    </Tab>
+</Tabs>
+
+### 提交您的 PR
+
+一旦您的测试通过且代码符合质量标准：
+
+1. 推送您的分支并打开一个拉取请求
+2. 遵循提供的 PR 模板
+3. 使用[关闭关键字](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword)（例如 `Fixes #123`）引用相关问题
+4. 等待 CI 检查完成
+
+<Note>
+    如果您的 PR 包含 AI 生成的内容，您必须遵守我们的[LLM 可接受使用政策](/oss/contributing/overview#acceptable-uses-of-llms)。看起来是低质量、AI 生成的垃圾邮件的 PR 将被关闭，恕不另行评论。
+</Note>
+
+<Warning>
+    及时处理 CI 失败。维护者可能会关闭在合理时间范围内未通过 CI 的 PR。
+</Warning>
+
+## 获取帮助
+
+我们的目标是拥有最易访问的开发者设置。如果您在设置过程中遇到任何困难，请在[社区 Slack](https://www.langchain.com/join-community) 中提问或在[论坛](https://forum.langchain.com/)发帖。
+
+<Check>
+    您现在已准备好为 LangChain 贡献高质量的代码！
+</Check>
