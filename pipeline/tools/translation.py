@@ -10,9 +10,10 @@ import re
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
+import tiktoken
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,25 @@ _LANGUAGE_CODE_PATTERN = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
 _RETRYABLE_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
 _DEFAULT_LANGUAGE_CODE = "en"
 _DEFAULT_LANGUAGE_LABEL = "English"
+_DEFAULT_MAX_PROMPT_TOKENS = 6000
 _FENCED_BLOCK_MIN_LINES = 3
 _QUOTED_VALUE_MIN_LEN = 2
+_CHAT_MESSAGE_FORMAT_TOKENS = 12
+_HEADING_LINE_PATTERN = re.compile(r"^#{1,6}\s")
+_CODE_FENCE_START_PATTERN = re.compile(r"^(`{3,}|~{3,})")
+_DIRECTIVE_FENCE_START_PATTERN = re.compile(r"^(:{3,})(?:\s*(\S.*))?$")
+_SENTENCE_FRAGMENT_PATTERN = re.compile(r".+?(?:[.!?](?:\s+|$)|$)", re.DOTALL)
+_WORD_FRAGMENT_PATTERN = re.compile(r"\S+\s*|\s+")
+_TRANSLATION_SYSTEM_PROMPT = (
+    "You are a technical translator for Markdown and MDX docs. "
+    "Translate only natural-language prose. Keep Markdown syntax, "
+    "MDX components, links, code blocks, inline code, and all identifiers "
+    "unchanged. The input may be a contiguous excerpt from a larger document. "
+    "Do not add, remove, or rebalance Markdown or MDX wrappers."
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 _COMMON_LANGUAGE_LABELS: dict[str, str] = {
@@ -51,6 +67,27 @@ class LanguageTarget:
 
     code: str
     label: str
+
+
+@dataclass(frozen=True)
+class MarkdownBlock:
+    """A structurally meaningful Markdown or MDX block."""
+
+    kind: Literal[
+        "blank",
+        "frontmatter",
+        "heading",
+        "fenced_code",
+        "directive_fence",
+        "table",
+        "text",
+    ]
+    text: str
+
+    @property
+    def is_splittable(self) -> bool:
+        """Whether the block can be safely broken into smaller fragments."""
+        return self.kind in {"blank", "heading", "text"}
 
 
 def compute_sha256(content: str) -> str:
@@ -259,7 +296,7 @@ class TranslationManifest:
 class OpenAICompatibleTranslator:
     """Translate Markdown/MDX via an OpenAI-compatible chat completions API."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         base_url: str,
@@ -267,6 +304,7 @@ class OpenAICompatibleTranslator:
         model: str,
         timeout_seconds: float = 120.0,
         max_retries: int = 3,
+        max_prompt_tokens: int = _DEFAULT_MAX_PROMPT_TOKENS,
     ) -> None:
         """Initialize the OpenAI-compatible translator client settings."""
         self.base_url = base_url
@@ -274,32 +312,54 @@ class OpenAICompatibleTranslator:
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
+        self.max_prompt_tokens = max_prompt_tokens
         self.endpoint = _build_chat_completions_url(base_url)
+        self.encoding = _resolve_token_encoding(model)
 
     def translate_markdown(self, content: str, target_language: str) -> str:
-        """Translate Markdown/MDX content into the target language."""
+        """Translate Markdown or MDX content into the target language."""
+        if not content:
+            return content
+
+        max_content_tokens = (
+            self.max_prompt_tokens - self._estimate_prompt_overhead(target_language)
+        )
+        if max_content_tokens <= 0:
+            msg = (
+                "DOCS_TRANSLATE_MAX_PROMPT_TOKENS is too small for the translation "
+                "prompt."
+            )
+            raise ValueError(msg)
+
+        chunks = _chunk_markdown_for_translation(
+            content,
+            max_content_tokens=max_content_tokens,
+            count_tokens=self._count_tokens,
+        )
+        if len(chunks) > 1:
+            logger.info(
+                "Split translation into %d chunks for %s.",
+                len(chunks),
+                target_language,
+            )
+
+        translated_chunks = [
+            self._translate_chunk(chunk, target_language) for chunk in chunks
+        ]
+        return "".join(translated_chunks)
+
+    def _translate_chunk(self, content: str, target_language: str) -> str:
         payload = {
             "model": self.model,
             "temperature": 0,
             "messages": [
                 {
                     "role": "system",
-                    "content": (
-                        "You are a technical translator for Markdown and MDX docs. "
-                        "Translate only natural-language prose. Keep Markdown syntax, "
-                        "MDX components, links, code blocks, inline code, and all "
-                        "identifiers unchanged."
-                    ),
+                    "content": _TRANSLATION_SYSTEM_PROMPT,
                 },
                 {
                     "role": "user",
-                    "content": (
-                        "Translate the following Markdown/MDX to "
-                        f"{target_language}.\n"
-                        "Return only translated Markdown/MDX with the exact same "
-                        "structure.\n\n"
-                        f"{content}"
-                    ),
+                    "content": self._build_user_prompt(content, target_language),
                 },
             ],
         }
@@ -337,6 +397,346 @@ class OpenAICompatibleTranslator:
     ) -> httpx.Response:
         with httpx.Client(timeout=self.timeout_seconds) as client:
             return client.post(self.endpoint, json=payload, headers=headers)
+
+    def _build_user_prompt(self, content: str, target_language: str) -> str:
+        return (
+            "Translate the following Markdown/MDX excerpt to "
+            f"{target_language}.\n"
+            "Return only translated Markdown/MDX with the exact same structure.\n\n"
+            f"{content}"
+        )
+
+    def _estimate_prompt_overhead(self, target_language: str) -> int:
+        return (
+            self._count_tokens(_TRANSLATION_SYSTEM_PROMPT)
+            + self._count_tokens(self._build_user_prompt("", target_language))
+            + _CHAT_MESSAGE_FORMAT_TOKENS
+        )
+
+    def _count_tokens(self, text: str) -> int:
+        return len(self.encoding.encode(text))
+
+
+def _resolve_token_encoding(model: str) -> tiktoken.Encoding:
+    try:
+        return tiktoken.encoding_for_model(model)
+    except KeyError:
+        return tiktoken.get_encoding("cl100k_base")
+
+
+def _chunk_markdown_for_translation(
+    content: str,
+    *,
+    max_content_tokens: int,
+    count_tokens: Callable[[str], int],
+) -> list[str]:
+    if not content:
+        return [content]
+    if count_tokens(content) <= max_content_tokens:
+        return [content]
+
+    blocks = _extract_markdown_blocks(content)
+    sections = _group_markdown_sections(blocks)
+    chunks: list[str] = []
+    current_chunk = ""
+
+    for section in sections:
+        section_text = "".join(block.text for block in section)
+        if count_tokens(section_text) <= max_content_tokens:
+            if (
+                current_chunk
+                and count_tokens(current_chunk + section_text) > max_content_tokens
+            ):
+                chunks.append(current_chunk)
+                current_chunk = section_text
+            else:
+                current_chunk += section_text
+            continue
+
+        if current_chunk:
+            chunks.append(current_chunk)
+            current_chunk = ""
+
+        chunks.extend(
+            _split_section_blocks(
+                section,
+                max_content_tokens=max_content_tokens,
+                count_tokens=count_tokens,
+            ),
+        )
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
+
+
+def _extract_markdown_blocks(content: str) -> list[MarkdownBlock]:
+    if not content:
+        return []
+
+    lines = content.splitlines(keepends=True)
+    blocks: list[MarkdownBlock] = []
+    index = 0
+
+    if lines and lines[0].strip() == "---":
+        end_index = _find_frontmatter_end(lines)
+        if end_index is not None:
+            end_index = _include_trailing_blank_lines(lines, end_index)
+            blocks.append(MarkdownBlock("frontmatter", "".join(lines[:end_index])))
+            index = end_index
+
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+
+        if not stripped:
+            blank_end = index + 1
+            while blank_end < len(lines) and not lines[blank_end].strip():
+                blank_end += 1
+            blocks.append(MarkdownBlock("blank", "".join(lines[index:blank_end])))
+            index = blank_end
+            continue
+
+        if _HEADING_LINE_PATTERN.match(stripped):
+            end_index = _include_trailing_blank_lines(lines, index + 1)
+            blocks.append(MarkdownBlock("heading", "".join(lines[index:end_index])))
+            index = end_index
+            continue
+
+        fence_end = _find_code_fence_end(lines, index)
+        if fence_end is not None:
+            fence_end = _include_trailing_blank_lines(lines, fence_end)
+            blocks.append(
+                MarkdownBlock("fenced_code", "".join(lines[index:fence_end])),
+            )
+            index = fence_end
+            continue
+
+        directive_end = _find_directive_fence_end(lines, index)
+        if directive_end is not None:
+            directive_end = _include_trailing_blank_lines(lines, directive_end)
+            blocks.append(
+                MarkdownBlock("directive_fence", "".join(lines[index:directive_end])),
+            )
+            index = directive_end
+            continue
+
+        if stripped.startswith("|"):
+            table_end = index + 1
+            while table_end < len(lines) and lines[table_end].strip().startswith("|"):
+                table_end += 1
+            table_end = _include_trailing_blank_lines(lines, table_end)
+            blocks.append(MarkdownBlock("table", "".join(lines[index:table_end])))
+            index = table_end
+            continue
+
+        text_end = index + 1
+        while text_end < len(lines) and lines[text_end].strip():
+            next_stripped = lines[text_end].strip()
+            if _HEADING_LINE_PATTERN.match(next_stripped):
+                break
+            if _CODE_FENCE_START_PATTERN.match(next_stripped):
+                break
+            if _DIRECTIVE_FENCE_START_PATTERN.match(next_stripped):
+                break
+            if next_stripped.startswith("|"):
+                break
+            text_end += 1
+        text_end = _include_trailing_blank_lines(lines, text_end)
+        blocks.append(MarkdownBlock("text", "".join(lines[index:text_end])))
+        index = text_end
+
+    return blocks
+
+
+def _group_markdown_sections(blocks: list[MarkdownBlock]) -> list[list[MarkdownBlock]]:
+    sections: list[list[MarkdownBlock]] = []
+    current: list[MarkdownBlock] = []
+
+    for block in blocks:
+        if block.kind == "heading" and current:
+            sections.append(current)
+            current = [block]
+            continue
+        current.append(block)
+
+    if current:
+        sections.append(current)
+
+    return sections
+
+
+def _split_section_blocks(
+    section: list[MarkdownBlock],
+    *,
+    max_content_tokens: int,
+    count_tokens: Callable[[str], int],
+) -> list[str]:
+    chunks: list[str] = []
+    current_chunk = ""
+
+    for block in section:
+        block_parts = [block.text]
+        if count_tokens(block.text) > max_content_tokens:
+            block_parts = _split_oversized_block(
+                block,
+                max_content_tokens=max_content_tokens,
+                count_tokens=count_tokens,
+            )
+
+        for part in block_parts:
+            if (
+                current_chunk
+                and count_tokens(current_chunk + part) > max_content_tokens
+            ):
+                chunks.append(current_chunk)
+                current_chunk = part
+            else:
+                current_chunk += part
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
+
+
+def _split_oversized_block(
+    block: MarkdownBlock,
+    *,
+    max_content_tokens: int,
+    count_tokens: Callable[[str], int],
+) -> list[str]:
+    if not block.is_splittable:
+        msg = (
+            f"Markdown block '{block.kind}' exceeds the translation token budget. "
+            "Increase DOCS_TRANSLATE_MAX_PROMPT_TOKENS."
+        )
+        raise ValueError(msg)
+
+    line_chunks = _pack_fragments(
+        block.text.splitlines(keepends=True),
+        max_content_tokens=max_content_tokens,
+        count_tokens=count_tokens,
+    )
+    if line_chunks is not None:
+        return line_chunks
+
+    sentence_chunks = _pack_fragments(
+        _split_sentence_fragments(block.text),
+        max_content_tokens=max_content_tokens,
+        count_tokens=count_tokens,
+    )
+    if sentence_chunks is not None:
+        return sentence_chunks
+
+    word_chunks = _pack_fragments(
+        _WORD_FRAGMENT_PATTERN.findall(block.text),
+        max_content_tokens=max_content_tokens,
+        count_tokens=count_tokens,
+    )
+    if word_chunks is not None:
+        return word_chunks
+
+    msg = (
+        "A Markdown text fragment exceeds the translation token budget even after "
+        "fallback splitting. Increase DOCS_TRANSLATE_MAX_PROMPT_TOKENS."
+    )
+    raise ValueError(msg)
+
+
+def _pack_fragments(
+    fragments: list[str],
+    *,
+    max_content_tokens: int,
+    count_tokens: Callable[[str], int],
+) -> list[str] | None:
+    if not fragments:
+        return []
+
+    chunks: list[str] = []
+    current_chunk = ""
+
+    for fragment in fragments:
+        if not fragment:
+            continue
+        if count_tokens(fragment) > max_content_tokens:
+            return None
+        if (
+            current_chunk
+            and count_tokens(current_chunk + fragment) > max_content_tokens
+        ):
+            chunks.append(current_chunk)
+            current_chunk = fragment
+        else:
+            current_chunk += fragment
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
+
+
+def _split_sentence_fragments(text: str) -> list[str]:
+    fragments = [
+        match.group(0)
+        for match in _SENTENCE_FRAGMENT_PATTERN.finditer(text)
+        if match.group(0)
+    ]
+    return fragments if len(fragments) > 1 else [text]
+
+
+def _find_frontmatter_end(lines: list[str]) -> int | None:
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            return index + 1
+    return None
+
+
+def _find_code_fence_end(lines: list[str], start_index: int) -> int | None:
+    opening_match = _CODE_FENCE_START_PATTERN.match(lines[start_index].strip())
+    if opening_match is None:
+        return None
+
+    fence = opening_match.group(1)
+    fence_char = fence[0]
+    minimum_length = len(fence)
+
+    for index in range(start_index + 1, len(lines)):
+        stripped = lines[index].strip()
+        if (
+            stripped
+            and stripped[0] == fence_char
+            and len(stripped.rstrip(fence_char)) == 0
+            and len(stripped) >= minimum_length
+        ):
+            return index + 1
+
+    return len(lines)
+
+
+def _find_directive_fence_end(lines: list[str], start_index: int) -> int | None:
+    opening_match = _DIRECTIVE_FENCE_START_PATTERN.match(lines[start_index].strip())
+    if opening_match is None:
+        return None
+
+    fence = opening_match.group(1)
+    if opening_match.group(2) is None:
+        return None
+
+    closing_pattern = re.compile(rf"^{re.escape(fence)}\s*$")
+    for index in range(start_index + 1, len(lines)):
+        if closing_pattern.match(lines[index].strip()):
+            return index + 1
+
+    return len(lines)
+
+
+def _include_trailing_blank_lines(lines: list[str], start_index: int) -> int:
+    index = start_index
+    while index < len(lines) and not lines[index].strip():
+        index += 1
+    return index
 
 
 def _parse_single_language_token(token: str) -> tuple[str, str]:

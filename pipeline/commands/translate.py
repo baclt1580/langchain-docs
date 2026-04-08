@@ -28,6 +28,7 @@ _SOURCE_DIR_NAME = "src"
 _I18N_DIR_NAME = "i18n"
 _CONFIG_FILE_NAME = "config.json"
 _MANIFEST_FILE_NAME = "translation-hashes.json"
+_MIN_PROMPT_TOKENS = 512
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class TranslationSettings:
     concurrency: int
     timeout_seconds: float
     max_retries: int
+    max_prompt_tokens: int
 
 
 @dataclass(frozen=True)
@@ -127,6 +129,7 @@ def translate_command(args: Any) -> int:  # noqa: ANN401
             model=settings.model,
             timeout_seconds=settings.timeout_seconds,
             max_retries=settings.max_retries,
+            max_prompt_tokens=settings.max_prompt_tokens,
         )
 
     context = TranslationRunContext(
@@ -172,6 +175,10 @@ def _load_settings_from_env() -> TranslationSettings:
         default=120.0,
     )
     max_retries = _get_optional_int_env("DOCS_TRANSLATE_MAX_RETRIES", default=3)
+    max_prompt_tokens = _get_optional_int_env(
+        "DOCS_TRANSLATE_MAX_PROMPT_TOKENS",
+        default=6000,
+    )
 
     target_languages = parse_target_languages(raw_languages)
     if concurrency < 1:
@@ -183,6 +190,12 @@ def _load_settings_from_env() -> TranslationSettings:
     if max_retries < 1:
         msg = "DOCS_TRANSLATE_MAX_RETRIES must be >= 1"
         raise ValueError(msg)
+    if max_prompt_tokens < _MIN_PROMPT_TOKENS:
+        msg = (
+            "DOCS_TRANSLATE_MAX_PROMPT_TOKENS must be >= "
+            f"{_MIN_PROMPT_TOKENS}"
+        )
+        raise ValueError(msg)
 
     return TranslationSettings(
         base_url=base_url,
@@ -192,6 +205,7 @@ def _load_settings_from_env() -> TranslationSettings:
         concurrency=concurrency,
         timeout_seconds=timeout_seconds,
         max_retries=max_retries,
+        max_prompt_tokens=max_prompt_tokens,
     )
 
 

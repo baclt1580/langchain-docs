@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 from pipeline.tools.translation import (
+    OpenAICompatibleTranslator,
     TranslationManifest,
+    _chunk_markdown_for_translation,
     compute_sha256,
     load_dotenv_file,
     parse_target_languages,
@@ -91,3 +93,108 @@ def test_load_dotenv_file_does_not_override_existing(
 
     assert loaded_count == 0
     assert os.getenv("DOCS_AI_OPENAI_MODEL") == "gpt-existing"
+
+
+def test_chunk_markdown_prefers_heading_boundaries() -> None:
+    """Split large documents at heading boundaries before finer block splits."""
+    content = (
+        "---\n"
+        "title: Sample\n"
+        "---\n\n"
+        "# Alpha\n\n"
+        "Alpha paragraph.\n\n"
+        "## Beta\n\n"
+        "Beta paragraph.\n\n"
+        "## Gamma\n\n"
+        "Gamma paragraph.\n"
+    )
+
+    chunks = _chunk_markdown_for_translation(
+        content,
+        max_content_tokens=55,
+        count_tokens=len,
+    )
+
+    assert chunks == [
+        "---\ntitle: Sample\n---\n\n# Alpha\n\nAlpha paragraph.\n\n",
+        "## Beta\n\nBeta paragraph.\n\n## Gamma\n\nGamma paragraph.\n",
+    ]
+    assert "".join(chunks) == content
+
+
+def test_chunk_markdown_falls_back_to_block_boundaries_without_splitting_fences(
+) -> None:
+    """Keep fenced blocks intact when a section must be split by block."""
+    content = (
+        "# Heading\n\n"
+        "First paragraph is long enough to force a split.\n\n"
+        "```python\n"
+        "print('hello')\n"
+        "```\n\n"
+        "Second paragraph is also long enough to stay on its own.\n"
+    )
+
+    chunks = _chunk_markdown_for_translation(
+        content,
+        max_content_tokens=70,
+        count_tokens=len,
+    )
+
+    assert chunks == [
+        "# Heading\n\nFirst paragraph is long enough to force a split.\n\n",
+        "```python\nprint('hello')\n```\n\n",
+        "Second paragraph is also long enough to stay on its own.\n",
+    ]
+    assert "".join(chunks) == content
+
+
+def test_chunk_markdown_raises_for_oversized_unsplittable_block() -> None:
+    """Raise a clear error when a protected block still exceeds the budget."""
+    content = "```python\n" + ("print('x')\n" * 20) + "```\n"
+
+    with pytest.raises(ValueError, match="DOCS_TRANSLATE_MAX_PROMPT_TOKENS"):
+        _chunk_markdown_for_translation(
+            content,
+            max_content_tokens=40,
+            count_tokens=len,
+        )
+
+
+def test_translate_markdown_translates_each_chunk_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Translate each computed chunk independently and concatenate results."""
+    translator = OpenAICompatibleTranslator(
+        base_url="https://api.example.com/v1",
+        api_key="test-key",
+        model="gpt-4o-mini",
+        max_prompt_tokens=40,
+    )
+    content = (
+        "# Alpha\n\n"
+        "Alpha paragraph.\n\n"
+        "## Beta\n\n"
+        "Beta paragraph.\n"
+    )
+    seen_chunks: list[str] = []
+
+    monkeypatch.setattr(translator, "_count_tokens", len)
+    monkeypatch.setattr(translator, "_estimate_prompt_overhead", lambda _lang: 0)
+
+    def fake_translate_chunk(chunk: str, target_language: str) -> str:
+        seen_chunks.append(chunk)
+        assert target_language == "Chinese (Simplified)"
+        return chunk.upper()
+
+    monkeypatch.setattr(translator, "_translate_chunk", fake_translate_chunk)
+
+    translated = translator.translate_markdown(
+        content,
+        target_language="Chinese (Simplified)",
+    )
+
+    assert seen_chunks == [
+        "# Alpha\n\nAlpha paragraph.\n\n",
+        "## Beta\n\nBeta paragraph.\n",
+    ]
+    assert translated == content.upper()
