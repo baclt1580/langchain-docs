@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 _SOURCE_DIR_NAME = "src"
 _I18N_DIR_NAME = "i18n"
-_CONFIG_FILE_NAME = "config.json"
+_CONFIG_FILE_NAME = "i18n-config.json"
 _MANIFEST_FILE_NAME = "translation-hashes.json"
 _MIN_PROMPT_TOKENS = 512
 
@@ -107,7 +107,7 @@ def translate_command(args: Any) -> int:  # noqa: ANN401
         return 1
 
     i18n_root = src_root / _I18N_DIR_NAME
-    config_path = i18n_root / _CONFIG_FILE_NAME
+    config_path = src_root / _CONFIG_FILE_NAME
     manifest_path = i18n_root / _MANIFEST_FILE_NAME
 
     if dry_run:

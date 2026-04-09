@@ -4,7 +4,9 @@
   "description": "Docs for the project",
   "private": true,
   "scripts": {
-    "translate": "uv run python -m pipeline.cli translate"
+    "translate": "uv run python -m pipeline.cli translate",
+    "build": "powershell -NoProfile -Command \"$env:UV_PROJECT_ENVIRONMENT='.venv313'; $env:PYTHONPATH=(Get-Location).Path; uv run pipeline build\"",
+    "dev": "powershell -NoProfile -Command \"npm run build; Set-Location build; mint dev --client-version 0.0.2768 --no-open\""
   },
   "dependencies": {
     "@langchain/docs-sandbox": "^0.0.21"

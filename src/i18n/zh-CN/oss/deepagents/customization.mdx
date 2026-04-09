@@ -240,9 +240,10 @@ agent = create_deep_agent(
 ```typescript
 import { createDeepAgent } from "deepagents";
 
-const researchInstructions = `你是一名专家研究员。` +
-  `你的工作是进行深入研究，然后` +
-  `撰写一份精炼的报告。`;
+const researchInstructions =
+  "你是一名专家研究员。" +
+  "你的工作是进行深入研究，然后" +
+  "撰写一份精炼的报告。";
 
 const agent = createDeepAgent({
   systemPrompt: researchInstructions,
@@ -266,7 +267,6 @@ const agent = createDeepAgent({
 - @[`MemoryMiddleware`]：当提供 `memory` 参数时，跨会话持久化和检索对话上下文
 - @[`SkillsMiddleware`]：当提供 `skills` 参数时，启用自定义技能
 - `HumanInTheLoopMiddleware`：当提供 `interruptOn` 参数时，在指定点暂停以等待人工批准或输入
-:::
 
 ### 预构建中间件
 
@@ -387,7 +387,7 @@ const agent = await createDeepAgent({
 
 **这样做：**
 
-::::python
+:::python
 ```python
 class CustomMiddleware(AgentMiddleware):
     def __init__(self):
@@ -396,9 +396,9 @@ class CustomMiddleware(AgentMiddleware):
     def before_agent(self, state, runtime):
         return {"x": state.get("x", 0) + 1}  # 改为更新图状态
 ```
-::::
+:::
 
-::::js
+:::js
 ```typescript
 const customMiddleware = createMiddleware({
   name: "CustomMiddleware",
@@ -407,11 +407,11 @@ const customMiddleware = createMiddleware({
   },
 });
 ```
-::::
+:::
 
 **不要**这样做：
 
-::::python
+:::python
 ```python
 class CustomMiddleware(AgentMiddleware):
     def __init__(self):
@@ -420,9 +420,9 @@ class CustomMiddleware(AgentMiddleware):
     def before_agent(self, state, runtime):
         self.x += 1  # 改变会导致竞态条件
 ```
-::::
+:::
 
-::::js
+:::js
 ```typescript
 let x = 1;
 
@@ -433,7 +433,7 @@ const customMiddleware = createMiddleware({
   },
 });
 ```
-::::
+:::
 
 :::python
 原地改变，例如在 `before_agent` 中修改 `self.x` 或在钩子中更改其他共享值，可能导致微妙的错误和竞态条件，因为许多操作是并发运行的（子智能体、并行工具以及不同线程上的并行调用）。

@@ -1,6 +1,6 @@
 ---
-标题: 用户管理
-侧边栏标题: 用户管理
+title: 用户管理
+sidebarTitle: 用户管理
 ---
 
 本文档涵盖了 LangSmith 中的用户管理功能，包括访问控制、身份验证和自动用户配置：
@@ -578,7 +578,9 @@ curl -X POST $LANGCHAIN_ENDPOINT/v1/platform/orgs/current/scim/tokens \
 
 <Note>
 如果您使用 Azure Entra ID（以前称为 Azure AD）或 Okta，则有针对身份提供商设置的具体说明（请参阅 [Azure Entra ID](#azure-entra-id-configuration-steps)、[Okta](#okta)）。上述要求和步骤适用于所有身份提供商。
-</Note>#### Azurentra ID 配置步骤
+</Note>
+
+#### Azure Entra ID 配置步骤
 
 有关更多信息，请参阅微软的[文档](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/user-provisioning)。
 

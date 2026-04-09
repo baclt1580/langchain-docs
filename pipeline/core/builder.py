@@ -771,6 +771,7 @@ class DocumentationBuilder:
             "index.mdx",
             "use-these-docs.mdx",
             "playground.mdx",
+            "i18n-config.json",
         }:
             return True
 

@@ -8,11 +8,13 @@
 (function () {
   "use strict";
 
-  const CONFIG_URL = "/i18n/config.json";
   const DEFAULT_CONFIG = {
     defaultLanguage: "en",
     prefix: "i18n",
-    languages: [{ code: "en", label: "English" }],
+    languages: [
+      { code: "en", label: "English" },
+      { code: "zh-CN", label: "Chinese (Simplified)" },
+    ],
   };
   const SWITCHER_ID = "docs-i18n-switcher";
   const PREFIX_DELIMITER = "/";
@@ -226,7 +228,7 @@
 
   async function loadConfig() {
     try {
-      const response = await fetch(CONFIG_URL, { cache: "no-store" });
+      const response = await fetch("/i18n-config.json", { cache: "no-store" });
       if (!response.ok) {
         return;
       }

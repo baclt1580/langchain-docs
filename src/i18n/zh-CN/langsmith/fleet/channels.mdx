@@ -5,44 +5,44 @@ description: 配置通道以自动触发您的 Fleet 智能体。
 
 通道定义了智能体何时开始运行。将您的智能体连接到外部事件，使其能够自动响应消息、电子邮件或其他事件。
 
-<提示>
+<Tip>
 若要在定期循环的基础上触发智能体，请使用[计划任务](/langsmith/fleet/schedules)。
-</提示>
+</Tip>
 
 ## 添加通道
 
 要添加通道：
 
-<步骤>
-  <步骤标题="编辑您的智能体">
+<Steps>
+  <Step title="编辑您的智能体">
     在 [Fleet](https://smith.langchain.com/agents) 收件箱中打开您的智能体。
-    在智能体名称旁边，点击 <图标 icon="pencil"/> **编辑智能体** 图标。
-  </步骤>
-  <步骤标题="添加通道">
+    在智能体名称旁边，点击 <Icon icon="pencil"/> **编辑智能体** 图标。
+  </Step>
+  <Step title="添加通道">
     1. 在 **通道** 部分，点击 **+ 添加** 并选择您要添加的通道。
     1. 按照提示添加通道并进行身份验证。
-  </步骤>
-</步骤>
+  </Step>
+</Steps>
 
 ### 添加 Gmail 通道
 
 Gmail 通道会在新邮件到达您的收件箱时激活您的智能体。为了让您的智能体读取和回复邮件，请在 **工具** 部分添加 Gmail 工具。可用的 Gmail 工具包括读取邮件、发送回复、创建草稿、管理标签以及将邮件标记为已读。更多信息请参阅[工具集成](/langsmith/fleet/tools)。
 
-<警告>
+<Warning>
 Gmail 通道仅监控您的主收件箱。以下邮件不会激活该通道：
 
 - **别名邮件**：发送到电子邮件别名而非您主地址的邮件。
 - **邮件列表邮件**：通过邮件列表或群组接收的邮件。
 - **收件箱外的邮件**：因过滤器而跳过收件箱的邮件，或进入垃圾邮件、已删除邮件或其他文件夹的邮件。
-</警告>
+</Warning>
 
 ### 添加 Slack 通道
 
 默认的 Slack 机器人会在连接的 Slack 频道中发布消息时激活您的智能体。它会触发频道中的每条消息，且无法接收私信。为了让您的智能体在 Slack 中回复，请[添加 Slack 工具](/langsmith/fleet/slack-app#add-slack-tools)。
 
-<提示>
+<Tip>
 如需仅通过标签触发或支持私信，请改为[创建自定义 Slack 机器人](/langsmith/fleet/slack-app)。对比信息请参阅[自定义与默认机器人](/langsmith/fleet/slack-app#custom-vs-default-bot)。
-</提示>
+</Tip>
 
 ### 添加 Microsoft Teams 通道
 
@@ -55,10 +55,10 @@ Teams 通道会在 Microsoft Teams 对话中发送消息时激活您的智能体
 您可以暂停和恢复通道而无需移除它们。要暂停所有通道：
 
 1. 在 [Fleet](https://smith.langchain.com/agents) 收件箱中，打开您的智能体。
-1. 在智能体名称旁边，点击 <图标 icon="pencil"/> **编辑智能体** 图标。
-1. 在 **通道** 部分，点击 <图标 icon="player-pause"/> **暂停通道** 按钮以暂停所有通道。
+1. 在智能体名称旁边，点击 <Icon icon="pencil"/> **编辑智能体** 图标。
+1. 在 **通道** 部分，点击 <Icon icon="player-pause"/> **暂停通道** 按钮以暂停所有通道。
 
-要恢复所有通道，请点击 <图标 icon="player-play"/> **恢复通道** 按钮。
+要恢复所有通道，请点击 <Icon icon="player-play"/> **恢复通道** 按钮。
 
 ## 会话行为
 

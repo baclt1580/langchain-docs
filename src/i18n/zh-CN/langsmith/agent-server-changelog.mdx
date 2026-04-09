@@ -1,4 +1,5 @@
-: Agent Server 更新日志
+---
+title: Agent Server 更新日志
 sidebarTitle: Agent Server 更新日志
 rss: true
 ---
@@ -653,4 +654,6 @@ rss: true
 <Update label="2025-12-16" tags={["agent-server"]} rss={{ title: "2025-12-16 - agent-server" }}>
 ## v0.6.4
 
-- 通过并行化元数据和配置过程增强了自定义加密，添加了对 thread.config 和某些
+- 通过并行化元数据和配置过程增强了自定义加密，添加了对 `thread.config` 和部分检查点的加密，并改进了测试与 schema 一致性。
+- 确保 Go 服务器在队列入口点中以 `core-api` 启动，以保持一致的运行时行为。
+</Update>

@@ -1,0 +1,15 @@
+{
+  "defaultLanguage": "en",
+  "prefix": "i18n",
+  "languages": [
+    {
+      "code": "en",
+      "label": "English"
+    },
+    {
+      "code": "zh-CN",
+      "label": "Chinese (Simplified)"
+    }
+  ],
+  "updatedAt": "2026-04-08T09:13:51.331300+00:00"
+}
