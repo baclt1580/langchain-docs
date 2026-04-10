@@ -1,0 +1,33 @@
+---
+title: "ArangoDB 集成"
+description: "使用 LangChain Python 与 ArangoDB 集成。"
+---
+
+>[ArangoDB](https://github.com/arangodb/arangodb) 是一个可扩展的图数据库系统，旨在更快地从连接的数据中挖掘价值。通过单一查询语言，提供原生图、集成搜索引擎和 JSON 支持。ArangoDB 可在本地部署、在云端运行——无处不在。
+
+## 安装与设置
+
+使用 [ArangoDB Python Driver](https://github.com/ArangoDB-Community/python-arango) 包进行安装
+
+<CodeGroup>
+```bash pip
+pip install python-arango
+```
+
+```bash uv
+uv add python-arango
+```
+</CodeGroup>
+
+## 图问答链
+
+将您的 `ArangoDB` 数据库与聊天模型连接，以获取数据洞察。
+
+请参阅 [ArangoDB 笔记本示例](/oss/integrations/graphs/arangodb)。
+
+```python
+from arango import ArangoClient
+
+from langchain_community.graphs import ArangoGraph
+from langchain_classic.chains import ArangoGraphQAChain
+```

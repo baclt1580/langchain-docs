@@ -1,0 +1,55 @@
+---
+title: "百川集成"
+description: "使用 LangChain Python 与百川大模型集成。"
+---
+
+百川智能（[www.baichuan-ai.com/](https://www.baichuan-ai.com/)）是 AGI 时代的一家中国初创公司，致力于解决人类的基本需求：效率、健康和幸福。
+
+```python
+##Installing the langchain packages needed to use the integration
+pip install -qU langchain-community
+```
+
+## 前置条件
+
+访问百川大模型 API 需要 API 密钥。请访问 [platform.baichuan-ai.com/](https://platform.baichuan-ai.com/) 获取您的 API 密钥。
+
+## 使用百川大模型
+
+```python
+import os
+
+os.environ["BAICHUAN_API_KEY"] = "YOUR_API_KEY"
+```
+
+```python
+from langchain_community.llms import BaichuanLLM
+
+# Load the model
+llm = BaichuanLLM()
+
+res = llm.invoke("What's your name?")
+print(res)
+```
+
+```python
+res = llm.generate(prompts=["你好！"])
+res
+```
+
+```python
+for res in llm.stream("Who won the second world war?"):
+    print(res)
+```
+
+```python
+import asyncio
+
+
+async def run_aio_stream():
+    async for res in llm.astream("Write a poem about the sun."):
+        print(res)
+
+
+asyncio.run(run_aio_stream())
+```

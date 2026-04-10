@@ -1,0 +1,30 @@
+---
+title: "StarRocks 集成"
+description: "使用 LangChain Python 与 StarRocks 集成。"
+---
+
+> [StarRocks](https://www.starrocks.io/) 是一款高性能分析型数据库。
+`StarRocks` 是一款面向全场景分析的下一代亚秒级 MPP 数据库，包括多维分析、实时分析和即席查询。
+
+> 通常 `StarRocks` 被归类为 OLAP，它在 [ClickBench — 分析型数据库管理系统基准测试](https://benchmark.clickhouse.com/) 中展现了卓越的性能。由于它拥有超快的向量化执行引擎，它也可以用作快速的向量数据库。
+
+## 安装和设置
+
+
+<CodeGroup>
+```bash pip
+pip install pymysql
+```
+
+```bash uv
+uv add pymysql
+```
+</CodeGroup>
+
+## 向量存储
+
+查看 [使用示例](/oss/integrations/vectorstores/starrocks)。
+
+```python
+from langchain_community.vectorstores import StarRocks
+```

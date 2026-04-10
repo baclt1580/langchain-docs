@@ -1,0 +1,12 @@
+from langchain.agents import create_agent
+from langchain_core.runnables import Runnable
+from langgraph.store.memory import InMemoryStore
+
+# InMemoryStore 将数据存储到内存字典中。在生产环境中请使用基于数据库的存储。
+store = InMemoryStore()
+
+agent: Runnable = create_agent(
+    "claude-sonnet-4-6",
+    tools=[],
+    store=store,
+)

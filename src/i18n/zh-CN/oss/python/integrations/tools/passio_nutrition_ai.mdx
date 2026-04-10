@@ -1,0 +1,163 @@
+---
+title: "Passio nutritionai 集成"
+description: "使用 LangChain Python 与 Passio nutritionai 工具进行集成。"
+---
+
+为了最好地理解 NutritionAI 如何赋予您的智能体超级食物营养能力，让我们构建一个可以通过 Passio NutritionAI 查找该信息的智能体。
+
+## 定义工具
+
+我们首先需要创建 [the Passio NutritionAI tool](/oss/integrations/tools/passio_nutrition_ai)。
+
+### [Passio nutrition AI](/oss/integrations/tools/passio_nutrition_ai)
+
+LangChain 中有一个内置工具，可以方便地使用 Passio NutritionAI 查找食物营养事实。
+请注意，这需要 API 密钥——他们提供免费层级。
+
+一旦您创建了 API 密钥，您需要将其导出为：
+
+```bash
+export NUTRITIONAI_SUBSCRIPTION_KEY="..."
+```
+
+... 或者通过其他方法（例如 `dotenv` 包）将其提供给您的 Python 环境。您也可以通过构造函数调用显式控制密钥。
+
+```python
+from dotenv import load_dotenv
+from langchain_core.utils import get_from_env
+
+load_dotenv()
+
+nutritionai_subscription_key = get_from_env(
+    "nutritionai_subscription_key", "NUTRITIONAI_SUBSCRIPTION_KEY"
+)
+```
+
+```python
+from langchain_community.tools.passio_nutrition_ai import NutritionAI
+from langchain_community.utilities.passio_nutrition_ai import NutritionAIAPI
+```
+
+```python
+nutritionai_search = NutritionAI(api_wrapper=NutritionAIAPI())
+```
+
+```python
+nutritionai_search.invoke("chicken tikka masala")
+```
+
+```python
+nutritionai_search.invoke("Schnuck Markets sliced pepper jack cheese")
+```
+
+### 工具
+
+既然我们已经有了工具，我们就可以创建一个将在下游使用的工具列表。
+
+```python
+tools = [nutritionai_search]
+```
+
+## 创建智能体
+
+既然我们已经定义了工具，我们就可以创建智能体。我们将使用 OpenAI Functions 智能体——有关此类智能体以及其他选项的更多信息，请参阅 [Agents](/oss/langchain/agents)
+
+首先，我们选择要指导智能体的 LLM。
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+```
+
+接下来，我们选择用于指导智能体的提示词。
+
+```python
+from langchain_classic import hub
+
+# Get the prompt to use - you can modify this!
+prompt = hub.pull("hwchase17/openai-functions-agent")
+prompt.messages
+```
+
+```text
+[SystemMessagePromptTemplate(prompt=PromptTemplate(input_variables=[], template='You are a helpful assistant')),
+ MessagesPlaceholder(variable_name='chat_history', optional=True),
+ HumanMessagePromptTemplate(prompt=PromptTemplate(input_variables=['input'], template='{input}')),
+ MessagesPlaceholder(variable_name='agent_scratchpad')]
+```
+
+现在，我们可以使用 LLM、提示词和工具初始化智能体。智能体负责接收输入并决定采取什么操作。关键在于，Agent 不执行这些操作——这是由 AgentExecutor（下一步）完成的。有关如何思考这些组件的更多信息，请参阅我们的 [conceptual guide](/oss/langchain/agents)
+
+```python
+from langchain.agents import create_openai_functions_agent
+
+agent = create_openai_functions_agent(llm, tools, prompt)
+```
+
+最后，我们在 AgentExecutor 中将智能体（大脑）与工具结合起来（它将反复调用智能体并执行工具）。有关如何思考这些组件的更多信息，请参阅我们的 [conceptual guide](/oss/langchain/agents)
+
+```python
+from langchain.agents import AgentExecutor
+
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+```
+
+## 运行智能体
+
+我们现在可以在一些查询上运行智能体！请注意，目前这些都是 **stateless** 查询（它不会记住之前的交互）。
+
+```python
+agent_executor.invoke({"input": "hi!"})
+```
+
+```text
+> Entering new AgentExecutor chain...
+Hello! How can I assist you today?
+
+> Finished chain.
+```
+
+```python
+{'input': 'hi!', 'output': 'Hello! How can I assist you today?'}
+```
+
+```python
+agent_executor.invoke({"input": "how many calories are in a slice pepperoni pizza?"})
+```
+
+如果我们想自动跟踪这些消息，我们可以将其包装在 RunnableWithMessageHistory 中。
+
+```python
+agent_executor.invoke(
+    {"input": "I had bacon and eggs for breakfast.  How many calories is that?"}
+)
+```
+
+```python
+agent_executor.invoke(
+    {
+        "input": "I had sliced pepper jack cheese for a snack.  How much protein did I have?"
+    }
+)
+```
+
+```python
+agent_executor.invoke(
+    {
+        "input": "I had sliced colby cheese for a snack. Give me calories for this Schnuck Markets product."
+    }
+)
+```
+
+```python
+agent_executor.invoke(
+    {
+        "input": "I had chicken tikka masala for dinner.  how much calories, protein, and fat did I have with default quantity?"
+    }
+)
+```
+
+## 结论
+
+这就结束了！在本快速入门中，我们介绍了如何创建一个简单的智能体，该智能体能够将食物营养信息整合到其答案中。智能体是一个复杂的主题，还有很多需要学习的内容！

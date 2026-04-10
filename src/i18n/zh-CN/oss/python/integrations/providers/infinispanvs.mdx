@@ -1,0 +1,18 @@
+---
+title: "Infinispan 与集成对比"
+description: "使用 Infinispan 进行集成与使用 LangChain Python 的对比。"
+---
+
+> [Infinispan](https://infinispan.org) Infinispan 是一个开源内存数据网格，提供
+> 一个键值数据存储，能够容纳所有类型的数据，从 Java 对象到纯文本。
+> 自 15 版本起，Infinispan 支持缓存上的向量搜索。
+
+## 安装和设置
+请参阅 [Get Started](https://infinispan.org/get-started/) 以运行 Infinispan 服务器，您可能希望禁用身份验证
+（目前不支持）
+
+## 向量存储
+
+```python
+from langchain_community.vectorstores import InfinispanVS
+```

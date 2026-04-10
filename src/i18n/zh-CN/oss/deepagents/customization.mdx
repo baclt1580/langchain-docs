@@ -1,7 +1,7 @@
 ---
-title: 自定义深度智能体
+title: 自定义 Deep Agents
 sidebarTitle: 自定义
-description: 了解如何通过系统提示词、工具、子智能体等方式自定义深度智能体
+description: 了解如何使用系统提示、工具、子代理等自定义 Deep Agents
 ---
 
 import ChatModelTabsDaPy from '/snippets/chat-model-tabs-da.mdx';
@@ -26,22 +26,22 @@ import SandboxBasicPy from '/snippets/deepagents-sandbox-basic-py.mdx';
 import SandboxBasicJs from '/snippets/deepagents-sandbox-basic-js.mdx';
 
 :::python
-`create_deep_agent` 有以下核心配置选项：
+`create_deep_agent` 具有以下核心配置选项：
 :::
 
 :::js
-`createDeepAgent` 有以下配置选项：
+`createDeepAgent` 具有以下配置选项：
 :::
 
-- [模型](#模型)
-- [工具](#工具)
-- [系统提示词](#系统提示词)
-- [中间件](#中间件)
-- [子智能体](#子智能体)
-- [后端（虚拟文件系统）](#后端)
-- [人在回路](#人在回路)
-- [技能](#技能)
-- [记忆](#记忆)
+- [模型](#model)
+- [工具](#tools)
+- [系统提示](#system-prompt)
+- [中间件](#middleware)
+- [子代理](#subagents)
+- [后端（虚拟文件系统）](#backends)
+- [人机回环](#human-in-the-loop)
+- [技能](#skills)
+- [记忆](#memory)
 
 :::python
 ```python
@@ -54,7 +54,7 @@ create_deep_agent(
 ) -> CompiledStateGraph
 ```
 
-更多信息，请参阅 @[`create_deep_agent`] API 参考。
+有关更多信息，请参阅 @[`create_deep_agent`] API 参考。
 :::
 
 :::js
@@ -67,18 +67,18 @@ const agent = createDeepAgent({
 });
 ```
 
-更多信息，请参阅 [自定义深度智能体](https://reference.langchain.com/javascript/modules/deepagents.html#customizing-deep-agents)。
+有关更多信息，请参阅 [Customizing Deep Agents](https://reference.langchain.com/javascript/modules/deepagents.html#customizing-deep-agents)。
 :::
 
 ### 连接弹性
 
-LangChain 聊天模型会自动以指数退避方式重试失败的 API 请求。默认情况下，模型会为网络错误、速率限制（429）和服务器错误（5xx）重试最多 **6 次**。客户端错误如 401（未授权）或 404 不会重试。
+LangChain 聊天模型会自动重试失败的 API 请求，并采用指数退避策略。默认情况下，模型会针对网络错误、速率限制（429）和服务器错误（5xx）**最多重试 6 次**。像 401（未授权）或 404 这样的客户端错误不会重试。
 
 :::python
-您可以在创建模型时调整 `max_retries` 参数，以根据您的环境调整此行为：
+您可以在创建模型时调整 `max_retries` 参数，以便根据您的环境调整此行为：
 :::
 :::js
-您可以在创建模型时调整 `maxRetries` 参数，以根据您的环境调整此行为：
+您可以在创建模型时调整 `maxRetries` 参数，以便根据您的环境调整此行为：
 :::
 
 :::python
@@ -90,8 +90,8 @@ from deepagents import create_deep_agent
 agent = create_deep_agent(
     model=init_chat_model(
         model="claude-sonnet-4-6",
-        max_retries=10,  # 对于不可靠的网络，增加此值（默认：6）
-        timeout=120,     # 对于慢速连接，增加超时时间
+        max_retries=10,  # 增加以应对不可靠的网络（默认值：6）
+        timeout=120,     # 增加超时时间以应对慢速连接
     ),
 )
 ```
@@ -107,22 +107,22 @@ import { createDeepAgent } from "deepagents";
 const agent = createDeepAgent({
     model: new ChatAnthropic({
         model: "claude-sonnet-4-6",
-        maxRetries: 10, // 对于不可靠的网络，增加此值（默认：6）
-        timeout: 120_000, // 对于慢速连接，增加超时时间
+        maxRetries: 10, // 增加以应对不可靠的网络（默认值：6）
+        timeout: 120_000, // 增加超时时间以应对慢速连接
     }),
 });
 ```
 
 :::
 
-<Tip>对于不可靠网络上的长时间运行的智能体任务，考虑将 `max_retries` 增加到 10–15，并与 [检查点器](/oss/langgraph/persistence) 配对使用，以便在故障时保留进度。</Tip>
+<Tip>对于在不可靠网络上运行的长时间运行代理任务，建议将 `max_retries` 增加到 10–15，并将其与 [检查点器](/oss/langgraph/persistence) 配对，以便在故障之间保留进度。</Tip>
 
 ## 模型
 
 默认情况下，`deepagents` 使用 [`claude-sonnet-4-6`](https://platform.claude.com/docs/en/about-claude/models/overview)。您可以通过传递任何支持的 <Tooltip tip="遵循 `provider:model` 格式的字符串（例如 openai:gpt-5）" cta="查看映射" href="https://reference.langchain.com/python/langchain/models/#langchain.chat_models.init_chat_model(model)">模型标识符字符串</Tooltip> 或 [LangChain 模型对象](/oss/integrations/chat) 来自定义模型。
 
 <Tip>
-    使用 `provider:model` 格式（例如 `openai:gpt-5`）可以快速在不同模型之间切换。
+    使用 `provider:model` 格式（例如 `openai:gpt-5`）可以快速切换模型。
 </Tip>
 
 :::python
@@ -135,7 +135,7 @@ const agent = createDeepAgent({
 
 ## 工具
 
-除了用于规划、文件管理和子智能体生成的 [内置工具](/oss/deepagents/overview#核心能力) 外，您还可以提供自定义工具：
+除了用于规划、文件管理和子代理生成的 [内置工具](/oss/deepagents/overview#core-capabilities) 之外，您还可以提供自定义工具：
 
 :::python
 ```python
@@ -152,7 +152,7 @@ def internet_search(
     topic: Literal["general", "news", "finance"] = "general",
     include_raw_content: bool = False,
 ):
-    """运行网页搜索"""
+    """运行网络搜索"""
     return tavily_client.search(
         query,
         max_results=max_results,
@@ -195,7 +195,7 @@ const internetSearch = tool(
   },
   {
     name: "internet_search",
-    description: "运行网页搜索",
+    description: "运行网络搜索",
     schema: z.object({
       query: z.string().describe("搜索查询"),
       maxResults: z.number().optional().default(5),
@@ -214,20 +214,19 @@ const agent = createDeepAgent({
 ```
 :::
 
-## 系统提示词
+## 系统提示
 
-深度智能体附带内置的系统提示词。默认的系统提示词包含使用内置规划工具、文件系统工具和子智能体的详细说明。
-当中间件添加特殊工具（如文件系统工具）时，它会将它们附加到系统提示词中。
+Deep Agents 自带内置系统提示。默认系统提示包含使用内置规划工具、文件系统工具和子代理的详细指令。
+当中间件添加特殊工具（如文件系统工具）时，它们会被附加到系统提示中。
 
-每个深度智能体还应包含针对其特定用例的自定义系统提示词：
+每个深度代理还应包含针对其特定用例的自定义系统提示：
 
 :::python
 ```python
 from deepagents import create_deep_agent
 
 research_instructions = """\
-你是一名专家研究员。你的工作是进行 \
-深入研究，然后撰写一份精炼的报告。 \
+你是一名专家研究员。你的工作是进行彻底的研究，然后撰写一份精美的报告。 \
 """
 
 agent = create_deep_agent(
@@ -242,8 +241,8 @@ import { createDeepAgent } from "deepagents";
 
 const researchInstructions =
   "你是一名专家研究员。" +
-  "你的工作是进行深入研究，然后" +
-  "撰写一份精炼的报告。";
+  "你的工作是进行彻底的研究，然后" +
+  "撰写一份精美的报告。";
 
 const agent = createDeepAgent({
   systemPrompt: researchInstructions,
@@ -253,34 +252,34 @@ const agent = createDeepAgent({
 
 ## 中间件
 
-默认情况下，深度智能体可以访问以下 [中间件](/oss/langchain/middleware/overview)：
+默认情况下，Deep Agents 可以访问以下 [中间件](/oss/langchain/middleware/overview)：
 
-- @[`TodoListMiddleware`]：跟踪和管理待办事项列表，用于组织智能体任务和工作
+- @[`TodoListMiddleware`]：跟踪和管理待办事项列表，以组织代理任务和作业
 - @[`FilesystemMiddleware`]：处理文件系统操作，如读取、写入和导航目录
-- @[`SubAgentMiddleware`]：生成和协调子智能体，用于将任务委托给专门的智能体
-- @[`SummarizationMiddleware`]：当对话变长时，压缩消息历史以保持在上下文限制内
-- @[`AnthropicPromptCachingMiddleware`]：在使用 Anthropic 模型时，自动减少冗余的令牌处理
-- @[`PatchToolCallsMiddleware`]：当工具调用在收到结果之前被中断或取消时，自动修复消息历史
+- @[`SubAgentMiddleware`]：生成和协调子代理，以便将任务委托给专用代理
+- @[`SummarizationMiddleware`]：压缩消息历史记录，以便在对话变长时保持在上下文限制内
+- @[`AnthropicPromptCachingMiddleware`]：在使用 Anthropic 模型时自动减少冗余令牌处理
+- @[`PatchToolCallsMiddleware`]：当工具调用在收到结果之前被中断或取消时，自动修复消息历史记录
 
-如果您正在使用记忆、技能或人在回路，则还包括以下中间件：
+如果您正在使用记忆、技能或人机回环，还包括以下中间件：
 
 - @[`MemoryMiddleware`]：当提供 `memory` 参数时，跨会话持久化和检索对话上下文
-- @[`SkillsMiddleware`]：当提供 `skills` 参数时，启用自定义技能
-- `HumanInTheLoopMiddleware`：当提供 `interruptOn` 参数时，在指定点暂停以等待人工批准或输入
+- @[`SkillsMiddleware`]：当提供 `skills` 参数时启用自定义技能
+- `HumanInTheLoopMiddleware`：当提供 `interruptOn` 参数时，在指定点暂停以获取人类批准或输入
 
 ### 预构建中间件
 
-LangChain 提供了额外的预构建中间件，允许您添加各种功能，例如重试、回退或 PII 检测。更多信息请参阅 [预构建中间件](/oss/langchain/middleware/built-in)。
+LangChain 暴露了其他预构建中间件，让您能够添加各种功能，如重试、降级或 PII 检测。有关更多信息，请参阅 [预构建中间件](/oss/langchain/middleware/built-in)。
 
 :::python
 
-`deepagents` 库还公开了 @[create_summarization_tool_middleware]，使智能体能够在合适的时机（例如任务之间）触发摘要，而不是在固定的令牌间隔。更多细节，请参阅 [框架中的摘要](/oss/deepagents/harness#摘要)。
+`deepagents` 库还暴露了 @[create_summarization_tool_middleware]，使代理能够在适当的时候触发摘要——例如在任务之间——而不是在固定的令牌间隔。有关更多详细信息，请参阅 [Harness 中的摘要](/oss/deepagents/harness#summarization)。
 
 :::
 
 :::js
 
-`deepagents` 包也为相同的工作流公开了 @[createSummarizationMiddleware]。更多细节，请参阅 [框架中的摘要](/oss/deepagents/harness#摘要)。
+`deepagents` 包也暴露了 @[createSummarizationMiddleware] 用于相同的工作流程。有关更多详细信息，请参阅 [Harness 中的摘要](/oss/deepagents/harness#summarization)。
 
 :::
 
@@ -297,20 +296,20 @@ from deepagents import create_deep_agent
 
 @tool
 def get_weather(city: str) -> str:
-    """获取城市的天气。"""
-    return f"{city} 的天气是晴天。"
+    """获取城市天气。"""
+    return f"{city} 的天气是晴朗的。"
 
 
 call_count = [0]  # 使用列表以允许在嵌套函数中修改
 
 @wrap_tool_call
 def log_tool_calls(request, handler):
-    """拦截并记录每个工具调用 - 演示横切关注点。"""
+    """拦截并记录每次工具调用 - 演示横切关注点。"""
     call_count[0] += 1
     tool_name = request.name if hasattr(request, 'name') else str(request)
 
     print(f"[中间件] 工具调用 #{call_count[0]}: {tool_name}")
-    print(f"[中间件] 参数: {request.args if hasattr(request, 'args') else 'N/A'}")
+    print(f"[中间件] 参数：{request.args if hasattr(request, 'args') else 'N/A'}")
 
     # 执行工具调用
     result = handler(request)
@@ -336,11 +335,11 @@ import * as z from "zod";
 
 const getWeather = tool(
   ({ city }: { city: string }) => {
-    return `${city} 的天气是晴天。`;
+    return `The weather in ${city} is sunny.`;
   },
   {
     name: "get_weather",
-    description: "获取城市的天气。",
+    description: "Get the weather in a city.",
     schema: z.object({
       city: z.string(),
     }),
@@ -352,13 +351,13 @@ let callCount = 0;
 const logToolCallsMiddleware = createMiddleware({
   name: "LogToolCallsMiddleware",
   wrapToolCall: async (request, handler) => {
-    // 拦截并记录每个工具调用 - 演示横切关注点
+    // 拦截并记录每次工具调用 - 演示横切关注点
     callCount += 1;
     const toolName = request.toolCall.name;
 
     console.log(`[中间件] 工具调用 #${callCount}: ${toolName}`);
     console.log(
-      `[中间件] 参数: ${JSON.stringify(request.toolCall.args)}`
+      `[中间件] 参数：${JSON.stringify(request.toolCall.args)}`
     );
 
     // 执行工具调用
@@ -380,10 +379,10 @@ const agent = await createDeepAgent({
 :::
 
 <Warning>
-**初始化后不要改变属性**
+**初始化后不要修改属性**
 
 如果您需要在钩子调用之间跟踪值（例如计数器或累积数据），请使用图状态。
-图状态按设计限定在线程范围内，因此在并发下更新是安全的。
+图状态按设计是针对线程范围的，因此更新在并发下是安全的。
 
 **这样做：**
 
@@ -394,7 +393,7 @@ class CustomMiddleware(AgentMiddleware):
         pass
 
     def before_agent(self, state, runtime):
-        return {"x": state.get("x", 0) + 1}  # 改为更新图状态
+        return {"x": state.get("x", 0) + 1}  # 更新图状态而不是直接修改
 ```
 :::
 
@@ -403,13 +402,13 @@ class CustomMiddleware(AgentMiddleware):
 const customMiddleware = createMiddleware({
   name: "CustomMiddleware",
   beforeAgent: async (state) => {
-    return { x: (state.x ?? 0) + 1 }; // 改为更新图状态
+    return { x: (state.x ?? 0) + 1 }; // 更新图状态而不是直接修改
   },
 });
 ```
 :::
 
-**不要**这样做：
+**不要这样做：**
 
 :::python
 ```python
@@ -418,7 +417,7 @@ class CustomMiddleware(AgentMiddleware):
         self.x = 1
 
     def before_agent(self, state, runtime):
-        self.x += 1  # 改变会导致竞态条件
+        self.x += 1  # 修改会导致竞态条件
 ```
 :::
 
@@ -429,26 +428,26 @@ let x = 1;
 const customMiddleware = createMiddleware({
   name: "CustomMiddleware",
   beforeAgent: async () => {
-    x += 1; // 改变会导致竞态条件
+    x += 1; // 修改会导致竞态条件
   },
 });
 ```
 :::
 
 :::python
-原地改变，例如在 `before_agent` 中修改 `self.x` 或在钩子中更改其他共享值，可能导致微妙的错误和竞态条件，因为许多操作是并发运行的（子智能体、并行工具以及不同线程上的并行调用）。
+就地修改，例如在 `before_agent` 中修改 `self.x` 或在钩子中更改其他共享值，可能会导致细微的错误和竞态条件，因为许多操作是并发运行的（子代理、并行工具和不同线程上的并行调用）。
 :::
 :::js
-原地改变，例如在 `beforeAgent` 中修改 `state.x`、在 `beforeAgent` 中改变共享变量或在钩子中更改其他共享值，可能导致微妙的错误和竞态条件，因为许多操作是并发运行的（子智能体、并行工具以及不同线程上的并行调用）。
+就地修改，例如在 `beforeAgent` 中修改 `state.x`、在 `beforeAgent` 中修改共享变量或在钩子中更改其他共享值，可能会导致细微的错误和竞态条件，因为许多操作是并发运行的（子代理、并行工具和不同线程上的并行调用）。
 :::
 
-有关使用自定义属性扩展状态的完整细节，请参阅 [自定义中间件 - 自定义状态模式](/oss/langchain/middleware/custom#自定义状态模式)。
-如果您必须在自定义中间件中使用改变，请考虑当子智能体、并行工具或并发智能体调用同时运行时会发生什么。
+有关使用自定义属性扩展状态的完整详细信息，请参阅 [自定义中间件 - 自定义状态模式](/oss/langchain/middleware/custom#custom-state-schema)。
+如果您必须在自定义中间件中使用修改，请考虑当子代理、并行工具或并发代理调用同时运行时会发生什么。
 </Warning>
 
-## 子智能体
+## 子代理
 
-为了隔离详细工作并避免上下文膨胀，请使用子智能体：
+为了隔离详细工作并避免上下文膨胀，请使用子代理：
 
 :::python
 <SubagentBasicPy />
@@ -458,23 +457,23 @@ const customMiddleware = createMiddleware({
 <SubagentBasicJs />
 :::
 
-更多信息，请参阅 [子智能体](/oss/deepagents/subagents)。
+有关更多信息，请参阅 [子代理](/oss/deepagents/subagents)。
 
 {/* TODO(https://github.com/langchain-ai/docs/pull/2368/) ## 结构化响应格式 */}
 
-{/* ## 上下文 - 您可以在运行之间持久化智能体状态以存储用户ID等信息。 */}
+{/* ## 上下文 - 您可以在运行之间持久化代理状态以存储用户 ID 等信息。*/}
 
 ## 后端
 
-深度智能体工具可以利用虚拟文件系统来存储、访问和编辑文件。默认情况下，深度智能体使用 @[`StateBackend`]。
+深度代理工具可以使用虚拟文件系统来存储、访问和编辑文件。默认情况下，Deep Agents 使用 @[`StateBackend`]。
 
-如果您正在使用 [技能](#技能) 或 [记忆](#记忆)，则必须在创建智能体之前将预期的技能或记忆文件添加到后端。
+如果您正在使用 [技能](#skills) 或 [记忆](#memory)，您必须在创建代理之前将预期的技能或记忆文件添加到后端。
 
 <Tabs>
     <Tab title="StateBackend">
         存储在 `langgraph` 状态中的临时文件系统后端。
 
-        此文件系统仅对 _单个线程_ 持久化。
+        此文件系统仅 _在一个线程内_ 持久存在。
 
         :::python
         <BackendStatePy />
@@ -488,9 +487,9 @@ const customMiddleware = createMiddleware({
         本地机器的文件系统。
 
         <Warning>
-            此后端授予智能体直接的文件系统读写访问权限。
-            请谨慎使用，并仅在适当的环境中使用。
-            更多信息，请参阅 [`FilesystemBackend`](/oss/deepagents/backends#filesystembackend-本地磁盘)。
+            此后端授予代理直接的文件系统读写访问权限。
+            请谨慎使用，仅在合适的环境中使用。
+            有关更多信息，请参阅 [`FilesystemBackend`](/oss/deepagents/backends#filesystembackend-local-disk)。
         </Warning>
 
         :::python
@@ -502,12 +501,12 @@ const customMiddleware = createMiddleware({
         :::
     </Tab>
     <Tab title="LocalShellBackend">
-        一个在主机上直接执行 shell 的文件系统。提供文件系统工具以及用于运行命令的 `execute` 工具。
+        直接在主机上执行 Shell 的文件系统。提供文件系统工具以及用于运行命令的 `execute` 工具。
 
         <Warning>
-            此后端授予智能体直接的文件系统读写访问权限 **以及** 在您主机上的无限制 shell 执行权限。
-            请极其谨慎地使用，并仅在适当的环境中使用。
-            更多信息，请参阅 [`LocalShellBackend`](/oss/deepagents/backends#localshellbackend-本地-shell)。
+            此后端授予代理直接的文件系统读写访问权限 **以及** 在您主机上的无限制 Shell 执行权限。
+            请极其谨慎使用，仅在合适的环境中使用。
+            有关更多信息，请参阅 [`LocalShellBackend`](/oss/deepagents/backends#localshellbackend-local-shell)。
         </Warning>
 
         :::python
@@ -519,7 +518,7 @@ const customMiddleware = createMiddleware({
         :::
     </Tab>
     <Tab title="StoreBackend">
-        一个提供长期存储的文件系统，该存储 _跨线程持久化_。
+        提供 _跨线程持久化_ 长期存储的文件系统。
 
         :::python
         <BackendStorePy />
@@ -530,7 +529,7 @@ const customMiddleware = createMiddleware({
         :::
 
         <Tip>
-            `namespace` 参数控制数据隔离。对于多用户部署，始终设置 [命名空间工厂](/oss/deepagents/backends#命名空间工厂) 以按用户或租户隔离数据。
+            `namespace` 参数控制数据隔离。对于多用户部署，始终设置 [命名空间工厂](/oss/deepagents/backends#namespace-factories) 以按用户或租户隔离数据。
         </Tip>
     </Tab>
     <Tab title="CompositeBackend">
@@ -546,14 +545,14 @@ const customMiddleware = createMiddleware({
     </Tab>
 </Tabs>
 
-更多信息，请参阅 [后端](/oss/deepagents/backends)。
+有关更多信息，请参阅 [后端](/oss/deepagents/backends)。
 
-### 沙盒
+### 沙箱
 
-沙盒是专门的 [后端](/oss/deepagents/backends)，它们在隔离的环境中运行智能体代码，拥有自己的文件系统和用于 shell 命令的 `execute` 工具。
-当您希望深度智能体写入文件、安装依赖项和运行命令而不改变本地机器上的任何内容时，请使用沙盒后端。
+沙箱是专门的 [后端](/oss/deepagents/backends)，它们在具有自己的文件系统和用于 Shell 命令的 `execute` 工具的隔离环境中运行代理代码。
+当您希望深度代理写入文件、安装依赖项和运行命令而不更改本地机器上的任何内容时，请使用沙箱后端。
 
-您可以通过在创建深度智能体时将沙盒后端传递给 `backend` 来配置沙盒：
+您可以通过在创建深度代理时将沙箱后端传递给 `backend` 来配置沙箱：
 
 :::python
 <SandboxBasicPy />
@@ -563,11 +562,11 @@ const customMiddleware = createMiddleware({
 <SandboxBasicJs />
 :::
 
-更多信息，请参阅 [沙盒](/oss/deepagents/sandboxes)。
+有关更多信息，请参阅 [沙箱](/oss/deepagents/sandboxes)。
 
-## 人在回路
+## 人机回环
 
-某些工具操作可能很敏感，需要在执行前获得人工批准。
+某些工具操作可能很敏感，需要执行前获得人类批准。
 您可以为每个工具配置批准：
 
 :::python
@@ -578,19 +577,19 @@ const customMiddleware = createMiddleware({
 <HitlBasicConfigJs />
 :::
 
-您可以在工具调用时以及从工具调用内部为智能体和子智能体配置中断。
-更多信息，请参阅 [人在回路](/oss/deepagents/human-in-the-loop)。
+您还可以为代理和子代理配置工具调用期间以及工具调用内部的中断。
+有关更多信息，请参阅 [人机回环](/oss/deepagents/human-in-the-loop)。
 
 ## 技能
 
-您可以使用 [技能](/oss/deepagents/overview) 为深度智能体提供新的能力和专业知识。
-虽然 [工具](/oss/deepagents/customization#工具) 倾向于覆盖较低级别的功能，如原生文件系统操作或规划，但技能可以包含关于如何完成任务、参考信息和其他资产（如模板）的详细说明。
-这些文件仅在智能体确定该技能对当前提示有用时才被加载。
-这种渐进式披露减少了智能体在启动时必须考虑的令牌和上下文数量。
+您可以使用 [技能](/oss/deepagents/overview) 为您的深度代理提供新的能力和专业知识。
+虽然 [工具](/oss/deepagents/customization#tools) 通常涵盖低级功能，如原生文件系统操作或规划，但技能可以包含完成任务的详细指令、参考信息和其他资源，例如模板。
+这些文件仅在代理确定该技能对当前提示有用时才由代理加载。
+这种渐进式披露减少了代理在启动时必须考虑的令牌和上下文数量。
 
-有关示例技能，请参阅 [深度智能体示例技能](https://github.com/langchain-ai/deepagentsjs/tree/main/examples/skills)。
+有关示例技能，请参阅 [深度代理示例技能](https://github.com/langchain-ai/deepagentsjs/tree/main/examples/skills)。
 
-要将技能添加到您的深度智能体，请将它们作为参数传递给 `create_deep_agent`：
+要将技能添加到您的深度代理，请将它们作为参数传递给 `create_deep_agent`：
 
 :::python
 <SkillsUsageTabsPy />
@@ -602,9 +601,9 @@ const customMiddleware = createMiddleware({
 
 ## 记忆
 
-使用 [`AGENTS.md` 文件](https://agents.md/) 为深度智能体提供额外的上下文。
+使用 [`AGENTS.md` 文件](https://agents.md/) 为您的深度代理提供额外上下文。
 
-您可以在创建深度智能体时将一个或多个文件路径传递给 `memory` 参数：
+您可以在创建深度代理时将一个或多个文件路径传递给 `memory` 参数：
 
 :::python
 
@@ -633,10 +632,10 @@ const customMiddleware = createMiddleware({
             "messages": [
                 {
                     "role": "user",
-                    "content": "请告诉我你的记忆文件中有什么。",
+                    "content": "Please tell me what's in your memory files.",
                 }
             ],
-            # 为默认 StateBackend 的 in-state 文件系统提供种子（虚拟路径必须以 "/" 开头）。
+            # 引导默认 StateBackend 的状态内文件系统（虚拟路径必须以 "/" 开头）。
             "files": {"/AGENTS.md": create_file_data(agents_md)},
         },
         config={"configurable": {"thread_id": "123456"}},
@@ -677,7 +676,7 @@ const customMiddleware = createMiddleware({
             "messages": [
                 {
                     "role": "user",
-                    "content": "请告诉我你的记忆文件中有什么。",
+                    "content": "Please tell me what's in your memory files.",
                 }
             ],
             "files": {"/AGENTS.md": create_file_data(agents_md)},
@@ -692,7 +691,7 @@ const customMiddleware = createMiddleware({
     from langgraph.checkpoint.memory import MemorySaver
     from deepagents.backends import FilesystemBackend
 
-    # 检查点器对于人在回路是必需的
+    # 检查点器对于人机回环是必需的
     checkpointer = MemorySaver()
 
     agent = create_deep_agent(
@@ -754,10 +753,10 @@ const customMiddleware = createMiddleware({
         messages: [
           {
             role: "user",
-            content: "请告诉我你的记忆文件中有什么。",
+            content: "Please tell me what's in your memory files.",
           },
         ],
-        // 为默认 StateBackend 的 in-state 文件系统提供种子（虚拟路径必须以 "/" 开头）。
+        // 引导默认 StateBackend 的状态内文件系统（虚拟路径必须以 "/" 开头）。
         files: { "/AGENTS.md": createFileData(agentsMd) },
       },
       { configurable: { thread_id: "12345" } }
@@ -820,7 +819,7 @@ const customMiddleware = createMiddleware({
         messages: [
           {
             role: "user",
-            content: "请告诉我你的记忆文件中有什么。",
+            content: "Please tell me what's in your memory files.",
           },
         ],
       },
@@ -833,7 +832,7 @@ const customMiddleware = createMiddleware({
     import { createDeepAgent, FilesystemBackend } from "deepagents";
     import { MemorySaver } from "@langchain/langgraph";
 
-    // 检查点器对于人在回路是必需的
+    // 检查点器对于人机回环是必需的
     const checkpointer = new MemorySaver();
 
     const agent = await createDeepAgent({
@@ -845,7 +844,7 @@ const customMiddleware = createMiddleware({
         write_file: true,
         delete_file: true,
       },
-      checkpointer, // 必需！
+      checkpointer, // Required!
     });
     ```
   </Tab>
@@ -855,10 +854,10 @@ const customMiddleware = createMiddleware({
 
 ## 结构化输出
 
-深度智能体支持 [结构化输出](/oss/langchain/structured-output)。
+Deep Agents 支持 [结构化输出](/oss/langchain/structured-output)。
 :::python
-您可以通过将其作为 `response_format` 参数传递给 `create_deep_agent()` 调用来设置所需的结构化输出模式。
-当模型生成结构化数据时，它会被捕获、验证并返回到深度智能体状态的 'structured_response' 键中。
+您可以通过将所需的结构化输出模式作为 `response_format` 参数传递给 `create_deep_agent()` 调用来设置它。
+当模型生成结构化数据时，它会被捕获、验证，并返回在深度代理状态的 'structured_response' 键中。
 
 ```python
 import os
@@ -875,7 +874,7 @@ def internet_search(
     topic: Literal["general", "news", "finance"] = "general",
     include_raw_content: bool = False,
 ):
-    """运行网页搜索"""
+    """运行网络搜索"""
     return tavily_client.search(
         query,
         max_results=max_results,
@@ -884,13 +883,13 @@ def internet_search(
     )
 
 class WeatherReport(BaseModel):
-    """包含当前状况和预报的结构化天气报告。"""
+    """带有当前条件和预报的结构化天气报告。"""
     location: str = Field(description="此天气报告的地点")
-    temperature: float = Field(description="当前温度（摄氏度）")
-    condition: str = Field(description="当前天气状况（例如，晴天、多云、雨天）")
+    temperature: float = Field(description="当前摄氏温度")
+    condition: str = Field(description="当前天气状况（例如，晴朗、多云、下雨）")
     humidity: int = Field(description="湿度百分比")
     wind_speed: float = Field(description="风速（公里/小时）")
-    forecast: str = Field(description="未来24小时的简要预报")
+    forecast: str = Field(description="未来 24 小时的简要预报")
 
 
 agent = create_deep_agent(
@@ -901,18 +900,18 @@ agent = create_deep_agent(
 result = agent.invoke({
     "messages": [{
         "role": "user",
-        "content": "旧金山的天气怎么样？"
+        "content": "What's the weather like in San Francisco?"
     }]
 })
 
 print(result["structured_response"])
-# location='San Francisco, California' temperature=18.3 condition='Sunny' humidity=48 wind_speed=7.6 forecast='预计将持续宜人的晴朗天气，白天温度约64°F（18°C），夜间降至约52°F（11°C）。预计天空晴朗，降水极少。'
+# location='San Francisco, California' temperature=18.3 condition='Sunny' humidity=48 wind_speed=7.6 forecast='Pleasant sunny conditions expected to continue with temperatures around 64°F (18°C) during the day, dropping to around 52°F (11°C) at night. Clear skies with minimal precipitation expected.'
 ```
 
 :::
 :::js
-您可以通过将其作为 `responseFormat` 参数传递给 `createDeepAgent()` 调用来设置所需的结构化输出模式。
-当模型生成结构化数据时，它会被捕获、验证并返回到智能体状态的 'structuredResponse' 键中。
+您可以通过将所需的结构化输出模式作为 `responseFormat` 参数传递给 `createDeepAgent()` 调用来设置它。
+当模型生成结构化数据时，它会被捕获、验证，并返回在代理状态的 'structuredResponse' 键中。
 
 ```typescript
 import { tool } from "langchain";
@@ -942,9 +941,9 @@ const internetSearch = tool(
   },
   {
     name: "internet_search",
-    description: "运行网页搜索",
+    description: "Run a web search",
     schema: z.object({
-      query: z.string().describe("搜索查询"),
+      query: z.string().describe("The search query"),
       maxResults: z.number().optional().default(5),
       topic: z
         .enum(["general", "news", "finance"])
@@ -956,14 +955,14 @@ const internetSearch = tool(
 );
 
 const weatherReportSchema = z.object({
-  location: z.string().describe("此天气报告的地点"),
-  temperature: z.number().describe("当前温度（摄氏度）"),
+  location: z.string().describe("The location for this weather report"),
+  temperature: z.number().describe("Current temperature in Celsius"),
   condition: z
     .string()
-    .describe("当前天气状况（例如，晴天、多云、雨天）"),
-  humidity: z.number().describe("湿度百分比"),
-  windSpeed: z.number().describe("风速（公里/小时）"),
-  forecast: z.string().describe("未来24小时的简要预报"),
+    .describe("Current weather condition (e.g., sunny, cloudy, rainy)"),
+  humidity: z.number().describe("Humidity percentage"),
+  windSpeed: z.number().describe("Wind speed in km/h"),
+  forecast: z.string().describe("Brief forecast for the next 24 hours"),
 });
 
 const agent = await createDeepAgent({
@@ -975,7 +974,7 @@ const result = await agent.invoke({
   messages: [
     {
       role: "user",
-      content: "旧金山的天气怎么样？",
+      content: "What's the weather like in San Francisco?",
     },
   ],
 });
@@ -987,10 +986,10 @@ console.log(result.structuredResponse);
 //   condition: 'Sunny',
 //   humidity: 48,
 //   windSpeed: 7.6,
-//   forecast: '天空晴朗，温度保持温和。白天最高18°C（64°F），夜间降至约11°C（52°F）。'
+//   forecast: 'Clear skies with temperatures remaining mild. High of 18°C (64°F) during the day, dropping to around 11°C (52°F) at night.'
 // }
 ```
 
 :::
 
-更多信息和示例，请参阅 [响应格式](/oss/langchain/structured-output#响应格式)。
+有关更多信息和示例，请参阅 [响应格式](/oss/langchain/structured-output#response-format)。

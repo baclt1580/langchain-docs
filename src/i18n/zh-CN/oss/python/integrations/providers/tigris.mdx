@@ -1,0 +1,28 @@
+---
+title: "Tigris 集成"
+description: "使用 LangChain Python 与 Tigris 集成。"
+---
+
+> [Tigris](https://tigrisdata.com) 是一个开源的无服务器 NoSQL 数据库和搜索平台，旨在简化构建高性能向量搜索应用程序的过程。
+> `Tigris` 消除了管理、运行和同步多个工具的基础设施复杂性，让您能够专注于构建出色的应用程序。
+
+## 安装和设置
+
+
+<CodeGroup>
+```bash pip
+pip install tigrisdb openapi-schema-pydantic
+```
+
+```bash uv
+uv add tigrisdb openapi-schema-pydantic
+```
+</CodeGroup>
+
+## 向量存储
+
+查看 [使用示例](/oss/integrations/vectorstores/tigris)。
+
+```python
+from langchain_community.vectorstores import Tigris
+```

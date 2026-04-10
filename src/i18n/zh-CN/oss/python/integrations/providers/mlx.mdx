@@ -1,0 +1,43 @@
+---
+title: "Mlx 集成"
+description: "使用 LangChain Python 与 Mlx 集成。"
+---
+
+>[MLX](https://ml-explore.github.io/mlx/build/html/index.html) 是一个类似 `NumPy` 的数组框架
+> 专为在 `Apple` 硅上高效且灵活地进行机器学习而设计，
+> 由 `Apple machine learning research` 提供。
+
+
+## 安装和设置
+
+安装几个 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install mlx-lm transformers huggingface_hub
+```
+
+```bash uv
+uv add mlx-lm transformers huggingface_hub
+```
+</CodeGroup>
+
+
+## 聊天模型
+
+
+查看 [使用示例](/oss/integrations/chat/mlx)。
+
+```python
+from langchain_community.chat_models.mlx import ChatMLX
+```
+
+## 大语言模型
+
+### MLX 本地流水线
+
+查看 [使用示例](/oss/integrations/llms/mlx_pipelines)。
+
+```python
+from langchain_community.llms.mlx_pipeline import MLXPipeline
+```

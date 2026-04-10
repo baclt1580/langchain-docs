@@ -1,0 +1,34 @@
+---
+title: "SerpAPI 集成"
+description: "使用 LangChain Python 与 SerpAPI 进行集成。"
+---
+
+本页介绍如何在 LangChain 中使用 [SerpApi 网络搜索 API](https://serpapi.com/)。
+它分为两部分：安装和设置，以及特定 SerpAPI 包装器的参考。
+
+## 安装和设置
+- 使用 `pip install google-search-results` 安装依赖项
+- 从 [SerpAPI API 密钥管理页面](https://serpapi.com/manage-api-key) 获取 SerpApi API 密钥，并将其设置为环境变量（`SERPAPI_API_KEY`）
+
+## 包装器
+
+### 实用工具
+
+存在一个封装此 API 的 SerpAPI 实用工具。要导入此实用工具：
+
+```python
+from langchain_community.utilities import SerpAPIWrapper
+```
+
+有关此包装器的更详细逐步指南，请参阅 [此笔记本](/oss/integrations/tools/serpapi)。
+
+### 工具
+
+您也可以轻松地将此包装器加载为工具（用于与 Agent 配合使用）。
+您可以这样操作：
+```python
+from langchain_community.agent_toolkits.load_tools import load_tools
+tools = load_tools(["serpapi"])
+```
+
+有关此的更多信息，请参阅 [工具](/oss/integrations/tools)

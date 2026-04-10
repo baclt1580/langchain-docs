@@ -1,0 +1,104 @@
+---
+title: "Friendli 集成"
+description: "使用 LangChain Python 与 Friendli LLM 集成。"
+---
+
+
+> [Friendli](https://friendli.ai/) 通过可扩展、高效的部署选项增强 AI 应用性能并优化成本节约，专为高需求 AI 工作负载量身定制。
+
+本教程将指导您如何将 `Friendli` 与 LangChain 集成。
+
+## 设置
+
+请确保已安装 `langchain_community` 和 `friendli-client`。
+
+```sh
+pip install -U langchain-community friendli-client
+```
+
+请登录 [Friendli Suite](https://suite.friendli.ai/) 创建个人访问令牌，并将其设置为 `FRIENDLI_TOKEN` 环境变量。
+
+```python
+import getpass
+import os
+
+if "FRIENDLI_TOKEN" not in os.environ:
+    os.environ["FRIENDLI_TOKEN"] = getpass.getpass("Friendi Personal Access Token: ")
+```
+
+您可以通过选择要使用的模型来初始化 Friendli 聊天模型。
+默认模型是 `meta-llama-3.1-8b-instruct`。您可以在 [friendli.ai/docs](https://friendli.ai/docs/guides/serverless_endpoints/pricing#text-generation-models) 查看可用模型。
+
+```python
+from langchain_community.llms.friendli import Friendli
+
+llm = Friendli(model="meta-llama-3.1-8b-instruct", max_tokens=100, temperature=0)
+```
+
+## 用法
+
+`Frienli` 支持 [`LLM`](/oss/langchain/models) 的所有方法，包括异步 API。
+
+您可以使用 `invoke`、`batch`、`generate` 和 `stream` 的功能。
+
+```python
+llm.invoke("Tell me a joke.")
+```
+
+```text
+" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come"
+```
+
+```python
+llm.batch(["Tell me a joke.", "Tell me a joke."])
+```
+
+```text
+[" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come",
+ " I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come"]
+```
+
+```python
+llm.generate(["Tell me a joke.", "Tell me a joke."])
+```
+
+```text
+LLMResult(generations=[[Generation(text=" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come")], [Generation(text=" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come")]], llm_output={'model': 'meta-llama-3.1-8b-instruct'}, run=[RunInfo(run_id=UUID('ee97984b-6eab-4d40-a56f-51d6114953de')), RunInfo(run_id=UUID('cbe501ea-a20f-4420-9301-86cdfcf898c0'))], type='LLMResult')
+```
+
+```python
+for chunk in llm.stream("Tell me a joke."):
+    print(chunk, end="", flush=True)
+```
+
+您还可以使用异步 API 的所有功能：`ainvoke`、`abatch`、`agenerate` 和 `astream`。
+
+```python
+await llm.ainvoke("Tell me a joke.")
+```
+
+```text
+" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come"
+```
+
+```python
+await llm.abatch(["Tell me a joke.", "Tell me a joke."])
+```
+
+```text
+[" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come",
+ " I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come"]
+```
+
+```python
+await llm.agenerate(["Tell me a joke.", "Tell me a joke."])
+```
+
+```text
+LLMResult(generations=[[Generation(text=" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come")], [Generation(text=" I need a laugh.\nHere's one: Why couldn't the bicycle stand up by itself?\nBecause it was two-tired!\nI hope that made you laugh! Do you want to hear another one? I have a million of 'em! (Okay, maybe not a million, but I have a few more where that came from!) What kind of joke are you in the mood for? A pun, a play on words, or something else? Let me know and I'll try to come")]], llm_output={'model': 'meta-llama-3.1-8b-instruct'}, run=[RunInfo(run_id=UUID('857bd88e-e68a-46d2-8ad3-4a282c199a89')), RunInfo(run_id=UUID('a6ba6e7f-9a7a-4aa1-a2ac-c8fcf48309d3'))], type='LLMResult')
+```
+
+```python
+async for chunk in llm.astream("Tell me a joke."):
+    print(chunk, end="", flush=True)
+```

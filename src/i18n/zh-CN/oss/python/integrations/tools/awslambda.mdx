@@ -1,0 +1,50 @@
+---
+title: "AWS Lambda 集成"
+description: "使用 LangChain Python 与 AWS Lambda 工具集成。"
+---
+
+>[`Amazon AWS Lambda`](https://aws.amazon.com/pm/lambda/) 是由 `Amazon Web Services` (`AWS`) 提供的无服务器计算服务。它帮助开发者构建和运行应用程序及服务，而无需配置或管理服务器。这种无服务器架构使您能够专注于编写和部署代码，而 AWS 会自动处理扩展、修补和管理运行您的应用程序所需的基础设施。
+
+本笔记本介绍如何使用 `AWS Lambda` 工具。
+
+通过将 `AWS Lambda` 包含在提供给 Agent 的工具列表中，您可以授予您的 Agent 调用您在 AWS 云中运行的代码的能力，以满足您的需求。
+
+当 Agent 使用 `AWS Lambda` 工具时，它将提供一个字符串类型的参数，该参数随后会通过 event 参数传递给 Lambda 函数。
+
+首先，您需要安装 `boto3` Python 包。
+
+```python
+pip install -qU boto3 > /dev/null
+pip install -qU langchain-community
+```
+
+为了让 Agent 使用该工具，您必须提供与其 lambda 函数逻辑功能相匹配的名称和描述。
+
+您还必须提供函数的名称。
+
+请注意，由于该工具本质上只是 boto3 库的包装器，您将需要运行 `aws configure` 才能使用该工具。更多详细信息，请参阅 [AWS CLI 文档](https://docs.aws.amazon.com/cli/index.html)
+
+```python
+from langchain.agents import create_agent, load_tools
+from langchain_openai import OpenAI
+
+llm = OpenAI(temperature=0)
+
+tools = load_tools(
+    ["awslambda"],
+    awslambda_tool_name="email-sender",
+    awslambda_tool_description="sends an email with the specified content to test@testing123.com",
+    function_name="testFunction1",
+)
+
+agent = create_agent(
+    model=llm,
+    tools=tools,
+)
+
+agent.invoke("Send an email to test@testing123.com saying hello world.")
+```
+
+```python
+
+```

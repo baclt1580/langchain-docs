@@ -1,0 +1,22 @@
+---
+title: "Semadb 集成"
+description: "使用 LangChain Python 与 Semadb 集成。"
+---
+
+>[SemaDB](https://semafind.com/) 是一款无需繁琐操作的向量相似度搜索引擎。它提供低成本的云托管版本，帮助您轻松构建 AI 应用程序。
+
+使用 SemaDB Cloud，我们的托管版本，“无需繁琐操作”意味着无需计算 Pod 大小、无需定义模式、无需分区设置、无需参数调优、无需搜索算法调优、无需复杂安装、无需复杂 API。它集成了 [RapidAPI](https://rapidapi.com/semafind-semadb/api/semadb)，提供透明的计费、自动分片以及交互式 API 沙盒。
+
+## 安装
+
+无需安装，直接在 [RapidAPI](https://rapidapi.com/semafind-semadb/api/semadb) 上开始使用 SemaDB Cloud。
+
+## 向量存储
+
+有一个围绕 `SemaDB` 集合的基础包装器，允许您将其用作向量存储。
+
+```python
+from langchain_community.vectorstores import SemaDB
+```
+
+您可以在 [此笔记本](/oss/integrations/vectorstores/semadb) 中查看有关如何使用包装器的教程。

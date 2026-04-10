@@ -1,0 +1,32 @@
+---
+title: "Rank_bm25 集成"
+description: "使用 LangChain Python 与 Rank_bm25 集成。"
+---
+
+[rank_bm25](https://github.com/dorianbrown/rank_bm25) 是一个开源算法集合，旨在查询文档并返回最相关的文档，通常用于构建搜索引擎。
+
+请查看其 [项目页面](https://github.com/dorianbrown/rank_bm25) 以获取可用算法。
+
+
+## 安装和设置
+
+首先，您需要安装 `rank_bm25` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install rank_bm25
+```
+
+```bash uv
+uv add rank_bm25
+```
+</CodeGroup>
+
+
+## 检索器
+
+查看 [使用示例](/oss/integrations/retrievers/bm25)。
+
+```python
+from langchain_community.retrievers import BM25Retriever
+```

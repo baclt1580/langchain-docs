@@ -1,0 +1,38 @@
+---
+title: "IEIT 系统集成"
+description: "使用 LangChain Python 与 IEIT 系统集成。"
+---
+
+> [IEIT 系统](https://en.ieisystem.com/) 是一家成立于 1999 年的中国信息技术公司。它提供 IT 基础设施产品、解决方案和服务，以及涵盖云计算、大数据和人工智能的创新 IT 产品和解决方案。
+
+
+## 大语言模型
+
+查看 [使用示例](/oss/integrations/llms/yuan2)。
+
+```python
+from langchain_community.llms.yuan2 import Yuan2
+```
+
+## 聊天模型
+
+查看 [安装说明](/oss/integrations/chat/yuan2/#setting-up-your-api-server)。
+
+Yuan2.0 提供了兼容 OpenAI 的 API，ChatYuan2 通过使用 `OpenAI client` 集成到 langchain 中。
+因此，请确保已安装 `openai` 包。
+
+<CodeGroup>
+    ```bash pip
+    pip install openai
+    ```
+
+    ```bash uv
+    uv add openai
+    ```
+</CodeGroup>
+
+查看 [使用示例](/oss/integrations/chat/yuan2)。
+
+```python
+from langchain_community.chat_models import ChatYuan2
+```

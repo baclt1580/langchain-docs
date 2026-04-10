@@ -1,0 +1,117 @@
+---
+title: "阿里云集成"
+description: "使用 LangChain Python 与阿里云集成。"
+---
+
+>[阿里巴巴集团控股有限公司（维基百科）](https://en.wikipedia.org/wiki/Alibaba_Group)，或 `Alibaba`
+>（中文：阿里巴巴），是一家专注于电子商务、零售、
+>互联网和技术的中国跨国科技公司。
+>
+> [阿里云（维基百科）](https://en.wikipedia.org/wiki/Alibaba_Cloud)，也称为 `Aliyun`
+>（中文：阿里云；拼音：Ālǐyún；字面意思：'Ali Cloud'），是一家云计算公司，是 `Alibaba Group` 的子公司。`Alibaba Cloud` 为在线业务和
+>阿里巴巴自己的电商生态系统提供云计算服务。
+
+
+## 大语言模型
+
+### 阿里云 PAI EAS
+
+请查看 [安装说明和使用示例](/oss/integrations/llms/alibabacloud_pai_eas_endpoint)。
+
+```python
+from langchain_community.llms.pai_eas_endpoint import PaiEasEndpoint
+```
+
+### 通义千问
+
+请查看 [安装说明和使用示例](/oss/integrations/llms/tongyi)。
+
+```python
+from langchain_community.llms import Tongyi
+```
+
+## 聊天模型
+
+### 阿里云 PAI EAS
+
+请查看 [安装说明和使用示例](/oss/integrations/chat/alibaba_cloud_pai_eas)。
+
+```python
+from langchain_community.chat_models import PaiEasChatEndpoint
+```
+
+### 通义千问聊天
+
+请查看 [安装说明和使用示例](/oss/integrations/chat/tongyi)。
+
+```python
+from langchain_community.chat_models.tongyi import ChatTongyi
+```
+
+### Qwen QwQ 聊天
+
+请查看 [安装说明和使用示例](/oss/integrations/chat/qwq)
+
+```python
+from langchain_qwq import ChatQwQ
+```
+
+### Qwen 模型聊天
+
+请查看 [安装说明和使用示例](/oss/integrations/chat/qwen)
+
+```python
+from langchain_qwq import ChatQwen
+```
+
+## 文档加载器
+
+### 阿里云 MaxCompute
+
+请查看 [安装说明和使用示例](/oss/integrations/document_loaders/alibaba_cloud_maxcompute)。
+
+```python
+from langchain_community.document_loaders import MaxComputeLoader
+```
+
+## 向量存储
+
+### 阿里云 OpenSearch
+
+请查看 [安装说明和使用示例](/oss/integrations/vectorstores/alibabacloud_opensearch)。
+
+```python
+from langchain_community.vectorstores import AlibabaCloudOpenSearch, AlibabaCloudOpenSearchSettings
+```
+
+### 阿里云 tair
+
+请查看 [安装说明和使用示例](/oss/integrations/vectorstores/tair)。
+
+```python
+from langchain_community.vectorstores import Tair
+```
+
+### AnalyticDB
+
+请查看 [安装说明和使用示例](/oss/integrations/vectorstores/analyticdb)。
+
+```python
+from langchain_community.vectorstores import AnalyticDB
+```
+
+### Hologres
+
+请查看 [安装说明和使用示例](/oss/integrations/vectorstores/hologres)。
+
+```python
+from langchain_community.vectorstores import Hologres
+```
+
+### Tablestore
+
+请查看 [安装说明和使用示例](/oss/integrations/vectorstores/tablestore)。
+
+```python
+from langchain_community.vectorstores import TablestoreVectorStore
+```

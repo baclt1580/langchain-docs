@@ -1,0 +1,88 @@
+---
+title: "Zep 集成"
+description: "使用 LangChain Python 与 Zep 集成。"
+---
+
+> 从聊天历史中回忆、理解和提取数据。赋能个性化的 AI 体验。
+
+>[Zep](https://www.getzep.com) 是用于 AI 助手应用的长期记忆服务。
+> 使用 Zep，您可以让 AI 助手具备回忆过去对话的能力，无论时间多么久远，
+> 同时减少幻觉、延迟和成本。
+
+## Zep 如何工作
+
+Zep 持久化并回忆聊天历史，并自动从这些聊天历史中生成摘要和其他工件。
+它还嵌入消息和摘要，使您能够搜索 Zep 以获取来自过去对话的相关上下文。
+Zep 异步完成所有这些操作，确保这些操作不会影响用户的聊天体验。
+数据持久化到数据库，允许您在增长需求时进行扩展。
+
+Zep 还提供了一个简单、易于使用的文档向量搜索抽象，称为文档集合。
+这是为了补充 Zep 的核心记忆功能而设计的，但并非设计为通用向量数据库。
+
+Zep 允许您在构建提示词时更加有意图：
+- 自动添加几条最近的消息，数量根据您的应用定制；
+- 上述消息之前最近对话的摘要；
+- 以及/或从整个聊天会话中展示的上下文相关摘要或消息。
+- 以及/或来自 Zep 文档集合的相关业务数据。
+
+## 什么是 Zep Cloud？
+[Zep Cloud](https://www.getzep.com) 是一项核心基于 Zep Open Source 的托管服务。
+除了 Zep Open Source 的记忆管理功能外，Zep Cloud 还提供：
+- **事实提取**：自动从对话中构建事实表，无需预先定义数据模式。
+- **对话分类**：即时且准确地分类聊天对话。理解用户意图和情感，细分用户等。基于语义上下文路由链，并触发事件。
+- **结构化数据提取**：使用您定义的模式快速从聊天对话中提取业务数据。了解您的助手接下来应该询问什么以完成任务。
+
+
+
+## Zep 开源版
+Zep 提供带有自托管选项的开源版本。
+请参阅 [Zep Open Source](https://github.com/getzep/zep) 仓库以获取更多信息。
+您还可以找到与 Zep Open Source 兼容的 [检索器](/oss/integrations/retrievers/zep_memorystore) 和 [向量存储](/oss/integrations/vectorstores/zep) 示例。
+
+## Zep Cloud 安装和设置
+
+[Zep Cloud 文档](https://help.getzep.com)
+
+1. 安装 Zep Cloud SDK：
+
+<CodeGroup>
+```bash pip
+pip install zep_cloud
+```
+
+```bash uv
+uv add zep_cloud
+```
+</CodeGroup>
+或
+```bash
+poetry add zep_cloud
+```
+
+## 检索器
+
+Zep 的记忆检索器是一个 LangChain 检索器，使您能够从 Zep 会话中检索消息并使用它们来构建您的提示词。
+
+该检索器支持搜索单个消息和对话摘要。后者有助于向 LLM 提供丰富但简洁的上下文，关于相关的过去对话。
+
+Zep 的记忆检索器支持相似性搜索和 [最大边际相关性 (MMR) 重排序](https://help.getzep.com/working-with-search#how-zeps-mmr-re-ranking-works)。MMR 搜索有助于确保检索到的消息多样化且彼此不太相似。
+
+查看 [使用示例](/oss/integrations/retrievers/zep_cloud_memorystore)。
+
+```python
+from langchain_community.retrievers import ZepCloudRetriever
+```
+
+## 向量存储
+
+Zep 的 [文档向量存储 API](https://help.getzep.com/document-collections) 使您能够使用向量相似性搜索存储和检索文档。Zep 不需要您理解
+距离函数、嵌入类型或索引最佳实践。您只需传入分块的文档，Zep 处理其余部分。
+
+Zep 支持相似性搜索和 [最大边际相关性 (MMR) 重排序](https://help.getzep.com/working-with-search#how-zeps-mmr-re-ranking-works)。
+MMR 搜索有助于确保检索到的文档多样化且彼此不太相似。
+
+```python
+from langchain_community.vectorstores import ZepCloudVectorStore
+```
+
+查看 [使用示例](/oss/integrations/vectorstores/zep_cloud)。

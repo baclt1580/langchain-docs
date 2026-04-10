@@ -1,0 +1,52 @@
+---
+title: "Hologres 集成"
+description: "使用 LangChain Python 与 Hologres 集成。"
+---
+
+>[Hologres](https://www.alibabacloud.com/help/en/hologres/latest/introduction) 是由阿里云开发的统一实时数据仓库服务。您可以使用 Hologres 实时写入、更新、处理和分析大量数据。
+>`Hologres` 支持标准 `SQL` 语法，兼容 `PostgreSQL`，并支持大多数 PostgreSQL 函数。Hologres 支持高达 PB 级数据的在线分析处理（OLAP）和即席分析，并提供高并发、低延迟的在线数据服务。
+
+>`Hologres` 通过采用 [VSAG](https://github.com/antgroup/vsag)（从 r4.0.0 版本开始）或 [Proxima](https://www.alibabacloud.com/help/en/hologres/latest/vector-processing)（r4.0.0 之前的版本），提供**向量数据库**功能。
+>[VSAG](https://github.com/antgroup/vsag) 是蚂蚁集团开发的一个用于相似性搜索的开源向量索引库。与 Proxima 相比，VSAG 具有更低的内存开销、简化的配置、在并发写入下改进的查询稳定性，以及处理超大规模向量数据集的能力。
+>`Proxima` 是 `阿里巴巴达摩院` 开发的高性能软件库，用于 r4.0.0 之前的 Hologres 版本。它允许您以高吞吐量和低延迟搜索向量的最近邻。
+
+## 安装和设置
+
+[在阿里云上部署 Hologres 云实例](https://www.alibabacloud.com/zh/product/hologres)。
+
+<CodeGroup>
+```bash pip
+pip install langchain_community
+```
+
+```bash uv
+uv add langchain_community
+```
+</CodeGroup>
+
+安装与您实例版本匹配的 Hologres SDK：
+
+- 如果 Hologres 实例版本低于 r4.0.0，请安装 `hologres-vector`。
+- 如果 Hologres 实例版本为 r4.0.0 或更高，请安装 `holo-search-sdk`。
+
+<CodeGroup>
+```bash pip
+pip install hologres-vector
+# or
+pip install holo-search-sdk
+```
+
+```bash uv
+uv add hologres-vector
+# or
+uv add holo-search-sdk
+```
+</CodeGroup>
+
+## 向量存储
+
+查看 [使用示例](/oss/integrations/vectorstores/hologres)。
+
+```python
+from langchain_community.vectorstores import Hologres
+```

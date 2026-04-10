@@ -1,0 +1,28 @@
+---
+title: "Datadog 日志集成"
+description: "使用 LangChain Python 与 Datadog 日志进行集成。"
+---
+
+>[Datadog](https://www.datadoghq.com/) 是一个用于云规模应用程序的监控和分析平台。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install datadog_api_client
+```
+
+```bash uv
+uv add datadog_api_client
+```
+</CodeGroup>
+
+我们必须使用 Datadog API 密钥和 APP 密钥初始化加载器，并且需要设置查询以提取所需的日志。
+
+## 文档加载器
+
+查看 [使用示例](/oss/integrations/document_loaders/datadog_logs)。
+
+```python
+from langchain_community.document_loaders import DatadogLogsLoader
+```

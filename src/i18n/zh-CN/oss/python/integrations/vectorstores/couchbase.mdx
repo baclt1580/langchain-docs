@@ -1,0 +1,892 @@
+---
+title: "Couchbase 集成"
+description: "使用 LangChain Python 与 Couchbase 向量存储进行集成。"
+---
+
+[Couchbase](http://couchbase.com/) 是一款屡获殊荣的分布式 NoSQL 云数据库，为您的所有云、移动、AI 和边缘计算应用提供无与伦比的多功能性、性能、可扩展性和财务价值。Couchbase 拥抱 AI，为开发者提供编码辅助，并为他们的应用提供向量搜索。
+
+Couchbase 为 LangChain 提供了两种不同的向量存储实现：
+
+| 向量存储 | 索引类型 | 最低版本 | 最佳用途 |
+|-------------|-----------|-----------------|----------|
+| `CouchbaseQueryVectorStore` | [超大规模向量索引](https://docs.couchbase.com/server/current/vector-index/hyperscale-vector-index.html) 或 [复合向量索引](https://docs.couchbase.com/server/current/vector-index/composite-vector-index.html) | Couchbase Server 8.0+ | 大规模纯向量搜索或结合向量相似性与标量过滤器的搜索 |
+| `CouchbaseSearchVectorStore` | [搜索向量索引](https://docs.couchbase.com/server/current/vector-search/vector-search.html) | Couchbase Server 7.6+ | 结合向量相似性与全文搜索 (FTS) 和地理空间搜索的混合搜索 |
+
+本教程解释如何在 Couchbase 中使用向量搜索。您可以使用 [Couchbase Capella](https://www.couchbase.com/products/capella/) 或自行管理的 Couchbase Server。
+
+## 设置
+
+要访问 Couchbase 向量存储，您首先需要安装 `langchain-couchbase` 合作伙伴包：
+
+```bash
+pip install langchain-couchbase langchain-openai langchain-community
+```
+
+### 凭据
+
+前往 Couchbase [网站](https://cloud.couchbase.com) 并创建新连接，确保保存您的数据库用户名和密码。
+
+您还需要 OpenAI API 密钥用于嵌入。从 [OpenAI](https://platform.openai.com/api-keys) 获取一个。
+
+```python
+import getpass
+import os
+
+COUCHBASE_CONNECTION_STRING = getpass.getpass(
+    "Enter the connection string for the Couchbase cluster: "
+)
+DB_USERNAME = getpass.getpass("Enter the username for the Couchbase cluster: ")
+DB_PASSWORD = getpass.getpass("Enter the password for the Couchbase cluster: ")
+OPENAI_API_KEY = getpass.getpass("Enter your OpenAI API key: ")
+
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+```
+
+```text
+Enter the connection string for the Couchbase cluster:  ········
+Enter the username for the Couchbase cluster:  ········
+Enter the password for the Couchbase cluster:  ········
+Enter your OpenAI API key:  ········
+```
+
+如果您希望获得最佳的类内自动化模型调用跟踪，您也可以通过取消注释以下内容来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+# os.environ["LANGSMITH_API_KEY"] = getpass.getpass()
+```
+
+## 创建 Couchbase 连接对象
+
+我们首先创建一个到 Couchbase 集群的连接，然后将集群对象传递给向量存储。
+
+这里，我们使用上面的用户名和密码进行连接。您也可以使用任何其他支持的方式连接到您的集群。
+
+有关连接到 Couchbase 集群的更多信息，请查看 [文档](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html#connect)。
+
+```python
+from datetime import timedelta
+
+from couchbase.auth import PasswordAuthenticator
+from couchbase.cluster import Cluster
+from couchbase.options import ClusterOptions
+
+auth = PasswordAuthenticator(DB_USERNAME, DB_PASSWORD)
+options = ClusterOptions(auth)
+options.apply_profile("wan_development")
+cluster = Cluster(COUCHBASE_CONNECTION_STRING, options)
+
+# Wait until the cluster is ready for use.
+cluster.wait_until_ready(timedelta(seconds=5))
+```
+
+我们现在将在 Couchbase 集群中设置我们要用于向量搜索的桶、作用域和集合名称。
+
+对于此示例，我们使用默认的作用域和集合。
+
+```python
+BUCKET_NAME = "langchain_bucket"
+SCOPE_NAME = "_default"
+COLLECTION_NAME = "_default"
+```
+
+---
+
+## CouchbaseQueryVectorStore
+
+`CouchbaseQueryVectorStore` 允许使用查询和索引服务利用 Couchbase 进行向量搜索。它支持两种不同类型的向量索引：
+
+- **超大规模向量索引** - 针对大型数据集（数十亿文档）上的纯向量搜索进行了优化。适用于内容发现、推荐以及需要高准确性且内存占用低的应用。超大规模向量索引同时比较向量和标量值。
+
+- **复合向量索引** - 将全局二级索引 (GSI) 与向量列相结合。适用于结合向量相似性与标量过滤器的搜索，其中标量过滤器可过滤掉数据集的大部分。复合向量索引先应用标量过滤器，然后在过滤后的结果上执行向量搜索。
+
+有关选择正确索引类型的指导，请参阅 [选择合适的向量索引](https://docs.couchbase.com/cloud/vector-index/use-vector-indexes.html)。
+
+**要求：** Couchbase Server 8.0 及以上版本。
+
+有关索引的更多信息，请参阅：
+
+- [超大规模向量索引文档](https://docs.couchbase.com/server/current/vector-index/hyperscale-vector-index.html)
+- [复合向量索引文档](https://docs.couchbase.com/server/current/vector-index/composite-vector-index.html)
+
+### 初始化
+
+下面，我们创建带有集群信息和距离度量的向量存储对象。
+
+首先，设置嵌入模型（如果尚未完成）：
+
+```python
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+```
+
+然后创建向量存储：
+
+```python
+from langchain_couchbase import CouchbaseQueryVectorStore
+from langchain_couchbase.vectorstores import DistanceStrategy
+
+vector_store = CouchbaseQueryVectorStore(
+    cluster=cluster,
+    bucket_name=BUCKET_NAME,
+    scope_name=SCOPE_NAME,
+    collection_name=COLLECTION_NAME,
+    embedding=embeddings,
+    distance_metric=DistanceStrategy.DOT,
+)
+```
+
+### 距离策略
+
+`CouchbaseQueryVectorStore` 通过 `DistanceStrategy` 枚举支持以下距离策略：
+
+| 策略 | 描述 |
+|----------|-------------|
+| `DistanceStrategy.DOT` | 点积相似度 |
+| `DistanceStrategy.COSINE` | 余弦相似度 |
+| `DistanceStrategy.EUCLIDEAN` | 欧几里得距离（等同于 L2） |
+| `DistanceStrategy.EUCLIDEAN_SQUARED` | 平方欧几里得距离（等同于 L2_SQUARED） |
+
+### 指定文本和嵌入字段
+
+您可以选择性地使用 `text_key` 和 `embedding_key` 字段指定文档的文本和嵌入字段。
+
+```python
+vector_store_specific = CouchbaseQueryVectorStore(
+    cluster=cluster,
+    bucket_name=BUCKET_NAME,
+    scope_name=SCOPE_NAME,
+    collection_name=COLLECTION_NAME,
+    embedding=embeddings,
+    distance_metric=DistanceStrategy.COSINE,
+    text_key="text",
+    embedding_key="embedding",
+)
+```
+
+### 管理向量存储
+
+一旦创建了向量存储，我们可以通过添加和删除不同项目来与其交互。
+
+**向向量存储添加项目**
+
+我们可以使用 `add_documents` 函数向向量存储添加项目。
+
+```python
+from uuid import uuid4
+
+from langchain_core.documents import Document
+
+document_1 = Document(page_content="foo", metadata={"baz": "bar"})
+document_2 = Document(page_content="thud", metadata={"bar": "baz"})
+document_3 = Document(page_content="i will be deleted :(")
+
+documents = [document_1, document_2, document_3]
+ids = ["1", "2", "3"]
+vector_store.add_documents(documents=documents, ids=ids)
+```
+
+**创建向量索引**
+
+**重要：** 必须在向向量存储添加文档**之后**创建向量索引。在添加文档后使用 `create_index()` 方法以启用高效的向量搜索。
+
+```python
+from langchain_couchbase.vectorstores import IndexType
+
+# Create a Hyperscale Vector Index
+vector_store.create_index(
+    index_type=IndexType.HYPERSCALE,
+    index_description="IVF,SQ8",
+)
+```
+
+或者创建复合向量索引：
+
+```python
+# Create a Composite Vector Index
+vector_store.create_index(
+    index_type=IndexType.COMPOSITE,
+    index_description="IVF,SQ8",
+)
+```
+
+**从向量存储删除项目**
+
+```python
+vector_store.delete(ids=["3"])
+```
+
+### 查询向量存储
+
+**相似度搜索**
+
+执行简单的相似度搜索可以如下操作：
+
+```python
+results = vector_store.similarity_search(query="thud", k=1)
+for doc in results:
+    print(f"* {doc.page_content} [{doc.metadata}]")
+```
+
+```text
+* thud [{'bar': 'baz'}]
+```
+
+**带过滤器的相似度搜索**
+
+您可以使用 `where_str` 参数通过 SQL++ WHERE 子句过滤结果：
+
+```python
+results = vector_store.similarity_search(
+    query="thud", k=1, where_str="metadata.bar = 'baz'"
+)
+for doc in results:
+    print(f"* {doc.page_content} [{doc.metadata}]")
+```
+
+```text
+* thud [{'bar': 'baz'}]
+```
+
+**带分数的相似度搜索**
+
+您可以通过调用 `similarity_search_with_score` 方法获取结果的距离分数。较低的分数表示更相似的文档。
+
+```python
+results = vector_store.similarity_search_with_score(query="qux", k=1)
+for doc, score in results:
+    print(f"* [DIST={score:3f}] {doc.page_content} [{doc.metadata}]")
+```
+
+```text
+* [DIST=-0.500724] foo [{'baz': 'bar'}]
+```
+
+### 异步操作
+
+`CouchbaseQueryVectorStore` 支持异步操作：
+
+```python
+# add documents
+await vector_store.aadd_documents(documents=documents, ids=ids)
+
+# delete documents
+await vector_store.adelete(ids=["3"])
+
+# search
+results = await vector_store.asimilarity_search(query="thud", k=1)
+
+# search with score
+results = await vector_store.asimilarity_search_with_score(query="qux", k=1)
+for doc, score in results:
+    print(f"* [DIST={score:3f}] {doc.page_content} [{doc.metadata}]")
+```
+
+```text
+* [DIST=-0.500724] foo [{'baz': 'bar'}]
+```
+
+### 用作检索器
+
+您可以将向量存储转换为检索器：
+
+```python
+retriever = vector_store.as_retriever(
+    search_kwargs={"k": 1, "fetch_k": 2, "lambda_mult": 0.5},
+)
+retriever.invoke("thud")
+```
+
+```python
+[Document(id='2', metadata={'bar': 'baz'}, page_content='thud')]
+```
+
+### 从文本来创建
+
+您可以直接从文本列表创建 `CouchbaseQueryVectorStore`：
+
+```python
+texts = ["hello", "world"]
+
+vectorstore = CouchbaseQueryVectorStore.from_texts(
+    texts,
+    embedding=embeddings,
+    cluster=cluster,
+    bucket_name=BUCKET_NAME,
+    scope_name=SCOPE_NAME,
+    collection_name=COLLECTION_NAME,
+    distance_metric=DistanceStrategy.COSINE,
+)
+```
+
+---
+
+## CouchbaseSearchVectorStore
+
+`CouchbaseSearchVectorStore` 允许使用 [搜索向量索引](https://docs.couchbase.com/server/current/vector-search/vector-search.html) 利用 Couchbase 进行向量搜索。搜索向量索引将 Couchbase 搜索索引与向量列相结合，允许结合向量搜索与全文搜索 (FTS) 和地理空间搜索的混合搜索。
+
+**要求：** Couchbase Server 7.6 及以上版本。
+
+有关如何创建支持向量字段的搜索索引的详细信息，请参阅文档：
+
+- [Couchbase Capella](https://docs.couchbase.com/cloud/vector-search/create-vector-search-index-ui.html)
+- [Couchbase Server](https://docs.couchbase.com/server/current/vector-search/create-vector-search-index-ui.html)
+
+### 本教程的搜索索引字段映射
+
+为了跟随本文档中的示例，您的搜索索引应包含以下字段的映射：
+
+| 字段 | 类型 | 描述 |
+|-------|------|-------------|
+| `text` | text | 文档文本内容 |
+| `embedding` | vector | 向量嵌入字段（维度：`text-embedding-3-large` 为 3072） |
+| `metadata` | object (child mapping) | 包含 `source`、`author`、`rating`、`date` 等子字段的元数据对象 |
+
+**注意：**
+
+- 向量字段维度必须与您的嵌入模型匹配（本教程中使用的 `text-embedding-3-large` 为 3072）
+- 元数据子字段（`source`、`author`、`rating`、`date`）用于混合查询示例
+- 您可以在初始化向量存储时使用 `text_key` 和 `embedding_key` 参数自定义字段名称
+
+### 初始化
+
+下面，我们创建带有集群信息和搜索索引名称的向量存储对象。
+
+首先，设置嵌入模型：
+
+```python
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+```
+
+然后创建向量存储：
+
+```python
+from langchain_couchbase import CouchbaseSearchVectorStore
+
+SEARCH_INDEX_NAME = "langchain-test-index"
+
+vector_store = CouchbaseSearchVectorStore(
+    cluster=cluster,
+    bucket_name=BUCKET_NAME,
+    scope_name=SCOPE_NAME,
+    collection_name=COLLECTION_NAME,
+    embedding=embeddings,
+    index_name=SEARCH_INDEX_NAME,
+)
+```
+
+### 指定文本和嵌入字段
+
+您可以选择性地使用 `text_key` 和 `embedding_key` 字段指定文档的文本和嵌入字段。
+
+```python
+vector_store_specific = CouchbaseSearchVectorStore(
+    cluster=cluster,
+    bucket_name=BUCKET_NAME,
+    scope_name=SCOPE_NAME,
+    collection_name=COLLECTION_NAME,
+    embedding=embeddings,
+    index_name=SEARCH_INDEX_NAME,
+    text_key="text",
+    embedding_key="embedding",
+)
+```
+
+### 管理向量存储
+
+一旦创建了向量存储，我们可以通过添加和删除不同项目来与其交互。
+
+**向向量存储添加项目**
+
+我们可以使用 `add_documents` 函数向向量存储添加项目。
+
+```python
+from uuid import uuid4
+
+from langchain_core.documents import Document
+
+document_1 = Document(
+    page_content="I had chocolate chip pancakes and scrambled eggs for breakfast this morning.",
+    metadata={"source": "tweet"},
+)
+
+document_2 = Document(
+    page_content="The weather forecast for tomorrow is cloudy and overcast, with a high of 62 degrees.",
+    metadata={"source": "news"},
+)
+
+document_3 = Document(
+    page_content="Building an exciting new project with LangChain - come check it out!",
+    metadata={"source": "tweet"},
+)
+
+document_4 = Document(
+    page_content="Robbers broke into the city bank and stole $1 million in cash.",
+    metadata={"source": "news"},
+)
+
+document_5 = Document(
+    page_content="Wow! That was an amazing movie. I can't wait to see it again.",
+    metadata={"source": "tweet"},
+)
+
+document_6 = Document(
+    page_content="Is the new iPhone worth the price? Read this review to find out.",
+    metadata={"source": "website"},
+)
+
+document_7 = Document(
+    page_content="The top 10 soccer players in the world right now.",
+    metadata={"source": "website"},
+)
+
+document_8 = Document(
+    page_content="LangGraph is the best framework for building stateful, agentic applications!",
+    metadata={"source": "tweet"},
+)
+
+document_9 = Document(
+    page_content="The stock market is down 500 points today due to fears of a recession.",
+    metadata={"source": "news"},
+)
+
+document_10 = Document(
+    page_content="I have a bad feeling I am going to get deleted :(",
+    metadata={"source": "tweet"},
+)
+
+documents = [
+    document_1,
+    document_2,
+    document_3,
+    document_4,
+    document_5,
+    document_6,
+    document_7,
+    document_8,
+    document_9,
+    document_10,
+]
+uuids = [str(uuid4()) for _ in range(len(documents))]
+
+vector_store.add_documents(documents=documents, ids=uuids)
+```
+
+```python
+['f125b836-f555-4449-98dc-cbda4e77ae3f',
+ 'a28fccde-fd32-4775-9ca8-6cdb22ca7031',
+ 'b1037c4b-947f-497f-84db-63a4def5080b',
+ 'c7082b74-b385-4c4b-bbe5-0740909c01db',
+ 'a7e31f62-13a5-4109-b881-8631aff7d46c',
+ '9fcc2894-fdb1-41bd-9a93-8547747650f4',
+ 'a5b0632d-abaf-4802-99b3-df6b6c99be29',
+ '0475592e-4b7f-425d-91fd-ac2459d48a36',
+ '94c6db4e-ba07-43ff-aa96-3a5d577db43a',
+ 'd21c7feb-ad47-4e7d-84c5-785afb189160']
+```
+
+**从向量存储删除项目**
+
+```python
+vector_store.delete(ids=[uuids[-1]])
+```
+
+```text
+True
+```
+
+### 查询向量存储
+
+一旦创建了向量存储并添加了相关文档，您很可能希望在运行链或代理期间对其进行查询。
+
+**相似度搜索**
+
+执行简单的相似度搜索可以如下操作：
+
+```python
+results = vector_store.similarity_search(
+    "LangChain provides abstractions to make working with LLMs easy",
+    k=2,
+)
+for res in results:
+    print(f"* {res.page_content} [{res.metadata}]")
+```
+
+```text
+* Building an exciting new project with LangChain - come check it out! [{'source': 'tweet'}]
+* LangGraph is the best framework for building stateful, agentic applications! [{'source': 'tweet'}]
+```
+
+**带分数的相似度搜索**
+
+您还可以通过调用 `similarity_search_with_score` 方法获取结果的分数。
+
+```python
+results = vector_store.similarity_search_with_score("Will it be hot tomorrow?", k=1)
+for res, score in results:
+    print(f"* [SIM={score:3f}] {res.page_content} [{res.metadata}]")
+```
+
+```text
+* [SIM=0.553213] The weather forecast for tomorrow is cloudy and overcast, with a high of 62 degrees. [{'source': 'news'}]
+```
+
+### 过滤结果
+
+您可以通过指定 Couchbase Search 服务支持的文档中文本或元数据上的任何过滤器来过滤搜索结果。
+
+`filter` 可以是 Couchbase Python SDK 支持的任意有效 [SearchQuery](https://docs.couchbase.com/python-sdk/current/howtos/full-text-searching-with-sdk.html#search-queries)。这些过滤器在执行向量搜索之前应用。
+
+如果您想过滤元数据中的一个字段，需要使用 `.` 指定它。
+
+例如，要获取元数据中的 `source` 字段，您需要指定 `metadata.source`。
+
+请注意，过滤器需要被搜索索引支持。
+
+```python
+from couchbase import search
+
+query = "Are there any concerning financial news?"
+filter_on_source = search.MatchQuery("news", field="metadata.source")
+results = vector_store.similarity_search_with_score(
+    query, fields=["metadata.source"], filter=filter_on_source, k=5
+)
+for res, score in results:
+    print(f"* {res.page_content} [{res.metadata}] {score}")
+```
+
+```text
+* The stock market is down 500 points today due to fears of a recession. [{'source': 'news'}] 0.38733142614364624
+* Robbers broke into the city bank and stole $1 million in cash. [{'source': 'news'}] 0.20637883245944977
+* The weather forecast for tomorrow is cloudy and overcast, with a high of 62 degrees. [{'source': 'news'}] 0.10403035581111908
+```
+
+### 指定要返回的字段
+
+您可以在搜索中使用 `fields` 参数指定要从文档返回的字段。这些字段作为返回文档中 `metadata` 对象的一部分返回。您可以获取存储在搜索索引中的任何字段。文档的 `text_key` 作为文档 `page_content` 的一部分返回。
+
+如果您不指定要获取的任何字段，则返回索引中存储的所有字段。
+
+如果您想获取元数据中的一个字段，需要使用 `.` 指定它。
+
+例如，要获取元数据中的 `source` 字段，您需要指定 `metadata.source`。
+
+```python
+query = "What did I eat for breakfast today?"
+results = vector_store.similarity_search(query, fields=["metadata.source"])
+print(results[0])
+```
+
+```python
+page_content='I had chocolate chip pancakes and scrambled eggs for breakfast this morning.' metadata={'source': 'tweet'}
+```
+
+### 转换为检索器进行查询
+
+您还可以将向量存储转换为检索器，以便在链中更轻松地使用。
+
+以下是如何将向量存储转换为检索器，然后使用简单查询和过滤器调用检索器。
+
+```python
+retriever = vector_store.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 1, "score_threshold": 0.5},
+)
+filter_on_source = search.MatchQuery("news", field="metadata.source")
+retriever.invoke("Stealing from the bank is a crime", filter=filter_on_source)
+```
+
+```python
+[Document(id='b480c9c6-b7df-4a22-ac2e-19287af7562d', metadata={'source': 'news'}, page_content='Robbers broke into the city bank and stole $1 million in cash.')]
+```
+
+### 混合查询
+
+Couchbase 允许您通过将向量搜索结果与文档的非向量字段（如 `metadata` 对象）上的搜索相结合来进行混合搜索。
+
+结果将基于向量搜索和搜索服务支持的搜索的结果组合。每个组件搜索的分数相加得到结果的总分。
+
+要执行混合搜索，有一个可选参数 `search_options` 可以传递给所有相似度搜索。
+您可以在 [Couchbase 搜索请求参数文档](https://docs.couchbase.com/server/current/search/search-request-params.html#query-object) 中找到 `search_options` 的不同搜索/查询可能性。
+
+**为混合搜索创建多样化元数据**
+
+为了演示混合搜索，让我们创建具有多样化元数据的文档。我们在元数据中添加三个字段：`date` 在 2010 到 2020 之间，`rating` 在 1 到 5 之间，`author` 设置为 John Doe 或 Jane Doe。
+
+```python
+from langchain_core.documents import Document
+
+# Create documents with diverse metadata for hybrid search examples
+hybrid_docs = [
+    Document(
+        page_content="The new AI model shows impressive performance on benchmark tests.",
+        metadata={"source": "tech", "date": "2019-01-01", "rating": 5, "author": "John Doe"},
+    ),
+    Document(
+        page_content="Stock markets showed mixed results today with tech sector leading gains.",
+        metadata={"source": "finance", "date": "2017-01-01", "rating": 3, "author": "Jane Doe"},
+    ),
+    Document(
+        page_content="The annual developer conference announced new framework updates.",
+        metadata={"source": "tech", "date": "2018-01-01", "rating": 4, "author": "John Doe"},
+    ),
+    Document(
+        page_content="Weather patterns indicate a mild winter ahead for the region.",
+        metadata={"source": "weather", "date": "2016-01-01", "rating": 2, "author": "Jane Doe"},
+    ),
+    Document(
+        page_content="The new smartphone release features advanced camera technology.",
+        metadata={"source": "tech", "date": "2020-01-01", "rating": 4, "author": "John Doe"},
+    ),
+    Document(
+        page_content="Economic indicators suggest steady growth in the coming quarter.",
+        metadata={"source": "finance", "date": "2017-01-01", "rating": 3, "author": "Jane Doe"},
+    ),
+]
+
+vector_store.add_documents(hybrid_docs)
+
+query = "Tell me about technology news"
+results = vector_store.similarity_search(query)
+print(results[0].metadata)
+```
+
+```python
+{'author': 'John Doe', 'date': '2020-01-01', 'rating': 4, 'source': 'tech'}
+```
+
+**按精确值查询**
+
+我们可以搜索 `metadata` 对象中文本字段（如作者）的精确匹配。
+
+```python
+query = "What are the latest technology updates?"
+results = vector_store.similarity_search(
+    query,
+    search_options={"query": {"field": "metadata.author", "match": "John Doe"}},
+    fields=["metadata.author"],
+)
+print(results[0])
+```
+
+```python
+page_content='The new smartphone release features advanced camera technology.' metadata={'author': 'John Doe'}
+```
+
+**按部分匹配查询**
+
+我们可以通过指定搜索的模糊度来搜索部分匹配。当您想要搜索搜索查询的细微变化或拼写错误时，这很有用。
+
+在这里，"Jae" 接近（模糊度为 1）"Jane"。
+
+```python
+query = "What are the financial market updates?"
+results = vector_store.similarity_search(
+    query,
+    search_options={
+        "query": {"field": "metadata.author", "match": "Jae", "fuzziness": 1}
+    },
+    fields=["metadata.author"],
+)
+print(results[0])
+```
+
+```python
+page_content='Stock markets showed mixed results today with tech sector leading gains.' metadata={'author': 'Jane Doe'}
+```
+
+**按日期范围查询**
+
+我们可以搜索在日期字段（如 `metadata.date`）上符合日期范围查询的文档。
+
+```python
+query = "What happened in the markets?"
+results = vector_store.similarity_search(
+    query,
+    search_options={
+        "query": {
+            "start": "2016-12-31",
+            "end": "2018-01-02",
+            "inclusive_start": True,
+            "inclusive_end": False,
+            "field": "metadata.date",
+        }
+    },
+)
+print(results[0])
+```
+
+```python
+page_content='Stock markets showed mixed results today with tech sector leading gains.' metadata={'author': 'Jane Doe', 'date': '2017-01-01', 'rating': 3, 'source': 'finance'}
+```
+
+**按数值范围查询**
+
+我们可以搜索在数值字段（如 `metadata.rating`）范围内符合范围的文档。
+
+```python
+query = "What are the economic indicators for the coming quarter?"
+results = vector_store.similarity_search_with_score(
+    query,
+    search_options={
+        "query": {
+            "min": 4,
+            "max": 5,
+            "inclusive_min": True,
+            "inclusive_max": True,
+            "field": "metadata.rating",
+        }
+    },
+)
+print(results[0])
+```
+
+```text
+(Document(id='6aeb8413bce340bc893f175cefbb64b3', metadata={'author': 'Jane Doe', 'date': '2017-01-01', 'rating': 3, 'source': 'finance'}, page_content='Economic indicators suggest steady growth in the coming quarter.'), 0.7944117188453674)
+```
+
+**组合多个搜索查询**
+
+可以使用 AND（合取）或 OR（析取）运算符组合不同的搜索查询。
+
+在此示例中，我们正在检查评分在 3 到 4 之间且日期为 2017 年的文档。
+
+```python
+query = "Tell me about finance"
+results = vector_store.similarity_search_with_score(
+    query,
+    search_options={
+        "query": {
+            "conjuncts": [
+                {"min": 3, "max": 4, "inclusive_max": True, "field": "metadata.rating"},
+                {"start": "2016-12-31", "end": "2018-01-01", "field": "metadata.date"},
+            ]
+        }
+    },
+)
+print(results[0])
+```
+
+```text
+(Document(id='0c9af73370c1483caddf9941440edb50', metadata={'author': 'Jane Doe', 'date': '2017-01-01', 'rating': 3, 'source': 'finance'}, page_content='Stock markets showed mixed results today with tech sector leading gains.'), 0.7275013146103568)
+```
+
+**注意**
+
+混合搜索结果可能包含不满足所有搜索参数的文档。这是由于 [评分计算方式](https://docs.couchbase.com/server/current/search/run-searches.html#scoring) 的原因。
+分数是向量搜索分数和混合搜索中查询分数的总和。如果向量搜索分数很高，组合分数将高于匹配混合搜索中所有查询的结果。
+为了避免此类结果，请使用 `filter` 参数而不是混合搜索。
+
+**将混合搜索查询与过滤器结合**
+
+混合搜索可以与过滤器结合使用，以获得混合搜索和满足要求的过滤器结果的最佳效果。
+
+在此示例中，我们正在检查评分在 3 到 5 之间且在文本字段中匹配字符串 "market" 的文档。
+
+```python
+filter_text = search.MatchQuery("market", field="text")
+
+query = "Tell me about market updates"
+results = vector_store.similarity_search_with_score(
+    query,
+    search_options={
+        "query": {
+            "min": 3,
+            "max": 5,
+            "inclusive_min": True,
+            "inclusive_max": True,
+            "field": "metadata.rating",
+        }
+    },
+    filter=filter_text,
+)
+
+print(results[0])
+```
+
+```text
+(Document(id='0c9af73370c1483caddf9941440edb50', metadata={'author': 'Jane Doe', 'date': '2017-01-01', 'rating': 3, 'source': 'finance'}, page_content='Stock markets showed mixed results today with tech sector leading gains.'), 0.4503188681265006)
+```
+
+**其他查询**
+
+同样，您可以在 `search_options` 参数中使用任何受支持的查询方法，如地理距离、多边形搜索、通配符、正则表达式等。有关可用查询方法及其语法的更多详细信息，请参阅文档。
+
+- [Couchbase Capella](https://docs.couchbase.com/cloud/search/search-request-params.html#query-object)
+- [Couchbase Server](https://docs.couchbase.com/server/current/search/search-request-params.html#query-object)
+
+---
+
+## 用于检索增强生成的用法
+
+有关如何使用这些向量存储进行检索增强生成 (RAG) 的指南，请参见以下部分：
+
+- [教程](/oss/langchain/rag)
+- [操作指南：使用 RAG 进行问答](https://python.langchain.com/docs/how_to/#qa-with-rag)
+- [检索概念文档](https://python.langchain.com/docs/concepts/retrieval)
+
+---
+
+## 常见问题
+
+### 问题：在创建 `CouchbaseSearchVectorStore` 对象之前，我应该先创建搜索索引吗？
+
+是的，在创建 `CouchbaseSearchVectorStore` 对象之前，您需要创建搜索索引。
+
+### 问题：我应该在向 `CouchbaseQueryVectorStore` 添加文档之前还是之后创建索引？
+
+对于 `CouchbaseQueryVectorStore`，您应该在使用 `create_index()` 方法添加文档**之后**创建索引。这与 `CouchbaseSearchVectorStore` 不同。
+
+### 问题：`CouchbaseSearchVectorStore` 和 `CouchbaseQueryVectorStore` 有什么区别？
+
+| 功能 | `CouchbaseSearchVectorStore` | `CouchbaseQueryVectorStore` |
+|---------|---------------------------|--------------------------|
+| 最低版本 | Couchbase Server 7.6+ | Couchbase Server 8.0+ |
+| 索引类型 | 搜索向量索引 | 超大规模或复合向量索引 |
+| 索引创建 | 向量存储创建之前 | 添加文档之后 |
+| 过滤 | `SearchQuery` 对象 | SQL++ WHERE 子句 (`where_str`) |
+| 最佳用途 | 混合搜索（向量 + FTS + 地理） | 大规模纯向量搜索或向量 + 标量过滤器 |
+
+### 问题：我在搜索结果中没有看到我指定的所有字段
+
+在 Couchbase 中，我们只能返回存储在搜索索引中的字段。请确保您在搜索结果中尝试访问的字段是搜索索引的一部分。
+
+处理此问题的一种方法是在索引中动态索引和存储文档的字段。
+
+- 在 Capella 中，您需要进入“高级模式”，然后在“常规设置”下勾选"[X] 存储动态字段”或"[X] 索引动态字段”
+- 在 Couchbase Server 中，在索引编辑器（不是快速编辑器）下的“高级”部分，您可以勾选"[X] 存储动态字段”或"[X] 索引动态字段”
+
+请注意，这些选项会增加索引的大小。
+
+有关动态映射的更多详细信息，请参阅 [文档](https://docs.couchbase.com/cloud/search/customize-index.html)。
+
+### 问题：我无法在搜索结果中看到元数据对象
+
+这很可能是由于文档中的 `metadata` 字段未被 Couchbase 搜索索引索引和/或存储。为了索引文档中的 `metadata` 字段，您需要将其作为子映射添加到索引中。
+
+如果您选择映射映射中的所有字段，您将能够按所有元数据字段进行搜索。或者，为了优化索引，您可以选择 `metadata` 对象内的特定字段进行索引。您可以参考 [文档](https://docs.couchbase.com/cloud/search/customize-index.html) 了解更多关于索引子映射的信息。
+
+创建子映射
+
+- [Couchbase Capella](https://docs.couchbase.com/cloud/search/create-child-mapping.html)
+- [Couchbase Server](https://docs.couchbase.com/server/current/search/create-child-mapping.html)
+
+### 问题：过滤器和 `search_options` / 混合查询有什么区别？
+
+过滤器是 [预过滤器](https://docs.couchbase.com/server/current/vector-search/pre-filtering-vector-search.html#about-pre-filtering)，用于限制在搜索索引中搜索的文档。它在 Couchbase Server 7.6.4 及更高版本中可用。
+
+混合查询是可用于调整从搜索索引返回的结果的附加搜索查询。
+
+过滤器和混合搜索查询具有相同的功能，但语法略有不同。过滤器是 [SearchQuery](https://docs.couchbase.com/python-sdk/current/howtos/full-text-searching-with-sdk.html#search-queries) 对象，而混合搜索查询是 [字典](https://docs.couchbase.com/server/current/search/search-request-params.html)。
+
+---
+
+## API 参考
+
+有关所有功能和配置的详细文档：
+
+- [`CouchbaseSearchVectorStore` API 参考](https://couchbase-ecosystem.github.io/langchain-couchbase/langchain_couchbase.html#module-langchain_couchbase.vectorstores.search_vector_store)
+- [`CouchbaseQueryVectorStore` API 参考](https://couchbase-ecosystem.github.io/langchain-couchbase/langchain_couchbase.html#module-langchain_couchbase.vectorstores.query_vector_store)

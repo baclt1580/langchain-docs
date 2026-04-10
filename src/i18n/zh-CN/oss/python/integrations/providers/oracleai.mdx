@@ -1,0 +1,69 @@
+---
+title: "OracleAI 向量搜索集成"
+description: "使用 LangChain Python 与 OracleAI 向量搜索进行集成。"
+---
+
+Oracle AI 数据库专为 AI 工作负载而构建，您可以根据**含义**（语义）查询数据，而不仅仅是关键词。它将**对非结构化内容的语义搜索**与**对业务数据的关系型过滤**结合在一个系统中——因此您可以构建 AI 检索工作流（如 RAG），而无需引入单独的向量数据库并将数据分散在多个平台上。
+
+### 为什么这很重要
+
+- **一个用于 AI + 业务数据的系统：** 向量和操作数据共存。
+- **更少的碎片化：** 比单独的向量存储组件更少。
+- **数据库级别的保证：** 将安全性、事务、扩展性和可用性应用于同一 AI 工作负载。
+
+## 先决条件
+
+安装 `langchain-oracledb`。`python-oracledb` 驱动程序将作为依赖项自动安装。
+
+<CodeGroup>
+```bash pip
+pip install -qU langchain-oracledb
+```
+```bash uv
+uv add langchain-oracledb
+```
+</CodeGroup>
+
+## 文档加载器
+
+请查看 [使用示例](/oss/integrations/document_loaders/oracleai)。
+
+```python
+from langchain_oracledb.document_loaders.oracleai import OracleDocLoader
+```
+
+## 文本分割器
+
+请查看 [使用示例](/oss/integrations/document_loaders/oracleai)。
+
+```python
+from langchain_oracledb.document_loaders.oracleai import OracleTextSplitter
+```
+
+## 嵌入
+
+请查看 [使用示例](/oss/integrations/embeddings/oracleai)。
+
+```python
+from langchain_oracledb.embeddings.oracleai import OracleEmbeddings
+```
+
+## 摘要
+
+请查看 [使用示例](/oss/integrations/tools/oracleai)。
+
+```python
+from langchain_oracledb.utilities.oracleai import OracleSummary
+```
+
+## 向量存储
+
+请查看 [使用示例](/oss/integrations/vectorstores/oracle)。
+
+```python
+from langchain_oracledb.vectorstores.oraclevs import OracleVS
+```
+
+## 端到端演示
+
+请查看 [Oracle AI 向量搜索端到端演示指南](https://github.com/langchain-ai/langchain/blob/v0.3/cookbook/oracleai_demo.ipynb)。

@@ -1,0 +1,218 @@
+---
+title: "ClickHouse 集成"
+description: "使用 LangChain Python 与 ClickHouse 向量存储进行集成。"
+---
+
+> [ClickHouse](https://clickhouse.com/) 是用于实时应用和分析的最快、资源效率最高的开源数据库，支持完整的 SQL 以及广泛的功能，协助用户编写分析查询。最近添加的数据结构和距离搜索函数（如 `L2Distance`）以及 [近似最近邻搜索索引](https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/annindexes) 使得 ClickHouse 能够作为高性能且可扩展的向量数据库，通过 SQL 存储和搜索向量。
+
+本笔记本展示了如何使用与 `ClickHouse` 向量存储相关的功能。
+
+## 设置
+
+首先使用 docker 设置本地 clickhouse 服务器：
+
+```python
+! docker run -d -p 8123:8123 -p 9000:9000 --name langchain-clickhouse-server --ulimit nofile=262144:262144 -e CLICKHOUSE_SKIP_USER_SETUP=1 clickhouse/clickhouse-server:25.7
+```
+
+你需要安装 `langchain-community` 和 `clickhouse-connect` 才能使用此集成
+
+```python
+pip install -qU langchain-community clickhouse-connect
+```
+
+### 凭据
+
+本笔记本没有凭据，只需确保你已如上所示安装了软件包。
+
+如果你希望获得最佳级别的模型调用自动化追踪，你也可以通过取消注释以下内容来设置你的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+## 实例化
+
+<EmbeddingTabs/>
+
+```python
+# | output: false
+# | echo: false
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+```
+
+```python
+from langchain_community.vectorstores import Clickhouse, ClickhouseSettings
+
+settings = ClickhouseSettings(table="clickhouse_example")
+vector_store = Clickhouse(embeddings, config=settings)
+```
+
+## 管理向量存储
+
+创建向量存储后，我们可以通过添加和删除不同项来与其交互。
+
+### 向向量存储添加项
+
+我们可以使用 `add_documents` 函数将项添加到我们的向量存储中。
+
+```python
+from uuid import uuid4
+
+from langchain_core.documents import Document
+
+document_1 = Document(
+    page_content="I had chocolate chip pancakes and scrambled eggs for breakfast this morning.",
+    metadata={"source": "tweet"},
+)
+
+document_2 = Document(
+    page_content="The weather forecast for tomorrow is cloudy and overcast, with a high of 62 degrees.",
+    metadata={"source": "news"},
+)
+
+document_3 = Document(
+    page_content="Building an exciting new project with LangChain - come check it out!",
+    metadata={"source": "tweet"},
+)
+
+document_4 = Document(
+    page_content="Robbers broke into the city bank and stole $1 million in cash.",
+    metadata={"source": "news"},
+)
+
+document_5 = Document(
+    page_content="Wow! That was an amazing movie. I can't wait to see it again.",
+    metadata={"source": "tweet"},
+)
+
+document_6 = Document(
+    page_content="Is the new iPhone worth the price? Read this review to find out.",
+    metadata={"source": "website"},
+)
+
+document_7 = Document(
+    page_content="The top 10 soccer players in the world right now.",
+    metadata={"source": "website"},
+)
+
+document_8 = Document(
+    page_content="LangGraph is the best framework for building stateful, agentic applications!",
+    metadata={"source": "tweet"},
+)
+
+document_9 = Document(
+    page_content="The stock market is down 500 points today due to fears of a recession.",
+    metadata={"source": "news"},
+)
+
+document_10 = Document(
+    page_content="I have a bad feeling I am going to get deleted :(",
+    metadata={"source": "tweet"},
+)
+
+documents = [
+    document_1,
+    document_2,
+    document_3,
+    document_4,
+    document_5,
+    document_6,
+    document_7,
+    document_8,
+    document_9,
+    document_10,
+]
+uuids = [str(uuid4()) for _ in range(len(documents))]
+
+vector_store.add_documents(documents=documents, ids=uuids)
+```
+
+### 从向量存储删除项
+
+我们可以使用 `delete` 函数通过 ID 从我们的向量存储中删除项。
+
+```python
+vector_store.delete(ids=uuids[-1])
+```
+
+## 查询向量存储
+
+一旦创建了向量存储并添加了相关文档，在运行链或代理时，你很可能会想要查询它。
+
+### 直接查询
+
+#### 相似度搜索
+
+执行简单的相似度搜索可以如下进行：
+
+```python
+results = vector_store.similarity_search(
+    "LangChain provides abstractions to make working with LLMs easy", k=2
+)
+for res in results:
+    page_content, metadata = res
+    print(f"* {page_content} [{metadata}]")
+```
+
+#### 带分数的相似度搜索
+
+你也可以带分数进行搜索：
+
+```python
+results = vector_store.similarity_search_with_score("Will it be hot tomorrow?", k=1)
+for res, score in results:
+    print(f"* [SIM={score:3f}] {res.page_content} [{res.metadata}]")
+```
+
+## 过滤
+
+你可以直接访问 ClickHouse SQL 的 where 语句。你可以按照标准 SQL 编写 `WHERE` 子句。
+
+**注意**：请注意 SQL 注入风险，此接口不应由最终用户直接调用。
+
+如果你在设置下自定义了 `column_map`，则可以使用以下方式进行带过滤器的搜索：
+
+```python
+meta = vector_store.metadata_column
+results = vector_store.similarity_search_with_relevance_scores(
+    "What did I eat for breakfast?",
+    k=4,
+    where_str=f"{meta}.source = 'tweet'",
+)
+for res in results:
+    print(f"* {res.page_content} [{res.metadata}]")
+```
+
+#### 其他搜索方法
+
+本笔记本未涵盖各种其他搜索方法，例如 MMR 搜索或通过向量搜索。
+
+### 转换为检索器进行查询
+
+你也可以将向量存储转换为检索器，以便在链中更轻松地使用。
+
+以下是如何将向量存储转换为检索器，然后使用简单查询和过滤器调用检索器的方法。
+
+```python
+retriever = vector_store.as_retriever(
+    search_type="similarity_score_threshold",
+    search_kwargs={"k": 1, "score_threshold": 0.5},
+)
+retriever.invoke("Stealing from the bank is a crime", filter={"source": "news"})
+```
+
+## 检索增强生成用法
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [教程](/oss/langchain/rag)
+- [如何：使用 RAG 问答](https://python.langchain.com/docs/how_to/#qa-with-rag)
+- [检索概念文档](https://python.langchain.com/docs/concepts/retrieval)
+
+更多请查看 [使用 Astra DB 的完整 RAG 模板](https://github.com/langchain-ai/langchain/tree/master/templates/rag-astradb)。
+
+---

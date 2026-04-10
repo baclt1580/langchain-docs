@@ -1,0 +1,36 @@
+---
+title: "Meilisearch 集成"
+description: "使用 LangChain Python 与 Meilisearch 集成。"
+---
+
+> [Meilisearch](https://meilisearch.com) 是一款开源、闪电般快速且高度相关的搜索引擎。
+> 它自带优秀的默认配置，帮助开发者构建流畅的搜索体验。
+>
+> 您可以 [自行托管 Meilisearch](https://www.meilisearch.com/docs/learn/getting_started/installation#local-installation)
+> 或在 [Meilisearch Cloud](https://www.meilisearch.com/pricing) 上运行。
+>
+> `Meilisearch v1.3` 支持向量搜索。
+
+## 安装和设置
+
+有关详细配置说明，请参阅 [使用示例](/oss/integrations/vectorstores/meilisearch)。
+
+我们需要安装 `meilisearch` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install meilisearch
+```
+
+```bash uv
+uv add meilisearch
+```
+</CodeGroup>
+
+## 向量存储
+
+请参阅 [使用示例](/oss/integrations/vectorstores/meilisearch)。
+
+```python
+from langchain_community.vectorstores import Meilisearch
+```

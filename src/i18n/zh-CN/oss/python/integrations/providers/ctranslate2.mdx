@@ -1,0 +1,34 @@
+---
+title: "Ctranslate2 集成"
+description: "使用 LangChain Python 与 Ctranslate2 集成。"
+---
+
+>[CTranslate2](https://opennmt.net/CTranslate2/quickstart.html) 是一个用于 Transformer 模型高效推理的 C++ 和 Python 库。
+>
+>该项目实现了一个自定义运行时，应用了多种性能优化技术，如权重量化、层融合、批处理重排序等，以加速并降低 CPU 和 GPU 上 Transformer 模型的内存占用。
+>
+>完整的功能和支持模型列表包含在 [项目仓库](https://opennmt.net/CTranslate2/guides/transformers.html) 中。开始之前，请查阅官方的 [快速入门指南](https://opennmt.net/CTranslate2/quickstart.html)。
+
+
+## 安装和设置
+
+安装 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install ctranslate2
+```
+
+```bash uv
+uv add ctranslate2
+```
+</CodeGroup>
+
+
+## 大语言模型
+
+查看 [使用示例](/oss/integrations/llms/ctranslate2)。
+
+```python
+from langchain_community.llms import CTranslate2
+```

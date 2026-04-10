@@ -1,0 +1,24 @@
+---
+title: "SingleStore 集成"
+description: "使用 LangChain Python 与 SingleStore 集成。"
+---
+
+[SingleStore](https://singlestore.com/) 是一款高性能的分布式 SQL 数据库，专为在 [cloud](https://www.singlestore.com/cloud/) 和本地部署环境中表现出色而设计。它提供功能丰富的特性集、无缝的部署选项和卓越的性能。
+
+此集成提供以下组件以利用 SingleStore 的功能：
+
+- **`SingleStoreLoader`**：直接从 SingleStore 数据库表加载文档。
+- **`SingleStoreSemanticCache`**：将 SingleStore 用作语义缓存，以实现嵌入的高效存储和检索。
+- **`SingleStoreChatMessageHistory`**：在 SingleStore 中存储和检索聊天消息历史。
+- **`SingleStoreVectorStore`**：存储文档嵌入并执行快速的向量和全文搜索。
+
+这些组件实现了高效的文档存储、嵌入管理和高级搜索功能，结合全文和基于向量的搜索，实现快速准确的查询。
+
+```python
+from langchain_singlestore import (
+    SingleStoreChatMessageHistory,
+    SingleStoreLoader,
+    SingleStoreSemanticCache,
+    SingleStoreVectorStore,
+)
+```

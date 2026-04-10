@@ -1,0 +1,60 @@
+---
+title: "C Transformers 集成"
+description: "使用 LangChain Python 与 C Transformers 进行集成。"
+---
+
+此页面介绍如何在 LangChain 中使用 [C Transformers](https://github.com/marella/ctransformers) 库。
+它分为两部分：安装和设置，以及特定 C Transformers 包装器的参考。
+
+## 安装和设置
+
+- 使用 `pip install ctransformers` 安装 Python 包
+- 下载支持的 [GGML 模型](https://huggingface.co/TheBloke)（参见 [支持的模型](https://github.com/marella/ctransformers#supported-models)）
+
+## 包装器
+
+### LLM
+
+存在一个 CTransformers LLM 包装器，您可以通过以下方式访问：
+
+```python
+from langchain_community.llms import CTransformers
+```
+
+它为所有模型提供统一的接口：
+
+```python
+llm = CTransformers(model='/path/to/ggml-gpt-2.bin', model_type='gpt2')
+
+print(llm.invoke('AI is going to'))
+```
+
+如果您遇到 `illegal instruction` 错误，请尝试使用 `lib='avx'` 或 `lib='basic'`：
+
+```py
+llm = CTransformers(model='/path/to/ggml-gpt-2.bin', model_type='gpt2', lib='avx')
+```
+
+它可以用于托管在 Hugging Face Hub 上的模型：
+
+```py
+llm = CTransformers(model='marella/gpt-2-ggml')
+```
+
+如果模型仓库有多个模型文件（`.bin` 文件），请使用以下指定模型文件：
+
+```py
+llm = CTransformers(model='marella/gpt-2-ggml', model_file='ggml-model.bin')
+```
+
+可以使用 `config` 参数传递其他参数：
+
+```py
+config = {'max_new_tokens': 256, 'repetition_penalty': 1.1}
+
+llm = CTransformers(model='marella/gpt-2-ggml', config=config)
+```
+
+有关可用参数列表，请参阅 [文档](https://github.com/marella/ctransformers#config)。
+
+有关更详细的逐步指南，请参阅 [此笔记本](/oss/integrations/llms/ctransformers)。

@@ -1,0 +1,34 @@
+---
+title: "GitLab 集成"
+description: "使用 LangChain Python 与 GitLab 集成。"
+---
+
+> [GitLab Inc.](https://about.gitlab.com/) 是一家开源核心公司
+> 运营 `GitLab`，一个 DevOps 软件套件，可开发、
+> 保障并运行软件。`GitLab` 包含基于 Git 的分布式版本
+> 控制系统，包括访问控制、错误跟踪、
+> 软件功能请求、任务管理以及每个项目的维基，
+> 以及代码片段。
+
+
+## 工具/工具包
+
+### GitLabToolkit
+
+`GitLab` 工具包包含使 LLM 代理能够与 GitLab 仓库交互的工具。
+
+该工具包是 `python-gitlab` 库的封装。
+
+查看 [使用示例](/oss/integrations/tools/gitlab)。
+
+```python
+from langchain_community.agent_toolkits.gitlab.toolkit import GitLabToolkit
+```
+
+### GitLabAction
+
+用于与 GitLab API 交互的工具。
+
+```python
+from langchain_community.tools.gitlab.tool import GitLabAction
+```

@@ -1,0 +1,32 @@
+---
+title: "LiteLLM 集成"
+description: "使用 LangChain Python 与 LiteLLM 集成。"
+---
+
+>[LiteLLM](https://github.com/BerriAI/litellm) 是一个简化调用 Anthropic、Azure、Huggingface、Replicate 等的库。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install langchain-litellm
+```
+
+```bash uv
+uv add langchain-litellm
+```
+</CodeGroup>
+
+## 聊天模型
+```python
+from langchain_litellm import ChatLiteLLM
+```
+```python
+from langchain_litellm import ChatLiteLLMRouter
+```
+有关更多详细信息，请参阅 [LiteLLM 聊天指南](/oss/integrations/chat/litellm)。
+
+---
+
+## API 参考
+如需了解所有 `ChatLiteLLM` 和 `ChatLiteLLMRouter` 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-litellm)。

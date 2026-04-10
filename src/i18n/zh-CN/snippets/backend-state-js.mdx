@@ -1,0 +1,9 @@
+import { createDeepAgent, StateBackend } from "deepagents";
+
+// 默认情况下，我们提供 StateBackend
+const agent = createDeepAgent();
+
+// 底层实现如下
+const agent2 = createDeepAgent({
+  backend: (rt) => new StateBackend(rt),   // 注意工具通过 runtime.state 访问状态
+});

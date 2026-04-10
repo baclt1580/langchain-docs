@@ -1,0 +1,37 @@
+---
+title: "PubMed 集成"
+description: "使用 LangChain Python 与 PubMed 集成。"
+---
+
+>[PubMed®](https://pubmed.ncbi.nlm.nih.gov/) by `The National Center for Biotechnology Information, National Library of Medicine`
+> comprises more than 35 million citations for biomedical literature from `MEDLINE`, life science journals, and online books.
+> Citations may include links to full text content from `PubMed Central` and publisher web sites.
+
+## 设置
+您需要安装一个 Python 包。
+
+<CodeGroup>
+```bash pip
+pip install xmltodict
+```
+
+```bash uv
+uv add xmltodict
+```
+</CodeGroup>
+
+### 检索器
+
+See a [usage example](/oss/integrations/retrievers/pubmed).
+
+```python
+from langchain_classic.retrievers import PubMedRetriever
+```
+
+### 文档加载器
+
+See a [usage example](/oss/integrations/document_loaders/pubmed).
+
+```python
+from langchain_community.document_loaders import PubMedLoader
+```

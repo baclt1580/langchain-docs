@@ -1,0 +1,177 @@
+---
+title: "Compass DeFi 工具包集成"
+description: "使用 LangChain Python 与 Compass DeFi 工具包进行集成。"
+---
+
+与各种 DeFi 协议交互。Non-custodial Tools 返回*未签名的交易*。该工具包构建在通用 DeFi API（[Compass API](https://api.compasslabs.ai/)）之上，允许代理执行金融操作，例如：
+
+- **在 Uniswap 和 Aerodrome 上交换代币**
+- **使用 Aave 上的协议出借或借入**资产
+- **在 Aerodrome 和 Uniswap 上提供流动性**
+- **在钱包之间转移资金**。
+- 查询余额、投资组合并**监控头寸**。
+
+## 概览
+
+### 集成详情
+
+| Class                    | Package             | Serializable | JS support |                                         Version                                         |
+|:-------------------------|:--------------------| :---: | :---: |:----------------------------------------------------------------------------------------------:|
+| `LangchainCompassToolkit`  | `langchain-compass` | ❌ | ❌ | ![PyPI - 版本](https://img.shields.io/pypi/v/langchain-compass?style=flat-square&label=%20) |
+
+### 工具功能
+
+以下是该工具包提供的部分工具示例（每日可能更新）：
+
+- `aave_supply`: 向 Aave 存入资产以赚取利息。
+- `aave_borrow`: 使用抵押品从 Aave 借入资产。
+- `uniswap_swap_sell_exactly`: 在 Uniswap 上交换特定数量的某种代币。
+- `generic_portfolio_get`: 获取钱包的投资组合（美元计价）及代币余额。
+- `generic_transfer_erc20`: 在地址间转移 ERC20 代币。
+
+## 设置
+
+我们将：
+
+1. 安装 langchain 包
+2. 导入并实例化工具包
+3. 使用 `toolkit.get_tools()` 将工具传递给您的代理
+
+### 安装
+
+该工具包位于 `langchain-compass` 包中：
+
+```python
+pip install -qU langchain-compass
+```
+
+#### 环境设置
+
+要运行这些示例，请确保 LangChain 可以访问 LLM 服务。例如，如果您使用 GPT-4o，请创建一个包含以下内容的 `.env` 文件：
+
+```plaintext
+# .env file
+OPENAI_API_KEY=<your_openai_api_key_here>
+```
+
+### 实例化
+
+现在我们可以实例化工具包：
+
+```python
+from langchain_compass.toolkits import LangchainCompassToolkit
+
+toolkit = LangchainCompassToolkit(compass_api_key=None)
+```
+
+### 工具
+
+查看 [可用工具](#tool-features)：
+
+```python
+tools = toolkit.get_tools()
+for tool in tools:
+    print(tool.name)
+```
+
+```
+# Expected output:
+
+aave_supply
+aave_borrow
+aave_repay
+aave_withdraw
+aave_asset_price_get
+aave_liquidity_change_get
+aave_user_position_summary_get
+...
+```
+
+## 调用
+
+要以编程方式调用单个工具：
+
+```python
+tool_name = "generic_ens_get"
+tool = next(tool for tool in tools if tool.name == tool_name)
+tool.invoke({"ens_name": "vitalik.eth", "chain": "ethereum:mainnet"})
+```
+
+```text
+EnsNameInfoResponse(wallet_address='0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', registrant='0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')
+```
+
+## 在代理中使用
+
+我们需要一个 LLM 或聊天模型：
+
+```python
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+
+load_dotenv()
+
+llm = ChatOpenAI(model="gpt-4.1")
+```
+
+初始化带有工具的代理：
+
+```python
+from langchain.agents import create_agent
+
+
+tools = toolkit.get_tools()
+agent_executor = create_agent(llm, tools)
+```
+
+示例用法：
+
+```python
+example_query = "please set an allowance on Uniswap of 10 WETH for vitalic.eth."  # spelt wrong intentionally
+
+events = agent_executor.stream(
+    {"messages": [("user", example_query)]},
+    stream_mode="values",
+)
+for event in events:
+    event["messages"][-1].pretty_print()
+```
+
+预期输出：
+
+```
+================================[1m Human Message [0m=================================
+
+please set an allowance on Uniswap of 10 WETH for vitalic.eth.
+==================================[1m Ai Message [0m==================================
+Tool Calls:
+  generic_ens_get (call_MHIXRXxWH0L7iUEYHwvDUdU1)
+ Call ID: call_MHIXRXxWH0L7iUEYHwvDUdU1
+  Args:
+    chain: ethereum:mainnet
+    ens_name: vitalic.eth
+=================================[1m Tool Message [0m=================================
+Name: generic_ens_get
+
+wallet_address='0x44761Ef63FaD902D8f8dC77e559Ab116929881Db' registrant='0x44761Ef63FaD902D8f8dC77e559Ab116929881Db'
+==================================[1m Ai Message [0m==================================
+Tool Calls:
+  generic_allowance_set (call_IEBftbtBfKCkI1zFXXtEY8tq)
+ Call ID: call_IEBftbtBfKCkI1zFXXtEY8tq
+  Args:
+    amount: 10
+    chain: ethereum:mainnet
+    contract_name: UniswapV3Router
+    sender: 0x44761Ef63FaD902D8f8dC77e559Ab116929881Db
+    token: WETH
+=================================[1m Tool Message [0m=================================
+Name: generic_allowance_set
+
+{"type": "unsigned_transaction", "content": {"chainId": 1, "data": "0x095ea7b300000000000000000000000068b3465833fb72a70ecdf485e0e4c7bd8665fc450000000000000000000000000000000000000000000000008ac7230489e80000", "from": "0x44761Ef63FaD902D8f8dC77e559Ab116929881Db", "gas": 46434, "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "value": 0, "nonce": 79, "maxFeePerGas": 2265376912, "maxPriorityFeePerGas": 6400594}}
+```
+
+---
+
+## API 参考
+
+`langchain-compass` 构建在 Compass API 之上。每个工具对应一个 API 端点。[请在此处查阅文档](https://api.compasslabs.ai/)

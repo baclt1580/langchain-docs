@@ -1,0 +1,227 @@
+---
+title: "OpenAIEmbeddings 集成"
+description: "使用 LangChain Python 集成 OpenAIEmbeddings 嵌入模型。"
+---
+
+这将帮助您使用 LangChain 开始使用 OpenAI 嵌入模型。有关 `OpenAIEmbeddings` 功能和配置选项的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-openai/embeddings/base/OpenAIEmbeddings)。
+
+## 概述
+
+### 集成详情
+
+<ItemTable category="embeddings" item="OpenAI" />
+
+## 设置
+
+要访问 OpenAI 嵌入模型，您需要创建一个 OpenAI 账户，获取 API 密钥，并安装 `langchain-openai` 集成包。
+
+### 凭据
+
+前往 [platform.openai.com](https://platform.openai.com) 注册 OpenAI 并生成 API 密钥。完成后，设置 `OPENAI_API_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+if not os.getenv("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = getpass.getpass("Enter your OpenAI API key: ")
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
+```
+
+### 安装
+
+LangChain OpenAI 集成位于 `langchain-openai` 包中：
+
+```python
+pip install -qU langchain-openai
+```
+
+## 实例化
+
+现在我们可以实例化我们的模型对象并生成聊天补全：
+
+```python
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-large",
+    # With the `text-embedding-3` class
+    # of models, you can specify the size
+    # of the embeddings you want returned.
+    # dimensions=1024
+)
+```
+
+<Info>
+    **Azure OpenAI v1 API 支持**
+
+    自 `langchain-openai>=1.0.1` 起，`OpenAIEmbeddings` 可以直接与 Azure OpenAI 端点配合使用新的 [v1 API](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle?tabs=python#next-generation-api-1)，包括对 Microsoft Entra ID 认证的支持。有关详细信息，请参阅下面的 [与 Azure OpenAI 配合使用](#using-with-azure-openai) 部分。
+</Info>
+
+## 索引和检索
+
+嵌入模型通常用于检索增强生成 (RAG) 流程，既作为数据索引的一部分，也用于后续检索。更详细的说明，请参阅我们的 [RAG 教程](/oss/langchain/rag)。
+
+下面，查看如何使用上面初始化的 `embeddings` 对象来索引和检索数据。在本示例中，我们将在 `InMemoryVectorStore` 中索引和检索一个示例文档。
+
+```python
+# Create a vector store with a sample text
+from langchain_core.vectorstores import InMemoryVectorStore
+
+text = "LangChain is the framework for building context-aware reasoning applications"
+
+vectorstore = InMemoryVectorStore.from_texts(
+    [text],
+    embedding=embeddings,
+)
+
+# Use the vectorstore as a retriever
+retriever = vectorstore.as_retriever()
+
+# Retrieve the most similar text
+retrieved_documents = retriever.invoke("What is LangChain?")
+
+# show the retrieved document's content
+retrieved_documents[0].page_content
+```
+
+```text
+'LangChain is the framework for building context-aware reasoning applications'
+```
+
+## 直接用法
+
+在底层，vectorstore 和 retriever 实现分别调用 `embeddings.embed_documents(...)` 和 `embeddings.embed_query(...)` 为 `from_texts` 和检索 `invoke` 操作中使用的文本创建嵌入。
+
+您可以直接调用这些方法以获取您自己用例的嵌入。
+
+### 嵌入单个文本
+
+您可以使用 `embed_query` 嵌入单个文本或文档：
+
+```python
+single_vector = embeddings.embed_query(text)
+print(str(single_vector)[:100])  # Show the first 100 characters of the vector
+```
+
+```text
+[-0.019276829436421394, 0.0037708976306021214, -0.03294256329536438, 0.0037671267054975033, 0.008175
+```
+
+### 嵌入多个文本
+
+您可以使用 `embed_documents` 嵌入多个文本：
+
+```python
+text2 = (
+    "LangGraph is a library for building stateful, multi-actor applications with LLMs"
+)
+two_vectors = embeddings.embed_documents([text, text2])
+for vector in two_vectors:
+    print(str(vector)[:100])  # Show the first 100 characters of the vector
+```
+
+```text
+[-0.019260549917817116, 0.0037612367887049913, -0.03291035071015358, 0.003757466096431017, 0.0082049
+[-0.010181212797760963, 0.023419594392180443, -0.04215526953339577, -0.001532090245746076, -0.023573
+```
+
+## 与 Azure OpenAI 配合使用
+
+<Info>
+    **Azure OpenAI v1 API 支持**
+
+    自 `langchain-openai>=1.0.1` 起，`OpenAIEmbeddings` 可以直接与 Azure OpenAI 端点配合使用新的 [v1 API](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle?tabs=python#next-generation-api-1)。这提供了一种统一的方式来使用 OpenAI 嵌入，无论托管在 OpenAI 还是 Azure 上。
+
+    对于传统的 Azure 特定实现，请继续使用 [`AzureOpenAIEmbeddings`](/oss/integrations/embeddings/azure_openai)。
+</Info>
+
+### 使用 API 密钥使用 Azure OpenAI v1 API
+
+要将 `OpenAIEmbeddings` 与 Azure OpenAI 配合使用，请将 `base_url` 设置为您的 Azure 端点，并在末尾附加 `/openai/v1/`：
+
+```python
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-large",  # Your Azure deployment name
+    base_url="https://{your-resource-name}.openai.azure.com/openai/v1/",
+    api_key="your-azure-api-key"
+)
+
+# Use as normal
+vector = embeddings.embed_query("Hello world")
+```
+
+### 使用 Microsoft Entra ID 使用 Azure OpenAI
+
+v1 API 添加了原生支持 [Microsoft Entra ID](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/managed-identity) 认证，具有自动令牌刷新功能。将令牌提供程序可调用对象传递给 `api_key` 参数：
+
+```python
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from langchain_openai import OpenAIEmbeddings
+
+# Create a token provider that handles automatic refresh
+token_provider = get_bearer_token_provider(
+    DefaultAzureCredential(),
+    "https://cognitiveservices.azure.com/.default"
+)
+
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-large",  # Your Azure deployment name
+    base_url="https://{your-resource-name}.openai.azure.com/openai/v1/",
+    api_key=token_provider  # Callable that handles token refresh
+)
+
+# Use as normal
+vectors = embeddings.embed_documents(["Hello", "World"])
+```
+
+<Tip>
+**安装要求**
+
+要使用 Microsoft Entra ID 认证，请安装 Azure Identity 库：
+
+```bash
+pip install azure-identity
+```
+
+</Tip>
+
+在使用异步函数时，您也可以将令牌提供程序可调用对象传递给 `api_key` 参数。您必须从 `azure.identity.aio` 导入 DefaultAzureCredential：
+
+:::python
+
+```python
+from azure.identity.aio import DefaultAzureCredential
+from langchain_openai import OpenAIEmbeddings
+
+credential = DefaultAzureCredential()
+
+embeddings_async = OpenAIEmbeddings(
+    model="text-embedding-3-large",
+    api_key=credential
+)
+
+# Use async methods when using async callable
+vectors = await embeddings_async.aembed_documents(["Hello", "World"])
+
+```
+
+:::
+
+<Note>
+    当为 API 密钥使用异步可调用对象时，您必须使用异步方法（`aembed_query`, `aembed_documents`）。同步方法将引发错误。
+</Note>
+
+---
+
+## API 参考
+
+有关 `OpenAIEmbeddings` 功能和配置选项的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-openai/embeddings/base/OpenAIEmbeddings)。

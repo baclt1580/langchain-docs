@@ -1,0 +1,109 @@
+---
+title: "TavilySearchAPI 集成"
+description: "使用 LangChain Python 与 TavilySearchAPI 检索器集成。"
+---
+
+>[Tavily 的搜索 API](https://tavily.com) 是专为 AI 代理（LLM）构建的搜索引擎，能够快速提供实时、准确且事实性的结果。
+
+我们可以将其用作 [检索器](/oss/langchain/retrieval)。它将展示此集成的特定功能。完成后，探索 [相关用例页面](/oss/langchain/rag) 以了解如何将此向量存储作为更大链的一部分使用可能会有所帮助。
+
+### 集成详情
+
+<ItemTable category="external_retrievers" item="TavilySearchAPIRetriever" />
+
+## 设置
+
+如果您希望从单个查询中获得自动跟踪，您也可以通过取消注释以下内容来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+该集成位于 `langchain-community` 包中。我们还需要安装 `tavily-python` 包本身。
+
+```python
+pip install -qU langchain-community tavily-python
+```
+
+我们还需要设置我们的 Tavily API 密钥。
+
+```python
+import getpass
+import os
+
+os.environ["TAVILY_API_KEY"] = getpass.getpass()
+```
+
+## 实例化
+
+现在我们可以实例化我们的检索器：
+
+```python
+from langchain_community.retrievers import TavilySearchAPIRetriever
+
+retriever = TavilySearchAPIRetriever(k=3)
+```
+
+## 用法
+
+```python
+query = "what year was breath of the wild released?"
+
+retriever.invoke(query)
+```
+
+```text
+[Document(metadata={'title': 'The Legend of Zelda: Breath of the Wild - Nintendo Switch Wiki', 'source': 'https://nintendo-switch.fandom.com/wiki/The_Legend_of_Zelda:_Breath_of_the_Wild', 'score': 0.9961155, 'images': []}, page_content='The Legend of Zelda: Breath of the Wild is an open world action-adventure game published by Nintendo for the Wii U and as a launch title for the Nintendo Switch, and was released worldwide on March 3, 2017. It is the nineteenth installment of the The Legend of Zelda series and the first to be developed with a HD resolution. The game features a gigantic open world, with the player being able to ...'),
+ Document(metadata={'title': 'The Legend of Zelda: Breath of the Wild - Zelda Wiki', 'source': 'https://zelda.fandom.com/wiki/The_Legend_of_Zelda:_Breath_of_the_Wild', 'score': 0.9804313, 'images': []}, page_content='[]\nReferences\nThe Legend of Zelda ·\nThe Adventure of Link ·\nA Link to the Past (& Four Swords) ·\nLink\'s Awakening (DX; Nintendo Switch) ·\nOcarina of Time (Master Quest; 3D) ·\nMajora\'s Mask (3D) ·\nOracle of Ages ·\nOracle of Seasons ·\nFour Swords (Anniversary Edition) ·\nThe Wind Waker (HD) ·\nFour Swords Adventures ·\nThe Minish Cap ·\nTwilight Princess (HD) ·\nPhantom Hourglass ·\nSpirit Tracks ·\nSkyward Sword (HD) ·\nA Link Between Worlds ·\nTri Force Heroes ·\nBreath of the Wild ·\nTears of the Kingdom\nZelda (Game & Watch) ·\nThe Legend of Zelda Game Watch ·\nLink\'s Crossbow Training ·\nMy Nintendo Picross: Twilight Princess ·\nCadence of Hyrule ·\nGame & Watch: The Legend of Zelda\nCD-i Games\n Listings[]\nCharacters[]\nBosses[]\nEnemies[]\nDungeons[]\nLocations[]\nItems[]\nTranslations[]\nCredits[]\nReception[]\nSales[]\nEiji Aonuma and Hidemaro Fujibayashi accepting the "Game of the Year" award for Breath of the Wild at The Game Awards 2017\nBreath of the Wild was estimated to have sold approximately 1.3 million copies in its first three weeks and around 89% of Switch owners were estimated to have also purchased the game.[52] Sales of the game have remained strong and as of June 30, 2022, the Switch version has sold 27.14 million copies worldwide while the Wii U version has sold 1.69 million copies worldwide as of December 31, 2019,[53]\[54] giving Breath of the Wild a cumulative total of 28.83 million copies sold.\n It also earned a Metacritic score of 97 from more than 100 critics, placing it among the highest-rated games of all time.[59]\[60] Notably, the game received the most perfect review scores for any game listed on Metacritic up to that point.[61]\nIn 2022, Breath of the Wild was chosen as the best Legend of Zelda game of all time in their "Top 10 Best Zelda Games" list countdown; but was then placed as the "second" best Zelda game in their new revamped version of their "Top 10 Best Zelda Games" list in 2023, right behind it\'s successor Tears of Video Game Canon ranks Breath of the Wild as one of the best video games of all time.[74] Metacritic ranked Breath of the Wild as the single best game of the 2010s.[75]\nFan Reception[]\nWatchMojo placed Breath of the Wild at the #2 spot in their "Top 10 Legend of Zelda Games of All Time" list countdown, right behind Ocarina of Time.[76] The Faces of Evil ·\nThe Wand of Gamelon ·\nZelda\'s Adventure\nHyrule Warriors Series\nHyrule Warriors (Legends; Definitive Edition) ·\nHyrule Warriors: Age of Calamity\nSatellaview Games\nBS The Legend of Zelda ·\nAncient Stone Tablets\nTingle Series\nFreshly-Picked Tingle\'s Rosy Rupeeland ·\nTingle\'s Balloon Fight DS ·\n'),
+ Document(metadata={'title': 'The Legend of Zelda: Breath of the Wild - Zelda Wiki', 'source': 'https://zeldawiki.wiki/wiki/The_Legend_of_Zelda:_Breath_of_the_Wild', 'score': 0.9627432, 'images': []}, page_content='The Legend of Zelda •\nThe Adventure of Link •\nA Link to the Past (& Four Swords) •\nLink\'s Awakening (DX; Nintendo Switch) •\nOcarina of Time (Master Quest; 3D) •\nMajora\'s Mask (3D) •\nOracle of Ages •\nOracle of Seasons •\nFour Swords (Anniversary Edition) •\nThe Wind Waker (HD) •\nFour Swords Adventures •\nThe Minish Cap •\nTwilight Princess (HD) •\nPhantom Hourglass •\nSpirit Tracks •\nSkyward Sword (HD) •\nA Link Between Worlds •\nTri Force Heroes •\nBreath of the Wild •\nTears of the Kingdom\nZelda (Game & Watch) •\nThe Legend of Zelda Game Watch •\nHeroes of Hyrule •\nLink\'s Crossbow Training •\nMy Nintendo Picross: Twilight Princess •\nCadence of Hyrule •\nVermin\nThe Faces of Evil •\nThe Wand of Gamelon •\nZelda\'s Adventure\nHyrule Warriors (Legends; Definitive Edition) •\nHyrule Warriors: Age of Calamity\nBS The Legend of Zelda •\nAncient Stone Tablets\nFreshly-Picked Tingle\'s Rosy Rupeeland •\nTingle\'s Balloon Fight DS •\nToo Much Tingle Pack •\nRipened Tingle\'s Balloon Trip of Love\nSoulcalibur II •\nWarioWare Series •\nCaptain Rainbow •\nNintendo Land •\nScribblenauts Unlimited •\nMario Kart 8 •\nSplatoon 3\nSuper Smash Bros (Series)\nSuper Smash Bros. •\nSuper Smash Bros. Melee •\nSuper Smash Bros. Brawl •\nSuper Smash Bros. for Nintendo 3DS / Wii U •\n It also earned a Metacritic score of 97 from more than 100 critics, placing it among the highest-rated games of all time.[60]\[61] Notably, the game received the most perfect review scores for any game listed on Metacritic up to that point.[62]\nAwards\nThroughout 2016, Breath of the Wild won several awards as a highly anticipated game, including IGN\'s and Destructoid\'s Best of E3,[63]\[64] at the Game Critic Awards 2016,[65] and at The Game Awards 2016.[66] Following its release, Breath of the Wild received the title of "Game of the Year" from the Japan Game Awards 2017,[67] the Golden Joystick Awards 2017,<ref"Our final award is for the Ultimate Game of the Year. Official website(s)\nOfficial website(s)\nCanonicity\nCanonicity\nCanon[citation needed]\nPredecessor\nPredecessor\nTri Force Heroes\nSuccessor\nSuccessor\nTears of the Kingdom\nThe Legend of Zelda: Breath of the Wild guide at StrategyWiki\nBreath of the Wild Guide at Zelda Universe\nThe Legend of Zelda: Breath of the Wild is the nineteenth main installment of The Legend of Zelda series. Listings\nCharacters\nBosses\nEnemies\nDungeons\nLocations\nItems\nTranslations\nCredits\nReception\nSales\nBreath of the Wild was estimated to have sold approximately 1.3 million copies in its first three weeks and around 89% of Switch owners were estimated to have also purchased the game.[53] Sales of the game have remained strong and as of September 30, 2023, the Switch version has sold 31.15 million copies worldwide while the Wii U version has sold 1.7 million copies worldwide as of December 31, 2021,[54]\[55] giving Breath of the Wild a cumulative total of 32.85 million copies sold.\n The Legend of Zelda: Breath of the Wild\nThe Legend of Zelda: Breath of the Wild\nThe Legend of Zelda: Breath of the Wild\nDeveloper(s)\nDeveloper(s)\nPublisher(s)\nPublisher(s)\nNintendo\nDesigner(s)\nDesigner(s)\n')]
+```
+
+## 在链中使用
+
+我们可以轻松地将此检索器组合到链中。
+
+```python
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_openai import ChatOpenAI
+
+prompt = ChatPromptTemplate.from_template(
+    """Answer the question based only on the context provided.
+
+Context: {context}
+
+Question: {question}"""
+)
+
+llm = ChatOpenAI(model="gpt-4.1-mini")
+
+
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+
+chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+```
+
+```python
+chain.invoke("how many units did bretch of the wild sell in 2020")
+```
+
+```text
+'As of August 2020, The Legend of Zelda: Breath of the Wild had sold over 20.1 million copies worldwide on Nintendo Switch and Wii U.'
+```
+
+---
+
+## API 参考
+
+有关所有 `TavilySearchAPIRetriever` 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/retrievers/tavily_search_api/TavilySearchAPIRetriever)。

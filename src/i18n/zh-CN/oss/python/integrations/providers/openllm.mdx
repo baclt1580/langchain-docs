@@ -1,0 +1,63 @@
+---
+title: "OpenLLM 集成"
+description: "使用 LangChain Python 与 OpenLLM 集成。"
+---
+
+OpenLLM 允许开发者通过**一条命令**运行任何**开源 LLMs**，并将其作为**兼容 OpenAI 的 API** 端点。
+
+- 🔬 构建用于快速及生产环境用途
+- 🚂 支持 llama3, qwen2, gemma 等，以及许多**量化**版本 [完整列表](https://github.com/bentoml/openllm-models)
+- ⛓️ 兼容 OpenAI 的 API
+- 💬 内置类 ChatGPT 界面
+- 🔥 利用最先进的推理后端加速 LLM 解码
+- 🌥️ 准备好企业级云部署（Kubernetes, Docker 和 BentoCloud）
+
+## 安装与设置
+
+通过 PyPI 安装 OpenLLM 包：
+
+<CodeGroup>
+```bash pip
+pip install openllm
+```
+
+```bash uv
+uv add openllm
+```
+</CodeGroup>
+
+## LLM
+
+OpenLLM 支持广泛的开源 LLMs，同时也支持服务用户自己微调的 LLMs。使用 `openllm model` 命令查看所有为 OpenLLM 预优化的可用模型。
+
+## 包装器
+
+有一个 OpenLLM 包装器，支持与运行中的 OpenLLM 服务器交互：
+
+```python
+from langchain_community.llms import OpenLLM
+```
+
+### OpenLLM 服务器的包装器
+
+此包装器支持与 OpenLLM 的兼容 OpenAI 的端点交互。
+
+要运行模型，请执行：
+
+```bash
+openllm hello
+```
+
+包装器用法：
+
+```python
+from langchain_community.llms import OpenLLM
+
+llm = OpenLLM(base_url="http://localhost:3000/v1", api_key="na")
+
+llm("What is the difference between a duck and a goose? And why there are so many Goose in Canada?")
+```
+
+### 用法
+
+有关 OpenLLM 包装器的更详细教程，请参阅 [示例笔记本](/oss/integrations/llms/openllm)

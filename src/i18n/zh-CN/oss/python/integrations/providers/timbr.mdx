@@ -1,0 +1,35 @@
+---
+title: "Timbr 集成"
+description: "使用 LangChain Python 与 Timbr 进行集成。"
+---
+
+>什么是 `Timbr`？
+
+>- Timbr 是一个 `semantic SQL knowledge graph platform`，专注于通过基于本体的语义层连接数据。
+>- Timbr 允许您使用业务友好的语言表示和查询数据，使其非常适合处理复杂的数据关系和业务逻辑。
+>- Timbr 提供 `natural language to SQL` 能力，使您可以使用简单的英语查询轻松与数据交互。
+>- 借助 Timbr，您可以实现高性能的 `semantic data querying`，适用于生产级分析和商业智能。
+
+>访问 [他们的网站](https://docs.timbr.ai/doc/docs/getting-started/intro-timbr/) 开始使用 Timbr。
+
+## 安装和设置
+
+- 使用 `pip install langchain-timbr` 安装 Python SDK
+
+### 可选：使用选定的 LLM 提供商安装
+
+选择以下之一：openai, anthropic, google, azure_openai, snowflake, databricks, vertex_ai（或 'all'）
+
+```bash
+pip install 'langchain-timbr[<your selected providers, separated by comma without spaces>]'
+```
+
+## 语义 SQL 查询
+
+Timbr 在其语义层周围提供了一个封装，该封装根据自然语言输入生成 SQL 语句，并从您的知识图谱中检索相关信息。
+
+```python
+from langchain_timbr import create_timbr_sql_agent, ExecuteTimbrQueryChain, GenerateTimbrSqlChain
+```
+
+查看 [使用示例](/oss/integrations/graphs/timbr)

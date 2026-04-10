@@ -1,0 +1,129 @@
+---
+title: "Aerospike 集成"
+description: "使用 LangChain Python 与 Aerospike 集成，实现 LangGraph 检查点持久化和存储持久化。"
+---
+
+>[Aerospike](https://aerospike.com/) 是一款高性能、分布式的 NoSQL 数据库，专为大规模实时应用而设计。它提供亚毫秒级延迟、强一致性和跨集群的自动数据分发，非常适合需要快速、可靠状态持久化的 AI 工作负载。
+
+Aerospike 采用无共享架构，支持线性水平扩展，拥有混合内存架构（DRAM 索引配合 SSD/NVMe 数据存储），每个命名空间可调节强一致性或宽松一致性，内置 TTL 用于自动记录过期，支持跨数据中心的双活复制，并支持键值、文档、图和数据向量等多模型数据。
+
+Aerospike LangGraph 集成提供了一个检查点器，用于持久化图执行状态，以及一个存储，用于长期存在的代理数据，如用户配置文件、提取的实体和缓存的工具输出。
+
+## 入门指南
+
+该实现位于 [aerospike-community/aerospike-langgraph](https://github.com/aerospike-community/aerospike-langgraph) 仓库中。它包括基于 Docker 的 Aerospike 设置、`AerospikeSaver` 和 `AerospikeStore` 的参考实现，以及测试检查点恢复、TTL 行为和命名空间范围存储访问的基本测试。
+
+要尝试使用，请启动 Aerospike 容器，在 LangGraph 应用中配置保存器和存储，然后运行包含的示例以观察执行恢复和代理状态持久化。
+
+## 安装
+
+安装这两个包：
+
+```bash
+pip install -U langgraph-store-aerospike langgraph-checkpoint-aerospike
+```
+
+## 本地运行 Aerospike
+
+使用 Aerospike Docker 镜像启动 Aerospike：
+
+```bash
+docker run -d --name aerospike \
+  -p 3000-3002:3000-3002 \
+  container.aerospike.com/aerospike/aerospike-server
+```
+
+## 配置
+
+存储和检查点器都使用相同的 Aerospike 连接设置：
+
+```bash
+export AEROSPIKE_HOST=127.0.0.1
+export AEROSPIKE_PORT=3000
+```
+
+## LangGraph 检查点器
+
+Aerospike 检查点器持久化 LangGraph 执行状态，并支持从任何检查点恢复。
+
+```python
+import aerospike
+from langgraph.checkpoint.aerospike import AerospikeSaver
+
+client = aerospike.client(
+    {"hosts": [("127.0.0.1", 3000)]}
+).connect()
+
+saver = AerospikeSaver(
+    client=client,
+    namespace="langgraph",
+)
+
+compiled = graph.compile(checkpointer=saver)
+
+compiled.invoke(
+    {"input": "hello"},
+    config={
+        "configurable": {
+            "thread_id": "demo-thread"
+        }
+    }
+)
+```
+
+## LangGraph 存储
+
+Aerospike 存储用于长期存在的代理数据，如用户配置文件、提取的实体和缓存的工具输出。
+
+```python
+import aerospike
+from langgraph.store.aerospike import AerospikeStore
+from langgraph.store.base import PutOp, GetOp, SearchOp
+
+client = aerospike.client(
+    {"hosts": [("127.0.0.1", 3000)]}
+).connect()
+
+store = AerospikeStore(
+    client=client,
+    namespace="langgraph",
+    set="store",
+)
+
+# Write data
+store.put(
+    namespace=("users", "profiles"),
+    key="user_123",
+    value={"name": "Alice", "age": 30},
+)
+
+# Read data
+item = store.get(
+    namespace=("users", "profiles"),
+    key="user_123",
+)
+print(item.value)
+
+# Batch operations
+results = store.batch([
+    PutOp(namespace=("documents",), key="doc1", value={"status": "draft"}),
+    GetOp(namespace=("documents",), key="doc1"),
+])
+
+# Search within a namespace
+search_results = store.search(
+    namespace_prefix=("documents",),
+    filter={"status": {"$eq": "draft"}},
+    limit=10,
+)
+
+# Delete data
+store.delete(namespace=("users", "profiles"), key="user_123")
+```
+
+## 资源
+
+- [PyPI 上的 langgraph-checkpoint-aerospike](https://pypi.org/project/langgraph-checkpoint-aerospike/)
+- [PyPI 上的 langgraph-store-aerospike](https://pypi.org/project/langgraph-store-aerospike/)
+- [GitHub 上的 aerospike-community/aerospike-langgraph](https://github.com/aerospike-community/aerospike-langgraph)
+- [Aerospike 文档](https://aerospike.com/docs/)

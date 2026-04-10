@@ -1,0 +1,386 @@
+---
+title: "TeradataVectorStore 集成"
+description: "使用 LangChain Python 与 TeradataVectorStore 集成。"
+---
+
+>Teradata Vector Store 旨在在企业数据平台内高效地存储、索引和搜索高维向量嵌入。
+
+本指南向您展示如何快速上手 TeradataVectorStore，以用于您的语义搜索和 RAG 应用。无论您是 Teradata 的新手，还是希望将 AI 功能添加到现有数据工作流中，本指南都将带您了解所需的一切知识。
+
+**TeradataVectorStore 有何特别之处？**
+- 基于企业级 Teradata Vantage 平台构建。 
+- 与您现有的数据仓库无缝集成。
+- 支持多种向量搜索算法以适应不同用例。
+- 从原型到生产负载均可扩展。
+
+## 设置
+
+在深入之前，您需要安装必要的包。TeradataVectorStore 是 `langchain-teradata` 包的一部分，该包还包含其他 LangChain 的 Teradata 集成。
+
+**对 Teradata 不熟悉？** 请参阅：
+- [Teradata VantageCloud Lake](https://www.teradata.com/platform/vantagecloud)
+- 开始使用 [VantageCloud Lake](https://docs.teradata.com/r/Lake-Getting-Started-with-VantageCloud-Lake/)
+
+### 安装
+
+
+    ```python pip
+    pip install langchain-teradata
+    ```
+
+### 凭据
+
+**连接到 Teradata：** `create_context()` 函数建立您与 Teradata Vantage 系统的连接。这是 teradataml（以及由此延伸的 TeradataVectorStore）知道要连接和认证哪个数据库的方式。
+
+**您需要准备：**
+- **hostname**: 您的 Teradata 系统地址
+- **username/password**: 您的数据库凭据  
+- **base_url**: 您 Teradata 系统的 API 端点
+- **pat_token**: 用于 API 认证的 Personal Access Token
+- **pem_file**: 用于安全连接的 SSL 证书文件
+
+**更多信息** 请查看 [Teradata Vector Store 用户指南](https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/Teradata-Vector-Store-User-Guide/Setting-up-Vector-Store/Required-Privileges) 以获取详细的设置说明。
+
+**有关 teradataml 的信息** 请参阅 [TeradataML 用户指南](https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/Teradata-Package-for-Python-User-Guide/Introduction-to-Teradata-Package-for-Python) 
+
+```python
+import os
+from getpass import getpass
+from teradataml import create_context
+
+os.environ['TD_HOST'] = getpass(prompt='hostname: ')
+os.environ['TD_USERNAME'] = getpass(prompt='username: ')
+os.environ['TD_PASSWORD'] = getpass(prompt='password: ')
+os.environ['TD_BASE_URL'] = getpass(prompt='base_url: ')
+os.environ['TD_PAT_TOKEN'] = getpass(prompt='pat_token: ')
+os.environ['TD_PEM_FILE'] = getpass(prompt='pem_file: ')
+create_context()
+```
+
+---
+
+## 实例化
+
+**初始化您的嵌入**
+
+**TeradataVectorStore 支持三种类型的嵌入对象：**
+1. **字符串标识符**（例如："amazon.titan-embed-text-v1"）
+2. **TeradataAI 对象**
+3. **LangChain 嵌入对象** - 兼容 LangChain 的嵌入模型对象
+
+```python
+# Initialize embeddings
+from langchain_aws import BedrockEmbeddings
+embeddings = BedrockEmbeddings(model_id="amazon.titan-embed-text-v1", region_name="us-west-2")
+```
+
+**创建您的第一个向量存储**
+
+让我们从一些示例文档开始并创建一个向量存储。`from_documents()` 方法是入门最简单的方法之一——只需传入您的文档，TeradataVectorStore 会处理其余部分。
+
+**底层发生了什么：**
+- 您的文档被转换为 Teradataml Dataframe 并传递给向量存储
+- 为每个 Document 对象生成并存储嵌入
+- 自动创建索引以进行快速相似性搜索和聊天操作
+
+```python
+from langchain_teradata import TeradataVectorStore
+from langchain_core.documents import Document
+# Sample documents about different topics
+docs = [
+    Document(page_content="Teradata provides scalable data analytics solutions for enterprises."),
+    Document(page_content="Machine learning models require high-quality training data to perform well."),
+    Document(page_content="Vector databases enable semantic search capabilities beyond keyword matching."),
+    Document(page_content="LangChain simplifies building applications with large language models."),
+    Document(page_content="Data warehousing has evolved to support real-time analytics and AI workloads.")
+]
+
+# Create the vector store
+vs = TeradataVectorStore.from_documents(
+    name="my_knowledge_base",
+    documents=docs,
+    embedding=embeddings
+)
+
+print("Vector store created successfully!")
+```
+
+创建向量存储后，验证一切是否设置正确总是个好习惯。TeradataVectorStore 提供了有用的方法来监控您的操作并了解幕后发生的事情。
+
+**为什么要检查状态？**
+- **操作跟踪**：查看您的向量存储创建确切处于哪个阶段。
+- **故障排除**：快速识别设置过程中是否出现问题。
+- **进度监控**：对于大型数据集，跟踪嵌入生成进度。
+- **验证**：确认您的向量存储已准备好进行查询。
+
+```python
+# Check the status of the store.
+vs.status()
+```
+
+想看看您的向量存储里实际有什么吗？`get_details()` 方法为您提供设置的全面概述——可以将其视为您的向量存储的“仪表板”。
+
+**您将看到：**
+- **对象清单**：您添加的表或文档数量。
+- **搜索参数**：当前算法设置（HNSW、K-means 等）
+- **配置详情**：嵌入维度、距离指标和索引选项。
+- **性能设置**：Top-k 值、相似性阈值和其他查询参数。
+
+```python
+vs.get_details()
+```
+
+---
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+TeradataVectorStore 最出色的功能之一是扩展知识库非常容易。随着业务增长且拥有更多文档，您可以持续添加它们而无需从头重建所有内容。
+
+**现实场景：**
+- 添加新创建的产品文档。
+- 包含最新的研究论文或行业报告。
+- 整合客户反馈和支持文档。
+- 更新最新的政策或程序变更。
+
+**企业优势：** 由于所有操作都在 Teradata 上运行，您可以轻松地从现有表、数据仓库或实时源添加数据，而无需复杂的数据移动。
+
+```python
+# Add more documents
+additional_docs = [
+    Document(page_content="Retrieval-augmented generation combines the power of search with language models."),
+    Document(page_content="Teradata's vector capabilities support both structured and unstructured data analysis.")
+]
+
+vs.add_documents(documents=additional_docs)
+print("Added more knowledge to the vector store!")
+```
+
+```python
+# Check the status of the new store.
+vs.status()
+```
+
+---
+
+## 查询向量存储
+
+一旦创建了向量存储并添加了相关文档，您很可能希望在运行链或代理时对其进行查询。
+
+### 直接查询
+
+现在让我们在向量存储中搜索信息。与传统的关键字搜索不同，向量搜索理解问题背后的含义。询问"AI 应用”，它可能会返回关于"机器学习模型”的结果，因为它理解这些概念是相关的。
+
+**相似性搜索工作原理：**
+- 您的问题被转换为向量嵌入（就像您的文档一样）。 
+- TeradataVectorStore 计算您的问题与存储文档之间的相似性分数。
+- 返回最相关的结果，按相似性排序。
+
+```python
+# Ask a question
+question = "What are vector databases?"
+results = vs.similarity_search(question=question, return_type = "json")
+
+print("Found relevant information:")
+for result in results.similar_objects:
+    print(f" {result}")
+```
+
+### 通过转换为检索器查询
+
+您也可以将向量存储转换为检索器，以便在链中更轻松地使用。
+
+```python
+# Create a retriever for your RAG pipeline
+retriever = vs.as_retriever(search_type="similarity")
+
+# Test the retriever
+retrieved_docs = retriever.invoke("Tell me about Teradata's capabilities")
+
+print("Retrieved documents for RAG:")
+for doc in retrieved_docs:
+    print(f"- {doc.page_content}")
+```
+
+---
+
+## 检索增强生成用法
+
+`ask()` 结合了向量搜索与语言模型生成的力量。您得到的不是原始文档块，而是连贯、有上下文的回答。
+
+**两步过程：**
+1. **检索**：从向量存储中找到最相关的文档。
+2. **生成**：使用这些文档作为上下文来生成自然语言响应。
+
+**为什么这很强大：** 您的 AI 响应基于您的实际数据，减少幻觉并确保准确性。就像拥有一位真正阅读过贵公司文档的知识渊博的助手！
+
+```python
+# Get a comprehensive answer
+response = vs.ask(question="What are the benefits of using vector databases?")
+print("AI Response:")
+print(response)
+```
+
+检索增强生成 (RAG) 是驱动大多数现代 AI 助手和聊天机器人的技术。TeradataVectorStore 与 LangChain 无缝集成，使构建 RAG 应用变得简单明了。
+
+**优秀的 RAG 应用具备什么：**
+- **相关检索**：您的向量存储找到正确的信息。
+- **上下文生成**：语言模型有效地使用该信息。
+- **来源透明度**：用户可以查看答案的来源。
+
+
+**它与 TeradataVectorStore 如何协作：** 
+- 您可以使用向量存储作为检索器来获取最相关的文档，然后将这些文档传递给 LangChain 工作流中的 RAG 链。 
+- 这赋予您构建自定义管道的灵活性，同时利用 Teradata 强大的向量搜索能力。
+
+现在让我们构建一个完整的 RAG 管道，将您的 TeradataVectorStore 检索器与语言模型结合起来。这展示了 RAG 的全部力量——从向量存储中检索相关信息并使用它生成知情响应。
+
+**此管道中正在发生什么：**
+
+- 检索：您的向量存储找到与问题最相关的文档。
+- 上下文准备：这些文档成为语言模型的上下文。
+- 生成：LM 根据您的实际数据生成答案。
+- 输出解析：干净、格式化的响应，准备好供您的应用程序使用。
+
+
+**现实应用场景：**
+
+- 客户支持：使用产品文档回答问题。
+- 研究辅助：查询组织的知识库。
+- 合规性：确保响应基于批准的公司信息。
+
+```python
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain.chat_models import init_chat_model
+
+#Example: Simple RAG chain
+# Initialize the chat model
+llm = init_chat_model("anthropic.claude-3-5-sonnet-20240620-v1:0", 
+                      model_provider="bedrock_converse", 
+                      region_name="<ENTER REGION>",
+                      aws_access_key_id = "<ENTER AWS ACCESS KEY>" ,
+                      aws_secret_access_key = "<ENTER AWS SECRET KEY>"
+                      )
+
+
+# Create a prompt template for the LLM to format its response using retrieved context
+prompt = PromptTemplate.from_template(
+    "Use the following context to answer the question.\nContext:\n{context}\n\nQuestion: {question}\nAnswer:"
+)
+
+# Build the RAG chain: retrieve context, format prompt, generate answer, and parse output
+rag_chain = (
+    {
+        "context": retriever,
+        "question": RunnablePassthrough()
+    }
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# Invoke the RAG chain with a sample question and print the response
+response = rag_chain.invoke("Benefits of Vector Store")
+print(response)
+```
+
+---
+
+## 处理不同类型的数据
+
+TeradataVectorStore 的灵活性在处理不同类型的数据源时尤为突出。根据您起始内容的不同，您可以选择最合适的方法。
+
+**选择您的起点：**
+- **有 PDF 文档？** 使用 `from_documents()` 配合文件路径
+- **正在处理数据库表？** 使用 `from_datasets()` 配合 DataFrames  
+- **已有嵌入？** 使用 `from_embeddings()` 直接导入它们
+
+### 从 PDF 文件
+```python
+# File-based vector store from PDFs
+pdf_vs = TeradataVectorStore.from_documents(
+    name="pdf_knowledge",
+    documents="path/to/your/document.pdf",  # or list of PDF paths
+    embedding=embeddings
+)
+```
+
+### 从数据库表
+```python
+# Content-based from existing tables
+from teradataml import DataFrame
+table_data = DataFrame('your_table_name')
+
+table_vs = TeradataVectorStore.from_datasets(
+    name="table_knowledge", 
+    data=table_data,
+    data_columns=["text_column"],
+    embedding=embeddings
+)
+```
+
+### 从预计算的嵌入
+```python
+# If you already have embeddings
+embedding_vs = TeradataVectorStore.from_embeddings(
+    name="embedding_store",
+    data=your_embedding_data,
+    data_columns="embedding_column"
+)
+```
+
+***注意*** <br />
+当处理表（和嵌入式表）时，`data_columns` 参数是必需的。这告诉 TeradataVectorStore 哪些列包含您想要转换为嵌入的文本内容。可以将其视为将服务指向正确的信息。
+
+例如，如果您的表有 id、title、description 和 category 列，您可以指定 data_columns=["description"] 仅嵌入描述文本，或者 data_columns=["title", "description"] 组合这两个字段。
+
+下面是一个加载示例表并使用 `teradatagenai` 从中创建基于内容的存储的小示例。对于 data_columns，我们将传递 "rev_text" 列，它将用于生成嵌入。
+
+```python
+from teradatagenai import load_data
+
+# Load sample data into Teradata
+load_data("byom", "amazon_reviews_25")
+
+# Create a vector store from the Teradata table
+td_vs = TeradataVectorStore.from_datasets(
+    name="table_store_amazon",
+    data="amazon_reviews_25",
+    data_columns="rev_text",
+    embedding=embeddings)
+```
+
+```python
+# Check the status of the new store
+td_vs.status()
+```
+
+---
+
+## 后续步骤
+
+恭喜！您刚刚使用 TeradataVectorStore 构建了第一个 AI 驱动的搜索和 RAG 系统。您现在已准备好将其扩展到处理真实的企业负载。
+
+**准备好深入探索了吗？**
+- **高级搜索算法**：尝试 HNSW 或 K-means 聚类以进行大规模部署
+- **自定义嵌入模型**：针对您的行业尝试特定领域的嵌入
+- **实时更新**：设置管道以在新数据到达时自动更新向量存储
+
+**生产注意事项：**
+- **安全性**：利用 Teradata 的企业安全功能
+- **监控**：使用 Teradata 内置的性能监控
+
+**了解更多：**
+- [LangChain RAG 教程](https://python.langchain.com/docs/tutorials/rag) - 深入了解 RAG 模式
+- [TeradataVectorStore 工作流](https://github.com/Teradata/langchain-teradata) - 完整示例和用例
+- [VantageCloud Lake](https://www.teradata.com/platform/vantagecloud) - 云原生分析平台
+
+---
+
+## API 参考
+
+有关所有 `TeradataVectorStore` 功能和配置的详细文档，请访问 API 参考。
+[langchain-teradata 用户指南](https://docs.teradata.com/search/documents?query=Teradata+Package+for+LangChain&sort=last_update&virtual-field=title_only&content-lang=en-US)

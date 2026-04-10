@@ -1,0 +1,99 @@
+---
+title: "Modal 集成"
+description: "使用 LangChain Python 与 Modal LLM 集成。"
+---
+
+[Modal 云平台](https://modal.com/docs/guide) 提供了便捷的按需访问，允许从本地计算机上的 Python 脚本使用无服务器云计算资源。
+使用 `modal` 运行您自己的自定义 LLM 模型，而不是依赖 LLM API。
+
+本示例介绍了如何使用 LangChain 与 `modal` HTTPS [Web 端点](https://modal.com/docs/guide/webhooks) 进行交互。
+
+[_使用 LangChain 进行问答_](https://modal.com/docs/guide/ex/potus_speech_qanda) 是另一个展示如何在 `Modal` 旁使用 LangChain 的示例。在该示例中，Modal 端到端地运行 LangChain 应用程序，并使用 OpenAI 作为其 LLM API。
+
+```python
+pip install -qU  modal
+```
+
+```python
+# Register an account with Modal and get a new token.
+
+!modal token new
+```
+
+```text
+Launching login page in your browser window...
+If this is not showing up, please copy this URL into your web browser manually:
+https://modal.com/token-flow/tf-Dzm3Y01234mqmm1234Vcu3
+```
+
+[`langchain.llms.modal.Modal`](https://github.com/langchain-ai/langchain/blame/master/langchain/llms/modal.py) 集成类要求您部署一个带有 Web 端点的 Modal 应用程序，该端点需符合以下 JSON 接口：
+
+1. LLM 提示词作为键 `"prompt"` 下的 `str` 值被接受
+2. LLM 响应作为键 `"prompt"` 下的 `str` 值返回
+
+**示例请求 JSON：**
+
+```json
+{
+    "prompt": "Identify yourself, bot!",
+    "extra": "args are allowed",
+}
+```
+
+**示例响应 JSON：**
+
+```json
+{
+    "prompt": "This is the LLM speaking",
+}
+```
+
+满足此接口的一个示例“虚拟”Modal Web 端点函数如下所示：
+
+```python
+...
+...
+
+class Request(BaseModel):
+    prompt: str
+
+@stub.function()
+@modal.web_endpoint(method="POST")
+def web(request: Request):
+    _ = request  # ignore input
+    return {"prompt": "hello world"}
+```
+
+* 请参阅 Modal 的 [Web 端点](https://modal.com/docs/guide/webhooks#passing-arguments-to-web-endpoints) 指南，了解设置符合此接口的端点的基础知识。
+* 请参阅 Modal 的 ['使用 AutoGPTQ 运行 Falcon-40B'](https://modal.com/docs/guide/ex/falcon_gptq) 开源 LLM 示例，将其作为您自定义 LLM 的起点！
+
+一旦您拥有了已部署的 Modal Web 端点，就可以将其 URL 传递给 `langchain.llms.modal.Modal` LLM 类。该类随后可以作为您链中的一个构建块。
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain_community.llms import Modal
+from langchain_core.prompts import PromptTemplate
+```
+
+```python
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+prompt = PromptTemplate.from_template(template)
+```
+
+```python
+endpoint_url = "https://ecorp--custom-llm-endpoint.modal.run"  # REPLACE ME with your deployed Modal web endpoint's URL
+llm = Modal(endpoint_url=endpoint_url)
+```
+
+```python
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+```
+
+```python
+question = "What NFL team won the Super Bowl in the year Justin Beiber was born?"
+
+llm_chain.run(question)
+```

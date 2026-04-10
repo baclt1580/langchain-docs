@@ -1,0 +1,178 @@
+---
+title: "阿里云 OpenSearch 集成"
+description: "使用 LangChain Python 集成阿里云 OpenSearch 向量存储。"
+---
+
+>[阿里云 OpenSearch](https://www.alibabacloud.com/product/opensearch) 是一个开发智能搜索服务的一站式平台。`OpenSearch` 基于 `Alibaba` 开发的大规模分布式搜索引擎构建。`OpenSearch` 服务于阿里巴巴集团超过 500 个业务案例以及数千名阿里云客户。`OpenSearch` 帮助开发不同搜索场景下的搜索服务，包括电子商务、O2O、多媒体、内容产业、社区和论坛，以及企业大数据查询。
+
+>`OpenSearch` 帮助您开发高质量、免维护且高性能的智能搜索服务，为用户提供高效的搜索效率和准确性。
+
+>`OpenSearch` 提供向量搜索功能。在特定场景下，特别是试题搜索和图片搜索场景，您可以将向量搜索功能与多模态搜索功能结合使用，以提高搜索结果的准确性。
+
+本笔记本展示了如何使用与 `Alibaba Cloud OpenSearch Vector Search Edition` 相关的功能。
+
+## 设置
+
+### 购买实例并配置它
+
+从 [阿里云](https://opensearch.console.aliyun.com) 购买 OpenSearch 向量搜索版，并根据帮助 [文档](https://help.aliyun.com/document_detail/463198.html?spm=a2c4g.465092.0.0.2cd15002hdwavO) 配置实例。
+
+要运行，您应该拥有一个已启动运行的 [OpenSearch 向量搜索版](https://opensearch.console.aliyun.com) 实例。
+
+### 阿里云 OpenSearch 向量存储类
+
+                                                                                                                `AlibabaCloudOpenSearch` 类支持以下功能：
+
+- `add_texts`
+- `add_documents`
+- `from_texts`
+- `from_documents`
+- `similarity_search`
+- `asimilarity_search`
+- `similarity_search_by_vector`
+- `asimilarity_search_by_vector`
+- `similarity_search_with_relevance_scores`
+- `delete_doc_by_texts`
+
+阅读 [帮助文档](https://www.alibabacloud.com/help/en/opensearch/latest/vector-search) 以快速熟悉并配置 OpenSearch 向量搜索版实例。
+
+如果您在使用过程中遇到任何问题，请随时联系 [xingshaomin.xsm@alibaba-inc.com](mailto:xingshaomin.xsm@alibaba-inc.com)，我们将尽力为您提供协助和支持。
+
+实例启动并运行后，请按照以下步骤拆分文档、获取嵌入、连接到阿里云 OpenSearch 实例、索引文档并执行向量检索。
+
+我们需要先安装以下 Python 包。
+
+```python
+pip install -qU  langchain-community alibabacloud_ha3engine_vector
+```
+
+我们要使用 `OpenAIEmbeddings`，因此需要获取 OpenAI API Key。
+
+```python
+import getpass
+import os
+
+if "OPENAI_API_KEY" not in os.environ:
+    os.environ["OPENAI_API_KEY"] = getpass.getpass("OpenAI API Key:")
+```
+
+## 示例
+
+```python
+from langchain_community.vectorstores import (
+    AlibabaCloudOpenSearch,
+    AlibabaCloudOpenSearchSettings,
+)
+from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import CharacterTextSplitter
+```
+
+拆分文档并获取嵌入。
+
+```python
+from langchain_community.document_loaders import TextLoader
+
+loader = TextLoader("../../../state_of_the_union.txt")
+documents = loader.load()
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+
+embeddings = OpenAIEmbeddings()
+```
+
+创建 OpenSearch 设置。
+
+```python
+settings = AlibabaCloudOpenSearchSettings(
+    endpoint=" The endpoint of opensearch instance, You can find it from the console of Alibaba Cloud OpenSearch.",
+    instance_id="The identify of opensearch instance, You can find it from the console of Alibaba Cloud OpenSearch.",
+    protocol="Communication Protocol between SDK and Server, default is http.",
+    username="The username specified when purchasing the instance.",
+    password="The password specified when purchasing the instance.",
+    namespace="The instance data will be partitioned based on the namespace field. If the namespace is enabled, you need to specify the namespace field name during initialization. Otherwise, the queries cannot be executed correctly.",
+    tablename="The table name specified during instance configuration.",
+    embedding_field_separator="Delimiter specified for writing vector field data, default is comma.",
+    output_fields="Specify the field list returned when invoking OpenSearch, by default it is the value list of the field mapping field.",
+    field_name_mapping={
+        "id": "id",  # The id field name mapping of index document.
+        "document": "document",  # The text field name mapping of index document.
+        "embedding": "embedding",  # The embedding field name mapping of index document.
+        "name_of_the_metadata_specified_during_search": "opensearch_metadata_field_name,=",
+        # The metadata field name mapping of index document, could specify multiple, The value field contains mapping name and operator, the operator would be used when executing metadata filter query,
+        # Currently supported logical operators are: > (greater than), < (less than), = (equal to), <= (less than or equal to), >= (greater than or equal to), != (not equal to).
+        # Refer to this link: https://help.aliyun.com/zh/open-search/vector-search-edition/filter-expression
+    },
+)
+
+# for example
+
+# settings = AlibabaCloudOpenSearchSettings(
+#     endpoint='ha-cn-5yd3fhdm102.public.ha.aliyuncs.com',
+#     instance_id='ha-cn-5yd3fhdm102',
+#     username='instance user name',
+#     password='instance password',
+#     table_name='test_table',
+#     field_name_mapping={
+#         "id": "id",
+#         "document": "document",
+#         "embedding": "embedding",
+#         "string_field": "string_filed,=",
+#         "int_field": "int_filed,=",
+#         "float_field": "float_field,=",
+#         "double_field": "double_field,="
+#
+#     },
+# )
+```
+
+通过设置创建 OpenSearch 访问实例。
+
+```python
+# Create an opensearch instance and index docs.
+opensearch = AlibabaCloudOpenSearch.from_texts(
+    texts=docs, embedding=embeddings, config=settings
+)
+```
+
+或
+
+```python
+# Create an opensearch instance.
+opensearch = AlibabaCloudOpenSearch(embedding=embeddings, config=settings)
+```
+
+添加文本并构建索引。
+
+```python
+metadatas = [
+    {"string_field": "value1", "int_field": 1, "float_field": 1.0, "double_field": 2.0},
+    {"string_field": "value2", "int_field": 2, "float_field": 3.0, "double_field": 4.0},
+    {"string_field": "value3", "int_field": 3, "float_field": 5.0, "double_field": 6.0},
+]
+# the key of metadatas must match field_name_mapping in settings.
+opensearch.add_texts(texts=docs, ids=[], metadatas=metadatas)
+```
+
+查询和检索数据。
+
+```python
+query = "What did the president say about Ketanji Brown Jackson"
+docs = opensearch.similarity_search(query)
+print(docs[0].page_content)
+```
+
+带元数据的查询和检索数据。
+
+```python
+query = "What did the president say about Ketanji Brown Jackson"
+metadata = {
+    "string_field": "value1",
+    "int_field": 1,
+    "float_field": 1.0,
+    "double_field": 2.0,
+}
+docs = opensearch.similarity_search(query, filter=metadata)
+print(docs[0].page_content)
+```
+
+如果您在使用过程中遇到任何问题，请随时联系 [xingshaomin.xsm@alibaba-inc.com](mailto:xingshaomin.xsm@alibaba-inc.com)，我们将尽力为您提供协助和支持。

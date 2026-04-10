@@ -1,0 +1,101 @@
+---
+title: "ThirdAI NeuralDB 集成"
+description: "使用 LangChain Python 与 ThirdAI NeuralDB 向量存储进行集成。"
+---
+
+>[NeuralDB](https://www.thirdai.com/neuraldb-enterprise/) 是由 [ThirdAI](https://www.thirdai.com/) 开发的 CPU 友好且可微调的向量存储。
+
+## 初始化
+
+有两种初始化方法：
+
+- 从零开始：基础模型
+- 从检查点加载：加载之前保存的模型
+
+对于以下所有初始化方法，如果设置了 `THIRDAI_KEY` 环境变量，则可以省略 `thirdai_key` 参数。
+
+ThirdAI API 密钥可以在 [www.thirdai.com/try-bolt/](https://www.thirdai.com/try-bolt/) 获取
+
+您需要安装 `langchain-community` 才能使用此集成，命令为 `pip install -qU langchain-community`
+
+```python
+from langchain_community.vectorstores import NeuralDBVectorStore
+
+# From scratch
+vectorstore = NeuralDBVectorStore.from_scratch(thirdai_key="your-thirdai-key")
+
+# From checkpoint
+vectorstore = NeuralDBVectorStore.from_checkpoint(
+    # Path to a NeuralDB checkpoint. For example, if you call
+    # vectorstore.save("/path/to/checkpoint.ndb") in one script, then you can
+    # call NeuralDBVectorStore.from_checkpoint("/path/to/checkpoint.ndb") in
+    # another script to load the saved model.
+    checkpoint="/path/to/checkpoint.ndb",
+    thirdai_key="your-thirdai-key",
+)
+```
+
+## 插入文档源
+
+```python
+vectorstore.insert(
+    # If you have PDF, DOCX, or CSV files, you can directly pass the paths to the documents
+    sources=["/path/to/doc.pdf", "/path/to/doc.docx", "/path/to/doc.csv"],
+    # When True this means that the underlying model in the NeuralDB will
+    # undergo unsupervised pretraining on the inserted files. Defaults to True.
+    train=True,
+    # Much faster insertion with a slight drop in performance. Defaults to True.
+    fast_mode=True,
+)
+
+from thirdai import neural_db as ndb
+
+vectorstore.insert(
+    # If you have files in other formats, or prefer to configure how
+    # your files are parsed, then you can pass in NeuralDB document objects
+    # like this.
+    sources=[
+        ndb.PDF(
+            "/path/to/doc.pdf",
+            version="v2",
+            chunk_size=100,
+            metadata={"published": 2022},
+        ),
+        ndb.Unstructured("/path/to/deck.pptx"),
+    ]
+)
+```
+
+## 相似度搜索
+
+要查询向量存储，您可以使用标准的 LangChain 向量存储方法 `similarity_search`，它返回一个 LangChain Document 对象列表。每个文档对象代表索引文件中的一部分文本。例如，它可能包含其中一个索引 PDF 文件中的一段段落。除了文本之外，文档的元数据字段还包含诸如文档 ID、该文档的来源（来自哪个文件）以及文档分数等信息。
+
+```python
+# This returns a list of LangChain Document objects
+documents = vectorstore.similarity_search("query", k=10)
+```
+
+## 微调
+
+NeuralDBVectorStore 可以根据用户行为和领域特定知识进行微调。它可以通过两种方式进行微调：
+
+1. 关联：向量存储将源短语与目标短语关联起来。当向量存储看到源短语时，它也会考虑与目标短语相关的结果。
+2. 点赞：向量存储提高特定查询中文档的分数。当您想要根据用户行为微调向量存储时，这很有用。例如，如果用户搜索“汽车是如何制造的”并喜欢返回的 id 为 52 的文档，那么我们可以针对查询“汽车是如何制造的”对 id 为 52 的文档进行点赞。
+
+```python
+vectorstore.associate(source="source phrase", target="target phrase")
+vectorstore.associate_batch(
+    [
+        ("source phrase 1", "target phrase 1"),
+        ("source phrase 2", "target phrase 2"),
+    ]
+)
+
+vectorstore.upvote(query="how is a car manufactured", document_id=52)
+vectorstore.upvote_batch(
+    [
+        ("query 1", 52),
+        ("query 2", 20),
+    ]
+)
+```

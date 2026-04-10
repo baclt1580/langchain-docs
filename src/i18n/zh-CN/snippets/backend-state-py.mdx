@@ -1,0 +1,9 @@
+# 默认情况下，我们提供一个 StateBackend
+agent = create_deep_agent()
+
+# 底层实现如下
+from deepagents.backends import StateBackend
+
+agent = create_deep_agent(
+    backend=(lambda rt: StateBackend(rt))   # 注意工具通过 runtime.state 访问 State
+)

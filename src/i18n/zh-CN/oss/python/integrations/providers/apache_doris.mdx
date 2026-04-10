@@ -1,0 +1,30 @@
+---
+title: "Apache Doris 集成"
+description: "使用 LangChain Python 与 Apache Doris 集成。"
+---
+
+>[Apache Doris](https://doris.apache.org/) 是一个用于实时分析的现代数据仓库。
+它能在大规模下对实时数据提供闪电般的快速分析。
+
+>通常 `Apache Doris` 被归类为 OLAP，并且它在 [ClickBench — a Benchmark For Analytical DBMS](https://benchmark.clickhouse.com/) 中展示了卓越的性能。
+>由于它拥有超快的向量化执行引擎，它也可以用作快速的向量数据库。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install pymysql
+```
+
+```bash uv
+uv add pymysql
+```
+</CodeGroup>
+
+## 向量存储
+
+查看 [用法示例](/oss/integrations/vectorstores/apache_doris)。
+
+```python
+from langchain_community.vectorstores import ApacheDoris
+```

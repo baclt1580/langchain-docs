@@ -1,0 +1,50 @@
+---
+title: "Vectorize 集成"
+description: "使用 LangChain Python 与 Vectorize 进行集成。"
+---
+
+> [Vectorize](https://vectorize.io/) 帮助您更快速、更轻松地构建 AI 应用。
+> 它自动化数据提取，利用 RAG 评估找到最佳的向量化策略，
+> 并让您能够快速为您的非结构化数据部署实时 RAG 管道。
+> 您的向量搜索索引保持最新，并且与您现有的向量数据库集成，
+> 从而让您完全掌控您的数据。
+> Vectorize 处理繁重的任务，让您专注于构建强大的 AI 解决方案，而无需陷入数据管理的泥潭。
+
+# 安装和设置
+
+安装以下 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install langchain-vectorize
+```
+
+```bash uv
+uv add langchain-vectorize
+```
+</CodeGroup>
+
+[注册免费的 Vectorize 账户](https://platform.vectorize.io/)。
+在 [访问令牌](https://docs.vectorize.io/rag-pipelines/retrieval-endpoint#access-tokens) 部分生成访问令牌。
+收集您的组织 ID。从浏览器 URL 中，从 `/organization/` 之后的 URL 中提取 UUID。
+
+设置以下变量：
+```python
+VECTORIZE_ORG_ID="your-organization-id"
+VECTORIZE_API_TOKEN="your-api-token"
+```
+
+## 检索器
+
+```python
+from langchain_vectorize import VectorizeRetriever
+
+retriever = VectorizeRetriever(
+    api_token=VECTORIZE_API_TOKEN,
+    organization=VECTORIZE_ORG_ID,
+    pipeline_id="...",
+)
+retriever.invoke("query")
+```
+
+在 [示例笔记本](/oss/integrations/retrievers/vectorize) 中了解更多。

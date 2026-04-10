@@ -1,0 +1,31 @@
+---
+title: "MoonshotChat 集成"
+description: "使用 LangChain Python 与 MoonshotChat LLM 集成。"
+---
+
+[Moonshot](https://platform.moonshot.cn/) 是一家为中国企业和个人提供 LLM 服务的中国初创公司。
+
+本示例介绍如何使用 LangChain 与 Moonshot 进行交互。
+
+```python
+from langchain_community.llms.moonshot import Moonshot
+```
+
+```python
+import os
+
+# Generate your api key from: https://platform.moonshot.cn/console/api-keys
+os.environ["MOONSHOT_API_KEY"] = "MOONSHOT_API_KEY"
+```
+
+```python
+llm = Moonshot()
+# or use a specific model
+# Available models: https://platform.moonshot.cn/docs
+# llm = Moonshot(model="moonshot-v1-128k")
+```
+
+```python
+# Prompt the model
+llm.invoke("What is the difference between panda and bear?")
+```

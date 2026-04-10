@@ -1,0 +1,29 @@
+---
+title: "天气集成"
+description: "使用 LangChain Python 与天气服务集成。"
+---
+
+>[OpenWeatherMap](https://openweathermap.org/) 是一个开源的天气服务提供商。
+
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install pyowm
+```
+
+```bash uv
+uv add pyowm
+```
+</CodeGroup>
+
+我们需要配置 OpenWeatherMap API 令牌。
+
+## 文档加载器
+
+查看 [使用示例](/oss/integrations/document_loaders/weather)。
+
+```python
+from langchain_community.document_loaders import WeatherDataLoader
+```

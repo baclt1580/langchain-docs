@@ -1,0 +1,90 @@
+---
+title: "Trulens 集成"
+description: "使用 LangChain Python 与 Trulens 集成。"
+---
+
+>[TruLens](https://trulens.org) 是一个 [开源](https://github.com/truera/trulens) 包，为基于大型语言模型（LLM）的应用程序提供监控和评估工具。
+
+本页面介绍如何使用 [TruLens](https://trulens.org) 来评估和跟踪基于 langchain 构建的 LLM 应用程序。
+
+
+## 安装和设置
+
+安装 `trulens-eval` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install trulens-eval
+```
+
+```bash uv
+uv add trulens-eval
+```
+</CodeGroup>
+
+## 快速入门
+
+查看 [TruLens 文档](https://www.trulens.org/trulens_eval/getting_started/quickstarts/langchain_quickstart/) 中的集成详情。
+
+### 跟踪
+
+创建好您的 LLM 链后，您可以使用 TruLens 进行评估和跟踪。
+TruLens 拥有许多 [开箱即用的反馈函数](https://www.trulens.org/trulens_eval/evaluation/feedback_functions/)，
+并且也是一个可扩展的 LLM 评估框架。
+
+创建反馈函数：
+
+```python
+from trulens_eval.feedback import Feedback, Huggingface,
+
+# Initialize HuggingFace-based feedback function collection class:
+hugs = Huggingface()
+openai = OpenAI()
+
+# Define a language match feedback function using HuggingFace.
+lang_match = Feedback(hugs.language_match).on_input_output()
+# By default this will check language match on the main app input and main app
+# output.
+
+# Question/answer relevance between overall question and answer.
+qa_relevance = Feedback(openai.relevance).on_input_output()
+# By default this will evaluate feedback on main app input and main app output.
+
+# Toxicity of input
+toxicity = Feedback(openai.toxicity).on_input()
+```
+
+### 链
+
+在为您的 LLM 设置反馈函数进行评估后，您可以使用 TruChain 包装您的应用程序，以获得详细的跟踪、日志记录和 LLM 应用评估。
+
+注意：有关 `chain` 创建的代码请参阅
+[TruLens 文档](https://www.trulens.org/trulens_eval/getting_started/quickstarts/langchain_quickstart/)。
+
+```python
+from trulens_eval import TruChain
+
+# wrap your chain with TruChain
+truchain = TruChain(
+    chain,
+    app_id='Chain1_ChatApplication',
+    feedbacks=[lang_match, qa_relevance, toxicity]
+)
+# Note: any `feedbacks` specified here will be evaluated and logged whenever the chain is used.
+truchain("que hora es?")
+```
+
+### 评估
+
+现在您可以探索您的基于 LLM 的应用程序了！
+
+这样做将帮助您一目了然地了解您的 LLM 应用程序的性能。随着您迭代新版本，您可以比较它们在所有已设置的质量指标上的性能。您还可以在记录级别查看评估结果，并探索每个记录的链元数据。
+
+```python
+from trulens_eval import Tru
+
+tru = Tru()
+tru.run_dashboard() # open a Streamlit app to explore
+```
+
+有关 TruLens 的更多信息，请访问 [trulens.org](https://www.trulens.org/)

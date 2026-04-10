@@ -1,0 +1,43 @@
+---
+title: "Infino 集成"
+description: "使用 LangChain Python 与 Infino 集成。"
+---
+
+> [Infino](https://github.com/infinohq/infino) 是一个开源的可观测性平台，它将指标和应用程序日志存储在一起。
+
+`Infino` 的主要功能包括：
+- **指标跟踪**：捕获 LLM 模型处理请求所需的时间、错误、令牌数量以及特定 LLM 的成本指示。
+- **数据跟踪**：记录并存储每次 LangChain 交互的提示、请求和响应数据。
+- **图可视化**：生成随时间变化的基本图表，展示诸如请求持续时间、错误发生次数、令牌数量和成本等指标。
+
+## 安装和设置
+
+首先，您需要按如下方式安装 `infinopy` Python 包：
+
+<CodeGroup>
+```bash pip
+pip install infinopy
+```
+
+```bash uv
+uv add infinopy
+```
+</CodeGroup>
+
+如果您已经运行了 `Infino Server`，那么您就准备好了；但如果没有，请按照以下步骤启动它：
+
+- 确保已安装 Docker
+- 在终端中运行以下命令：
+    ```
+    docker run --rm --detach --name infino-example -p 3000:3000 infinohq/infino:latest
+    ```
+
+
+
+## 使用 Infino
+
+查看 [`InfinoCallbackHandler`](/oss/integrations/callbacks/infino) 的使用示例。
+
+```python
+from langchain.callbacks import InfinoCallbackHandler
+```

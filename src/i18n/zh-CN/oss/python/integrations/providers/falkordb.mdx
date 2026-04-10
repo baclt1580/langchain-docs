@@ -1,0 +1,33 @@
+---
+title: "Falkordb 集成"
+description: "使用 LangChain Python 与 Falkordb 集成。"
+---
+
+>什么是 `FalkorDB`？
+
+>- FalkorDB 是一个 `开源数据库管理系统`，专注于图数据库技术。
+>- FalkorDB 允许您在节点和边中表示和存储数据，使其非常适合处理连接数据和关系。
+>- FalkorDB 支持带有专有扩展的 OpenCypher 查询语言，使您能够轻松交互和查询图数据。
+>- 使用 FalkorDB，您可以实现高性能的 `图遍历和查询`，适用于生产级系统。
+
+>请访问 [其官网](https://docs.falkordb.com/) 以开始使用 FalkorDB。
+
+## 安装和设置
+
+- 使用 `pip install falkordb langchain-falkordb` 安装 Python SDK
+
+## 向量存储
+
+FalkorDB 向量索引用作向量存储，无论是用于语义搜索还是示例选择。
+
+```python
+from langchain_community.vectorstores.falkordb_vector import FalkorDBVector
+```
+
+或
+
+```python
+from langchain_falkordb.vectorstore import FalkorDBVector
+```
+
+查看 [使用示例](/oss/integrations/vectorstores/falkordbvector.ipynb)

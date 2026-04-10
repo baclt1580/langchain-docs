@@ -1,0 +1,58 @@
+---
+title: LambdaDB
+---
+
+>[LambdaDB](https://lambdadb.ai/) 是一款面向 RAG 和智能体的无服务器 AI 数据库。它基于灵活的文档模型，统一了全文、多向量和混合搜索。能够即时处理无限的持久化内存和海量并发——成本仅为十分之一。
+
+## 安装与设置
+
+安装 Python SDK：
+
+<CodeGroup>
+    ```bash pip
+    pip install langchain-lambdadb
+    ```
+
+    ```bash uv
+    uv add langchain-lambdadb
+    ```
+</CodeGroup>
+
+此外，你还需要一个包含以下信息的 LambdaDB 账户：
+- 项目 URL
+- 项目 API 密钥
+
+请前往 [lambdadb.ai](https://lambdadb.ai) 获取你的凭据。
+
+## 向量存储
+
+LambdaDB 集合提供了一个封装器，允许你将其作为向量存储用于语义搜索、RAG 及其他 AI 应用。
+
+要导入此向量存储：
+```python
+from langchain_lambdadb import LambdaDBVectorStore
+```
+
+### 快速开始
+
+```python
+from langchain_lambdadb import LambdaDBVectorStore
+from langchain_openai import OpenAIEmbeddings
+from lambdadb import LambdaDB
+import os
+
+# Initialize client
+client = LambdaDB(
+    server_url=os.environ["LAMBDADB_SERVER_URL"],
+    project_api_key=os.environ["LAMBDADB_API_KEY"]
+)
+
+# Create vector store with existing collection
+vector_store = LambdaDBVectorStore(
+    client=client,
+    collection_name="my_collection",  # Must exist beforehand
+    embedding=OpenAIEmbeddings()
+)
+```
+
+如需了解 LambdaDB 封装器的更详细教程，请参阅 [完整文档](/oss/integrations/vectorstores/lambdadb)。

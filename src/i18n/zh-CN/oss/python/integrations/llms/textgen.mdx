@@ -1,0 +1,78 @@
+---
+title: "TextGen 集成"
+description: "使用 LangChain Python 与 TextGen LLM 进行集成。"
+---
+
+[GitHub:oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) 一个用于运行大型语言模型（如 LLaMA、llama.cpp、GPT-J、Pythia、OPT 和 GALACTICA）的 Gradio Web UI。
+
+本示例介绍了如何使用 LangChain 通过 `text-generation-webui` API 集成与 LLM 模型进行交互。
+
+请确保您已配置 `text-generation-webui` 并安装了 LLM。推荐根据您的操作系统安装相应的 [适合您操作系统的一键安装程序](https://github.com/oobabooga/text-generation-webui#one-click-installers)。
+
+一旦 `text-generation-webui` 安装完成并通过 Web 界面确认工作正常，请通过 Web 模型配置选项卡启用 `api` 选项，或在启动命令中添加运行时参数 `--api`。
+
+## 设置 model_url 并运行示例
+
+```python
+model_url = "http://localhost:5000"
+```
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain.globals import set_debug
+from langchain_community.llms import TextGen
+from langchain_core.prompts import PromptTemplate
+
+set_debug(True)
+
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+
+prompt = PromptTemplate.from_template(template)
+llm = TextGen(model_url=model_url)
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+question = "What NFL team won the Super Bowl in the year Justin Bieber was born?"
+
+llm_chain.run(question)
+```
+
+### 流式版本
+
+您应安装 websocket-client 以使用此功能。
+`pip install websocket-client`
+
+```python
+model_url = "ws://localhost:5005"
+```
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain.globals import set_debug
+from langchain_community.llms import TextGen
+from langchain_core.callbacks import StreamingStdOutCallbackHandler
+from langchain_core.prompts import PromptTemplate
+
+set_debug(True)
+
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+
+prompt = PromptTemplate.from_template(template)
+llm = TextGen(
+    model_url=model_url, streaming=True, callbacks=[StreamingStdOutCallbackHandler()]
+)
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+question = "What NFL team won the Super Bowl in the year Justin Bieber was born?"
+
+llm_chain.run(question)
+```
+
+```python
+llm = TextGen(model_url=model_url, streaming=True)
+for chunk in llm.stream("Ask 'Hi, how are you?' like a pirate:'", stop=["'", "\n"]):
+    print(chunk, end="", flush=True)
+```

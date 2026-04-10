@@ -1,0 +1,32 @@
+---
+title: "字节跳动集成"
+description: "使用 LangChain Python 与字节跳动集成。"
+---
+
+>[字节跳动](https://bytedance.com/) 是一家中国互联网技术公司。
+
+## 安装和设置
+
+获取访问令牌。
+您可以在 [飞书开放平台文档](https://open.larksuite.com/document) 中找到访问说明。
+
+## 文档加载器
+
+>[飞书](https://www.larksuite.com/) 是一个企业协作平台
+> 由 `ByteDance` 开发。
+
+### 飞书文档
+
+查看 [使用示例](/oss/integrations/document_loaders/larksuite/#load-from-document)。
+
+```python
+from langchain_community.document_loaders.larksuite import LarkSuiteDocLoader
+```
+
+### 飞书维基
+
+查看 [使用示例](/oss/integrations/document_loaders/larksuite/#load-from-wiki)。
+
+```python
+from langchain_community.document_loaders.larksuite import LarkSuiteWikiLoader
+```

@@ -1,0 +1,24 @@
+---
+title: "StackExchange 集成"
+description: "使用 LangChain Python 与 StackExchange 工具集成。"
+---
+
+>[Stack Exchange](https://stackexchange.com/) 是一个涵盖不同领域主题的问答（Q&A）网站网络，每个网站覆盖特定主题，问题和答案以及用户都受到声誉奖励流程的约束。声誉系统允许这些网站实现自我监管。
+
+`StackExchange` 组件将 StackExchange API 集成到 LangChain 中，允许访问 Stack Exchange 网络的 [StackOverflow](https://stackoverflow.com/) 站点。Stack Overflow 专注于计算机编程。
+
+本笔记本介绍了如何使用 `StackExchange` 组件。
+
+我们首先需要安装实现 Stack Exchange API 的 Python 包 stackapi。
+
+```python
+pip install -U stackapi
+```
+
+```python
+from langchain_community.utilities import StackExchangeAPIWrapper
+
+stackexchange = StackExchangeAPIWrapper()
+
+stackexchange.run("zsh: command not found: python")
+```

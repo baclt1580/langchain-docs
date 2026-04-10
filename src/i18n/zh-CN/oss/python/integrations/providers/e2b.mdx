@@ -1,0 +1,29 @@
+---
+title: "E2b 集成"
+description: "使用 LangChain Python 与 E2b 集成。"
+---
+
+>[E2B](https://e2b.dev/) 为 AI 生成的代码执行提供开源安全沙箱
+> 更多信息请查看 [e2b GitHub 仓库](https://github.com/e2b-dev)。
+
+## 安装和设置
+
+需要安装一个 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install e2b_code_interpreter
+```
+
+```bash uv
+uv add e2b_code_interpreter
+```
+</CodeGroup>
+
+## 工具
+
+查看 [使用示例](/oss/integrations/tools/e2b_data_analysis)。
+
+```python
+from langchain_community.tools import E2BDataAnalysisTool
+```

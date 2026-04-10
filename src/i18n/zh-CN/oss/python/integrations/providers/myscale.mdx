@@ -1,0 +1,68 @@
+---
+title: "MyScale 集成"
+description: "使用 LangChain Python 与 MyScale 进行集成。"
+---
+
+本页介绍如何在 LangChain 中使用 MyScale 向量数据库。
+内容分为两部分：安装和设置，以及特定 MyScale 包装器的参考。
+
+通过 MyScale，您可以管理结构化和非结构化（向量化）数据，并使用 SQL 对这两种类型的数据执行联合查询和分析。此外，基于 ClickHouse 构建的 MyScale 云原生 OLAP 架构，即使在海量数据集上也能实现闪电般的数据处理速度。
+
+## 简介
+
+[MyScale 概述及高性能向量搜索](https://docs.myscale.com/en/overview/)
+
+您现在可以在我们的 SaaS 上注册并 [立即启动集群！](https://docs.myscale.com/en/quickstart/)
+
+如果您也对我们如何整合 SQL 和向量感兴趣，请参阅 [此文档](https://docs.myscale.com/en/vector-reference/) 以获取进一步的语法参考。
+
+我们还在 Hugging Face 上提供实时演示！请查看我们的 [Hugging Face 空间](https://huggingface.co/myscale)！它们能在眨眼间搜索数百万个向量！
+
+## 安装和设置
+- 使用 `pip install clickhouse-connect` 安装 Python SDK
+
+### 环境设置
+
+有两种方式为 MyScale 索引设置参数。
+
+1. 环境变量
+
+    在运行应用程序之前，请使用 `export` 设置环境变量：
+        `export MYSCALE_HOST='<your-endpoints-url>' MYSCALE_PORT=<your-endpoints-port> MYSCALE_USERNAME=<your-username> MYSCALE_PASSWORD=<your-password> ...`
+
+    您可以在我们的 SaaS 上轻松找到您的账户、密码和其他信息。详细信息请参考 [此文档](https://docs.myscale.com/en/cluster-management/)
+    `MyScaleSettings` 下的每个属性都可以使用前缀 `MYSCALE_` 设置，且不区分大小写。
+
+2. 使用参数创建 `MyScaleSettings` 对象
+
+
+    ```python
+    from langchain_community.vectorstores import MyScale, MyScaleSettings
+    config = MyScaleSettings(host="<your-backend-url>", port=8443, ...)
+    index = MyScale(embedding_function, config)
+    index.add_documents(...)
+    ```
+
+## 包装器
+支持的函数：
+- `add_texts`
+- `add_documents`
+- `from_texts`
+- `from_documents`
+- `similarity_search`
+- `asimilarity_search`
+- `similarity_search_by_vector`
+- `asimilarity_search_by_vector`
+- `similarity_search_with_relevance_scores`
+- `delete`
+
+### 向量存储
+
+存在一个围绕 MyScale 数据库的包装器，允许您将其用作向量存储，无论是用于语义搜索还是类似示例检索。
+
+要导入此向量存储：
+```python
+from langchain_community.vectorstores import MyScale
+```
+
+有关 MyScale 包装器的更详细教程，请参阅 [此笔记本](/oss/integrations/vectorstores/myscale)

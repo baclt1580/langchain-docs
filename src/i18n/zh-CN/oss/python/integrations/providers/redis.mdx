@@ -1,0 +1,127 @@
+---
+title: "Redis 集成"
+description: "使用 LangChain Python 与 Redis 集成。"
+---
+
+>[Redis (远程字典服务器)](https://en.wikipedia.org/wiki/Redis) 是一种开源的内存存储，
+> 用作分布式、内存键值数据库、缓存和消息代理，具有可选的持久性。
+> 由于它将所有数据保存在内存中且因其设计，`Redis` 提供低延迟的读写，
+> 使其特别适合需要缓存的使用场景。Redis 是最流行的 NoSQL 数据库，
+> 也是整体最受欢迎的数据库之一。
+
+本页介绍如何在 LangChain 中使用 [Redis](https://redis.com) 生态系统。
+它分为两部分：安装和设置，然后是特定 Redis 包装器的参考。
+
+## 安装和设置
+
+安装 Python SDK 和 LangChain Redis 集成：
+
+<CodeGroup>
+```bash pip
+pip install redis langchain-redis
+```
+
+```bash uv
+uv add redis langchain-redis
+```
+</CodeGroup>
+
+要在本地运行 Redis，可以使用 Docker：
+
+```bash
+docker run --name langchain-redis -d -p 6379:6379 redis redis-server --save 60 1 --loglevel warning
+```
+
+停止容器：
+
+```bash
+docker stop langchain-redis
+```
+
+然后再次启动它：
+
+```bash
+docker start langchain-redis
+```
+
+### 连接
+
+我们需要一个 Redis URL 连接字符串来连接到数据库，支持独立的 Redis 服务器或带有复制和 Redis Sentinel 的高可用性设置。
+
+#### Redis 独立连接 URL
+对于独立的 `Redis` 服务器，可以使用官方 redis 连接 URL 格式，如 python redis 模块中的 "from_url()" 方法所述 [Redis.from_url](https://redis-py.readthedocs.io/en/stable/connections.html#redis.Redis.from_url)
+
+示例：`redis_url = "redis://:secret-pass@localhost:6379/0"`
+
+#### Redis Sentinel 连接 URL
+
+对于 [Redis Sentinel 设置](https://redis.io/docs/management/sentinel/)，连接方案是 "redis+sentinel"。
+这是官方 IANA 注册协议方案的非官方扩展，只要没有可用的 Sentinel 连接 URL。
+
+示例：`redis_url = "redis+sentinel://:secret-pass@sentinel-host:26379/mymaster/0"`
+
+格式为 `redis+sentinel://$USERNAME:$PASSWORD@$HOST_OR_IP:$PORT/$SERVICE_NAME/$DB_NUMBER`
+如果未显式设置，则默认值为 "service-name = mymaster" 和 "db-number = 0"。
+服务名称是在 Sentinel 内配置的 Redis 服务器监控组名称。
+
+当前的 URL 格式将连接字符串限制为仅一个 Sentinel 主机（不能给出列表），并且 Redis 服务器和 Sentinel 必须设置相同的密码（如果使用）。
+
+#### Redis 集群连接 URL
+
+目前不支持所有需要 "redis_url" 参数的方法的 Redis 集群。
+使用 Redis 集群的唯一方法是使用接受预配置 Redis 客户端的 LangChain 类，例如 `RedisCache`（见下文示例）。
+
+## 缓存
+
+缓存包装器允许将 [Redis](https://redis.io) 用作 LLM 提示和响应的远程、低延迟、内存缓存。
+
+### 标准缓存
+标准缓存是全球 [开源](https://redis.io) 和 [企业](https://redis.com) 用户在生产中使用的 Redis 核心用例。
+
+```python
+from langchain_redis import RedisCache
+```
+
+要将此缓存与您的 LLM 一起使用：
+```python
+from langchain.globals import set_llm_cache
+import redis
+
+redis_client = redis.Redis.from_url(...)
+set_llm_cache(RedisCache(redis_client))
+```
+
+### 语义缓存
+语义缓存允许用户基于用户输入与之前缓存结果之间的语义相似性检索缓存的提示。在底层，它将 Redis 作为缓存和向量存储结合使用。
+
+```python
+from langchain_redis import RedisSemanticCache
+```
+
+要将此缓存与您的 LLM 一起使用：
+```python
+from langchain.globals import set_llm_cache
+import redis
+
+# use any embedding provider...
+from tests.integration_tests.vectorstores.fake_embeddings import FakeEmbeddings
+
+redis_url = "redis://localhost:6379"
+
+set_llm_cache(RedisSemanticCache(
+    embedding=FakeEmbeddings(),
+    redis_url=redis_url
+))
+```
+
+## 向量存储
+
+向量存储包装器将 Redis 转变为用于语义搜索或 LLM 内容检索的低延迟 [向量数据库](https://redis.com/solutions/use-cases/vector-database/)。
+
+```python
+from langchain_community.vectorstores import Redis
+```
+
+## 检索器
+
+Redis 向量存储检索器包装器泛化了向量存储类以执行低延迟文档检索。要创建检索器，只需在基础向量存储类上调用 `.as_retriever()`。

@@ -1,0 +1,156 @@
+---
+title: "Javelin AI 网关教程集成"
+description: "使用 LangChain Python 与 Javelin AI 网关教程 LLM 进行集成。"
+---
+
+本 Jupyter Notebook 将探索如何使用 Python SDK 与 Javelin AI 网关进行交互。
+Javelin AI 网关通过提供安全统一的端点，促进了大型语言模型（LLM）如 OpenAI、Cohere、Anthropic 等的利用。网关本身提供了一个集中机制，用于系统性地部署模型，
+为企业提供访问安全、策略和成本护栏等，
+
+有关 Javelin 所有功能及优势的完整列表，请访问 [www.getjavelin.io](https://www.getjavelin.io)
+
+## 步骤 1：简介
+
+[Javelin AI 网关](https://www.getjavelin.io) 是一个面向 AI 应用的企业级 API 网关。它集成了强大的访问安全性，确保与大型语言模型的安全交互。更多信息请查看 [官方文档](https://docs.getjavelin.io)。
+
+## 步骤 2：安装
+
+在开始之前，我们必须安装 `javelin_sdk` 并将 Javelin API 密钥设置为环境变量。
+
+```python
+pip install 'javelin_sdk'
+```
+
+## 步骤 3：补全示例
+
+本节将演示如何与 Javelin AI 网关交互以从大型语言模型获取补全。以下是一个演示此操作的 Python 脚本：
+（注意）假设您已在网关中设置了名为 'eng_dept03' 的路由
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain_community.llms import JavelinAIGateway
+from langchain_core.prompts import PromptTemplate
+
+route_completions = "eng_dept03"
+
+gateway = JavelinAIGateway(
+    gateway_uri="http://localhost:8000",  # replace with service URL or host/port of Javelin
+    route=route_completions,
+    model_name="gpt-3.5-turbo-instruct",
+)
+
+prompt = PromptTemplate("Translate the following English text to French: {text}")
+
+llmchain = LLMChain(llm=gateway, prompt=prompt)
+result = llmchain.run("podcast player")
+
+print(result)
+```
+
+```text
+---------------------------------------------------------------------------
+```
+```text
+ImportError                               Traceback (most recent call last)
+```
+```text
+Cell In[6], line 2
+      1 from langchain_classic.chains import LLMChain
+----> 2 from langchain.llms import JavelinAIGateway
+      3 from langchain.prompts import PromptTemplate
+      5 route_completions = "eng_dept03"
+```
+```text
+ImportError: cannot import name 'JavelinAIGateway' from 'langchain.llms' (/usr/local/Caskroom/miniconda/base/lib/python3.11/site-packages/langchain/llms/__init__.py)
+```
+
+# 步骤 4：嵌入示例
+
+本节演示如何使用 Javelin AI 网关为文本查询和文档获取嵌入。以下是一个说明此操作的 Python 脚本：
+（注意）假设您已在网关中设置了名为 'embeddings' 的路由
+
+```python
+from langchain_community.embeddings import JavelinAIGatewayEmbeddings
+
+embeddings = JavelinAIGatewayEmbeddings(
+        gateway_uri="http://localhost:8000",  # replace with service URL or host/port of Javelin
+        route="embeddings",
+)
+
+print(embeddings.embed_query("hello"))
+print(embeddings.embed_documents(["hello"]))
+```
+
+```text
+---------------------------------------------------------------------------
+```
+```text
+ImportError                               Traceback (most recent call last)
+```
+```text
+Cell In[9], line 1
+----> 1 from langchain.embeddings import JavelinAIGatewayEmbeddings
+      2 from langchain.embeddings.openai import OpenAIEmbeddings
+            4 embeddings = JavelinAIGatewayEmbeddings(
+            5     gateway_uri="http://localhost:8000", # replace with service URL or host/port of Javelin
+            6     route="embeddings",
+      7 )
+```
+```text
+ImportError: cannot import name 'JavelinAIGatewayEmbeddings' from 'langchain.embeddings' (/usr/local/Caskroom/miniconda/base/lib/python3.11/site-packages/langchain/embeddings/__init__.py)
+```
+
+# 步骤 5：聊天示例
+
+本节说明了如何与 Javelin AI 网关交互以促进与大型语言模型的聊天。以下是一个演示此操作的 Python 脚本：
+（注意）假设您已在网关中设置了名为 'mychatbot_route' 的路由
+
+```python
+from langchain_community.chat_models import ChatJavelinAIGateway
+from langchain.messages import HumanMessage, SystemMessage
+
+messages = [
+    SystemMessage(
+        content="You are a helpful assistant that translates English to French."
+    ),
+    HumanMessage(
+        content="Artificial Intelligence has the power to transform humanity and make the world a better place"
+    ),
+]
+
+chat = ChatJavelinAIGateway(
+    gateway_uri="http://localhost:8000",  # replace with service URL or host/port of Javelin
+    route="mychatbot_route",
+    model_name="gpt-3.5-turbo",
+    params={"temperature": 0.1},
+)
+
+print(chat(messages))
+```
+
+```text
+---------------------------------------------------------------------------
+```
+```text
+ImportError                               Traceback (most recent call last)
+```
+```text
+Cell In[8], line 1
+----> 1 from langchain.chat_models import ChatJavelinAIGateway
+      2 from langchain.schema import HumanMessage, SystemMessage
+      4 messages = [
+      5     SystemMessage(
+      6         content="You are a helpful assistant that translates English to French."
+   (...)
+     10     ),
+     11 ]
+```
+```text
+ImportError: cannot import name 'ChatJavelinAIGateway' from 'langchain.chat_models' (/usr/local/Caskroom/miniconda/base/lib/python3.11/site-packages/langchain/chat_models/__init__.py)
+```
+
+步骤 6：结论
+本教程介绍了 Javelin AI 网关，并演示了如何使用 Python SDK 与其交互。
+记得查看 Javelin [Python SDK](https://www.github.com/getjavelin.io/javelin-python) 获取更多示例，并查阅官方文档了解更多详情。
+
+愉快编码！

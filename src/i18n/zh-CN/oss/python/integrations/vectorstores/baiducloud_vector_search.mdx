@@ -1,0 +1,74 @@
+---
+title: "百度云 Elasticsearch 向量搜索集成"
+description: "使用 LangChain Python 集成百度云 Elasticsearch 向量搜索向量存储。"
+---
+
+>[百度云向量搜索](https://cloud.baidu.com/doc/BES/index.html?from=productToDoc) 是一项完全托管的企业级分布式搜索和分析服务，与开源 100% 兼容。百度云向量搜索为结构化/非结构化数据提供低成本、高性能且可靠的检索和分析平台级产品服务。作为向量数据库，它支持多种索引类型和相似度距离方法。
+
+>`Baidu Cloud ElasticSearch` 提供了权限管理机制，供您自由配置集群权限，以进一步确保数据安全。
+
+本笔记本展示了如何使用与 `Baidu Cloud ElasticSearch VectorStore` 相关的功能。
+要运行此代码，您应该已经有一个 [百度云 Elasticsearch](https://cloud.baidu.com/product/bes.html) 实例正在运行：
+
+阅读 [帮助文档](https://cloud.baidu.com/doc/BES/s/8llyn0hh4 ) 以快速熟悉并配置百度云 Elasticsearch 实例。
+
+实例启动并运行后，请按照以下步骤分割文档、获取嵌入、连接到百度云 Elasticsearch 实例、索引文档并执行向量检索。
+
+我们首先需要安装以下 Python 包。
+
+```python
+pip install -qU langchain-community elasticsearch == 7.11.0
+```
+
+首先，我们要使用 `QianfanEmbeddings`，因此需要获取 Qianfan AK 和 SK。QianFan 的详细信息请参阅 [百度千帆工坊](https://cloud.baidu.com/product/wenxinworkshop)
+
+```python
+import getpass
+import os
+
+if "QIANFAN_AK" not in os.environ:
+    os.environ["QIANFAN_AK"] = getpass.getpass("Your Qianfan AK:")
+if "QIANFAN_SK" not in os.environ:
+    os.environ["QIANFAN_SK"] = getpass.getpass("Your Qianfan SK:")
+```
+
+其次，分割文档并获取嵌入。
+
+```python
+from langchain_community.document_loaders import TextLoader
+from langchain_text_splitters import CharacterTextSplitter
+
+loader = TextLoader("../../../state_of_the_union.txt")
+documents = loader.load()
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+
+from langchain_community.embeddings import QianfanEmbeddingsEndpoint
+
+embeddings = QianfanEmbeddingsEndpoint()
+```
+
+然后，创建一个可访问的百度 Elasticsearch 实例。
+
+```python
+# Create a bes instance and index docs.
+from langchain_community.vectorstores import BESVectorStore
+
+bes = BESVectorStore.from_documents(
+    documents=docs,
+    embedding=embeddings,
+    bes_url="your bes cluster url",
+    index_name="your vector index",
+)
+bes.client.indices.refresh(index="your vector index")
+```
+
+最后，查询和检索数据
+
+```python
+query = "What did the president say about Ketanji Brown Jackson"
+docs = bes.similarity_search(query)
+print(docs[0].page_content)
+```
+
+如果您在使用过程中遇到任何问题，请随时联系 [liuboyao@baidu.com](mailto:liuboyao@baidu.com) 或 [chenweixu01@baidu.com](mailto:chenweixu01@baidu.com)，我们将竭诚为您提供支持。

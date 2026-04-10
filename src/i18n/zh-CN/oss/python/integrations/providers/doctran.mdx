@@ -1,0 +1,44 @@
+---
+title: "Doctran 集成"
+description: "使用 LangChain Python 与 Doctran 进行集成。"
+---
+
+> [Doctran](https://github.com/psychic-api/doctran) 是一个 Python 包。它使用 LLMs 和开源
+> NLP 库将原始文本转换为干净、结构化、信息密集的文档，这些文档针对向量空间检索进行了优化。你可以将 `Doctran` 视为一个黑盒，其中杂乱的字符串进去，整洁、干净的带标签字符串出来。
+
+
+## 安装与设置
+
+<CodeGroup>
+```bash pip
+pip install doctran
+```
+
+```bash uv
+uv add doctran
+```
+</CodeGroup>
+
+## 文档转换器
+
+### 文档询问器
+
+查看 [DoctranQATransformer 的使用示例](/oss/integrations/document_transformers/doctran_interrogate_document)。
+
+```python
+from langchain_community.document_transformers import DoctranQATransformer
+```
+### 属性提取器
+
+查看 [DoctranPropertyExtractor 的使用示例](/oss/integrations/document_transformers/doctran_extract_properties)。
+
+```python
+from langchain_community.document_transformers import DoctranPropertyExtractor
+```
+### 文档翻译器
+
+查看 [DoctranTextTranslator 的使用示例](/oss/integrations/document_transformers/doctran_translate_document)。
+
+```python
+from langchain_community.document_transformers import DoctranTextTranslator
+```

@@ -1,0 +1,35 @@
+---
+title: "Elevenlabs 集成"
+description: "使用 LangChain Python 与 Elevenlabs 集成。"
+---
+
+>[ElevenLabs](https://elevenlabs.io/about) 是一家语音 AI 研究与部署公司
+> 其使命是让内容在任何语言和声音中都能普遍可及。
+>
+>`ElevenLabs` 打造最逼真、多功能且具有上下文感知能力的 AI 音频，
+> 提供在数百种新和现有声音中生成语音的能力，
+> 涵盖 29 种语言。
+
+## 安装与设置
+
+首先，您需要设置一个 ElevenLabs 账户。您可以在此处遵循 [此处说明](https://docs.elevenlabs.io/welcome/introduction)。
+
+安装 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install elevenlabs
+```
+
+```bash uv
+uv add elevenlabs
+```
+</CodeGroup>
+
+## 工具
+
+查看 [使用示例](/oss/integrations/tools/eleven_labs_tts)。
+
+```python
+from langchain_community.tools import ElevenLabsText2SpeechTool
+```

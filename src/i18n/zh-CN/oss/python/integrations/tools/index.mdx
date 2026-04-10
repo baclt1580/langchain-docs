@@ -1,0 +1,273 @@
+---
+title: "工具集成"
+sidebarTitle: "工具和工具包"
+description: "使用 LangChain Python 与工具集成。"
+---
+
+[工具](/oss/langchain/tools) 是设计为由模型调用的实用程序：它们的输入设计为由模型生成，输出设计为传回给模型。
+
+工具包是一组旨在一起使用的工具集合。
+
+## 搜索
+
+下表展示了以某种形式执行在线搜索的工具：
+
+| 工具/工具包 | 免费/付费 | 返回数据 |
+|-------------|-----------|----------|
+| [Bing Search](/oss/integrations/tools/bing_search) | 付费 | URL, Snippet, Title |
+| [Brave Search](/oss/integrations/tools/brave_search) | 免费 | URL, Snippet, Title |
+| [cloro](/oss/integrations/tools/cloro) | 付费 | URL, Snippet, Title, Answer |
+| [DuckDuckgoSearch](/oss/integrations/tools/ddg) | 免费 | URL, Snippet, Title |
+| [Exa Search](/oss/integrations/tools/exa_search) | 每月 1000 次免费搜索 | URL, Author, Title, Published Date |
+| [Google Search](/oss/integrations/tools/google_search) | 付费 | URL, Snippet, Title |
+| [Google Serper](/oss/integrations/tools/google_serper) | 免费 | URL, Snippet, Title, Search Rank, Site Links |
+| [Jina Search](/oss/integrations/tools/jina_search) | 1M 响应 Token 免费 | URL, Snippet, Title, Page Content |
+| [Mojeek Search](/oss/integrations/tools/mojeek_search) | 付费 | URL, Snippet, Title |
+| [Nia Toolkit](/oss/integrations/tools/nia) | 提供免费层级 | Code, Docs, Metadata, Sources |
+| [Nimble Search](/oss/integrations/tools/nimble_search) | 提供免费试用 | URL, Content, Title |
+| [Parallel Search](/oss/integrations/tools/parallel_search) | 付费 | URL, Title, Excerpts |
+| [SearchApi](/oss/integrations/tools/searchapi) | 注册后 100 次免费搜索 | URL, Snippet, Title, Search Rank, Site Links, Authors |
+| [SearxNG Search](/oss/integrations/tools/searx_search) | 免费 | URL, Snippet, Title, Category |
+| [SerpApi](/oss/integrations/tools/serpapi) | 每月 250 次免费搜索 | Answer |
+| [Tavily Search](/oss/integrations/tools/tavily_search) | 每月 1000 次免费搜索 | URL, Content, Title, Images, Answer |
+| [Apify](/oss/integrations/tools/apify_actors) | 免费层级，按使用量付费（因 Actor 而异） | Actor 输出（因 Actor 而异） |
+| [You.com Search](/oss/integrations/tools/you) | 60 天免费 | URL, Title, Page Content |
+
+## 代码解释器
+
+下表展示了可用作代码解释器的工具：
+
+| 工具/工具包 | 支持的语言 | 沙盒生命周期 | 支持文件上传 | 返回类型 | 支持自托管 |
+|-------------|-------------------|-----------------|---------------------|--------------|-------------------|
+| [Amazon Bedrock AgentCore Code Interpreter](/oss/integrations/tools/bedrock_agentcore_code_interpreter) | Python, JavaScript, TypeScript | 可配置（最长 8 小时） | ✅ | Text, Images, Files | ❌ |
+| [Azure Container Apps dynamic sessions](/oss/integrations/tools/azure_dynamic_sessions) | Python | 1 小时 | ✅ | Text, Images | ❌ |
+| [Bearly Code Interpreter](/oss/integrations/tools/bearly) | Python | 执行时重置 | ✅ | Text | ❌ |
+| [Riza Code Interpreter](/oss/integrations/tools/riza) | Python, JavaScript, PHP, Ruby | 执行时重置 | ✅ | Text | ✅ |
+
+## 生产力
+
+下表展示了可用于自动化生产力工具任务的工具：
+
+| 工具/工具包 | 定价 |
+|-------------|---------|
+| [GitHub Toolkit](/oss/integrations/tools/github) | 免费 |
+| [GitLab Toolkit](/oss/integrations/tools/gitlab) | 个人项目免费 |
+| [Gmail Toolkit](/oss/integrations/tools/google_gmail) | 免费，每个用户每秒限制 250 配额单位 |
+| [Infobip Tool](/oss/integrations/tools/infobip) | 提供免费试用，之后为可变定价 |
+| [Jira Toolkit](/oss/integrations/tools/jira) | 免费，有 [速率限制](https://developer.atlassian.com/cloud/jira/platform/rate-limiting/) |
+| [Office365 Toolkit](/oss/integrations/tools/office365) | Office365 免费，包含 [速率限制](https://learn.microsoft.com/en-us/graph/throttling-limits) |
+| [Slack Toolkit](/oss/integrations/tools/slack) | 免费 |
+| [Twilio Tool](/oss/integrations/tools/twilio) | 提供免费试用，之后为 [按需定价](https://www.twilio.com/en-us/pricing) |
+
+## 网页浏览
+
+下表展示了可用于自动化网页浏览器任务的工具：
+
+| 工具/工具包 | 定价 | 支持与浏览器交互 |
+|-------------|---------|---------------------------------------|
+| [AgentQL Toolkit](/oss/integrations/tools/agentql) | 提供免费试用，之后为按需和固定费率计划 | ✅ |
+| [Amazon Bedrock AgentCore Browser](/oss/integrations/tools/bedrock_agentcore_browser) | 按使用量付费（AWS） | ✅ |
+| [Hyperbrowser Browser Agent Tools](/oss/integrations/tools/hyperbrowser_browser_agent_tools) | 提供免费试用，之后为固定费率计划和预付费积分 | ✅ |
+| [Hyperbrowser Web Scraping Tools](/oss/integrations/tools/hyperbrowser_web_scraping_tools) | 提供免费试用，之后为固定费率计划和预付费积分 | ❌ |
+| [MultiOn Toolkit](/oss/integrations/tools/multion) | 每天 40 次免费请求 | ✅ |
+| [Nimble Extract](/oss/integrations/tools/nimble_extract) | 提供免费试用 | ❌ |
+| [Oxylabs Web Scraper API](/oss/integrations/tools/oxylabs) | 提供免费试用，之后为固定费率计划和预付费积分 | ❌ |
+| [PlayWright Browser Toolkit](/oss/integrations/tools/playwright) | 免费 | ✅ |
+| [Requests Toolkit](/oss/integrations/tools/requests) | 免费 | ❌ |
+
+## 数据库
+
+下表展示了可用于自动化数据库任务的工具：
+
+| 工具/工具包 | 允许的操作 |
+|-------------|-------------------|
+| [Cassandra Database Toolkit](/oss/integrations/tools/cassandra_database) | SELECT 和架构自省 |
+| [MCP Toolbox](/oss/integrations/tools/mcp_toolbox) | 任何 SQL 操作 |
+| [SQLDatabase Toolkit](/oss/integrations/tools/sql_database) | 任何 SQL 操作 |
+| [Spark SQL Toolkit](/oss/integrations/tools/spark_sql) | 任何 SQL 操作 |
+| [Drasi Toolkit](/oss/integrations/tools/drasi) | 实时数据库变更检测 |
+| [Stardog](/oss/integrations/tools/stardog) | SPARQL SELECT 和架构自省 |
+
+## 金融
+
+下表展示了可用于执行金融交易（如支付、购买等）的工具：
+
+| 工具/工具包 | 定价 | 功能 |
+|-------------|---------|--------------|
+| [Ampersend](/oss/integrations/tools/ampersend) | 付费 | 支付并使用远程 AI 代理服务，自动处理 x402 付款。 |
+| [GOAT](/oss/integrations/tools/goat) | 免费 | 创建和接收付款、购买实物商品、进行投资等。 |
+| [Privy](/oss/integrations/tools/privy) | 免费 | 创建具有可配置权限的钱包并快速执行交易。 |
+
+## 集成平台
+
+以下平台通过统一接口提供对多种工具和服务的访问：
+
+| 工具/工具包 | 集成数量 | 定价 | 关键功能 |
+|-------------|----------------------|---------|--------------|
+| [Composio](/oss/integrations/tools/composio) | 500+ | 提供免费层级 | OAuth 处理、事件驱动工作流、多用户支持 |
+
+## 所有工具和工具包
+
+<Columns cols={3}>
+<Card title="ADS4GPTs" icon="link" href="/oss/integrations/tools/ads4gpts" arrow="true" cta="查看指南" />
+<Card title="AgentQL" icon="link" href="/oss/integrations/tools/agentql" arrow="true" cta="查看指南" />
+<Card title="AINetwork Toolkit" icon="link" href="/oss/integrations/tools/ainetwork" arrow="true" cta="查看指南" />
+<Card title="Alpha Vantage" icon="link" href="/oss/integrations/tools/alpha_vantage" arrow="true" cta="查看指南" />
+<Card title="Ampersend" icon="link" href="/oss/integrations/tools/ampersend" arrow="true" cta="查看指南" />
+<Card title="Amadeus Toolkit" icon="link" href="/oss/integrations/tools/amadeus" arrow="true" cta="查看指南" />
+<Card title="Amazon Bedrock AgentCore Browser" icon="link" href="/oss/integrations/tools/bedrock_agentcore_browser" arrow="true" cta="查看指南" />
+<Card title="Amazon Bedrock AgentCore Code Interpreter" icon="link" href="/oss/integrations/tools/bedrock_agentcore_code_interpreter" arrow="true" cta="查看指南" />
+<Card title="Anchor Browser" icon="link" href="/oss/integrations/tools/anchor_browser" arrow="true" cta="查看指南" />
+<Card title="Apify" icon="link" href="/oss/integrations/tools/apify_actors" arrow="true" cta="查看指南" />
+<Card title="ArXiv" icon="link" href="/oss/integrations/tools/arxiv" arrow="true" cta="查看指南" />
+<Card title="AskNews" icon="link" href="/oss/integrations/tools/asknews" arrow="true" cta="查看指南" />
+<Card title="AWS Lambda" icon="link" href="/oss/integrations/tools/awslambda" arrow="true" cta="查看指南" />
+<Card title="Azure AI Services Toolkit" icon="link" href="/oss/integrations/tools/azure_ai_services" arrow="true" cta="查看指南" />
+<Card title="Azure Cognitive Services Toolkit" icon="link" href="/oss/integrations/tools/azure_cognitive_services" arrow="true" cta="查看指南" />
+<Card title="Azure Container Apps Dynamic Sessions" icon="link" href="/oss/integrations/tools/azure_dynamic_sessions" arrow="true" cta="查看指南" />
+<Card title="Shell (bash)" icon="link" href="/oss/integrations/tools/bash" arrow="true" cta="查看指南" />
+<Card title="Bearly Code Interpreter" icon="link" href="/oss/integrations/tools/bearly" arrow="true" cta="查看指南" />
+<Card title="Bing Search" icon="link" href="/oss/integrations/tools/bing_search" arrow="true" cta="查看指南" />
+<Card title="Bodo DataFrames" icon="link" href="/oss/integrations/tools/bodo" arrow="true" cta="查看指南" />
+<Card title="cloro" icon="link" href="/oss/integrations/tools/cloro" arrow="true" cta="查看指南" />
+<Card title="Brave Search" icon="link" href="/oss/integrations/tools/brave_search" arrow="true" cta="查看指南" />
+<Card title="BrightData Web Scraper API" icon="link" href="/oss/integrations/tools/brightdata-webscraperapi" arrow="true" cta="查看指南" />
+<Card title="BrightData SERP" icon="link" href="/oss/integrations/tools/brightdata_serp" arrow="true" cta="查看指南" />
+<Card title="BrightData Unlocker" icon="link" href="/oss/integrations/tools/brightdata_unlocker" arrow="true" cta="查看指南" />
+<Card title="CAMB AI" icon="link" href="/oss/integrations/tools/camb" arrow="true" cta="查看指南" />
+<Card title="Cassandra Database Toolkit" icon="link" href="/oss/integrations/tools/cassandra_database" arrow="true" cta="查看指南" />
+<Card title="CDP" icon="link" href="/oss/integrations/tools/cdp_agentkit" arrow="true" cta="查看指南" />
+<Card title="ChatGPT Plugins" icon="link" href="/oss/integrations/tools/chatgpt_plugins" arrow="true" cta="查看指南" />
+<Card title="ClickUp Toolkit" icon="link" href="/oss/integrations/tools/clickup" arrow="true" cta="查看指南" />
+<Card title="Cogniswitch Toolkit" icon="link" href="/oss/integrations/tools/cogniswitch" arrow="true" cta="查看指南" />
+<Card title="Compass DeFi Toolkit" icon="link" href="/oss/integrations/tools/compass" arrow="true" cta="查看指南" />
+<Card title="Composio" icon="link" href="/oss/integrations/tools/composio" arrow="true" cta="查看指南" />
+<Card title="Connery Toolkit" icon="link" href="/oss/integrations/tools/connery" arrow="true" cta="查看指南" />
+<Card title="Dall-E Image Generator" icon="link" href="/oss/integrations/tools/dalle_image_generator" arrow="true" cta="查看指南" />
+<Card title="Dappier" icon="link" href="/oss/integrations/tools/dappier" arrow="true" cta="查看指南" />
+<Card title="Databricks Unity Catalog" icon="link" href="/oss/integrations/tools/databricks" arrow="true" cta="查看指南" />
+<Card title="DataForSEO" icon="link" href="/oss/integrations/tools/dataforseo" arrow="true" cta="查看指南" />
+<Card title="Dataherald" icon="link" href="/oss/integrations/tools/dataherald" arrow="true" cta="查看指南" />
+<Card title="Daytona Data Analysis" icon="link" href="/oss/integrations/tools/daytona_data_analysis" arrow="true" cta="查看指南" />
+<Card title="DuckDuckGo Search" icon="link" href="/oss/integrations/tools/ddg" arrow="true" cta="查看指南" />
+<Card title="Discord" icon="link" href="/oss/integrations/tools/discord" arrow="true" cta="查看指南" />
+<Card title="Drasi" icon="link" href="/oss/integrations/tools/drasi" arrow="true" cta="查看指南" />
+<Card title="E2B Data Analysis" icon="link" href="/oss/integrations/tools/e2b_data_analysis" arrow="true" cta="查看指南" />
+<Card title="Eden AI" icon="link" href="/oss/integrations/tools/edenai_tools" arrow="true" cta="查看指南" />
+<Card title="ElevenLabs Text2Speech" icon="link" href="/oss/integrations/tools/eleven_labs_tts" arrow="true" cta="查看指南" />
+<Card title="Exa Search" icon="link" href="/oss/integrations/tools/exa_search" arrow="true" cta="查看指南" />
+<Card title="File System" icon="link" href="/oss/integrations/tools/filesystem" arrow="true" cta="查看指南" />
+<Card title="Financial Datasets Toolkit" icon="link" href="/oss/integrations/tools/financial_datasets" arrow="true" cta="查看指南" />
+<Card title="FMP Data" icon="link" href="/oss/integrations/tools/fmp-data" arrow="true" cta="查看指南" />
+<Card title="GitHub Toolkit" icon="link" href="/oss/integrations/tools/github" arrow="true" cta="查看指南" />
+<Card title="GitLab Toolkit" icon="link" href="/oss/integrations/tools/gitlab" arrow="true" cta="查看指南" />
+<Card title="Gmail Toolkit" icon="link" href="/oss/integrations/tools/google_gmail" arrow="true" cta="查看指南" />
+<Card title="GOAT" icon="link" href="/oss/integrations/tools/goat" arrow="true" cta="查看指南" />
+<Card title="Privy" icon="link" href="/oss/integrations/tools/privy" arrow="true" cta="查看指南" />
+<Card title="Golden Query" icon="link" href="/oss/integrations/tools/golden_query" arrow="true" cta="查看指南" />
+<Card title="Google Books" icon="link" href="/oss/integrations/tools/google_books" arrow="true" cta="查看指南" />
+<Card title="Google Calendar Toolkit" icon="link" href="/oss/integrations/tools/google_calendar" arrow="true" cta="查看指南" />
+<Card title="Google Cloud Text-to-Speech" icon="link" href="/oss/integrations/tools/google_cloud_texttospeech" arrow="true" cta="查看指南" />
+<Card title="Google Drive" icon="link" href="/oss/integrations/tools/google_drive" arrow="true" cta="查看指南" />
+<Card title="Google Finance" icon="link" href="/oss/integrations/tools/google_finance" arrow="true" cta="查看指南" />
+<Card title="Google Imagen" icon="link" href="/oss/integrations/tools/google_imagen" arrow="true" cta="查看指南" />
+<Card title="Google Jobs" icon="link" href="/oss/integrations/tools/google_jobs" arrow="true" cta="查看指南" />
+<Card title="Google Lens" icon="link" href="/oss/integrations/tools/google_lens" arrow="true" cta="查看指南" />
+<Card title="Google Places" icon="link" href="/oss/integrations/tools/google_places" arrow="true" cta="查看指南" />
+<Card title="Google Scholar" icon="link" href="/oss/integrations/tools/google_scholar" arrow="true" cta="查看指南" />
+<Card title="Google Search" icon="link" href="/oss/integrations/tools/google_search" arrow="true" cta="查看指南" />
+<Card title="Google Serper" icon="link" href="/oss/integrations/tools/google_serper" arrow="true" cta="查看指南" />
+<Card title="Google Trends" icon="link" href="/oss/integrations/tools/google_trends" arrow="true" cta="查看指南" />
+<Card title="Gradio" icon="link" href="/oss/integrations/tools/gradio_tools" arrow="true" cta="查看指南" />
+<Card title="GraphQL" icon="link" href="/oss/integrations/tools/graphql" arrow="true" cta="查看指南" />
+<Card title="HuggingFace Hub Tools" icon="link" href="/oss/integrations/tools/huggingface_tools" arrow="true" cta="查看指南" />
+<Card title="Human as a Tool" icon="link" href="/oss/integrations/tools/human_tools" arrow="true" cta="查看指南" />
+<Card title="Hyperbrowser Browser Agent Tools" icon="link" href="/oss/integrations/tools/hyperbrowser_browser_agent_tools" arrow="true" cta="查看指南" />
+<Card title="Hyperbrowser Web Scraping Tools" icon="link" href="/oss/integrations/tools/hyperbrowser_web_scraping_tools" arrow="true" cta="查看指南" />
+<Card title="IBM watsonx.ai" icon="link" href="/oss/integrations/tools/ibm_watsonx" arrow="true" cta="查看指南" />
+<Card title="IBM watsonx.ai (SQL)" icon="link" href="/oss/integrations/tools/ibm_watsonx_sql" arrow="true" cta="查看指南" />
+<Card title="IFTTT WebHooks" icon="link" href="/oss/integrations/tools/ifttt" arrow="true" cta="查看指南" />
+<Card title="Infobip" icon="link" href="/oss/integrations/tools/infobip" arrow="true" cta="查看指南" />
+<Card title="Ionic Shopping Tool" icon="link" href="/oss/integrations/tools/ionic_shopping" arrow="true" cta="查看指南" />
+<Card title="Jenkins" icon="link" href="/oss/integrations/tools/jenkins" arrow="true" cta="查看指南" />
+<Card title="Jina Search" icon="link" href="/oss/integrations/tools/jina_search" arrow="true" cta="查看指南" />
+<Card title="Jira Toolkit" icon="link" href="/oss/integrations/tools/jira" arrow="true" cta="查看指南" />
+<Card title="JSON Toolkit" icon="link" href="/oss/integrations/tools/json" arrow="true" cta="查看指南" />
+<Card title="Lemon Agent" icon="link" href="/oss/integrations/tools/lemonai" arrow="true" cta="查看指南" />
+<Card title="Linkup Search Tool" icon="link" href="/oss/integrations/tools/linkup_search" arrow="true" cta="查看指南" />
+<Card title="Memgraph" icon="link" href="/oss/integrations/tools/memgraph" arrow="true" cta="查看指南" />
+<Card title="Memorize" icon="link" href="/oss/integrations/tools/memorize" arrow="true" cta="查看指南" />
+<Card title="Mojeek Search" icon="link" href="/oss/integrations/tools/mojeek_search" arrow="true" cta="查看指南" />
+<Card title="MultiOn Toolkit" icon="link" href="/oss/integrations/tools/multion" arrow="true" cta="查看指南" />
+<Card title="NASA Toolkit" icon="link" href="/oss/integrations/tools/nasa" arrow="true" cta="查看指南" />
+<Card title="Naver Search" icon="link" href="/oss/integrations/tools/naver_search" arrow="true" cta="查看指南" />
+<Card title="Nia Toolkit" icon="link" href="/oss/integrations/tools/nia" arrow="true" cta="查看指南" />
+<Card title="Nuclia Understanding" icon="link" href="/oss/integrations/tools/nuclia" arrow="true" cta="查看指南" />
+<Card title="Nimble Extract" icon="link" href="/oss/integrations/tools/nimble_extract" arrow="true" cta="查看指南" />
+<Card title="Nimble Search" icon="link" href="/oss/integrations/tools/nimble_search" arrow="true" cta="查看指南" />
+<Card title="NVIDIA Riva" icon="link" href="/oss/integrations/tools/nvidia_riva" arrow="true" cta="查看指南" />
+<Card title="Office365 Toolkit" icon="link" href="/oss/integrations/tools/office365" arrow="true" cta="查看指南" />
+<Card title="OpenAPI Toolkit" icon="link" href="/oss/integrations/tools/openapi" arrow="true" cta="查看指南" />
+<Card title="Natural Language API Toolkits" icon="link" href="/oss/integrations/tools/openapi_nla" arrow="true" cta="查看指南" />
+<Card title="OpenGradient" icon="link" href="/oss/integrations/tools/opengradient_toolkit" arrow="true" cta="查看指南" />
+<Card title="OpenWeatherMap" icon="link" href="/oss/integrations/tools/openweathermap" arrow="true" cta="查看指南" />
+<Card title="Oracle AI Database" icon="link" href="/oss/integrations/tools/oracleai" arrow="true" cta="查看指南" />
+<Card title="Oxylabs" icon="link" href="/oss/integrations/tools/oxylabs" arrow="true" cta="查看指南" />
+<Card title="Pandas Dataframe" icon="link" href="/oss/integrations/tools/pandas" arrow="true" cta="查看指南" />
+<Card title="Passio NutritionAI" icon="link" href="/oss/integrations/tools/passio_nutrition_ai" arrow="true" cta="查看指南" />
+<Card title="Parallel Extract" icon="link" href="/oss/integrations/tools/parallel_extract" arrow="true" cta="查看指南" />
+<Card title="Parallel Search" icon="link" href="/oss/integrations/tools/parallel_search" arrow="true" cta="查看指南" />
+<Card title="Permit" icon="link" href="/oss/integrations/tools/permit" arrow="true" cta="查看指南" />
+<Card title="PlayWright Browser Toolkit" icon="link" href="/oss/integrations/tools/playwright" arrow="true" cta="查看指南" />
+<Card title="Polygon IO Toolkit" icon="link" href="/oss/integrations/tools/polygon" arrow="true" cta="查看指南" />
+<Card title="PowerBI Toolkit" icon="link" href="/oss/integrations/tools/powerbi" arrow="true" cta="查看指南" />
+<Card title="Prolog" icon="link" href="/oss/integrations/tools/prolog_tool" arrow="true" cta="查看指南" />
+<Card title="PubMed" icon="link" href="/oss/integrations/tools/pubmed" arrow="true" cta="查看指南" />
+<Card title="Python REPL" icon="link" href="/oss/integrations/tools/python" arrow="true" cta="查看指南" />
+<Card title="Reddit Search" icon="link" href="/oss/integrations/tools/reddit_search" arrow="true" cta="查看指南" />
+<Card title="Requests Toolkit" icon="link" href="/oss/integrations/tools/requests" arrow="true" cta="查看指南" />
+<Card title="Riza Code Interpreter" icon="link" href="/oss/integrations/tools/riza" arrow="true" cta="查看指南" />
+<Card title="Robocorp Toolkit" icon="link" href="/oss/integrations/tools/robocorp" arrow="true" cta="查看指南" />
+<Card title="Salesforce" icon="link" href="/oss/integrations/tools/salesforce" arrow="true" cta="查看指南" />
+<Card title="SceneXplain" icon="link" href="/oss/integrations/tools/sceneXplain" arrow="true" cta="查看指南" />
+<Card title="ScrapeGraph" icon="link" href="/oss/integrations/tools/scrapegraph" arrow="true" cta="查看指南" />
+<Card title="Scrapeless Crawl" icon="link" href="/oss/integrations/tools/scrapeless_crawl" arrow="true" cta="查看指南" />
+<Card title="Scrapeless Scraping API" icon="link" href="/oss/integrations/tools/scrapeless_scraping_api" arrow="true" cta="查看指南" />
+<Card title="Scrapeless Universal Scraping" icon="link" href="/oss/integrations/tools/scrapeless_universal_scraping" arrow="true" cta="查看指南" />
+<Card title="SearchApi" icon="link" href="/oss/integrations/tools/searchapi" arrow="true" cta="查看指南" />
+<Card title="SearxNG Search" icon="link" href="/oss/integrations/tools/searx_search" arrow="true" cta="查看指南" />
+<Card title="Semantic Scholar API" icon="link" href="/oss/integrations/tools/semanticscholar" arrow="true" cta="查看指南" />
+<Card title="SerpApi" icon="link" href="/oss/integrations/tools/serpapi" arrow="true" cta="查看指南" />
+<Card title="Slack Toolkit" icon="link" href="/oss/integrations/tools/slack" arrow="true" cta="查看指南" />
+<Card title="SpiceDB" icon="link" href="/oss/integrations/tools/spicedb" arrow="true" cta="查看指南" />
+<Card title="Spark SQL Toolkit" icon="link" href="/oss/integrations/tools/spark_sql" arrow="true" cta="查看指南" />
+<Card title="SQLDatabase Toolkit" icon="link" href="/oss/integrations/tools/sql_database" arrow="true" cta="查看指南" />
+<Card title="StackExchange" icon="link" href="/oss/integrations/tools/stackexchange" arrow="true" cta="查看指南" />
+<Card title="Stardog" icon="link" href="/oss/integrations/tools/stardog" arrow="true" cta="查看指南" />
+<Card title="Steam Toolkit" icon="link" href="/oss/integrations/tools/steam" arrow="true" cta="查看指南" />
+<Card title="Stripe" icon="link" href="/oss/integrations/tools/stripe" arrow="true" cta="查看指南" />
+<Card title="Tableau" icon="link" href="/oss/integrations/tools/tableau" arrow="true" cta="查看指南" />
+<Card title="Taiga" icon="link" href="/oss/integrations/tools/taiga" arrow="true" cta="查看指南" />
+<Card title="Tavily Extract" icon="link" href="/oss/integrations/tools/tavily_extract" arrow="true" cta="查看指南" />
+<Card title="Tavily Search" icon="link" href="/oss/integrations/tools/tavily_search" arrow="true" cta="查看指南" />
+<Card title="Tilores" icon="link" href="/oss/integrations/tools/tilores" arrow="true" cta="查看指南" />
+<Card title="MCP Toolbox" icon="link" href="/oss/integrations/tools/mcp_toolbox" arrow="true" cta="查看指南" />
+<Card title="Twilio" icon="link" href="/oss/integrations/tools/twilio" arrow="true" cta="查看指南" />
+<Card title="Upstage" icon="link" href="/oss/integrations/tools/upstage_groundedness_check" arrow="true" cta="查看指南" />
+<Card title="Valthera" icon="link" href="/oss/integrations/tools/valthera" arrow="true" cta="查看指南" />
+<Card title="ValyuContext" icon="link" href="/oss/integrations/tools/valyu_search" arrow="true" cta="查看指南" />
+<Card title="Vectara" icon="link" href="/oss/integrations/tools/vectara" arrow="true" cta="查看指南" />
+<Card title="Wikidata" icon="link" href="/oss/integrations/tools/wikidata" arrow="true" cta="查看指南" />
+<Card title="Wikipedia" icon="link" href="/oss/integrations/tools/wikipedia" arrow="true" cta="查看指南" />
+<Card title="Wolfram Alpha" icon="link" href="/oss/integrations/tools/wolfram_alpha" arrow="true" cta="查看指南" />
+<Card title="WRITER Tools" icon="link" href="/oss/integrations/tools/writer" arrow="true" cta="查看指南" />
+<Card title="Yahoo Finance News" icon="link" href="/oss/integrations/tools/yahoo_finance_news" arrow="true" cta="查看指南" />
+<Card title="You.com Search" icon="link" href="/oss/integrations/tools/you" arrow="true" cta="查看指南" />
+<Card title="YouTube" icon="link" href="/oss/integrations/tools/youtube" arrow="true" cta="查看指南" />
+<Card title="Zapier Natural Language Actions" icon="link" href="/oss/integrations/tools/zapier" arrow="true" cta="查看指南" />
+<Card title="ZenGuard AI" icon="link" href="/oss/integrations/tools/zenguard" arrow="true" cta="查看指南" />
+</Columns>
+
+<Info>
+    如果您想贡献集成，请参阅 [贡献集成](/oss/contributing#add-a-new-integration)。
+</Info>

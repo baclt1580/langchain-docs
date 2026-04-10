@@ -1,0 +1,191 @@
+---
+title: "Box 集成"
+description: "使用 LangChain Python 与 Box 集成。"
+---
+
+[Box](https://box.com) 是智能内容云，一个单一平台，使组织能够推动协作、管理整个内容生命周期、保护关键内容，并利用企业 AI 转变业务工作流程。成立于 2005 年，Box 简化了包括阿斯利康、JLL、摩根士丹利和 Nationwide 在内的全球领先组织的工作。
+
+在此包中，我们提供了多种将 Box 内容包含在您的 AI 工作流中的方法。
+
+### 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install -U langchain-box
+```
+
+```bash uv
+uv add langchain-box
+```
+</CodeGroup>
+
+# langchain-box
+
+此包包含 LangChain 与 Box 的集成。有关 Box 的更多信息，请查看我们的 [开发者文档](https://developer.box.com)。
+
+## 前置条件
+
+要与 Box 集成，您需要以下几项：
+
+* 一个 Box 实例 — 如果您不是当前的 Box 客户，请注册一个 [免费开发账户](https://account.box.com/signup/n/developer#ty9l3)。
+* 一个 Box 应用 — 更多关于如何 [创建应用](https://developer.box.com/guides/getting-started/first-application/)
+* 您的应用在您的 Box 实例中获得批准 — 这由您的管理员完成。
+好消息是，如果您使用的是免费开发账户，您就是管理员。
+[授权您的应用](https://developer.box.com/guides/authorization/custom-app-approval/#manual-approval)
+
+## 认证
+
+box-langchain 包提供了一些认证灵活性。
+最基本的认证方法是使用开发者令牌。这可以在 [Box 开发者控制台](https://account.box.com/developers/console)
+的配置屏幕上找到。此令牌故意短期有效（1 小时），旨在用于开发。使用此令牌，您可以将其作为
+`BOX_DEVELOPER_TOKEN` 添加到您的环境中，可以直接传递给加载器，或者可以使用
+`BoxAuth` 认证辅助类。
+
+我们将在下面的部分介绍直接将其传递给加载器的方法。
+
+### BoxAuth 辅助类
+
+`BoxAuth` 支持以下认证方法：
+
+* 令牌 — 无论是开发者令牌还是通过 Box SDK 生成的任何令牌
+* 带有服务账户的 JWT
+* 带有指定用户的 JWT
+* 带有服务账户的 CCG
+* 带有指定用户的 CCG
+
+<Note>
+**如果使用 JWT 认证，您将需要从 Box
+
+开发者控制台下载配置。生成公钥/私钥对后。将此文件放在您的
+应用程序目录结构中的某个位置。在使用
+BoxAuth 辅助类时，您将使用该文件的路径。
+</Note>
+
+有关更多信息，请了解如何
+[设置 Box 应用](https://developer.box.com/guides/getting-started/first-application/)，
+并查看
+[Box 认证指南](https://developer.box.com/guides/authentication/select/)
+了解更多关于我们不同的认证选项。
+
+示例：
+
+**令牌**
+
+```python
+from langchain_box.document_loaders import BoxLoader
+from langchain_box.utilities import BoxAuth, BoxAuthType
+
+auth = BoxAuth(
+    auth_type=BoxAuthType.TOKEN,
+    box_developer_token=box_developer_token
+)
+
+loader = BoxLoader(
+    box_auth=auth,
+    ...
+)
+```
+
+**带有服务账户的 JWT**
+
+```python
+from langchain_box.document_loaders import BoxLoader
+from langchain_box.utilities import BoxAuth, BoxAuthType
+
+auth = BoxAuth(
+    auth_type=BoxAuthType.JWT,
+    box_jwt_path=box_jwt_path
+)
+
+loader = BoxLoader(
+    box_auth=auth,
+    ...
+```
+
+**带有指定用户的 JWT**
+
+```python
+from langchain_box.document_loaders import BoxLoader
+from langchain_box.utilities import BoxAuth, BoxAuthType
+
+auth = BoxAuth(
+    auth_type=BoxAuthType.JWT,
+    box_jwt_path=box_jwt_path,
+    box_user_id=box_user_id
+)
+
+loader = BoxLoader(
+    box_auth=auth,
+    ...
+```
+
+**带有服务账户的 CCG**
+
+```python
+from langchain_box.document_loaders import BoxLoader
+from langchain_box.utilities import BoxAuth, BoxAuthType
+
+auth = BoxAuth(
+    auth_type=BoxAuthType.CCG,
+    box_client_id=box_client_id,
+    box_client_secret=box_client_secret,
+    box_enterprise_id=box_enterprise_id
+)
+
+loader = BoxLoader(
+    box_auth=auth,
+    ...
+```
+
+**带有指定用户的 CCG**
+
+```python
+from langchain_box.document_loaders import BoxLoader
+from langchain_box.utilities import BoxAuth, BoxAuthType
+
+auth = BoxAuth(
+    auth_type=BoxAuthType.CCG,
+    box_client_id=box_client_id,
+    box_client_secret=box_client_secret,
+    box_user_id=box_user_id
+)
+
+loader = BoxLoader(
+    box_auth=auth,
+    ...
+```
+
+如果您希望使用具有 authorization_code 流的 OAuth2，请使用您已获取的令牌配合 BoxAuthType.TOKEN。
+
+## 文档加载器
+
+### BoxLoader
+
+[查看使用示例](/oss/integrations/document_loaders/box)
+
+```python
+from langchain_box.document_loaders import BoxLoader
+
+```
+
+## 检索器
+
+### BoxRetriever
+
+[查看使用示例](/oss/integrations/retrievers/box)
+
+```python
+from langchain_box.retrievers import BoxRetriever
+
+```
+
+## Blob 加载器
+
+### BoxBlobLoader
+
+[查看使用示例](/oss/integrations/document_loaders/box)
+
+```python
+from langchain_box.blob_loaders import BoxBlobLoader
+
+```

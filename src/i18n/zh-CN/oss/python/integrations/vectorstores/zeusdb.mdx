@@ -1,0 +1,226 @@
+---
+title: "ZeusDB 集成"
+description: "使用 LangChain Python 与 ZeusDB 向量存储进行集成。"
+---
+
+>[ZeusDB](https://www.zeusdb.com) 是一个由 Rust 驱动的高性能向量数据库，提供产品量化、持久化存储和企业级日志等高级功能。
+
+本文档展示了如何使用 ZeusDB 为您的 LangChain 应用带来企业级向量搜索能力。
+
+---
+
+## 设置
+
+从 PyPI 安装 ZeusDB LangChain 集成包：
+
+```python
+pip install -qU langchain-zeusdb
+```
+
+在 Jupyter Notebook 中设置
+
+```python
+pip install -qU langchain-zeusdb
+```
+
+---
+
+## 入门指南
+
+此示例使用 OpenAIEmbeddings，需要 OpenAI API 密钥：[在此获取您的 OpenAI API 密钥](https://platform.openai.com/api-keys)
+如果您愿意，也可以使用此包配合任何其他嵌入提供商（Hugging Face、Cohere、自定义函数等）。
+从 PyPI 安装 LangChain OpenAI 集成包：
+
+```python
+pip install -qU langchain-openai
+
+# Use this command if inside Jupyter Notebooks
+#pip install -qU langchain-openai
+```
+
+#### 请选择以下选项以集成您的 OpenAI 密钥
+
+*选项 1: 🔑 每次输入您的 API 密钥*
+在 Jupyter 中使用 getpass 安全地输入当前会话的密钥：
+
+```python
+import os
+import getpass
+
+os.environ["OPENAI_API_KEY"] = getpass.getpass("OpenAI API Key:")
+```
+
+*选项 2: 🗂️ 使用 .env 文件*
+将密钥保存在本地 .env 文件中，并使用 python-dotenv 自动加载它
+
+```python
+from dotenv import load_dotenv
+
+load_dotenv()  # reads .env and sets OPENAI_API_KEY
+```
+
+<Info>
+🎉 做得好！您已准备就绪。
+</Info>
+---
+
+## 初始化
+
+```python
+# Import required Packages and Classes
+from langchain_zeusdb import ZeusDBVectorStore
+from langchain_openai import OpenAIEmbeddings
+from zeusdb import VectorDatabase
+```
+
+```python
+# Initialize embeddings
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+# Create ZeusDB index
+vdb = VectorDatabase()
+index = vdb.create(index_type="hnsw", dim=1536, space="cosine")
+
+# Create vector store
+vector_store = ZeusDBVectorStore(zeusdb_index=index, embedding=embeddings)
+```
+
+---
+
+## 管理向量存储
+
+### 2.1 向向量存储添加项目
+
+```python
+from langchain_core.documents import Document
+
+document_1 = Document(
+    page_content="ZeusDB is a high-performance vector database",
+    metadata={"source": "https://docs.zeusdb.com"},
+)
+
+document_2 = Document(
+    page_content="Product Quantization reduces memory usage significantly",
+    metadata={"source": "https://docs.zeusdb.com"},
+)
+
+document_3 = Document(
+    page_content="ZeusDB integrates seamlessly with LangChain",
+    metadata={"source": "https://docs.zeusdb.com"},
+)
+
+documents = [document_1, document_2, document_3]
+
+vector_store.add_documents(documents=documents, ids=["1", "2", "3"])
+```
+
+### 2.2 更新向量存储中的项目
+
+```python
+updated_document = Document(
+    page_content="ZeusDB now supports advanced Product Quantization with 4x-256x compression",
+    metadata={"source": "https://docs.zeusdb.com", "updated": True},
+)
+
+vector_store.add_documents([updated_document], ids=["1"])
+```
+
+### 2.3 从向量存储删除项目
+
+```python
+vector_store.delete(ids=["3"])
+```
+
+---
+
+## 查询向量存储
+
+### 3.1 直接查询
+
+执行简单的相似度搜索：
+
+```python
+results = vector_store.similarity_search(query="high performance database", k=2)
+
+for doc in results:
+    print(f"* {doc.page_content} [{doc.metadata}]")
+```
+
+如果您想执行相似度搜索并接收相应的分数：
+
+```python
+results = vector_store.similarity_search_with_score(query="memory optimization", k=2)
+
+for doc, score in results:
+    print(f"* [SIM={score:.3f}] {doc.page_content} [{doc.metadata}]")
+```
+
+### 3.2 转换为检索器进行查询
+
+您还可以将向量存储转换为检索器，以便在链中更轻松地使用：
+
+```python
+retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 2})
+
+retriever.invoke("vector database features")
+```
+
+---
+
+## ZeusDB 特定功能
+
+### 4.1 使用产品量化的内存高效设置
+
+对于大型数据集，请使用产品量化来减少内存使用：
+
+```python
+# Create memory-optimized vector store
+quantization_config = {"type": "pq", "subvectors": 8, "bits": 8, "training_size": 10000}
+
+vdb_quantized = VectorDatabase()
+quantized_index = vdb_quantized.create(
+    index_type="hnsw", dim=1536, quantization_config=quantization_config
+)
+
+quantized_vector_store = ZeusDBVectorStore(
+    zeusdb_index=quantized_index, embedding=embeddings
+)
+
+print(f"Created quantized store: {quantized_index.info()}")
+```
+
+### 4.2 持久性
+
+将向量存储保存到磁盘并加载：
+如何保存您的向量存储
+
+```python
+# Save the vector store
+vector_store.save_index("my_zeusdb_index.zdb")
+```
+
+如何加载您的向量存储
+
+```python
+# Load the vector store
+loaded_store = ZeusDBVectorStore.load_index(
+    path="my_zeusdb_index.zdb", embedding=embeddings
+)
+
+print(f"Loaded store with {loaded_store.get_vector_count()} vectors")
+```
+
+---
+
+## 检索增强生成 (RAG) 的使用
+
+关于如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [操作指南：使用 RAG 进行问答](https://python.langchain.com/docs/how_to/#qa-with-rag)
+- [检索概念文档](https://python.langchain.com/docs/concepts/retrieval/)
+
+---
+
+## API 参考
+
+有关所有 `ZeusDBVectorStore` 功能和配置的详细文档，请前往 [ZeusDB 文档](https://docs.zeusdb.com/en/latest/vector_database/integrations/langchain.html)。

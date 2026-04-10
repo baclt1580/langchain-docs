@@ -1,0 +1,55 @@
+---
+title: "在 Hugging Face 上集成 Sentence Transformers"
+description: "使用 LangChain Python 集成 Hugging Face 上的 Sentence Transformers 嵌入模型。"
+---
+
+>[Hugging Face sentence-transformers](https://huggingface.co/sentence-transformers) 是一个用于最先进的句子、文本和图像嵌入的 Python 框架。
+>您可以从 `HuggingFaceEmbeddings` 类使用这些嵌入模型。
+
+<Warning>
+**在本地运行 sentence-transformers 可能会受到您的操作系统和其他全局因素的影响。仅建议经验丰富的用户使用。**
+
+</Warning>
+
+## 设置
+
+您需要安装 `langchain_huggingface` 包作为依赖项：
+
+```python
+pip install -qU langchain-huggingface
+```
+
+## 用法
+
+```python
+from langchain_huggingface import HuggingFaceEmbeddings
+
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+text = "This is a test document."
+query_result = embeddings.embed_query(text)
+
+# show only the first 100 characters of the stringified vector
+print(str(query_result)[:100] + "...")
+```
+
+```text
+[-0.038338568061590195, 0.12346471101045609, -0.028642969205975533, 0.05365273356437683, 0.008845377...
+```
+
+```python
+doc_result = embeddings.embed_documents([text, "This is not a test document."])
+print(str(doc_result)[:100] + "...")
+```
+
+```text
+[[-0.038338497281074524, 0.12346471846103668, -0.028642890974879265, 0.05365274101495743, 0.00884535...
+```
+
+## 故障排除
+
+如果您遇到找不到 `accelerate` 包或导入失败的问题，安装/升级它可能会有帮助：
+
+```python
+pip install -qU accelerate
+```

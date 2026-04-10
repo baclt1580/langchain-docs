@@ -1,0 +1,113 @@
+---
+title: "OpenWeatherMap 集成"
+description: "使用 LangChain Python 与 OpenWeatherMap 工具集成。"
+---
+
+本笔记本介绍如何使用 `OpenWeatherMap` 组件获取天气信息。
+
+首先，您需要注册一个 `OpenWeatherMap API` 密钥：
+
+1. 访问 OpenWeatherMap 并注册一个 [API 密钥](https://openweathermap.org/api/)
+2. pip install pyowm
+
+然后我们需要设置一些环境变量：
+
+1. 将您的 API KEY 保存到 OPENWEATHERMAP_API_KEY 环境变量中
+
+## 使用包装器
+
+```python
+pip install -qU pyowm
+```
+
+```python
+import os
+
+from langchain_community.utilities import OpenWeatherMapAPIWrapper
+
+os.environ["OPENWEATHERMAP_API_KEY"] = ""
+
+weather = OpenWeatherMapAPIWrapper()
+```
+
+```python
+weather_data = weather.run("London,GB")
+print(weather_data)
+```
+
+```text
+In London,GB, the current weather is as follows:
+Detailed status: overcast clouds
+Wind speed: 4.12 m/s, direction: 10°
+Humidity: 51%
+Temperature:
+  - Current: 12.82°C
+  - High: 13.98°C
+  - Low: 12.01°C
+  - Feels like: 11.49°C
+Rain: {}
+Heat index: None
+Cloud cover: 100%
+```
+
+## 使用工具
+
+```python
+import os
+
+from langchain.agents import create_agent
+
+
+os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENWEATHERMAP_API_KEY"] = ""
+
+tools = [weather.run]
+agent = create_agent("gpt-4.1-mini", tools)
+```
+
+```python
+input_message = {
+    "role": "user",
+    "content": "What's the weather like in London?",
+}
+
+for step in agent.stream(
+    {"messages": [input_message]},
+    stream_mode="values",
+):
+    step["messages"][-1].pretty_print()
+```
+
+```text
+================================ Human Message =================================
+
+What's the weather like in London?
+================================== Ai Message ==================================
+Tool Calls:
+  run (call_6vPq9neyy7oOnht29ExidE2g)
+ Call ID: call_6vPq9neyy7oOnht29ExidE2g
+  Args:
+    location: London
+================================= Tool Message =================================
+Name: run
+
+In London, the current weather is as follows:
+Detailed status: overcast clouds
+Wind speed: 4.12 m/s, direction: 10°
+Humidity: 51%
+Temperature:
+  - Current: 12.82°C
+  - High: 13.98°C
+  - Low: 12.01°C
+  - Feels like: 11.49°C
+Rain: {}
+Heat index: None
+Cloud cover: 100%
+================================== Ai Message ==================================
+
+The weather in London is currently overcast with 100% cloud cover. The temperature is around 12.82°C, feeling like 11.49°C. The wind is blowing at 4.12 m/s from the direction of 10°. Humidity is at 51%. The high for the day is 13.98°C, and the low is 12.01°C.
+```
+
+```python
+
+```

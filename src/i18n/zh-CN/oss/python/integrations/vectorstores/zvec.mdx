@@ -1,0 +1,69 @@
+---
+title: Zvec
+---
+
+> [Zvec](https://zvec.org/en/) 是一个开源的进程内向量数据库——轻量级、极速，并设计为可直接嵌入应用程序。基于 Proxima（阿里巴巴经过实战验证的向量搜索引擎）构建，它提供生产级、低延迟、可扩展的相似性搜索，且设置极简
+
+本笔记本演示如何在 LangChain 中使用 'Zvec' 向量数据库。
+
+## 安装
+
+```python
+pip install -qU  langchain-community zvec dashscope
+```
+
+我们需要使用 `DashScopeEmbeddings`，因此还必须获取 Dashscope API 密钥。
+
+```python
+import getpass
+import os
+
+if "DASHSCOPE_API_KEY" not in os.environ:
+    os.environ["DASHSCOPE_API_KEY"] = getpass.getpass("DashScope API Key:")
+```
+
+## 示例
+
+```python
+from langchain_community.embeddings.dashscope import DashScopeEmbeddings
+from langchain_community.vectorstores import Zvec
+from langchain_text_splitters import CharacterTextSplitter
+```
+
+```python
+from langchain_community.document_loaders import TextLoader
+
+loader = TextLoader("../../how_to/state_of_the_union.txt")
+documents = loader.load()
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+
+embeddings = DashScopeEmbeddings()
+```
+
+我们可以从文档创建 Zvec。
+
+```python
+zvec = Zvec.from_documents(docs, embeddings)
+
+query = "What did the president say about Ketanji Brown Jackson"
+docs = zvec.similarity_search(query)
+print(docs)
+```
+
+我们可以添加带有元数据和 ID 的文本，并使用元数据过滤器进行搜索。
+
+```python
+texts = ["foo", "bar", "baz"]
+metadatas = [{"source": "test_data"} for _ in texts]
+ids = ["0", "1", "2"]
+
+zvec.add_texts(texts, metadatas=metadatas, ids=ids)
+
+docs = zvec.similarity_search("foo")
+print(docs)
+```
+
+```python
+[Document(metadata={'source': 'test_data'}, page_content='foo')]
+```

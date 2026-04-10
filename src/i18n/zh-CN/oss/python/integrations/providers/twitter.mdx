@@ -1,0 +1,34 @@
+---
+title: "Twitter 集成"
+description: "使用 LangChain Python 与 Twitter 集成。"
+---
+
+>[Twitter](https://twitter.com/) 是一个在线社交媒体和社交网络服务。
+
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install tweepy
+```
+
+```bash uv
+uv add tweepy
+```
+</CodeGroup>
+
+我们必须使用 `Twitter API` 令牌初始化加载器，并且需要设置 Twitter `username`。
+
+
+## 文档加载器
+
+查看 [使用示例](/oss/integrations/document_loaders/twitter)。
+
+```python
+from langchain_community.document_loaders import TwitterTweetLoader
+```
+
+## 聊天加载器
+
+查看 [使用示例](/oss/integrations/chat_loaders/twitter)。

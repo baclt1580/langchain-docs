@@ -1,0 +1,27 @@
+---
+title: "Uptrain 集成"
+description: "使用 LangChain Python 与 Uptrain 集成。"
+---
+
+>[UpTrain](https://uptrain.ai/) 是一个开源的统一平台，用于评估和改进生成式 AI 应用。它提供 20 多种预配置评估的评分
+>（涵盖语言、代码、嵌入用例），对失败案例进行根本原因分析，并提供如何解决它们的见解。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install uptrain
+```
+
+```bash uv
+uv add uptrain
+```
+</CodeGroup>
+
+## 回调
+
+```python
+from langchain_community.callbacks.uptrain_callback import UpTrainCallbackHandler
+```
+
+查看 [示例](/oss/integrations/callbacks/uptrain)。

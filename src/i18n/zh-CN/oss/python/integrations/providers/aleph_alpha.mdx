@@ -1,0 +1,45 @@
+---
+title: "Aleph Alpha 集成"
+description: "使用 LangChain Python 与 Aleph Alpha 进行集成。"
+---
+
+>[Aleph Alpha](https://docs.aleph-alpha.com/) 成立于 2019 年，致力于研究和构建强人工智能时代的底层技术。由国际科学家、工程师和创新者组成的团队研究、开发和部署变革性人工智能，如大型语言和多模态模型，并运营着欧洲最快的商业 AI 集群。
+
+>[Luminous 系列](https://docs.aleph-alpha.com/docs/introduction/luminous/) 是一个大型语言模型家族。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install aleph-alpha-client
+```
+
+```bash uv
+uv add aleph-alpha-client
+```
+</CodeGroup>
+
+您需要创建一个新令牌。请参见 [说明](https://docs.aleph-alpha.com/docs/account/#create-a-new-token)。
+
+```python
+from getpass import getpass
+
+ALEPH_ALPHA_API_KEY = getpass()
+```
+
+
+## 大语言模型
+
+查看 [使用示例](/oss/integrations/llms/aleph_alpha)。
+
+```python
+from langchain_community.llms import AlephAlpha
+```
+
+## 文本嵌入模型
+
+查看 [使用示例](/oss/integrations/embeddings/aleph_alpha)。
+
+```python
+from langchain_community.embeddings import AlephAlphaSymmetricSemanticEmbedding, AlephAlphaAsymmetricSemanticEmbedding
+```
