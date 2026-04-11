@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from pipeline.tools.translation import (
+    _TRANSLATION_SYSTEM_PROMPT,
     OpenAICompatibleTranslator,
     TranslationManifest,
     _chunk_markdown_for_translation,
@@ -13,6 +14,11 @@ from pipeline.tools.translation import (
     load_dotenv_file,
     parse_target_languages,
 )
+
+
+class _FakeEncoding:
+    def encode(self, text: str) -> list[int]:
+        return list(text.encode("utf-8"))
 
 
 def test_parse_target_languages_with_mixed_formats() -> None:
@@ -164,6 +170,10 @@ def test_translate_markdown_translates_each_chunk_separately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Translate each computed chunk independently and concatenate results."""
+    monkeypatch.setattr(
+        "pipeline.tools.translation._resolve_token_encoding",
+        lambda _model: _FakeEncoding(),
+    )
     translator = OpenAICompatibleTranslator(
         base_url="https://api.example.com/v1",
         api_key="test-key",
@@ -198,3 +208,35 @@ def test_translate_markdown_translates_each_chunk_separately(
         "## Beta\n\nBeta paragraph.\n",
     ]
     assert translated == content.upper()
+
+
+def test_translation_prompts_preserve_mdx_structure_rules() -> None:
+    """Keep strict MDX structure-preservation rules in the translation prompts."""
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        "pipeline.tools.translation._resolve_token_encoding",
+        lambda _model: _FakeEncoding(),
+    )
+    translator = OpenAICompatibleTranslator(
+        base_url="https://api.example.com/v1",
+        api_key="test-key",
+        model="gpt-4o-mini",
+    )
+
+    user_prompt = translator._build_user_prompt(
+        "```typescript\nconst x = 1;\n```\n",
+        "Chinese (Simplified)",
+    )
+
+    assert "Preserve the exact document structure" in _TRANSLATION_SYSTEM_PROMPT
+    assert "Never add, remove, unwrap, or rebalance Markdown or MDX wrappers" in (
+        _TRANSLATION_SYSTEM_PROMPT
+    )
+    assert "Keep frontmatter keys, delimiters, and field order unchanged." in (
+        user_prompt
+    )
+    assert "Preserve all Markdown fences exactly" in user_prompt
+    assert "Do not remove or rewrite import/export lines" in user_prompt
+    assert "Do not translate code, inline code, identifiers" in user_prompt
+    assert "translation must remain a fenced code block" in user_prompt
+    monkeypatch.undo()

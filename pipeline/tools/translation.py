@@ -32,10 +32,9 @@ _SENTENCE_FRAGMENT_PATTERN = re.compile(r".+?(?:[.!?](?:\s+|$)|$)", re.DOTALL)
 _WORD_FRAGMENT_PATTERN = re.compile(r"\S+\s*|\s+")
 _TRANSLATION_SYSTEM_PROMPT = (
     "You are a technical translator for Markdown and MDX docs. "
-    "Translate only natural-language prose. Keep Markdown syntax, "
-    "MDX components, links, code blocks, inline code, and all identifiers "
-    "unchanged. The input may be a contiguous excerpt from a larger document. "
-    "Do not add, remove, or rebalance Markdown or MDX wrappers."
+    "Translate only natural-language prose intended for readers. "
+    "Preserve the exact document structure and all non-prose syntax. "
+    "Never add, remove, unwrap, or rebalance Markdown or MDX wrappers."
 )
 
 if TYPE_CHECKING:
@@ -402,7 +401,16 @@ class OpenAICompatibleTranslator:
         return (
             "Translate the following Markdown/MDX excerpt to "
             f"{target_language}.\n"
-            "Return only translated Markdown/MDX with the exact same structure.\n\n"
+            "Return only translated Markdown/MDX with the exact same structure.\n"
+            "Hard requirements:\n"
+            "- Keep frontmatter keys, delimiters, and field order unchanged.\n"
+            "- Preserve all Markdown fences exactly, including ```/~~~ code fences, ::: directives, and their info strings.\n"  # noqa: E501
+            "- Do not remove or rewrite import/export lines, JSX, MDX components, HTML tags, attributes, URLs, anchors, or file paths.\n"  # noqa: E501
+            "- Do not translate code, inline code, identifiers, env vars, API names, JSON keys, or package names.\n"  # noqa: E501
+            "- Preserve comments inside code blocks and keep all indentation and line breaks stable unless translating visible prose within the same line is required.\n"  # noqa: E501
+            "- If a snippet is a fenced code block in the source, the translation must remain a fenced code block with the same opening and closing fences.\n"  # noqa: E501
+            "- Do not wrap the answer in an extra code fence or add any "
+            "explanation.\n\n"
             f"{content}"
         )
 

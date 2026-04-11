@@ -14,6 +14,9 @@ from tqdm import tqdm
 from pipeline.preprocessors import preprocess_markdown
 
 _IS_CI = os.environ.get("CI", "").lower() in ("true", "1")
+_I18N_TRANSLATED_PATH_PARTS = 3
+_CHAT_LANGCHAIN_LOCAL_EMBED_URL = "http://localhost:4100"
+_CHAT_LANGCHAIN_PROD_EMBED_URL = "https://ui-patterns.langchain.com/react"
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +72,219 @@ class DocumentationBuilder:
             "python": "python",
             "js": "javascript",
         }
+        self.i18n_dir = self.src_dir / "i18n"
+        self.i18n_config_path = self.i18n_dir / "config.json"
+        self.site_language: str | None = None
+        self.site_translation_root: Path | None = None
+        self._refresh_site_language()
+
+    def _refresh_site_language(self) -> None:
+        """Load the configured site language and cache its translation root."""
+        self.site_language = self._load_site_language()
+        self.site_translation_root = (
+            self.i18n_dir / self.site_language if self.site_language else None
+        )
+
+    def _load_site_language(self) -> str | None:
+        """Load the language code that should be published at the site root."""
+        if not self.i18n_config_path.is_file():
+            return None
+
+        try:
+            raw_config = json.loads(self.i18n_config_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            logger.warning(
+                "Failed to load i18n site config from %s",
+                self.i18n_config_path,
+                exc_info=True,
+            )
+            return None
+
+        if not isinstance(raw_config, dict):
+            logger.warning(
+                "Ignoring invalid i18n site config in %s",
+                self.i18n_config_path,
+            )
+            return None
+
+        raw_site_language = raw_config.get(
+            "siteLanguage",
+            raw_config.get("defaultLanguage"),
+        )
+        if not isinstance(raw_site_language, str):
+            return None
+
+        site_language = raw_site_language.strip()
+        if not site_language or site_language.lower() == "en":
+            return None
+
+        return site_language
+
+    def _logical_relative_path(self, file_path: Path) -> Path | None:
+        """Map a source file to the live logical path used for the build output."""
+        relative_path = file_path.absolute().relative_to(self.src_dir.absolute())
+        if not relative_path.parts:
+            return None
+
+        if relative_path.parts[0] != "i18n":
+            return relative_path
+
+        if (
+            self.site_language is None
+            or len(relative_path.parts) < _I18N_TRANSLATED_PATH_PARTS
+        ):
+            return None
+
+        if relative_path.parts[1] != self.site_language:
+            return None
+
+        return Path(*relative_path.parts[2:])
+
+    def _resolve_source_for_logical_path(self, logical_relative: Path) -> Path | None:
+        """Resolve the best source file for a logical doc path."""
+        if self.site_translation_root is not None:
+            translated_path = self.site_translation_root / logical_relative
+            if translated_path.is_file():
+                return translated_path
+
+        source_path = self.src_dir / logical_relative
+        if source_path.is_file():
+            return source_path
+
+        return None
+
+    def _build_logical_file(self, file_path: Path, logical_relative: Path) -> None:
+        """Build a live doc using its resolved logical path."""
+        if logical_relative.parts[0] == "oss":
+            self._build_oss_file(file_path, logical_relative)
+        elif logical_relative.parts[0] == "langsmith":
+            self._build_unversioned_file(file_path, logical_relative)
+        elif self.is_shared_relative_path(logical_relative):
+            self._build_shared_file(file_path, logical_relative)
+        else:
+            self._build_simple_file(file_path, logical_relative)
+
+    def _collect_content_logical_paths(self, source_dir: str) -> list[Path]:
+        """Collect logical content paths from the source tree and active overlay."""
+        logical_paths: set[Path] = set()
+        roots = [(self.src_dir / source_dir, Path(source_dir))]
+
+        if self.site_translation_root is not None:
+            roots.append((self.site_translation_root / source_dir, Path(source_dir)))
+
+        for root_path, logical_root in roots:
+            if not root_path.exists():
+                continue
+
+            for file_path in root_path.rglob("*"):
+                if not file_path.is_file():
+                    continue
+
+                logical_relative = logical_root / file_path.relative_to(root_path)
+                if not self.is_shared_relative_path(logical_relative):
+                    logical_paths.add(logical_relative)
+
+        return sorted(logical_paths)
+
+    def _collect_shared_logical_paths(self) -> list[Path]:
+        """Collect shared logical paths from the source tree and active overlay."""
+        logical_paths: set[Path] = set()
+
+        for file_path in self.src_dir.rglob("*"):
+            if not file_path.is_file():
+                continue
+
+            relative_path = file_path.relative_to(self.src_dir)
+            if relative_path.parts and relative_path.parts[0] == "i18n":
+                continue
+
+            if self.is_shared_relative_path(relative_path):
+                logical_paths.add(relative_path)
+
+        if (
+            self.site_translation_root is not None
+            and self.site_translation_root.exists()
+        ):
+            for file_path in self.site_translation_root.rglob("*"):
+                if not file_path.is_file():
+                    continue
+
+                logical_relative = file_path.relative_to(self.site_translation_root)
+                if self.is_shared_relative_path(logical_relative):
+                    logical_paths.add(logical_relative)
+
+        return sorted(logical_paths)
+
+    def _finalize_output_path(self, output_path: Path) -> Path:
+        """Normalize output paths after builder-side extension rewrites."""
+        if output_path.name == "docs.yml" and output_path.suffix.lower() in {
+            ".yml",
+            ".yaml",
+        }:
+            return output_path.with_suffix(".json")
+
+        if output_path.suffix.lower() == ".md":
+            return output_path.with_suffix(".mdx")
+
+        return output_path
+
+    def _output_paths_for_logical_path(self, logical_relative: Path) -> list[Path]:
+        """Return every live build output generated from a logical source path."""
+        if not logical_relative.parts:
+            return []
+
+        if logical_relative.parts[0] == "oss" and not self.is_shared_relative_path(
+            logical_relative
+        ):
+            if len(logical_relative.parts) > 1 and logical_relative.parts[1] in {
+                "python",
+                "javascript",
+            }:
+                sub_path = Path(*logical_relative.parts[2:])
+                return [
+                    self._finalize_output_path(
+                        self.build_dir / "oss" / logical_relative.parts[1] / sub_path
+                    ),
+                ]
+
+            sub_path = Path(*logical_relative.parts[1:])
+            return [
+                self._finalize_output_path(
+                    self.build_dir / "oss" / "python" / sub_path
+                ),
+                self._finalize_output_path(
+                    self.build_dir / "oss" / "javascript" / sub_path
+                ),
+            ]
+
+        return [self._finalize_output_path(self.build_dir / logical_relative)]
+
+    def get_output_paths_for_source_file(self, file_path: Path) -> list[Path]:
+        """Return every live build output generated for a source file."""
+        logical_relative = self._logical_relative_path(file_path)
+        if logical_relative is None:
+            return []
+
+        return self._output_paths_for_logical_path(logical_relative)
+
+    def handle_deleted_file(self, file_path: Path) -> None:
+        """Update build output after a source file is deleted."""
+        if file_path.absolute() == self.i18n_config_path.absolute():
+            self._refresh_site_language()
+            self.build_all()
+            return
+
+        logical_relative = self._logical_relative_path(file_path)
+        if logical_relative is None:
+            return
+
+        source_path = self._resolve_source_for_logical_path(logical_relative)
+        if source_path is not None:
+            self._build_logical_file(source_path, logical_relative)
+            return
+
+        for output_path in self._output_paths_for_logical_path(logical_relative):
+            output_path.unlink(missing_ok=True)
 
     def build_all(self) -> None:
         """Build all documentation files from source to build directory.
@@ -318,20 +534,20 @@ class DocumentationBuilder:
             msg = f"File does not exist: {file_path} this is likely a programming error"
             raise AssertionError(msg)
 
-        relative_path = file_path.absolute().relative_to(self.src_dir.absolute())
+        if file_path.absolute() == self.i18n_config_path.absolute():
+            self._refresh_site_language()
+            self.build_all()
+            return
 
-        # Check if this is OSS content that needs versioned building
-        if relative_path.parts[0] == "oss":
-            self._build_oss_file(file_path, relative_path)
-        # Check if this is unversioned content
-        elif relative_path.parts[0] == "langsmith":
-            self._build_unversioned_file(file_path, relative_path)
-        # Handle shared files (images, docs.json, etc.)
-        elif self.is_shared_file(file_path):
-            self._build_shared_file(file_path, relative_path)
-        # Handle root-level files
-        else:
-            self._build_simple_file(file_path, relative_path)
+        logical_relative = self._logical_relative_path(file_path)
+        if logical_relative is None:
+            return
+
+        source_path = self._resolve_source_for_logical_path(logical_relative)
+        if source_path is None:
+            return
+
+        self._build_logical_file(source_path, logical_relative)
 
     def _build_oss_file(self, file_path: Path, relative_path: Path) -> None:
         """Build an OSS file for both Python and JavaScript versions.
@@ -445,35 +661,13 @@ class DocumentationBuilder:
         Returns:
             True if the file was copied, False if it was skipped.
         """
-        # Skip template files
-        if file_path.name == "TEMPLATE.mdx":
+        logical_relative = self._logical_relative_path(file_path)
+        if logical_relative is None:
             return False
 
-        relative_path = file_path.absolute().relative_to(self.src_dir.absolute())
-        output_path = self.build_dir / relative_path
-
-        # Update progress bar description with current file
-        pbar.set_postfix_str(f"{relative_path}")
-
-        # Create output directory if needed
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Handle special case for docs.yml files
-        if file_path.name == "docs.yml" and file_path.suffix.lower() in {
-            ".yml",
-            ".yaml",
-        }:
-            self._convert_yaml_to_json(file_path, output_path)
-            return True
-        # Copy other supported files directly
-        if file_path.suffix.lower() in self.copy_extensions:
-            # Handle markdown files with preprocessing
-            if file_path.suffix.lower() in {".md", ".mdx"}:
-                self._process_markdown_file(file_path, output_path)
-                return True
-            shutil.copy2(file_path, output_path)
-            return True
-        return False
+        pbar.set_postfix_str(f"{logical_relative}")
+        self.build_file(file_path)
+        return True
 
     def build_files(self, file_paths: list[Path]) -> None:
         """Build specific files by copying them to the build directory.
@@ -530,18 +724,7 @@ class DocumentationBuilder:
             output_dir: Output directory (e.g., "langgraph/python").
             target_language: Target language for conditional blocks ("python" or "js").
         """
-        # Only process files in the oss/ directory
-        oss_dir = self.src_dir / "oss"
-        if not oss_dir.exists():
-            logger.warning("oss/ directory not found, skipping LangGraph build")
-            return
-
-        all_files = [
-            file_path
-            for file_path in oss_dir.rglob("*")
-            if file_path.is_file() and not self.is_shared_file(file_path)
-        ]
-
+        all_files = self._collect_content_logical_paths("oss")
         if not all_files:
             logger.info("No files found in oss/ directory for %s", output_dir)
             return
@@ -559,9 +742,8 @@ class DocumentationBuilder:
             leave=False,
             disable=_IS_CI,
         ) as pbar:
-            for file_path in all_files:
-                # Calculate relative path from oss/ directory
-                relative_path = file_path.relative_to(oss_dir)
+            for logical_relative in all_files:
+                relative_path = logical_relative.relative_to(Path("oss"))
 
                 if relative_path.parts:
                     first_part = relative_path.parts[0]
@@ -582,9 +764,14 @@ class DocumentationBuilder:
 
                 # Build to output_dir/ (not `output_dir/oss/`)
                 output_path = self.build_dir / output_dir / relative_path
+                source_path = self._resolve_source_for_logical_path(logical_relative)
+                if source_path is None:
+                    skipped_count += 1
+                    pbar.update(1)
+                    continue
 
                 result = self._build_single_file(
-                    file_path,
+                    source_path,
                     output_path,
                     target_language,
                     pbar,
@@ -610,17 +797,7 @@ class DocumentationBuilder:
             source_dir: Source directory name (e.g., "langsmith").
             output_dir: Output directory name (same as source_dir).
         """
-        src_path = self.src_dir / source_dir
-        if not src_path.exists():
-            logger.warning("%s/ directory not found, skipping", source_dir)
-            return
-
-        all_files = [
-            file_path
-            for file_path in src_path.rglob("*")
-            if file_path.is_file() and not self.is_shared_file(file_path)
-        ]
-
+        all_files = self._collect_content_logical_paths(source_dir)
         if not all_files:
             logger.info("No files found in %s/ directory", source_dir)
             return
@@ -638,14 +815,18 @@ class DocumentationBuilder:
             leave=False,
             disable=_IS_CI,
         ) as pbar:
-            for file_path in all_files:
-                # Calculate relative path from source directory
-                relative_path = file_path.relative_to(src_path)
+            for logical_relative in all_files:
+                relative_path = logical_relative.relative_to(Path(source_dir))
                 # Build directly to output_dir/
                 output_path = self.build_dir / output_dir / relative_path
+                source_path = self._resolve_source_for_logical_path(logical_relative)
+                if source_path is None:
+                    skipped_count += 1
+                    pbar.update(1)
+                    continue
 
                 result = self._build_single_file(
-                    file_path,
+                    source_path,
                     output_path,
                     "python",
                     pbar,
@@ -752,6 +933,28 @@ class DocumentationBuilder:
             return True
         return False
 
+    def is_shared_relative_path(self, relative_path: Path) -> bool:
+        """Check if a logical path should be shared between versions."""
+        if not relative_path.parts:
+            return False
+
+        if relative_path.name == "docs.json":
+            return True
+
+        if len(relative_path.parts) == 1 and relative_path.name in {
+            "index.mdx",
+            "use-these-docs.mdx",
+            "playground.mdx",
+            "i18n-config.json",
+        }:
+            return True
+
+        shared_dirs = {"images", "snippets", ".well-known", "fonts"}
+        if shared_dirs & set(relative_path.parts):
+            return True
+
+        return relative_path.suffix.lower() in {".js", ".css"}
+
     def is_shared_file(self, file_path: Path) -> bool:
         """Check if a file should be shared between versions rather than duplicated.
 
@@ -761,44 +964,26 @@ class DocumentationBuilder:
         Returns:
             True if the file should be shared, False if it should be version-specific.
         """
-        relative_path = file_path.absolute().relative_to(self.src_dir.absolute())
+        logical_relative = self._logical_relative_path(file_path)
+        if logical_relative is None:
+            return False
 
-        if file_path.name == "docs.json":
-            return True
-
-        # Root-level files that should be shared
-        if len(relative_path.parts) == 1 and file_path.name in {
-            "index.mdx",
-            "use-these-docs.mdx",
-            "playground.mdx",
-            "i18n-config.json",
-        }:
-            return True
-
-        # Directories whose contents should be shared
-        shared_dirs = {"images", "snippets", ".well-known", "fonts", "i18n"}
-        if shared_dirs & set(relative_path.parts):
-            return True
-
-        # JavaScript and CSS files should be shared (custom scripts/styles)
-        return file_path.suffix.lower() in {".js", ".css"}
+        return self.is_shared_relative_path(logical_relative)
 
     def _copy_shared_files(self) -> None:
         """Copy files that should be shared between versions."""
-        # Collect shared files
-        shared_files = [
-            file_path
-            for file_path in self.src_dir.rglob("*")
-            if file_path.is_file() and self.is_shared_file(file_path)
-        ]
+        shared_files = self._collect_shared_logical_paths()
 
         if not shared_files:
             logger.info("No shared files found")
             return
 
         copied_count = 0
-        for file_path in shared_files:
-            relative_path = file_path.absolute().relative_to(self.src_dir.absolute())
+        for relative_path in shared_files:
+            file_path = self._resolve_source_for_logical_path(relative_path)
+            if file_path is None:
+                continue
+
             output_path = self.build_dir / relative_path
 
             # Create output directory if needed
@@ -836,6 +1021,63 @@ class DocumentationBuilder:
     _NPM_BUILD_FILES: ClassVar[dict[str, str]] = {
         "ChatLangChainEmbed.js": "ChatLangChainEmbed.js",
     }
+
+    def _rewrite_chat_langchain_embed(self, embed_path: Path) -> None:
+        """Force the chat embed to use the hosted app, even on localhost.
+
+        The upstream npm bundle points localhost docs builds at a separate local
+        embed dev server on port 4100. Our local docs workflow does not run that
+        server, so we rewrite the copied bundle to use the hosted embed URL.
+        """
+        content = embed_path.read_text(encoding="utf-8")
+        rewritten_content = content.replace(
+            _CHAT_LANGCHAIN_LOCAL_EMBED_URL,
+            _CHAT_LANGCHAIN_PROD_EMBED_URL,
+        )
+
+        if rewritten_content != content:
+            embed_path.write_text(rewritten_content, encoding="utf-8")
+            logger.info("Rewrote ChatLangChain embed to use hosted URL: %s", embed_path)
+
+    def _restore_snippet_code_fence(
+        self, content: str, input_path: Path, logical_relative: Path
+    ) -> str:
+        """Restore fenced code blocks for translated snippets when needed.
+
+        Some translated snippet files under i18n contain only the inner code block
+        content, while the source snippet keeps the surrounding markdown fence.
+        Mint parses imported snippet MDX files directly, so bare code causes MDX
+        parsing failures. When the translated snippet lacks a fence, copy the fence
+        marker from the source snippet at the same logical path.
+        """
+        stripped_content = content.lstrip()
+        if stripped_content.startswith(("```", "~~~")):
+            return content
+
+        source_path = self.src_dir / logical_relative
+        if source_path == input_path or not source_path.is_file():
+            return content
+
+        source_content = source_path.read_text(encoding="utf-8").lstrip()
+        first_line = source_content.splitlines()[0] if source_content else ""
+        fence_match = re.match(r"^(```|~~~)([^\r\n]*)$", first_line)
+        if fence_match is None:
+            return content
+
+        fence = fence_match.group(1)
+        fence_suffix = fence_match.group(2)
+        normalized_content = content.strip("\n")
+        if not normalized_content:
+            return content
+
+        logger.warning(
+            "Snippet missing code fence in %s; restored %s fence from %s",
+            input_path,
+            f"{fence}{fence_suffix}",
+            source_path,
+        )
+
+        return f"{fence}{fence_suffix}\n{normalized_content}\n{fence}\n"
 
     def _copy_npm_snippets(self) -> None:
         """Copy snippet components from the @langchain/docs-sandbox npm package.
@@ -875,6 +1117,8 @@ class DocumentationBuilder:
                 continue
             dest_file = self.build_dir / dest_name
             shutil.copy2(src_file, dest_file)
+            if dest_name == "ChatLangChainEmbed.js":
+                self._rewrite_chat_langchain_embed(dest_file)
             logger.info("Copied npm build file: %s → build/%s", src_name, dest_name)
 
     def _process_snippet_markdown_file(
@@ -894,6 +1138,16 @@ class DocumentationBuilder:
             # Read the source markdown content
             with input_path.open("r", encoding="utf-8") as f:
                 content = f.read()
+
+            logical_relative = self._logical_relative_path(input_path)
+            if logical_relative is None:
+                logical_relative = input_path.relative_to(self.src_dir)
+
+            content = self._restore_snippet_code_fence(
+                content,
+                input_path,
+                logical_relative,
+            )
 
             # Apply standard markdown preprocessing
             processed_content = preprocess_markdown(

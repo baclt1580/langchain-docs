@@ -137,11 +137,8 @@ class DocsFileHandler(FileSystemEventHandler):
             return
 
         relative_path = file_path.relative_to(self.builder.src_dir.absolute())
-        output_path = self.builder.build_dir / relative_path
-
-        if output_path.exists():
-            output_path.unlink()
-            logger.info("Deleted: %s", relative_path)
+        self.builder.handle_deleted_file(file_path)
+        logger.info("Deleted: %s", relative_path)
 
 
 class FileWatcher:
@@ -347,66 +344,9 @@ class FileWatcher:
             try:
                 current_time = time.time()
                 touched_count = 0
-                relative_path = source_file.absolute().relative_to(
-                    self.src_dir.absolute()
-                )
-
-                # Handle different content types based on the updated build_file logic
-                if relative_path.parts[0] == "oss":
-                    # OSS content is versioned - check Python and JavaScript versions
-                    # Skip if it's a shared file (images, JS, CSS) - those go to root
-                    if self.builder.is_shared_file(source_file):
-                        built_file = self.build_dir / relative_path
-                        if built_file.suffix.lower() == ".md":
-                            built_file = built_file.with_suffix(".mdx")
-                        if built_file.exists():
-                            os.utime(built_file, (current_time, current_time))
-                            touched_count += 1
-                    else:
-                        # Remove 'oss/' prefix and add version-specific paths
-                        sub_path = Path(*relative_path.parts[1:])
-
-                        for version in ["python", "javascript"]:
-                            built_file = self.build_dir / "oss" / version / sub_path
-
-                            # Handle .md -> .mdx conversion
-                            if built_file.suffix.lower() == ".md":
-                                built_file = built_file.with_suffix(".mdx")
-
-                            # Touch the file if it exists
-                            if built_file.exists():
-                                os.utime(built_file, (current_time, current_time))
-                                touched_count += 1
-
-                elif relative_path.parts[0] in {"labs", "langsmith"}:
-                    # Unversioned content
-                    built_file = self.build_dir / relative_path
-
-                    # Handle .md -> .mdx conversion
-                    if built_file.suffix.lower() == ".md":
-                        built_file = built_file.with_suffix(".mdx")
-
-                    # Touch the file if it exists
-                    if built_file.exists():
-                        os.utime(built_file, (current_time, current_time))
-                        touched_count += 1
-
-                elif self.builder.is_shared_file(source_file):
-                    # Shared files (images, docs.json, JS/CSS) - go to build root
-                    built_file = self.build_dir / relative_path
-                    if built_file.exists():
-                        os.utime(built_file, (current_time, current_time))
-                        touched_count += 1
-
-                else:
-                    # Root-level files
-                    built_file = self.build_dir / relative_path
-
-                    # Handle .md -> .mdx conversion
-                    if built_file.suffix.lower() == ".md":
-                        built_file = built_file.with_suffix(".mdx")
-
-                    # Touch the file if it exists
+                for built_file in self.builder.get_output_paths_for_source_file(
+                    source_file
+                ):
                     if built_file.exists():
                         os.utime(built_file, (current_time, current_time))
                         touched_count += 1

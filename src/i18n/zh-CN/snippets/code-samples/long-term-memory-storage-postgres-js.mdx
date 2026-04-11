@@ -1,3 +1,4 @@
+```ts
 import { PostgresStore } from "@langchain/langgraph-checkpoint-postgres/store";
 
 const embed = (texts: string[]): number[][] => {
@@ -29,3 +30,4 @@ const items = await store.search(namespace, {
   filter: { "my-key": "my-value" },
   query: "language preferences",
 });
+```

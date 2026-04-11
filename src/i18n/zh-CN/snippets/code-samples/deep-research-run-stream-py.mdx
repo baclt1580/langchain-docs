@@ -1,3 +1,4 @@
+```python
 from langchain.messages import HumanMessage
 from langgraph.types import Overwrite
 
@@ -17,3 +18,4 @@ if __name__ == "__main__":
             for msg in msg_list:
                 if hasattr(msg, "content") and msg.content:
                     print(msg.content)
+```
