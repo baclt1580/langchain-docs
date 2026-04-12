@@ -1,0 +1,117 @@
+---
+title: "TavilySearchAPIRetriever 集成"
+description: "使用 LangChain JavaScript 集成 TavilySearchAPIRetriever 检索器。"
+---
+
+[Tavily 搜索 API](https://tavily.com) 是一款专为 AI 智能体（LLMs）构建的搜索引擎，能够快速提供实时、准确且基于事实的搜索结果。
+
+## 概述
+
+本文将帮助您开始使用 `TavilySearchAPIRetriever` [检索器](/oss/javascript/langchain/retrieval)。有关 `TavilySearchAPIRetriever` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/retrievers/tavily_search_api/TavilySearchAPIRetriever)。
+
+### 集成详情
+
+| 检索器 | 来源 | 包 |
+| :--- | :--- | :---: |
+[`TavilySearchAPIRetriever`](https://reference.langchain.com/javascript/langchain-community/retrievers/tavily_search_api/TavilySearchAPIRetriever) | 网络信息。 | [`@langchain/community`](https://npmjs.com/@langchain/community/) |
+
+## 设置
+
+您需要将 Tavily API 密钥填入 `TAVILY_API_KEY` 环境变量，或在构造函数中通过 `apiKey` 参数传入。请通过[在其官网注册](https://tavily.com/)获取密钥。
+
+如果您希望从单个查询中获得自动化追踪，还可以通过取消以下注释来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```typescript
+// process.env.LANGSMITH_API_KEY = "<您的 API 密钥>";
+// process.env.LANGSMITH_TRACING = "true";
+```
+
+### 安装
+
+此检索器位于 `@langchain/community` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/core
+```
+```bash yarn
+yarn add @langchain/community @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/core
+```
+</CodeGroup>
+
+## 实例化
+
+现在我们可以实例化检索器：
+
+```typescript
+import { TavilySearchAPIRetriever } from "@langchain/community/retrievers/tavily_search_api";
+
+const retriever = new TavilySearchAPIRetriever({
+  k: 3,
+});
+```
+
+有关允许参数的完整列表，请参阅[官方文档](https://docs.tavily.com/docs/tavily-api/rest_api#parameters)。您可以通过 `kwargs` 对象向 SDK 传递任何参数。
+
+## 使用
+
+```typescript
+const query = "旧金山现在的天气如何？";
+
+await retriever.invoke(query);
+```
+
+```javascript
+[
+  Document {
+    pageContent: "{'location': {'name': 'San Francisco', 'region': 'California', 'country': 'United States of America', 'lat': 37.78, 'lon': -122.42, 'tz_id': 'America/Los_Angeles', 'localtime_epoch': 1722900266, 'localtime': '2024-08-05 16:24'}, 'current': {'last_updated_epoch': 1722899700, 'last_updated': '2024-08-05 16:15', 'temp_c': 16.8, 'temp_f': 62.2, 'is_day': 1, 'condition': {'text': 'Partly Cloudy', 'icon': '//cdn.weatherapi.com/weather/64x64/day/116.png', 'code': 1003}, 'wind_mph': 13.2, 'wind_kph': 21.2, 'wind_degree': 261, 'wind_dir': 'W', 'pressure_mb': 1014.0, 'pressure_in': 29.94, 'precip_mm': 0.0, 'precip_in': 0.0, 'humidity': 74, 'cloud': 60, 'feelslike_c': 16.8, 'feelslike_f': 62.2, 'windchill_c': 16.8, 'windchill_f': 62.2, 'heatindex_c': 16.8, 'heatindex_f': 62.2, 'dewpoint_c': 12.3, 'dewpoint_f': 54.1, 'vis_km': 10.0, 'vis_miles': 6.0, 'uv': 5.0, 'gust_mph': 17.3, 'gust_kph': 27.8}}",
+    metadata: {
+      title: 'Weather in San Francisco',
+      source: 'https://www.weatherapi.com/',
+      score: 0.9947009,
+      images: []
+    },
+    id: undefined
+  },
+  Document {
+    pageContent: 'Current Weather for Popular Cities . San Francisco, CA 56 ° F Mostly Cloudy; Manhattan, NY warning 85 ° F Fair; Schiller Park, IL (60176) 71 ° F Mostly Cloudy; Boston, MA warning 84 ° F Partly ...',
+    metadata: {
+      title: 'San Francisco, CA Hourly Weather Forecast | Weather Underground',
+      source: 'https://www.wunderground.com/hourly/us/ca/san-francisco/date/2024-08-02',
+      score: 0.9859904,
+      images: []
+    },
+    id: undefined
+  },
+  Document {
+    pageContent: 'San Francisco CA 37.77°N 122.41°W (Elev. 131 ft) Last Update: 2:42 pm PDT Aug 4, 2024. Forecast Valid: 5pm PDT Aug 4, 2024-6pm PDT Aug 11, 2024 . Forecast Discussion . Additional Resources. Radar & Satellite Image. Hourly Weather Forecast. ... Severe Weather ; Current Outlook Maps ; Drought ; Fire Weather ; Fronts/Precipitation Maps ; Current ...',
+    metadata: {
+      title: 'National Weather Service',
+      source: 'https://forecast.weather.gov/zipcity.php?inputstring=San+Francisco,CA',
+      score: 0.98141783,
+      images: []
+    },
+    id: undefined
+  }
+]
+```
+
+---
+
+## API 参考
+
+有关 `TavilySearchAPIRetriever` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/retrievers/tavily_search_api/TavilySearchAPIRetriever)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\tavily.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,45 @@
+---
+title: "Hugging Face 集成中的 Instruct 嵌入"
+description: "使用 LangChain Python 与 Hugging Face 嵌入模型中的 Instruct 嵌入进行集成。"
+---
+
+>[Hugging Face sentence-transformers](https://huggingface.co/sentence-transformers) 是一个用于最先进句子、文本和图像嵌入的 Python 框架。
+>`HuggingFaceInstructEmbeddings` 类中使用了其中一种 instruct 嵌入模型。
+
+```python
+from langchain_community.embeddings import HuggingFaceInstructEmbeddings
+```
+
+```python
+embeddings = HuggingFaceInstructEmbeddings(
+    query_instruction="Represent the query for retrieval: "
+)
+```
+
+```text
+load INSTRUCTOR_Transformer
+max_seq_length  512
+```
+
+```python
+text = "This is a test document."
+```
+
+```python
+query_result = embeddings.embed_query(text)
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\instruct_embeddings.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

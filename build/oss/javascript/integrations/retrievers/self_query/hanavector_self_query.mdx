@@ -1,0 +1,158 @@
+---
+title: 使用 SAP HANA Cloud Vector Engine 进行自查询
+---
+
+关于 SAP HANA 向量存储的设置详情，请参阅指南：[向量存储：SAP HANA](/oss/javascript/integrations/vectorstores/sap_hanavector)。
+
+我们在此使用相同的设置：
+
+```typescript
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import hanaClient from "@sap/hana-client";
+
+const connectionParams = {
+  host: process.env.HANA_DB_ADDRESS,
+  port: process.env.HANA_DB_PORT,
+  user: process.env.HANA_DB_USER,
+  password: process.env.HANA_DB_PASSWORD,
+};
+const client = hanaClient.createConnection(connectionParams);
+
+// 连接到 hanaDB
+await new Promise<void>((resolve, reject) => {
+  client.connect((err: Error) => {
+    // 此处使用箭头函数
+    if (err) {
+      reject(err);
+    } else {
+      console.log("成功连接到 SAP HANA。");
+      resolve();
+    }
+  });
+});
+```
+
+为了能够以良好性能进行自查询，我们在 HANA 的向量存储表中创建额外的元数据字段：
+
+```typescript
+await new Promise<void>((resolve, reject) => {
+  client.exec(
+    `DROP TABLE LANGCHAIN_DEMO_SELF_QUERY`,
+    (dropErr: Error) => {
+      // 忽略删除错误
+      client.exec(
+        `CREATE TABLE "LANGCHAIN_DEMO_SELF_QUERY"  (
+          "name" NVARCHAR(100), "is_active" BOOLEAN, "id" INTEGER, "height" DOUBLE,
+          "VEC_TEXT" NCLOB,
+          "VEC_META" NCLOB,
+          "VEC_VECTOR" REAL_VECTOR
+        )`,
+        (createErr: Error) => {
+          if (createErr) {
+            reject(createErr);
+          } else {
+            resolve();
+          }
+        }
+      );
+    }
+  );
+});
+```
+
+让我们添加一些文档。
+
+```typescript
+import { HanaDB } from "@sap/hana-langchain";
+import { Document } from "@langchain/core/documents";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const embeddings = new OpenAIEmbeddings();
+
+const db = new HanaDB(embeddings, {
+  connection: client,
+  tableName: "LANGCHAIN_DEMO_SELF_QUERY",
+  specificMetadataColumns: ["name", "is_active", "id", "height"],
+});
+await db.initialize();
+
+const docs = [
+  new Document({
+    pageContent: "First",
+    metadata: { name: "adam", is_active: true, id: 1, height: 10.0 },
+  }),
+  new Document({
+    pageContent: "Second",
+    metadata: { name: "bob", is_active: false, id: 2, height: 5.7 },
+  }),
+  new Document({
+    pageContent: "Third",
+    metadata: { name: "jane", is_active: true, id: 3, height: 2.4 },
+  }),
+];
+
+await db.delete({ filter: {} });
+await db.addDocuments(docs);
+```
+
+## 自查询
+
+现在进入主要环节：以下是如何为 HANA 向量存储构建 SelfQueryRetriever：
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { AttributeInfo } from "@langchain/classic/chains/query_constructor";
+import { SelfQueryRetriever } from "@langchain/classic/retrievers/self_query"
+import { HanaTranslator } from "@sap/hana-langchain";
+
+const llm = new ChatOpenAI({ model: "gpt-3.5-turbo" });
+
+const metadataFieldInfo: AttributeInfo[] = [
+  { name: "name", description: "人员姓名", type: "string" },
+  { name: "is_active", description: "该人员是否活跃", type: "boolean" },
+  { name: "id", description: "人员ID", type: "integer" },
+  { name: "height", description: "人员身高", type: "float" },
+];
+
+const contentDescription = "人员集合";
+
+const hanaTranslator = new HanaTranslator();
+
+const retriever = await SelfQueryRetriever.fromLLM({
+  llm,
+  vectorStore: db,
+  documentContentDescription: contentDescription,
+  attributeInfo: metadataFieldInfo,
+  structuredQueryTranslator: hanaTranslator,
+});
+```
+
+让我们使用这个检索器来准备一个（自）查询以查找人员：
+
+```typescript
+const queryPrompt = "哪个人不活跃？"
+const retreivedDocs = await retriever.invoke(queryPrompt);
+
+for (const doc of retreivedDocs){
+  console.log("-".repeat(80));
+  console.log(doc.pageContent + " " + JSON.stringify(doc.metadata));
+}
+```
+
+```text
+--------------------------------------------------------------------------------
+Second {"name":"bob","is_active":false,"id":2,"height":5.7}
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\self_query\hanavector_self_query.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,76 @@
+---
+title: "Gradient AI 集成"
+description: "使用 LangChain JavaScript 与 Gradient AI LLM 集成。"
+---
+
+LangChain.js 支持与 Gradient AI 集成。查看 [Gradient AI](https://docs.gradient.ai/docs) 以获取可用模型列表。
+
+## 设置
+
+您需要安装官方的 Gradient Node SDK 作为对等依赖项：
+
+```bash npm
+npm i @gradientai/nodejs-sdk
+```
+使用 Gradient AI API 需要设置以下环境变量：
+
+1. `GRADIENT_ACCESS_TOKEN`
+2. `GRADIENT_WORKSPACE_ID`
+
+或者，这些参数可以在实例化 GradientAI 类时分别作为 `gradientAccessKey` 和 `workspaceId` 进行设置。
+例如：
+
+```typescript
+const model = new GradientLLM({
+  gradientAccessKey: "我的秘密访问令牌"
+  workspaceId: "我的秘密工作空间 ID"
+});
+```
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+```typescript
+import { GradientLLM } from "@langchain/community/llms/gradient_ai";
+
+// 注意 inferenceParameters 是可选的
+const model = new GradientLLM({
+  modelSlug: "llama2-7b-chat",
+  inferenceParameters: {
+    maxGeneratedTokenCount: 20,
+    temperature: 0,
+  },
+});
+const res = await model.invoke(
+  "一家生产彩色袜子的公司，起什么名字比较好？"
+);
+
+console.log({ res });
+```
+
+### 使用您自己微调的适配器
+
+要使用您自己的自定义适配器，只需在设置时指定 `adapterId`。
+
+<GradientAiAdapter />
+
+## 相关链接
+
+- [模型指南](/oss/javascript/langchain/models)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\llms\gradient_ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

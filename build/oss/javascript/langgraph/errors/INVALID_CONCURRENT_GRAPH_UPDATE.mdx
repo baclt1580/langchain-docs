@@ -1,0 +1,76 @@
+---
+title: INVALID_CONCURRENT_GRAPH_UPDATE
+---
+
+LangGraph 的 [`StateGraph`](https://langchain-ai.github.io/langgraph/reference/graphs/#langgraph.graph.state.StateGraph) 收到了来自多个节点对其状态的并发更新，而该状态属性不支持此类操作。
+
+这种情况可能发生在以下场景：你在图中使用了[扇出（fanout）](/oss/javascript/langgraph/use-graph-api#map-reduce-and-the-send-api)或其他并行执行逻辑，并且定义了类似这样的图：
+
+
+
+```typescript
+import { StateGraph, StateSchema, START } from "@langchain/langgraph";
+import { z } from "zod/v4";  // [!code highlight]
+
+const State = new StateSchema({
+  someKey: z.string(),
+});
+
+const builder = new StateGraph(State)
+  .addNode("node", (state) => {
+    return { someKey: "some_string_value" };
+  })
+  .addNode("otherNode", (state) => {
+    return { someKey: "some_string_value" };
+  })
+  .addEdge(START, "node")
+  .addEdge(START, "otherNode");
+
+const graph = builder.compile();
+```
+
+
+
+
+如果上述图中的某个节点返回 `{ someKey: "some_string_value" }`，这将用 `"some_string_value"` 覆盖 `someKey` 的状态值。
+然而，如果在单个步骤中（例如在扇出操作中）有多个节点返回了 `someKey` 的值，图将抛出此错误，因为无法确定如何更新内部状态。
+
+
+要解决此问题，你可以定义一个合并多个值的归约器（reducer）：
+
+
+
+```typescript
+import { StateSchema, ReducedValue } from "@langchain/langgraph";
+import { z } from "zod/v4";
+
+const State = new StateSchema({  // [!code highlight]
+  someKey: new ReducedValue(  // [!code highlight]
+    z.array(z.string()).default(() => []),  // [!code highlight]
+    {
+      inputSchema: z.array(z.string()),
+      reducer: (existing, update) => existing.concat(update),  // [!code highlight]
+    }
+  ),
+});
+```
+
+
+这将允许你定义逻辑，以处理从并行执行的多个节点返回的相同键。
+
+## 故障排除
+
+以下方法可能有助于解决此错误：
+
+* 如果你的图并行执行节点，请确保已为相关的状态键定义了归约器。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\errors\INVALID_CONCURRENT_GRAPH_UPDATE.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

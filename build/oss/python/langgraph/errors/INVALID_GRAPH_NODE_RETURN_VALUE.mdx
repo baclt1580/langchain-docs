@@ -1,0 +1,53 @@
+---
+title: INVALID_GRAPH_NODE_RETURN_VALUE
+---
+
+LangGraph 的 [`StateGraph`](https://langchain-ai.github.io/langgraph/reference/graphs/#langgraph.graph.state.StateGraph) 收到了来自节点的非字典类型返回值。以下是一个示例：
+
+```python
+class State(TypedDict):
+    some_key: str
+
+def bad_node(state: State):
+    # 应返回包含 "some_key" 值的字典，而不是列表
+    return ["whoops"]
+
+builder = StateGraph(State)
+builder.add_node(bad_node)
+...
+
+graph = builder.compile()
+```
+
+调用上述图将导致如下错误：
+
+```python
+graph.invoke({ "some_key": "someval" });
+```
+
+```
+InvalidUpdateError: Expected dict, got ['whoops']
+如需故障排除，请访问：https://docs.langchain.com/oss/python/langgraph/errors/INVALID_GRAPH_NODE_RETURN_VALUE
+```
+
+图中的节点必须返回一个字典，其中包含在状态中定义的一个或多个键。
+
+
+
+
+## 故障排除
+
+以下方法可能有助于解决此错误：
+
+* 如果节点中包含复杂逻辑，请确保所有代码路径都返回适合已定义状态的字典。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\errors\INVALID_GRAPH_NODE_RETURN_VALUE.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

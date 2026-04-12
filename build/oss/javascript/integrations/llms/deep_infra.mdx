@@ -1,0 +1,54 @@
+---
+title: "DeepInfra 集成"
+description: "使用 LangChain JavaScript 与 DeepInfra LLM 集成。"
+---
+
+LangChain 通过 `DeepInfra` 包装器支持由 [Deep Infra](https://deepinfra.com/) 托管的 LLM。
+首先，你需要安装 `@langchain/community` 包：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+你需要获取一个 API 密钥，并将其设置为名为 `DEEPINFRA_API_TOKEN` 的环境变量（或将其传入构造函数），然后按如下方式调用模型：
+
+```typescript
+import { DeepInfraLLM } from "@langchain/community/llms/deepinfra";
+
+const apiKey = process.env.DEEPINFRA_API_TOKEN;
+const model = "meta-llama/Meta-Llama-3-70B-Instruct";
+
+const llm = new DeepInfraLLM({
+  temperature: 0.7,
+  maxTokens: 20,
+  model,
+  apiKey,
+  maxRetries: 5,
+});
+
+const res = await llm.invoke(
+  "制作一款好游戏的下一步是什么？"
+);
+
+console.log({ res });
+```
+
+## 相关链接
+
+
+- [模型指南](/oss/javascript/langchain/models)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\llms\deep_infra.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

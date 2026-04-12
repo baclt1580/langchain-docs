@@ -1,0 +1,257 @@
+---
+title: "Modal"
+sidebarTitle: "Modal"
+description: "使用 Modal 沙盒后端配合 deepagents，实现支持 GPU 的隔离代码执行环境"
+---
+
+[Modal](https://modal.com) 提供支持 GPU 的无服务器容器基础设施。最适合 ML/AI 工作负载和 Python 开发。
+
+## 安装
+
+<CodeGroup>
+    ```bash npm
+    npm install @langchain/modal
+    ```
+
+    ```bash yarn
+    yarn add @langchain/modal
+    ```
+
+    ```bash pnpm
+    pnpm add @langchain/modal
+    ```
+</CodeGroup>
+
+### 认证
+
+从 [modal.com/settings/tokens](https://modal.com/settings/tokens) 获取您的令牌。
+
+```bash
+export MODAL_TOKEN_ID=your_token_id
+export MODAL_TOKEN_SECRET=your_token_secret
+```
+
+或者直接传递凭据：
+
+```typescript
+const sandbox = await ModalSandbox.create({
+  auth: {
+    tokenId: "your-token-id",
+    tokenSecret: "your-token-secret",
+  },
+});
+```
+
+## 与 deepagents 配合使用
+
+```typescript
+import { createDeepAgent } from "deepagents";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { ModalSandbox } from "@langchain/modal";
+
+const sandbox = await ModalSandbox.create({
+  imageName: "python:3.12-slim",
+  timeoutMs: 600_000, // 10 分钟
+});
+
+try {
+  const agent = createDeepAgent({
+    model: new ChatAnthropic({ model: "claude-sonnet-4-20250514" }),
+    systemPrompt: "您是一个拥有沙盒访问权限的编程助手。",
+    backend: sandbox,
+  });
+
+  const result = await agent.invoke({
+    messages: [{ role: "user", content: "安装 numpy 并计算 pi" }],
+  });
+} finally {
+  await sandbox.close();
+}
+```
+
+
+## 独立使用
+
+```typescript
+import { ModalSandbox } from "@langchain/modal";
+
+const sandbox = await ModalSandbox.create({
+  imageName: "python:3.12-slim",
+  timeoutMs: 600_000,
+});
+
+const result = await sandbox.execute("python --version");
+console.log(result.output);
+
+await sandbox.close();
+```
+
+
+## 配置
+
+| 选项 | 类型 | 默认值 | 描述 |
+|--------|------|---------|-------------|
+| `imageName` | `string` | `"alpine:3.21"` | 使用的 Docker 镜像 |
+| `timeoutMs` | `number` | `300000` | 最大生命周期（毫秒） |
+| `workdir` | `string` | - | 工作目录 |
+| `gpu` | `string` | - | GPU 类型 (`"T4"`, `"A100"`, `"H100"` 等) |
+| `cpu` | `number` | - | CPU 核心数（允许小数） |
+| `memoryMiB` | `number` | - | 内存分配（MiB） |
+| `volumes` | `Record<string, string>` | - | 卷映射（挂载路径到卷名） |
+| `secrets` | `string[]` | - | 要注入的 Modal Secret 名称 |
+| `initialFiles` | `Record<string, string \| Uint8Array>` | - | 启动时创建的文件 |
+| `env` | `Record<string, string>` | - | 环境变量 |
+| `blockNetwork` | `boolean` | - | 阻止网络访问 |
+| `name` | `string` | - | 沙盒名称（在应用内唯一） |
+
+## GPU 支持
+
+Modal 支持 NVIDIA GPU 用于 ML 工作负载：
+
+```typescript
+const sandbox = await ModalSandbox.create({
+  imageName: "python:3.12-slim",
+  gpu: "T4",  // 或 "L4", "A10G", "A100", "H100"
+});
+```
+
+
+## 卷和密钥
+
+挂载 Modal Volumes 以实现持久化存储，并将密钥作为环境变量注入：
+
+```typescript
+// 卷和密钥必须先在 Modal 中创建
+const sandbox = await ModalSandbox.create({
+  imageName: "python:3.12-slim",
+  volumes: {
+    "/data": "my-data-volume",
+    "/models": "my-models-volume",
+  },
+  secrets: ["my-api-keys", "database-credentials"],
+});
+
+// /data 和 /models 中的文件在沙盒重启后仍然保留
+await sandbox.execute("echo 'Hello' > /data/test.txt");
+
+// 密钥可作为环境变量使用
+await sandbox.execute("echo $API_KEY");
+```
+
+
+## 初始文件
+
+在创建时预填充沙盒文件：
+
+```typescript
+const sandbox = await ModalSandbox.create({
+  imageName: "python:3.12-slim",
+  initialFiles: {
+    "/app/main.py": 'print("Hello from Python!")',
+    "/app/config.json": JSON.stringify({ name: "my-app" }, null, 2),
+  },
+});
+
+const result = await sandbox.execute("python /app/main.py");
+```
+
+
+## 访问 Modal SDK
+
+对于 `BaseSandbox` 未暴露的高级功能，可以访问底层的 Modal SDK：
+
+```typescript
+const modalSandbox = await ModalSandbox.create();
+
+const client = modalSandbox.client;     // ModalClient
+const instance = modalSandbox.instance;  // Sandbox
+
+// 直接进行 SDK 操作
+const process = await instance.exec(["python", "-c", "print('Hello')"], {
+  stdout: "pipe",
+  stderr: "pipe",
+});
+```
+
+
+## 重新连接到现有沙盒
+
+```typescript
+// 通过 ID 重新连接
+const reconnected = await ModalSandbox.fromId(sandboxId);
+
+// 通过名称重新连接
+const reconnected2 = await ModalSandbox.fromName("my-app", "my-sandbox");
+```
+
+
+## 工厂函数
+
+```typescript
+import { createModalSandboxFactory, createModalSandboxFactoryFromSandbox } from "@langchain/modal";
+
+// 每次调用创建新沙盒
+const factory = createModalSandboxFactory({ imageName: "python:3.12-slim" });
+
+// 或者在多次调用间复用现有沙盒
+const sandbox = await ModalSandbox.create();
+const reuseFactory = createModalSandboxFactoryFromSandbox(sandbox);
+```
+
+
+## 错误处理
+
+```typescript
+import { ModalSandboxError } from "@langchain/modal";
+
+try {
+  await sandbox.execute("some command");
+} catch (error) {
+  if (error instanceof ModalSandboxError) {
+    switch (error.code) {
+      case "NOT_INITIALIZED":
+        await sandbox.initialize();
+        break;
+      case "COMMAND_TIMEOUT":
+        console.error("命令执行超时");
+        break;
+      case "AUTHENTICATION_FAILED":
+        console.error("请检查您的 Modal 令牌凭据");
+        break;
+    }
+  }
+}
+```
+
+### 错误代码
+
+| 代码 | 描述 |
+|------|-------------|
+| `NOT_INITIALIZED` | 沙盒未初始化 - 调用 `initialize()` |
+| `ALREADY_INITIALIZED` | 无法重复初始化 |
+| `AUTHENTICATION_FAILED` | Modal 令牌无效或缺失 |
+| `SANDBOX_CREATION_FAILED` | 创建沙盒失败 |
+| `SANDBOX_NOT_FOUND` | 沙盒 ID/名称未找到或已过期 |
+| `COMMAND_TIMEOUT` | 命令执行超时 |
+| `COMMAND_FAILED` | 命令执行失败 |
+| `FILE_OPERATION_FAILED` | 文件读写失败 |
+| `RESOURCE_LIMIT_EXCEEDED` | CPU、内存或存储限制超出 |
+| `VOLUME_ERROR` | 卷操作失败 |
+
+## 环境变量
+
+| 变量 | 描述 |
+|----------|-------------|
+| `MODAL_TOKEN_ID` | Modal API 令牌 ID |
+| `MODAL_TOKEN_SECRET` | Modal API 令牌密钥 |
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\providers\modal.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

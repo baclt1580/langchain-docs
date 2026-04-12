@@ -1,0 +1,106 @@
+---
+title: "Astra DB 集成"
+description: "使用 LangChain JavaScript 与 Astra DB 向量存储进行集成。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+DataStax [Astra DB](https://astra.datastax.com/register) 是一款基于 [Apache Cassandra](https://cassandra.apache.org/_/index.html) 构建的无服务器向量数据库，通过易于使用的 JSON API 提供便捷访问。
+
+## 设置步骤
+
+1. 创建 [Astra DB 账户](https://astra.datastax.com/register)。
+2. 创建 [支持向量的数据库](https://astra.datastax.com/createDatabase)。
+3. 从数据库详情中获取 `API 端点` 和 `令牌`。
+4. 设置以下环境变量：
+
+```bash
+export ASTRA_DB_APPLICATION_TOKEN=您的_ASTRA_DB_应用令牌
+export ASTRA_DB_ENDPOINT=您的_ASTRA_DB_端点
+export ASTRA_DB_COLLECTION=您的_ASTRA_DB_集合名称
+export OPENAI_API_KEY=您的_OPENAI_API_密钥
+```
+
+其中 `ASTRA_DB_COLLECTION` 是您希望创建的集合名称
+
+6. 安装 Astra TS 客户端和 LangChain 社区包
+
+<Tip>
+通用安装说明请参阅 [LangChain 包安装指南](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @datastax/astra-db-ts @langchain/community @langchain/core
+```
+
+## 文档索引
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import {
+  AstraDBVectorStore,
+  AstraLibArgs,
+} from "@langchain/community/vectorstores/astradb";
+
+const astraConfig: AstraLibArgs = {
+  token: process.env.ASTRA_DB_APPLICATION_TOKEN as string,
+  endpoint: process.env.ASTRA_DB_ENDPOINT as string,
+  collection: process.env.ASTRA_DB_COLLECTION ?? "langchain_test",
+  collectionOptions: {
+    vector: {
+      dimension: 1536,
+      metric: "cosine",
+    },
+  },
+};
+
+const vectorStore = await AstraDBVectorStore.fromTexts(
+  [
+    "AstraDB 基于 Apache Cassandra 构建",
+    "AstraDB 是 NoSQL 数据库",
+    "AstraDB 支持向量搜索",
+  ],
+  [{ foo: "foo" }, { foo: "bar" }, { foo: "baz" }],
+  new OpenAIEmbeddings(),
+  astraConfig
+);
+
+// 文档查询：
+const results = await vectorStore.similaritySearch("Cassandra", 1);
+
+// 或带过滤条件的查询：
+const filteredQueryResults = await vectorStore.similaritySearch("A", 1, {
+  foo: "bar",
+});
+```
+
+## 向量类型
+
+Astra DB 支持 `cosine`（默认）、`dot_product` 和 `euclidean` 相似度搜索；这需要在首次创建向量存储时通过 `CreateCollectionOptions` 定义：
+
+```typescript
+  vector: {
+      dimension: number;
+      metric?: "cosine" | "euclidean" | "dot_product";
+  };
+```
+
+## 相关资源
+
+- 向量存储 [概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储 [操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\astradb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,115 @@
+---
+title: "Cohere 集成"
+description: "使用 LangChain Python 与 Cohere LLM 进行集成。"
+---
+
+<Warning>
+**您目前所在的页面是关于将 Cohere 模型用作文本补全模型的文档。许多流行的 Cohere 模型是 [聊天完成模型](/oss/python/langchain/models)。**
+
+您可能正在寻找 [此页面](/oss/python/integrations/chat/cohere/)。
+</Warning>
+
+>[Cohere](https://cohere.ai/about) 是一家加拿大初创公司，提供自然语言处理模型，帮助企业改善人机交互。
+
+有关所有属性和方法的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/llms/cohere/Cohere)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/llms/cohere/) | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |  :---: | :---: | :---: |
+| [`Cohere`](https://reference.langchain.com/python/langchain-community/llms/cohere/Cohere) | [`langchain-community`](https://reference.langchain.com/python/langchain-community) | ❌ | beta | ✅ | ![PyPI - 下载量](https://img.shields.io/pypi/dm/langchain_community?style=flat-square&label=%20) | ![PyPI - 版本](https://img.shields.io/pypi/v/langchain_community?style=flat-square&label=%20) |
+
+## 设置
+
+该集成位于 `langchain-community` 包中。我们还需要安装 `cohere` 包本身。我们可以使用以下命令安装：
+
+### 凭据
+
+我们需要获取一个 [Cohere API 密钥](https://cohere.com/) 并设置 `COHERE_API_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+if "COHERE_API_KEY" not in os.environ:
+    os.environ["COHERE_API_KEY"] = getpass.getpass()
+```
+
+### 安装
+
+```python
+pip install -U langchain-community langchain-cohere
+```
+
+设置 [LangSmith](https://smith.langchain.com/) 以获得一流的观测能力也很有帮助（但不是必需的）
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+# os.environ["LANGSMITH_API_KEY"] = getpass.getpass()
+```
+
+## 调用
+
+Cohere 支持所有 [LLM](/oss/python/langchain/models) 功能：
+
+```python
+from langchain_cohere import Cohere
+from langchain.messages import HumanMessage
+```
+
+```python
+model = Cohere(max_tokens=256, temperature=0.75)
+```
+
+```python
+message = "Knock knock"
+model.invoke(message)
+```
+
+```text
+" Who's there?"
+```
+
+```python
+await model.ainvoke(message)
+```
+
+```text
+" Who's there?"
+```
+
+```python
+for chunk in model.stream(message):
+    print(chunk, end="", flush=True)
+```
+
+```text
+ Who's there?
+```
+
+```python
+model.batch([message])
+```
+
+```text
+[" Who's there?"]
+```
+
+---
+
+## API 参考
+
+有关所有 `Cohere` llm 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/llms/cohere/Cohere)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\cohere.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

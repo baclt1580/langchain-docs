@@ -1,0 +1,93 @@
+---
+title: "AWSKendraRetriever 集成"
+description: "使用 LangChain JavaScript 集成 AWSKendraRetriever 检索器。"
+---
+
+## 概述
+
+[Amazon Kendra](https://aws.amazon.com/kendra/) 是亚马逊网络服务（AWS）提供的一项智能搜索服务。
+它利用先进的自然语言处理（NLP）和机器学习算法，为组织内各种数据源提供强大的搜索能力。
+Kendra 旨在帮助用户快速准确地找到所需信息，从而提高生产力和决策效率。
+
+借助 Kendra，用户可以跨多种内容类型进行搜索，包括文档、常见问题解答、知识库、手册和网站。
+它支持多种语言，能够理解复杂的查询、同义词和上下文含义，以提供高度相关的搜索结果。
+
+本文将帮助您开始使用 `AWSKendraRetriever` [检索器](/oss/javascript/langchain/retrieval)。有关 `AWSKendraRetriever` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-aws/AmazonKendraRetriever)。
+
+### 集成详情
+
+| 检索器 | 来源 | 包 |
+| :--- | :--- | :---: |
+[AWSKendraRetriever](https://reference.langchain.com/javascript/langchain-aws/AmazonKendraRetriever) | 各类 AWS 资源 | [`@langchain/aws`](https://www.npmjs.com/package/@langchain/aws) |
+
+## 设置
+
+您需要一个 AWS 账户和一个 Amazon Kendra 实例才能开始。有关更多信息，请参阅 AWS 的这篇[教程](https://docs.aws.amazon.com/kendra/latest/dg/getting-started.html)。
+
+如果您希望从单个查询中获得自动化追踪，还可以通过取消注释以下代码来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```typescript
+// process.env.LANGSMITH_API_KEY = "<您的 API 密钥>";
+// process.env.LANGSMITH_TRACING = "true";
+```
+
+### 安装
+
+此检索器位于 `@langchain/aws` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/aws @langchain/core
+```
+```bash yarn
+yarn add @langchain/aws @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/aws @langchain/core
+```
+</CodeGroup>
+
+## 实例化
+
+现在我们可以实例化我们的检索器：
+
+```typescript
+import { AmazonKendraRetriever } from "@langchain/aws";
+
+const retriever = new AmazonKendraRetriever({
+  topK: 10,
+  indexId: "您的索引ID",
+  region: "us-east-2", // 您的区域
+  clientOptions: {
+    credentials: {
+      accessKeyId: "您的访问密钥ID",
+      secretAccessKey: "您的秘密访问密钥",
+    },
+  },
+});
+```
+
+## 使用
+
+```typescript
+const query = "..."
+
+await retriever.invoke(query);
+```
+
+---
+
+## API 参考
+
+有关 `AmazonKendraRetriever` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-aws/AmazonKendraRetriever)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\kendra-retriever.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

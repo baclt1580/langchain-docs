@@ -1,0 +1,144 @@
+---
+title: "QianfanChatEndpoint 集成"
+description: "使用 LangChain Python 集成 QianfanChatEndpoint 聊天模型。"
+---
+
+百度智能云千帆平台是一站式的大模型开发与服务运营平台，面向企业开发者。千帆不仅提供了包括文心一言（ERNIE-Bot）在内的模型及第三方开源模型，还提供了多种 AI 开发工具和完整的开发环境，方便客户轻松使用和开发大模型应用。
+
+这些模型主要分为以下几种类型：
+
+- 嵌入（Embedding）
+- 聊天（Chat）
+- 补全（Completion）
+
+在本笔记中，我们将介绍如何将 langchain 与 [千帆](https://cloud.baidu.com/doc/WENXINWORKSHOP/index.html) 结合使用，主要针对 `Chat` 类型，对应于 langchain 中的 `langchain/chat_models` 包：
+
+## API 初始化
+
+要使用基于百度千帆的 LLM 服务，您需要初始化以下参数：
+
+您可以选择在环境变量中初始化 AK 和 SK，或者在初始化参数中设置：
+
+```bash
+export QIANFAN_AK=XXX
+export QIANFAN_SK=XXX
+```
+
+## 当前支持的模型
+
+- ERNIE-Bot-turbo（默认模型）
+- ERNIE-Bot
+- BLOOMZ-7B
+- Llama-2-7b-chat
+- Llama-2-13b-chat
+- Llama-2-70b-chat
+- Qianfan-BLOOMZ-7B-compressed
+- Qianfan-Chinese-Llama-2-7B
+- ChatGLM2-6B-32K
+- AquilaChat-7B
+
+## 设置
+
+```python
+"""基础初始化和调用"""
+import os
+
+from langchain_community.chat_models import QianfanChatEndpoint
+from langchain_core.language_models.chat_models import HumanMessage
+
+os.environ["QIANFAN_AK"] = "您的_api_key"
+os.environ["QIANFAN_SK"] = "您的_secret_Key"
+```
+
+## 使用
+
+```python
+chat = QianfanChatEndpoint(streaming=True)
+messages = [HumanMessage(content="Hello")]
+chat.invoke(messages)
+```
+
+```text
+AIMessage(content='您好！请问您需要什么帮助？我将尽力回答您的问题。')
+```
+
+```python
+await chat.ainvoke(messages)
+```
+
+```text
+AIMessage(content='您好！有什么我可以帮助您的吗？')
+```
+
+```python
+chat.batch([messages])
+```
+
+```text
+[AIMessage(content='您好！有什么我可以帮助您的吗？')]
+```
+
+### 流式传输
+
+```python
+try:
+    for chunk in chat.stream(messages):
+        print(chunk.content, end="", flush=True)
+except TypeError as e:
+    print("")
+```
+
+```text
+您好！有什么我可以帮助您的吗？
+```
+
+## 在千帆中使用不同模型
+
+默认模型是 ERNIE-Bot-turbo，如果您想基于文心大模型或第三方开源模型部署自己的模型，可以按照以下步骤操作：
+
+1. （可选，如果模型已包含在默认模型中，请跳过此步骤）在千帆控制台部署您的模型，获取自定义的部署端点。
+2. 在初始化时设置 `endpoint` 字段：
+
+```python
+chatBot = QianfanChatEndpoint(
+    streaming=True,
+    model="ERNIE-Bot",
+)
+
+messages = [HumanMessage(content="Hello")]
+chatBot.invoke(messages)
+```
+
+```text
+AIMessage(content='Hello，可以回答问题了，我会竭尽全力为您解答，请问有什么问题吗？')
+```
+
+## 模型参数
+
+目前，只有 `ERNIE-Bot` 和 `ERNIE-Bot-turbo` 支持以下模型参数，未来我们可能会支持更多模型。
+
+- temperature
+- top_p
+- penalty_score
+
+```python
+chat.invoke(
+    [HumanMessage(content="Hello")],
+    **{"top_p": 0.4, "temperature": 0.1, "penalty_score": 1},
+)
+```
+
+```text
+AIMessage(content='您好！有什么我可以帮助您的吗？')
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\baidu_qianfan_endpoint.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

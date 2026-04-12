@@ -1,0 +1,146 @@
+---
+title: 开始使用 Studio
+sidebarTitle: 快速入门
+---
+
+[LangSmith 部署界面](https://smith.langchain.com)中的 [Studio](/langsmith/studio) 支持连接到两种类型的图：
+
+- 部署在[云端或自托管](#deployed-graphs)的图。
+- 通过 [Agent Server](#local-development-server) 在本地运行的图。
+
+## 已部署的图
+
+Studio 可在 [LangSmith UI](https://smith.langchain.com) 中通过 **Deployments** 导航访问。
+
+对于[已部署](/langsmith/deployment-quickstart)的应用程序，您可以在该部署中访问 Studio。为此，请在 UI 中导航到该部署并选择 **Studio**。
+
+这将加载连接到您实时部署的 Studio，允许您在该部署中创建、读取和更新[线程](/oss/python/langgraph/persistence#threads)、[助手](/langsmith/assistants)和[记忆](/oss/python/concepts/memory)。
+
+## 本地开发服务器
+
+### 前提条件
+
+要使用 Studio 在本地测试您的应用程序：
+
+- 请先遵循[本地应用程序快速入门](/langsmith/local-dev-testing)。
+- 如果您不希望数据被[追踪](/langsmith/observability-concepts#traces)到 LangSmith，请在应用程序的 `.env` 文件中设置 `LANGSMITH_TRACING=false`。禁用追踪后，数据不会离开您的本地服务器。
+
+### 设置
+
+1. 安装 [LangGraph CLI](/langsmith/cli)：
+
+    <CodeGroup>
+    ```bash pip
+    pip install -U "langgraph-cli[inmem]"
+    langgraph dev
+    ```
+
+    ```bash uv
+    uv add "langgraph-cli[inmem]"
+    langgraph dev
+    ```
+
+    ```bash npm
+    npx @langchain/langgraph-cli dev
+    ```
+    </CodeGroup>
+
+    <Warning>
+    **浏览器兼容性**
+    Safari 会阻止到 Studio 的 `localhost` 连接。要解决此问题，请使用 `--tunnel` 参数运行命令，通过安全隧道访问 Studio。您需要在 Studio UI 中点击 **Connect to a local server** 手动将隧道 URL 添加到允许的来源。请参阅[故障排除指南](/langsmith/troubleshooting-studio#safari-connection-issues)了解步骤。
+    </Warning>
+
+    这将在本地启动 Agent Server，以内存模式运行。服务器将以监视模式运行，监听代码更改并自动重启。阅读此[参考文档](/langsmith/cli#dev)以了解启动 API 服务器的所有选项。
+
+    您将看到以下日志：
+
+    ```
+    > 准备就绪！
+    >
+    > - API: [http://localhost:2024](http://localhost:2024/)
+    >
+    > - 文档: http://localhost:2024/docs
+    >
+    > - LangSmith Studio Web UI: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+    ```
+
+    运行后，您将自动被引导至 Studio。
+
+1. 对于正在运行的服务器，可通过以下任一方式访问调试器：
+    1. 直接导航到以下 URL：`https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`。
+    1. 在 UI 中导航到 **Deployments**，点击部署上的 **Studio** 按钮，输入 `http://127.0.0.1:2024` 并点击 **Connect**。
+
+    如果您的服务器运行在不同的主机或端口上，请相应更新 `baseUrl`。
+
+### （可选）附加调试器
+
+要进行带断点和变量检查的逐步调试，请运行以下命令：
+
+    <CodeGroup>
+    ```bash pip
+    # 安装 debugpy 包
+    pip install debugpy
+    # 启用调试启动服务器
+    langgraph dev --debug-port 5678
+    ```
+
+    ```bash uv
+    # 安装 debugpy 包
+    uv add debugpy
+    # 启用调试启动服务器
+    langgraph dev --debug-port 5678
+    ```
+    </CodeGroup>
+
+然后附加您首选的调试器：
+
+<Tabs>
+    <Tab title="VS Code">
+    将此配置添加到 `launch.json`：
+
+    ```json
+    {
+        "name": "附加到 LangGraph",
+        "type": "debugpy",
+        "request": "attach",
+        "connect": {
+          "host": "0.0.0.0",
+          "port": 5678
+        }
+    }
+    ```
+    </Tab>
+    <Tab title="PyCharm">
+    1. 转到 Run → Edit Configurations
+    2. 点击 + 并选择 "Python Debug Server"
+    3. 设置 IDE 主机名：`localhost`
+    4. 设置端口：`5678`（或您在上一步中选择的端口号）
+    5. 点击 "OK" 并开始调试
+    </Tab>
+</Tabs>
+
+<Tip>
+如果在入门时遇到问题，请参考[故障排除指南](/langsmith/troubleshooting-studio)。
+</Tip>
+
+## 后续步骤
+
+有关如何运行 Studio 的更多信息，请参阅以下指南：
+
+- [运行应用程序](/langsmith/use-studio#run-application)
+- [管理助手](/langsmith/use-studio#manage-assistants)
+- [管理线程](/langsmith/use-studio#manage-threads)
+- [迭代提示词](/langsmith/observability-studio)
+- [调试 LangSmith 追踪](/langsmith/observability-studio#debug-langsmith-traces)
+- [将节点添加到数据集](/langsmith/observability-studio#add-node-to-dataset)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\quick-start-studio.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

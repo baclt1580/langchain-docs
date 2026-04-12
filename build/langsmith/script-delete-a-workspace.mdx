@@ -1,0 +1,90 @@
+---
+title: 删除工作区
+sidebarTitle: 删除工作区
+---
+
+<Note>
+删除工作区功能在 **LangSmith 自托管版本 v0.10 中已原生支持**。查看[删除工作区的说明](/langsmith/set-up-hierarchy#delete-a-workspace)。
+
+对于 v0.10 之前的自托管版本，请遵循以下指南。
+</Note>
+
+LangSmith 用户界面目前不支持从组织中删除单个工作区。不过，可以通过直接从 ClickHouse 的所有物化视图（runs\_history 视图除外）以及 runs 和 feedbacks 表中移除所有相关痕迹，然后从 Postgres 的 tenants 表中删除该工作区来实现。
+
+此命令使用工作区 ID 作为参数。
+
+### 前提条件
+
+确保已准备好以下工具/项目。
+
+1. kubectl
+
+   * [https://kubernetes.io/docs/tasks/tools/](https://kubernetes.io/docs/tasks/tools/)
+
+2. PostgreSQL 客户端
+
+   * [https://www.postgresql.org/download/](https://www.postgresql.org/download/)
+
+3. PostgreSQL 数据库连接信息：
+
+   * 主机
+   * 端口
+   * 用户名
+     * 如果使用捆绑版本，用户名为 `postgres`
+   * 密码
+     * 如果使用捆绑版本，密码为 `postgres`
+   * 数据库名称
+     * 如果使用捆绑版本，数据库名为 `postgres`
+
+4. Clickhouse 数据库凭据
+
+   * 主机
+   * 端口
+   * 用户名
+     * 如果使用捆绑版本，用户名为 `default`
+   * 密码
+     * 如果使用捆绑版本，密码为 `password`
+   * 数据库名称
+     * 如果使用捆绑版本，数据库名为 `default`
+
+5. 从运行迁移脚本的机器到 PostgreSQL 数据库的连接性。
+
+   * 如果使用捆绑版本，可能需要将 postgresql 服务端口转发到本地机器。
+   * 运行 `kubectl port-forward svc/langsmith-postgres 5432:5432` 将 postgresql 服务端口转发到本地机器。
+
+6. 从运行迁移脚本的机器到 Clickhouse 数据库的连接性。
+
+   * 如果使用捆绑版本，可能需要将 clickhouse 服务端口转发到本地机器。
+     * 运行 `kubectl port-forward svc/langsmith-clickhouse 8123:8123` 将 clickhouse 服务端口转发到本地机器。
+   * 如果使用 Clickhouse Cloud，需要指定 `--ssl` 标志并使用端口 `8443`
+
+7. 删除工作区的脚本
+
+   * 下载[工作区脚本](https://github.com/langchain-ai/helm/blob/main/charts/langsmith/scripts/delete_workspace.sh)
+
+### 运行单个工作区的删除脚本
+
+运行以下命令来执行工作区移除脚本：
+
+```bash
+sh delete_workspace.sh <postgres_url> <clickhouse_url> --workspace_id <workspace_id>
+```
+
+例如，如果使用捆绑版本并进行了端口转发，命令将如下所示：
+
+```bash
+sh delete_workspace.sh "postgres://postgres:postgres@localhost:5432/postgres" "clickhouse://default:password@localhost:8123/default" --workspace_id 4ec70ec7-0808-416a-b836-7100aeec934b
+```
+
+如果访问 LangSmith 用户界面，现在应该可以看到工作区已被删除。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\script-delete-a-workspace.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

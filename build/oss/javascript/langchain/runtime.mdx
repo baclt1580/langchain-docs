@@ -1,0 +1,173 @@
+---
+title: 运行时
+---
+
+## 概述
+
+
+LangChain 的 `createAgent` 底层运行在 LangGraph 的运行时之上。
+
+LangGraph 暴露了一个 [`Runtime`](https://reference.langchain.com/javascript/langchain/index/Runtime) 对象，包含以下信息：
+
+1.  **上下文**：静态信息，如用户 ID、数据库连接或代理调用所需的其他依赖项
+2.  **存储**：一个 [BaseStore](https://reference.langchain.com/javascript/langchain-core/stores/BaseStore) 实例，用于[长期记忆](/oss/javascript/langchain/long-term-memory)
+3.  **流写入器**：一个对象，用于通过 `"custom"` 流模式流式传输信息
+
+
+
+<Tip>
+运行时上下文是你将数据传递到代理中的方式。你可以将值（如数据库连接、用户会话或配置）附加到上下文，并在工具和中间件内部访问它们，而不是将内容存储在全局状态中。这保持了无状态、可测试和可重用的特性。
+</Tip>
+
+
+你可以在[工具内部](#inside-tools)和[中间件内部](#inside-middleware)访问运行时信息。
+
+## 访问
+
+
+使用 `createAgent` 创建代理时，你可以指定 `contextSchema` 来定义存储在代理 [`Runtime`](https://reference.langchain.com/javascript/langchain/index/Runtime) 中的 `context` 的结构。
+
+
+调用代理时，传递包含运行相关配置的 `context` 参数：
+
+
+```ts
+import * as z from "zod";
+import { createAgent } from "langchain";
+
+const contextSchema = z.object({ // [!code highlight]
+  userName: z.string(), // [!code highlight]
+}); // [!code highlight]
+
+const agent = createAgent({
+  model: "gpt-4.1",
+  tools: [
+    /* ... */
+  ],
+  contextSchema, // [!code highlight]
+});
+
+const result = await agent.invoke(
+  { messages: [{ role: "user", content: "What's my name?" }] },
+  { context: { userName: "John Smith" } } // [!code highlight]
+);
+```
+
+
+### 在工具内部
+
+你可以在工具内部访问运行时信息，以：
+
+*   访问上下文
+*   读取或写入长期记忆
+*   写入[自定义流](/oss/javascript/langchain/streaming#custom-updates)（例如，工具进度/更新）
+
+
+使用 `runtime` 参数在工具内部访问 [`Runtime`](https://reference.langchain.com/javascript/langchain/index/Runtime) 对象。
+
+```ts
+import * as z from "zod";
+import { tool } from "langchain";
+import { type ToolRuntime } from "@langchain/core/tools"; // [!code highlight]
+
+const contextSchema = z.object({
+  userName: z.string(),
+});
+
+const fetchUserEmailPreferences = tool(
+  async (_, runtime: ToolRuntime<any, typeof contextSchema>) => { // [!code highlight]
+    const userName = runtime.context?.userName; // [!code highlight]
+    if (!userName) {
+      throw new Error("userName is required");
+    }
+
+    let preferences = "用户希望你写一封简短而有礼貌的电子邮件。";
+    if (runtime.store) { // [!code highlight]
+      const memory = await runtime.store?.get(["users"], userName); // [!code highlight]
+      if (memory) {
+        preferences = memory.value.preferences;
+      }
+    }
+    return preferences;
+  },
+  {
+    name: "fetch_user_email_preferences",
+    description: "获取用户的电子邮件偏好。",
+    schema: z.object({}),
+  }
+);
+```
+
+
+### 在中间件内部
+
+你可以在中间件中访问运行时信息，以创建动态提示、修改消息或根据用户上下文控制代理行为。
+
+
+使用 `runtime` 参数在中间件内部访问 [`Runtime`](https://reference.langchain.com/javascript/langchain/index/Runtime) 对象。
+
+```ts
+import * as z from "zod";
+import { createAgent, createMiddleware, SystemMessage } from "langchain";
+
+const contextSchema = z.object({
+  userName: z.string(),
+});
+
+// 动态提示中间件
+const dynamicPromptMiddleware = createMiddleware({
+  name: "DynamicPrompt",
+  contextSchema,
+  beforeModel: (state, runtime) => { // [!code highlight]
+    const userName = runtime.context?.userName; // [!code highlight]
+    if (!userName) {
+      throw new Error("userName is required");
+    }
+
+    const systemMsg = `你是一个乐于助人的助手。请称呼用户为 ${userName}。`;
+    return {
+      messages: [new SystemMessage(systemMsg), ...state.messages],
+    };
+  },
+});
+
+// 日志中间件
+const loggingMiddleware = createMiddleware({
+  name: "Logging",
+  contextSchema,
+  beforeModel: (state, runtime) => {  // [!code highlight]
+    console.log(`正在处理用户请求: ${runtime.context?.userName}`);  // [!code highlight]
+    return;
+  },
+  afterModel: (state, runtime) => {  // [!code highlight]
+    console.log(`已完成用户请求: ${runtime.context?.userName}`);  // [!code highlight]
+    return;
+  },
+});
+
+const agent = createAgent({
+  model: "gpt-4.1",
+  tools: [
+    /* ... */
+  ],
+  middleware: [dynamicPromptMiddleware, loggingMiddleware],  // [!code highlight]
+  contextSchema,
+});
+
+const result = await agent.invoke(
+  { messages: [{ role: "user", content: "What's my name?" }] },
+  { context: { userName: "John Smith" } }
+);
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\runtime.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

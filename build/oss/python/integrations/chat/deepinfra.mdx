@@ -1,0 +1,127 @@
+---
+title: "DeepInfra 集成"
+description: "使用 LangChain Python 与 DeepInfra 聊天模型集成。"
+---
+
+[DeepInfra](https://deepinfra.com/?utm_source=langchain) 是一种无服务器推理即服务，提供对多种 [LLMs](https://deepinfra.com/models?utm_source=langchain) 和 [嵌入模型](https://deepinfra.com/models?type=embeddings&utm_source=langchain) 的访问。本笔记本将介绍如何将 LangChain 与 DeepInfra 结合使用，用于聊天模型。
+
+## 设置环境 API 密钥
+
+请确保从 DeepInfra 获取您的 API 密钥。您需要 [登录](https://deepinfra.com/login?from=%2Fdash) 并获取一个新令牌。
+
+您将获得 1 小时免费的无服务器 GPU 计算资源，用于测试不同模型。（请参阅 [deepctl 文档](https://github.com/deepinfra/deepctl#deepctl)）
+您可以使用 `deepctl auth token` 打印您的令牌。
+
+```python
+# 获取新令牌：https://deepinfra.com/login?from=%2Fdash
+
+import os
+from getpass import getpass
+
+from langchain_community.chat_models import ChatDeepInfra
+from langchain.messages import HumanMessage
+
+DEEPINFRA_API_TOKEN = getpass()
+
+# 或者将 deepinfra_api_token 参数传递给 ChatDeepInfra 构造函数
+os.environ["DEEPINFRA_API_TOKEN"] = DEEPINFRA_API_TOKEN
+
+chat = ChatDeepInfra(model="meta-llama/Llama-2-7b-chat-hf")
+
+messages = [
+    HumanMessage(
+        content="将这句话从英语翻译成法语。I love programming."
+    )
+]
+chat.invoke(messages)
+```
+
+## `ChatDeepInfra` 也支持异步和流式功能
+
+```python
+from langchain_core.callbacks import StreamingStdOutCallbackHandler
+```
+
+```python
+await chat.agenerate([messages])
+```
+
+```python
+chat = ChatDeepInfra(
+    streaming=True,
+    verbose=True,
+    callbacks=[StreamingStdOutCallbackHandler()],
+)
+chat.invoke(messages)
+```
+
+# 工具调用
+
+DeepInfra 目前仅支持同步调用和异步调用的工具调用功能。
+
+有关支持工具调用的完整模型列表，请参阅我们的 [工具调用文档](https://deepinfra.com/docs/advanced/function_calling)。
+
+```python
+import asyncio
+
+from dotenv import find_dotenv, load_dotenv
+from langchain_community.chat_models import ChatDeepInfra
+from langchain.messages import HumanMessage
+from langchain.tools import tool
+from pydantic import BaseModel
+
+model_name = "meta-llama/Meta-Llama-3-70B-Instruct"
+
+_ = load_dotenv(find_dotenv())
+
+
+# LangChain 工具
+@tool
+def foo(something):
+    """
+    当 foo 被调用时执行
+    """
+    pass
+
+
+# Pydantic 类
+class Bar(BaseModel):
+    """
+    当 Bar 被调用时执行
+    """
+
+    pass
+
+
+llm = ChatDeepInfra(model=model_name)
+tools = [foo, Bar]
+llm_with_tools = llm.bind_tools(tools)
+messages = [
+    HumanMessage("请执行 Foo 和 Bar。"),
+]
+
+response = llm_with_tools.invoke(messages)
+print(response.tool_calls)
+# [{'name': 'foo', 'args': {'something': None}, 'id': 'call_Mi4N4wAtW89OlbizFE1aDxDj'}, {'name': 'Bar', 'args': {}, 'id': 'call_daiE0mW454j2O1KVbmET4s2r'}]
+
+
+async def call_ainvoke():
+    result = await llm_with_tools.ainvoke(messages)
+    print(result.tool_calls)
+
+
+# 异步调用
+asyncio.run(call_ainvoke())
+# [{'name': 'foo', 'args': {'something': None}, 'id': 'call_ZH7FetmgSot4LHcMU6CEb8tI'}, {'name': 'Bar', 'args': {}, 'id': 'call_2MQhDifAJVoijZEvH8PeFSVB'}]
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\deepinfra.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

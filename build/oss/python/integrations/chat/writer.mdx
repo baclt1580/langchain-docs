@@ -1,0 +1,236 @@
+---
+title: "ChatWriter 集成"
+description: "使用 LangChain Python 与 ChatWriter 聊天模型集成。"
+---
+
+本指南提供了快速入门指南，帮助您开始使用 WRITER [聊天](/oss/python/langchain/models/) 模型。
+
+WRITER 提供多种聊天模型。您可以在 [WRITER 文档](https://dev.writer.com/home) 中找到有关其最新模型及其成本、上下文窗口和受支持输入类型的信息。
+
+## 概述
+
+### 集成详情
+
+| 类                                                                                                                    | 包          | 可序列化 | JS 支持 |                                        下载量                                         |                                        版本                                         |
+|:-------------------------------------------------------------------------------------------------------------------------|:-----------------| :---: |:----------:|:------------------------------------------------------------------------------------------------:|:---------------------------------------------------------------------------------------------:|
+| [`ChatWriter`](https://github.com/writer/langchain-writer/blob/main/langchain_writer/chat_models.py#L308) | [`langchain-writer`](https://pypi.org/project/langchain-writer/) |                                       ❌                                       | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-writer?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-writer?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/python/langchain/tools) | [结构化输出](/oss/python/langchain/structured-output) | 图像输入 | 音频输入 | 视频输入 | [令牌级流式传输](/oss/python/langchain/streaming/) | 原生异步 |         [令牌使用量](/oss/python/langchain/models#token-usage)          | 对数概率 |
+| :---: |:-----------------:| :---: |  :---: | :---: | :---: | :---: |:--------------------------------:|:--------:|
+| ✅ |         ✅         | ❌ | ❌ | ❌ | ✅ | ✅ |                ✅                 |    ❌     |
+
+### 凭证
+
+注册 [WRITER AI Studio](https://app.writer.com/aistudio/signup?utm_campaign=devrel) 并按照此 [快速入门](https://dev.writer.com/api-guides/quickstart) 获取 API 密钥。然后，设置 WRITER_API_KEY 环境变量：
+
+```python
+import getpass
+import os
+
+if not os.getenv("WRITER_API_KEY"):
+    os.environ["WRITER_API_KEY"] = getpass.getpass("Enter your WRITER API key: ")
+```
+
+如果您希望自动追踪模型调用，也可以通过取消注释以下代码来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
+```
+
+### 安装
+
+`ChatWriter` 可通过 `langchain-writer` 包获取。使用以下命令安装：
+
+```python
+pip install -qU langchain-writer
+```
+
+### 实例化
+
+现在我们可以实例化模型对象以生成聊天补全：
+
+```python
+from langchain_writer import ChatWriter
+
+llm = ChatWriter(
+    model="palmyra-x5",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
+```
+
+## 使用
+
+要使用该模型，您传入一个消息列表并调用 `invoke` 方法：
+
+```python
+messages = [
+    (
+        "system",
+        "You are a helpful assistant that translates English to French. Translate the user sentence.",
+    ),
+    ("human", "I love programming."),
+]
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+然后，您可以访问消息的内容：
+
+```python
+print(ai_msg.content)
+```
+
+## 流式传输
+
+您也可以流式传输响应。首先，创建一个流：
+
+```python
+messages = [
+    (
+        "system",
+        "You are a helpful assistant that translates English to French. Translate the user sentence.",
+    ),
+    ("human", "I love programming. Sing a song about it"),
+]
+ai_stream = llm.stream(messages)
+ai_stream
+```
+
+然后，遍历流以获取数据块：
+
+```python
+for chunk in ai_stream:
+    print(chunk.content, end="")
+```
+
+## 工具调用
+
+像 Palmyra X5 这样的 WRITER 模型支持 [工具调用](https://dev.writer.com/api-guides/tool-calling)，它允许您描述工具及其参数。模型将返回一个 JSON 对象，其中包含要调用的工具以及该工具的输入。
+
+### 绑定工具
+
+使用 `ChatWriter.bind_tools`，您可以轻松地将 Pydantic 类、字典模式、LangChain 工具甚至函数作为工具传递给模型。在底层，这些被转换为工具模式，如下所示：
+
+```
+{
+    "name": "...",
+    "description": "...",
+    "parameters": {...}  # JSONSchema
+}
+```
+
+这些会在每次模型调用时传入。
+
+例如，要使用一个获取给定地点天气的工具，您可以定义一个 Pydantic 类并将其传递给 `ChatWriter.bind_tools`：
+
+```python
+from pydantic import BaseModel, Field
+
+
+class GetWeather(BaseModel):
+    """Get the current weather in a given location"""
+
+    location: str = Field(description="The city and state, e.g. San Francisco, CA")
+
+
+llm.bind_tools([GetWeather])
+```
+
+然后，您可以使用该工具调用模型：
+
+```python
+ai_msg = llm.invoke(
+    "what is the weather like in New York City",
+)
+ai_msg
+```
+
+最后，您可以访问工具调用并继续执行您的函数：
+
+```python
+print(ai_msg.tool_calls)
+```
+
+### 关于工具绑定的说明
+
+`ChatWriter.bind_tools()` 方法不会创建带有绑定工具的新实例，而是将接收到的 `tools` 和 `tool_choice` 存储在初始类实例属性中，以便在使用 `ChatWriter` 调用时将它们作为参数传递给 Palmyra LLM 调用。这种方法支持不同的工具类型，例如 `function` 和 `graph`。`Graph` 是远程调用的 WRITER Palmyra 工具之一。更多信息，请访问我们的 [文档](https://dev.writer.com/api-guides/knowledge-graph#knowledge-graph)。
+
+有关 LangChain 中工具使用的更多信息，请访问 [LangChain 工具调用文档](https://python.langchain.com/docs/concepts/tool_calling/)。
+
+## 批处理
+
+您还可以批处理请求并设置 `max_concurrency`：
+
+```python
+ai_batch = llm.batch(
+    [
+        "How to cook pancakes?",
+        "How to compose poem?",
+        "How to run faster?",
+    ],
+    config={"max_concurrency": 3},
+)
+ai_batch
+```
+
+然后，遍历批处理以获取结果：
+
+```python
+for batch in ai_batch:
+    print(batch.content)
+    print("-" * 100)
+```
+
+## 异步使用
+
+上述所有功能（调用、流式传输、批处理、工具调用）也支持异步使用。
+
+## 提示模板
+
+[提示模板](https://python.langchain.com/docs/concepts/prompt_templates/) 有助于将用户输入和参数转换为语言模型的指令。您可以像这样将 `ChatWriter` 与提示模板一起使用：
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate(
+    [
+        (
+            "system",
+            "You are a helpful assistant that translates {input_language} to {output_language}.",
+        ),
+        ("human", "{input}"),
+    ]
+)
+
+chain = prompt | llm
+chain.invoke(
+    {
+        "input_language": "English",
+        "output_language": "German",
+        "input": "I love programming.",
+    }
+)
+```
+
+---
+
+## 其他资源
+
+您可以在 [WRITER 文档](https://dev.writer.com/home) 中找到有关 WRITER 模型（包括成本、上下文窗口和受支持输入类型）和工具的信息。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\writer.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,291 @@
+---
+title: 技能
+description: 学习如何通过技能扩展深度智能体的能力
+---
+
+import SkillsUsageTabsPy from '/snippets/skills-usage-tabs-py.mdx';
+import SkillsUsageTabsJs from '/snippets/skills-usage-tabs-js.mdx';
+
+技能是可复用的智能体能力，提供专门的工作流程和领域知识。
+
+你可以使用 [Agent Skills](https://agentskills.io/) 为你的深度智能体提供新的能力和专业知识。对于能提升智能体在 LangChain 生态系统任务中性能的即用型技能，请参阅 [LangChain Skills](https://github.com/langchain-ai/langchain-skills) 仓库。
+
+深度智能体技能遵循 [Agent Skills 规范](https://agentskills.io/specification)。
+
+## 什么是技能
+
+技能是一个文件夹目录，其中每个文件夹包含一个或多个智能体可以使用的上下文文件：
+
+- 一个包含技能说明和元数据的 `SKILL.md` 文件
+- 额外的脚本（可选）
+- 额外的参考信息，例如文档（可选）
+- 额外的资源，例如模板和其他资产（可选）
+
+<Note>
+    任何额外的资产（脚本、文档、模板或其他资源）都必须在 `SKILL.md` 文件中被引用，并说明文件内容和使用方法，以便智能体决定何时使用它们。
+</Note>
+
+## 技能如何工作
+
+当你创建深度智能体时，可以传入一个包含技能的目录列表。智能体启动时，会读取每个 `SKILL.md` 文件的前置元数据。
+
+当智能体收到提示时，它会检查在执行提示任务时是否可以使用任何技能。如果找到匹配的提示，它会接着查看技能的其他文件。这种仅在需要时才查看技能信息的模式称为*渐进式披露*。
+
+## 示例
+
+你可能有一个技能文件夹，其中包含一个以特定方式使用文档站点的技能，以及另一个用于搜索 arXiv 研究论文预印本库的技能：
+
+```plaintext
+    skills/
+    ├── langgraph-docs
+    │   └── SKILL.md
+    └── arxiv_search
+        ├── SKILL.md
+        └── arxiv_search.py # 用于搜索 arXiv 的代码
+```
+
+
+
+
+`SKILL.md` 文件始终遵循相同的模式，以前置元数据开头，后面是技能的使用说明。
+
+以下示例展示了一个技能，它提供了在收到相关提示时如何提供相关 langgraph 文档的说明：
+
+```md
+---
+name: langgraph-docs
+description: 对于与 LangGraph 相关的请求，使用此技能来获取相关文档，以提供准确、最新的指导。
+---
+
+# langgraph-docs
+
+## 概述
+
+此技能解释了如何访问 LangGraph Python 文档，以帮助回答问题并指导实现。
+
+## 使用说明
+
+### 1. 获取文档索引
+
+使用 fetch_url 工具读取以下 URL：
+https://docs.langchain.com/llms.txt
+
+这将提供一个包含描述的结构化可用文档列表。
+
+### 2. 选择相关文档
+
+根据问题，从索引中识别 2-4 个最相关的文档 URL。优先考虑：
+
+- 针对实现问题的具体操作指南
+- 针对理解问题的核心概念页面
+- 端到端示例的教程
+- API 详情的参考文档
+
+### 3. 获取选定的文档
+
+使用 fetch_url 工具读取选定的文档 URL。
+
+### 4. 提供准确指导
+
+阅读文档后，完成用户的请求。
+```
+
+更多技能示例，请参阅 [Deep Agent 示例技能](https://github.com/langchain-ai/deepagents/tree/main/libs/cli/examples/skills)。
+
+
+
+
+<Warning>
+    **重要**
+
+    有关编写技能文件时的约束和最佳实践，请参阅完整的 [Agent Skills 规范](https://agentskills.io/specification)。特别要注意：
+
+    * 如果 `description` 字段超过 1024 个字符，它将被截断。
+    * 在 Deep Agents 中，`SKILL.md` 文件必须小于 10 MB。超过此限制的文件在技能加载时会被跳过。
+</Warning>
+
+### 完整示例
+
+以下示例展示了一个使用了所有可用前置元数据字段的 `SKILL.md` 文件：
+
+```md expandable
+---
+name: langgraph-docs
+description: 对于与 LangGraph 相关的请求，使用此技能来获取相关文档，以提供准确、最新的指导。
+license: MIT
+compatibility: 需要互联网访问以获取文档 URL
+metadata:
+  author: langchain
+  version: "1.0"
+allowed-tools: fetch_url
+---
+
+# langgraph-docs
+
+## 概述
+
+此技能解释了如何访问 LangGraph Python 文档，以帮助回答问题并指导实现。
+
+## 使用说明
+
+### 1. 获取文档索引
+
+使用 fetch_url 工具读取以下 URL：
+https://docs.langchain.com/llms.txt
+
+这将提供一个包含描述的结构化可用文档列表。
+
+### 2. 选择相关文档
+
+根据问题，从索引中识别 2-4 个最相关的文档 URL。优先考虑：
+
+- 针对实现问题的具体操作指南
+- 针对理解问题的核心概念页面
+- 端到端示例的教程
+- API 详情的参考文档
+
+### 3. 获取选定的文档
+
+使用 fetch_url 工具读取选定的文档 URL。
+
+### 4. 提供准确指导
+
+阅读文档后，完成用户的请求。
+```
+
+## 使用方法
+
+在创建深度智能体时传入技能目录：
+
+<SkillsUsageTabsPy />
+
+<ParamField body="skills" type="list[str]" optional>
+    技能源路径列表。
+
+    路径必须使用正斜杠指定，并且相对于后端的根目录。
+
+    - 如果省略，则不加载任何技能。
+    - 使用 `StateBackend`（默认）时，通过 `invoke(files={...})` 提供技能文件。使用 `deepagents.backends.utils` 中的 `create_file_data()` 来格式化文件内容；不支持原始字符串。
+    - 使用 `FilesystemBackend` 时，技能从磁盘加载，相对于后端的 `root_dir`。
+
+    对于同名的技能，后加载的源会覆盖先加载的源（后加载者胜出）。
+</ParamField>
+
+
+
+
+
+<Note>
+    SDK 仅加载你在 `skills` 中传入的源。它不会自动扫描 CLI 目录，例如 `~/.deepagents/...` 或 `~/.agents/...`。
+
+    有关 CLI 存储约定，请参阅 [应用数据](/oss/python/deepagents/data-locations)。
+
+    <Accordion
+        title="在 SDK 中模拟 CLI 源顺序"
+    >
+        如果你希望在 SDK 代码中实现 CLI 风格的分层，请按从低到高的优先级顺序显式传递所有所需的源：
+
+        ```text
+        [
+        "<user-home>/.deepagents/{agent}/skills/",
+        "<user-home>/.agents/skills/",
+        "<project-root>/.deepagents/skills/",
+        "<project-root>/.agents/skills/",
+        ]
+        ```
+
+        然后在创建智能体时，将该有序列表作为 `skills` 传入。
+    </Accordion>
+</Note>
+
+
+## 源优先级
+
+当多个技能源包含同名技能时，`skills` 数组中靠后列出的源中的技能具有优先级（后加载者胜出）。这允许你从不同来源分层叠加技能。
+
+```python
+# 如果两个源都包含名为 "web-search" 的技能，
+# 那么来自 "/skills/project/" 的技能胜出（最后加载）。
+agent = create_deep_agent(
+    skills=["/skills/user/", "/skills/project/"],
+    ...
+)
+```
+
+
+
+
+## 子智能体的技能
+
+当你使用 [子智能体](/oss/python/deepagents/subagents) 时，可以配置每种类型可以访问哪些技能：
+
+- **通用子智能体**：当你将 `skills` 传递给 `create_deep_agent` 时，会自动继承主智能体的技能。无需额外配置。
+- **自定义子智能体**：不继承主智能体的技能。在每个子智能体定义中添加一个 `skills` 参数，指定该子智能体的技能源路径。
+
+技能状态是完全隔离的：主智能体的技能对子智能体不可见，子智能体的技能对主智能体也不可见。
+
+```python
+from deepagents import create_deep_agent
+
+research_subagent = {
+    "name": "researcher",
+    "description": "具有专业技能的研究助手",
+    "system_prompt": "你是一名研究员。",
+    "tools": [web_search],
+    "skills": ["/skills/research/", "/skills/web-search/"],  # 子智能体特定技能
+}
+
+agent = create_deep_agent(
+    model="claude-sonnet-4-6",
+    skills=["/skills/main/"],  # 主智能体和通用子智能体获得这些技能
+    subagents=[research_subagent],  # 研究员仅获得其自己的技能
+)
+```
+
+
+
+
+有关子智能体配置和技能继承的更多信息，请参阅 [子智能体](/oss/python/deepagents/subagents)。
+
+## 智能体看到的内容
+
+当配置了技能时，一个“技能系统”部分会被注入到智能体的系统提示中。智能体使用此信息遵循一个三步流程：
+
+1.  **匹配** — 当用户提示到达时，智能体检查是否有任何技能的描述与任务匹配。
+2.  **读取** — 如果某个技能适用，智能体使用其技能列表中显示的路径读取完整的 `SKILL.md` 文件。
+3.  **执行** — 智能体遵循技能的说明，并根据需要访问任何支持文件（脚本、模板、参考文档）。
+
+<Tip>
+    在你的 `SKILL.md` 前置元数据中编写清晰、具体的描述。智能体仅根据描述来决定是否使用技能——详细的描述能带来更好的技能匹配。
+</Tip>
+
+## 技能与记忆
+
+技能和 [记忆](/oss/python/deepagents/customization#memory)（`AGENTS.md` 文件）有不同的用途：
+
+| | 技能 | 记忆 |
+|---|--------|--------|
+| **目的** | 通过渐进式披露按需发现的能力 | 启动时始终加载的持久上下文 |
+| **加载方式** | 仅在智能体确定相关性时读取 | 始终注入到系统提示中 |
+| **格式** | 命名目录中的 `SKILL.md` | `AGENTS.md` 文件 |
+| **分层** | 用户 → 项目（后加载者胜出） | 用户 → 项目（合并） |
+| **使用场景** | 说明是任务特定的且可能很大 | 上下文始终相关（项目约定、偏好） |
+
+## 何时使用技能与工具
+
+以下是使用工具和技能的一些通用准则：
+
+- 当存在大量上下文时，使用技能以减少系统提示中的令牌数量。
+- 使用技能将多个能力捆绑成更大的操作，并提供超出单个工具描述的额外上下文。
+- 如果智能体无法访问文件系统，则使用工具。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\skills.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

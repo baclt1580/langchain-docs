@@ -1,0 +1,152 @@
+---
+title: Deep Agents 概述
+sidebarTitle: 概述
+description: 构建能够规划、使用子代理并利用文件系统处理复杂任务的智能体
+---
+
+开始构建由大语言模型驱动的智能体和应用程序的最简单方式——内置任务规划、用于上下文管理的文件系统、子代理生成以及长期记忆等功能。
+你可以将 deep agents 用于任何任务，包括复杂的多步骤任务。
+
+我们将 `deepagents` 视为一种["智能体框架"](/oss/python/concepts/products#agent-harnesses-like-the-deep-agents-sdk)。它与其他智能体框架的核心工具调用循环相同，但内置了工具和功能。
+
+[`deepagents`](https://pypi.org/project/deepagents/) 是一个基于 [LangChain](/oss/python/langchain/) 智能体核心构建模块的独立库。它使用 [LangGraph](/oss/python/langgraph/) 运行时来实现持久化执行、流式处理、人在回路等功能。
+
+
+
+
+`deepagents` 库包含：
+- **Deep Agents SDK**：一个用于构建能够处理任何任务的智能体的包
+- [**Deep Agents CLI**](/oss/python/deepagents/cli)：一个基于 Deep Agents SDK 构建的终端编码智能体
+- [**ACP 集成**](/oss/python/deepagents/acp)：一个 Agent Client Protocol 连接器，用于在 Zed 等代码编辑器中使用 deep agents
+
+[LangChain](/oss/python/langchain/) 是为你的智能体提供核心构建模块的框架。
+要了解更多关于 LangChain、LangGraph 和 Deep Agents 之间的区别，请参阅[框架、运行时和框架](/oss/python/concepts/products)。
+
+## <Icon icon="wand" /> 创建 deep agent
+
+```python
+# pip install -qU deepagents
+from deepagents import create_deep_agent
+
+def get_weather(city: str) -> str:
+    """获取指定城市的天气。"""
+    return f"{city} 总是阳光明媚！"
+
+agent = create_deep_agent(
+    tools=[get_weather],
+    system_prompt="你是一个有用的助手",
+)
+
+# 运行智能体
+agent.invoke(
+    {"messages": [{"role": "user", "content": "旧金山的天气怎么样"}]}
+)
+```
+
+
+
+
+请参阅[快速入门](/oss/python/deepagents/quickstart/)和[自定义指南](/oss/python/deepagents/customization/)，开始使用 Deep Agents 构建你自己的智能体和应用程序。
+
+<Tip>
+    使用 [LangSmith](/langsmith/home) 来追踪请求、调试智能体行为并评估输出。设置 `LANGSMITH_TRACING=true` 和你的 API 密钥即可开始使用。
+</Tip>
+
+## 何时使用 Deep Agents
+
+当你想要构建能够实现以下功能的智能体时，请使用 **Deep Agents SDK**：
+
+- **处理复杂的多步骤任务**，这些任务需要规划和分解
+- **通过文件系统工具和[自动摘要](#auto-summarization)管理大量上下文**
+- **切换文件系统后端**，以使用内存状态、本地磁盘、持久化存储、[沙箱](/oss/python/deepagents/sandboxes)或[你自己的自定义后端](/oss/python/deepagents/backends)
+- 在使用[沙箱后端](/oss/python/deepagents/sandboxes)时，通过 `execute` 工具**执行 shell 命令**
+- **将工作委派**给专门的子代理以实现上下文隔离
+- **跨对话和线程持久化记忆**
+- 通过[人在回路](/oss/python/deepagents/human-in-the-loop)工作流，**对敏感操作要求人工批准**
+- **使用任何支持工具调用的模型**——在领先模型和开源模型之间[提供商无关](/oss/python/deepagents/models)
+
+对于构建更简单的智能体，可以考虑使用 LangChain 的 [`create_agent`](/oss/python/langchain/agents) 或构建自定义的 [LangGraph](/oss/python/langgraph/overview) 工作流。
+
+
+
+
+当你需要一个基于 Deep Agents SDK 构建的命令行编码智能体时，请使用 **Deep Agents CLI**：
+
+- **交互式或非交互式运行**——将 CLI 用作聊天式编码智能体，或使用 `-n` 管道传输任务以实现可编写脚本的无头执行。
+- 使用[技能](/oss/python/deepagents/skills)和记忆**自定义**智能体。
+- 在使用过程中**教导**智能体了解你的偏好、常见模式和自定义项目知识。
+- **在你的机器或沙箱中执行代码**。
+- 通过外部[模型上下文协议](https://modelcontextprotocol.io/)服务器的 **MCP 工具进行扩展**。
+
+## 核心功能
+
+<Card title="规划和任务分解" icon="timeline">
+    Deep Agents 包含一个内置的 [`write_todos`](/oss/python/langchain/middleware/built-in#to-do-list) 工具，使智能体能够将复杂任务分解为离散步骤、跟踪进度，并在新信息出现时调整计划。
+</Card>
+<Card title="上下文管理" icon="scissors">
+    文件系统工具（[`ls`](/oss/python/deepagents/harness#virtual-filesystem-access)、[`read_file`](/oss/python/deepagents/harness#virtual-filesystem-access)、[`write_file`](/oss/python/deepagents/harness#virtual-filesystem-access)、[`edit_file`](/oss/python/deepagents/harness#virtual-filesystem-access)）允许智能体将大量上下文卸载到内存或文件系统存储中，防止上下文窗口溢出，并支持处理可变长度的工具结果。自动摘要功能在上下文窗口变长时压缩较早的对话消息，使智能体在长时间会话中保持高效。
+</Card>
+<Card title="Shell 执行" icon="terminal">
+    当使用[沙箱后端](/oss/python/deepagents/sandboxes)时，智能体会获得一个 `execute` 工具来运行 shell 命令，用于测试、构建、git 操作和系统任务。沙箱后端提供隔离，使智能体能够执行代码而不会危及你的主机系统。
+</Card>
+<Card title="可插拔的文件系统后端" icon="plug">
+    虚拟文件系统由[可插拔后端](/oss/python/deepagents/backends)驱动，你可以根据用例进行切换。可以选择内存状态、本地磁盘、用于跨线程持久化的 LangGraph 存储、用于隔离代码执行的[沙箱](/oss/python/deepagents/sandboxes)（Modal、Daytona、Deno），或通过复合路由组合多个后端。你也可以实现自己的自定义后端。
+</Card>
+<Card title="子代理生成" icon="users-group">
+    内置的 `task` 工具使智能体能够生成专门的子代理以实现上下文隔离。这可以保持主代理的上下文清洁，同时仍能深入处理特定的子任务。
+</Card>
+<Card title="长期记忆" icon="database">
+    使用 LangGraph 的[记忆存储](/oss/python/langgraph/persistence#memory-store)扩展智能体，实现跨线程的持久化记忆。智能体可以保存和检索先前对话的信息。
+</Card>
+<Card title="人在回路" icon="user-check">
+    使用 LangGraph 的中断功能为敏感工具操作配置[人工批准](/oss/python/deepagents/human-in-the-loop)。控制哪些工具在执行前需要确认。
+</Card>
+<Card title="技能" icon="puzzle">
+    使用可重用的[技能](/oss/python/deepagents/skills)扩展智能体，这些技能提供专门的工作流、领域知识和自定义指令。
+</Card>
+<Card title="智能默认值" icon="wand">
+    附带预设的系统提示，教导模型如何有效使用其工具——先规划后行动、验证工作并管理上下文。根据需要自定义或替换默认值。
+</Card>
+
+## 开始使用
+
+<CardGroup cols={2}>
+    <Card title="SDK 快速入门" icon="rocket" href="/oss/python/deepagents/quickstart">
+        构建你的第一个 deep agent
+    </Card>
+    <Card title="自定义" icon="adjustments" href="/oss/python/deepagents/customization">
+        了解 SDK 的自定义选项
+    </Card>
+    <Card title="模型" icon="cpu" href="/oss/python/deepagents/models">
+        配置模型和提供商
+    </Card>
+    <Card title="后端" icon="plug" href="/oss/python/deepagents/backends">
+        选择和配置可插拔的文件系统后端
+    </Card>
+    <Card title="沙箱" icon="cube" href="/oss/python/deepagents/sandboxes">
+        在隔离环境中执行代码
+    </Card>
+    <Card title="人在回路" icon="user-check" href="/oss/python/deepagents/human-in-the-loop">
+        为敏感操作配置批准流程
+    </Card>
+    <Card title="CLI" icon="terminal" href="/oss/python/deepagents/cli/overview">
+        使用 Deep Agents CLI
+    </Card>
+    <Card title="ACP" icon="plug-connected" href="/oss/python/deepagents/acp">
+        通过 ACP 在代码编辑器中使用 deep agents
+    </Card>
+    <Card title="参考文档" icon="external-link" href="https://reference.langchain.com/python/deepagents/">
+        查看 `deepagents` API 参考
+    </Card>
+</CardGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\overview.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

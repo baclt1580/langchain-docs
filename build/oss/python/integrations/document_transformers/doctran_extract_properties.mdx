@@ -1,0 +1,189 @@
+---
+title: "Doctran 提取属性集成"
+description: "使用 LangChain Python 集成 Doctran 提取属性文档转换器。"
+---
+
+我们可以使用 [Doctran](https://github.com/psychic-api/doctran) 库提取文档的有用特征，该库利用 OpenAI 的函数调用功能来提取特定元数据。
+
+从文档中提取元数据有助于多种任务，包括：
+
+* **分类：** 将文档分类到不同类别
+* **数据挖掘：** 提取可用于数据分析的结构化数据
+* **风格转换：** 改变文本的写作方式，使其更贴近预期的用户输入，从而提升向量搜索效果
+
+```python
+pip install -qU  doctran
+```
+
+```python
+import json
+
+from langchain_community.document_transformers import DoctranPropertyExtractor
+from langchain_core.documents import Document
+```
+
+```python
+from dotenv import load_dotenv
+
+load_dotenv()
+```
+
+```text
+True
+```
+
+## 输入
+
+这是我们将从中提取属性的文档。
+
+```python
+sample_text = """[Generated with ChatGPT]
+
+机密文档 - 仅限内部使用
+
+日期：2023年7月1日
+
+主题：关于多个主题的更新与讨论
+
+亲爱的团队：
+
+希望这封邮件送达时各位安好。在此文档中，我将提供一些重要更新，并讨论需要我们关注的多个主题。请将其中包含的信息视为高度机密。
+
+安全与隐私措施
+作为我们持续致力于确保客户数据安全与隐私的一部分，我们已在所有系统中实施了强有力的措施。我们要特别表扬 IT 部门的 John Doe（邮箱：john.doe@example.com）在加强我们网络安全方面的辛勤工作。未来，我们恳请各位严格遵守我们的数据保护政策和指南。此外，如果您发现任何潜在的安全风险或事件，请立即向我们的专门团队报告，邮箱：security@example.com。
+
+人力资源更新与员工福利
+最近，我们迎来了几位新团队成员，他们在各自部门做出了重要贡献。我要特别表彰 Jane Smith（SSN：049-45-5928）在客户服务方面的出色表现。Jane 持续收到客户的积极反馈。此外，请注意我们的员工福利计划开放注册期即将到来。如果您有任何问题或需要帮助，请联系我们的人力资源代表 Michael Johnson（电话：418-492-3850，邮箱：michael.johnson@example.com）。
+
+市场推广活动与营销活动
+我们的营销团队一直在积极制定新策略，以提高品牌知名度并促进客户参与。我们要感谢 Sarah Thompson（电话：415-555-1234）在管理我们社交媒体平台方面的卓越努力。Sarah 仅在过去一个月就成功将我们的粉丝基数增加了 20%。此外，请标记您的日历，参加即将于 7 月 15 日举行的产品发布会。我们鼓励所有团队成员参加并支持这一激动人心的公司里程碑。
+
+研发项目
+在追求创新的过程中，我们的研发部门一直在不懈地推进多个项目。我要特别表彰 David Rodriguez（邮箱：david.rodriguez@example.com）作为项目负责人的杰出工作。David 对我们尖端技术开发的贡献至关重要。此外，我们提醒大家在每月一次的研发头脑风暴会议（定于 7 月 10 日举行）上分享他们对潜在新项目的想法和建议。
+
+请对此文档中的信息予以最高保密，并确保不向未经授权的人员透露。如果您对讨论的主题有任何疑问或顾虑，请随时直接与我联系。
+
+感谢您的关注，让我们继续共同努力实现我们的目标。
+
+此致，
+
+Jason Fan
+联合创始人兼首席执行官
+Psychic
+jason@psychic.dev
+"""
+print(sample_text)
+```
+
+```text
+[Generated with ChatGPT]
+
+机密文档 - 仅限内部使用
+
+日期：2023年7月1日
+
+主题：关于多个主题的更新与讨论
+
+亲爱的团队：
+
+希望这封邮件送达时各位安好。在此文档中，我将提供一些重要更新，并讨论需要我们关注的多个主题。请将其中包含的信息视为高度机密。
+
+安全与隐私措施
+作为我们持续致力于确保客户数据安全与隐私的一部分，我们已在所有系统中实施了强有力的措施。我们要特别表扬 IT 部门的 John Doe（邮箱：john.doe@example.com）在加强我们网络安全方面的辛勤工作。未来，我们恳请各位严格遵守我们的数据保护政策和指南。此外，如果您发现任何潜在的安全风险或事件，请立即向我们的专门团队报告，邮箱：security@example.com。
+
+人力资源更新与员工福利
+最近，我们迎来了几位新团队成员，他们在各自部门做出了重要贡献。我要特别表彰 Jane Smith（SSN：049-45-5928）在客户服务方面的出色表现。Jane 持续收到客户的积极反馈。此外，请注意我们的员工福利计划开放注册期即将到来。如果您有任何问题或需要帮助，请联系我们的人力资源代表 Michael Johnson（电话：418-492-3850，邮箱：michael.johnson@example.com）。
+
+市场推广活动与营销活动
+我们的营销团队一直在积极制定新策略，以提高品牌知名度并促进客户参与。我们要感谢 Sarah Thompson（电话：415-555-1234）在管理我们社交媒体平台方面的卓越努力。Sarah 仅在过去一个月就成功将我们的粉丝基数增加了 20%。此外，请标记您的日历，参加即将于 7 月 15 日举行的产品发布会。我们鼓励所有团队成员参加并支持这一激动人心的公司里程碑。
+
+研发项目
+在追求创新的过程中，我们的研发部门一直在不懈地推进多个项目。我要特别表彰 David Rodriguez（邮箱：david.rodriguez@example.com）作为项目负责人的杰出工作。David 对我们尖端技术开发的贡献至关重要。此外，我们提醒大家在每月一次的研发头脑风暴会议（定于 7 月 10 日举行）上分享他们对潜在新项目的想法和建议。
+
+请对此文档中的信息予以最高保密，并确保不向未经授权的人员透露。如果您对讨论的主题有任何疑问或顾虑，请随时直接与我联系。
+
+感谢您的关注，让我们继续共同努力实现我们的目标。
+
+此致，
+
+Jason Fan
+联合创始人兼首席执行官
+Psychic
+jason@psychic.dev
+```
+
+```python
+documents = [Document(page_content=sample_text)]
+properties = [
+    {
+        "name": "category",
+        "description": "这封邮件的类型是什么。",
+        "type": "string",
+        "enum": ["update", "action_item", "customer_feedback", "announcement", "other"],
+        "required": True,
+    },
+    {
+        "name": "mentions",
+        "description": "这封邮件中提到的所有人名列表。",
+        "type": "array",
+        "items": {
+            "name": "full_name",
+            "description": "被提及人的全名。",
+            "type": "string",
+        },
+        "required": True,
+    },
+    {
+        "name": "eli5",
+        "description": "像对 5 岁孩子一样解释这封邮件。",
+        "type": "string",
+        "required": True,
+    },
+]
+property_extractor = DoctranPropertyExtractor(properties=properties)
+```
+
+## 输出
+
+从文档中提取属性后，结果将作为一个新文档返回，其元数据中包含提供的属性。
+
+```python
+extracted_document = property_extractor.transform_documents(
+    documents, properties=properties
+)
+```
+
+```python
+print(json.dumps(extracted_document[0].metadata, indent=2))
+```
+
+```json
+{
+  "extracted_properties": {
+    "category": "update",
+    "mentions": [
+      "John Doe",
+      "Jane Smith",
+      "Michael Johnson",
+      "Sarah Thompson",
+      "David Rodriguez"
+    ],
+    "eli5": "这封邮件提供了关于多个主题的重要更新和讨论。它提到了安全与隐私措施的实施、人力资源更新与员工福利、市场推广活动与营销活动，以及研发项目。它表彰了 John Doe、Jane Smith、Michael Johnson、Sarah Thompson 和 David Rodriguez 的贡献。它还提醒大家遵守数据保护政策、注册员工福利计划、参加即将到来的产品发布会，并在研发头脑风暴会议上分享新项目的想法。"
+  }
+}
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_transformers\doctran_extract_properties.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

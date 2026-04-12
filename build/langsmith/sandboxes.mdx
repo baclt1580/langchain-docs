@@ -1,0 +1,48 @@
+---
+title: 沙箱概览
+sidebarTitle: 概览
+description: 使用托管的沙箱在隔离环境中安全地执行代码并与文件系统交互。
+---
+
+import SandboxPreview from "/snippets/langsmith/sandbox-preview-warning.mdx";
+
+沙箱是隔离环境，允许代理安全地执行潜在高风险操作——例如运行任意代码或与文件系统交互——而不会影响您的主基础设施。
+
+<SandboxPreview />
+
+在 [LangSmith 主页](https://smith.langchain.com) 上，选择 **沙箱** 来管理您所有的沙箱资源。
+
+![沙箱概览页面](/images/langsmith/sandboxes/sb-overview.png)
+
+## 资源
+
+<CardGroup cols={2}>
+
+<Card title="模板" icon="layout" href="/langsmith/sandbox-templates">
+  定义容器镜像、资源限制、卷和认证代理配置。
+</Card>
+
+<Card title="预热池" icon="flame" href="/langsmith/sandbox-warm-pools">
+  预置沙箱以实现更快的执行速度，并支持自动补充。
+</Card>
+
+<Card title="认证代理" icon="shield-lock" href="/langsmith/sandbox-auth-proxy">
+  将凭据注入出站 API 请求中，无需硬编码密钥。
+</Card>
+
+<Card title="SDK 使用" icon="code" href="/langsmith/sandbox-sdk">
+  使用 Python 或 TypeScript SDK 以编程方式创建和管理沙箱。
+</Card>
+
+</CardGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\sandboxes.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

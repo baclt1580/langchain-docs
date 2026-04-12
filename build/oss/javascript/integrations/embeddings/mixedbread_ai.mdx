@@ -1,0 +1,104 @@
+---
+title: "Mixedbread AI 集成"
+description: "使用 LangChain JavaScript 与 Mixedbread AI 嵌入模型进行集成。"
+---
+
+`MixedbreadAIEmbeddings` 类使用 [Mixedbread AI](https://mixedbread.ai/) API 生成文本嵌入。本指南将引导您设置和使用 `MixedbreadAIEmbeddings` 类，帮助您有效地将其集成到项目中。
+
+## 安装
+
+要安装 `@langchain/mixedbread-ai` 包，请使用以下命令：
+
+<Tip>
+有关安装 LangChain 包的一般说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/mixedbread-ai @langchain/core
+```
+
+## 初始化
+
+首先，在 Mixedbread AI 网站上注册并获取您的 [Mixedbread AI API 密钥](https://mixedbread.ai/)。然后，您可以使用此密钥初始化 `MixedbreadAIEmbeddings` 类。
+
+您可以直接将 API 密钥传递给构造函数，或将其设置为环境变量（`MXBAI_API_KEY`）。
+
+### 基本用法
+
+以下是创建 `MixedbreadAIEmbeddings` 实例的方法：
+
+```typescript
+import { MixedbreadAIEmbeddings } from "@langchain/mixedbread-ai";
+
+const embeddings = new MixedbreadAIEmbeddings({
+  apiKey: "YOUR_API_KEY",
+  // 可选指定模型
+  // model: "mixedbread-ai/mxbai-embed-large-v1",
+});
+```
+
+如果未提供 `apiKey`，将从 `MXBAI_API_KEY` 环境变量中读取。
+
+## 生成嵌入
+
+### 嵌入单个查询
+
+要为单个文本查询生成嵌入，请使用 `embedQuery` 方法：
+
+```typescript
+const embedding = await embeddings.embedQuery(
+  "将此句子表示为用于搜索相关段落：烘焙有趣吗？"
+);
+console.log(embedding);
+```
+
+### 嵌入多个文档
+
+要为多个文档生成嵌入，请使用 `embedDocuments` 方法。此方法会根据 `batchSize` 参数自动处理批处理：
+
+```typescript
+const documents = ["烘焙面包很有趣", "我喜欢烘焙"];
+
+const embeddingsArray = await embeddings.embedDocuments(documents);
+console.log(embeddingsArray);
+```
+
+## 自定义请求
+
+您可以通过传递额外参数来自定义 SDK。
+
+```typescript
+const customEmbeddings = new MixedbreadAIEmbeddings({
+  apiKey: "YOUR_API_KEY",
+  baseUrl: "...",
+  maxRetries: 6,
+});
+```
+
+## 错误处理
+
+如果未提供 API 密钥且无法在环境变量中找到，将抛出错误：
+
+```typescript
+try {
+  const embeddings = new MixedbreadAIEmbeddings();
+} catch (error) {
+  console.error(error);
+}
+```
+
+## 相关链接
+
+- 嵌入模型[概念指南](/oss/javascript/integrations/embeddings)
+- 嵌入模型[操作指南](/oss/javascript/integrations/embeddings)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\embeddings\mixedbread_ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,71 @@
+---
+title: "Reddit 集成"
+description: "使用 LangChain Python 集成 Reddit 文档加载器。"
+---
+
+>[Reddit](https://www.reddit.com) 是一个美国社交新闻聚合、内容评分和讨论网站。
+
+该加载器使用 `praw` Python 包，从 Subreddit 或 Reddit 用户的帖子中获取文本内容。
+
+请先创建一个 [Reddit 应用](https://www.reddit.com/prefs/apps/)，然后使用你的 Reddit API 凭证初始化加载器。
+
+```python
+from langchain_community.document_loaders import RedditPostsLoader
+```
+
+```python
+pip install -qU  praw
+```
+
+```python
+# 使用 'subreddit' 模式加载
+loader = RedditPostsLoader(
+    client_id="YOUR CLIENT ID",
+    client_secret="YOUR CLIENT SECRET",
+    user_agent="extractor by u/Master_Ocelot8179",
+    categories=["new", "hot"],  # 要加载帖子的类别列表
+    mode="subreddit",
+    search_queries=[
+        "investing",
+        "wallstreetbets",
+    ],  # 要加载帖子的 subreddit 列表
+    number_posts=20,  # 默认值为 10
+)
+
+# # 或使用 'username' 模式加载
+# loader = RedditPostsLoader(
+#     client_id="YOUR CLIENT ID",
+#     client_secret="YOUR CLIENT SECRET",
+#     user_agent="extractor by u/Master_Ocelot8179",
+#     categories=['new', 'hot'],
+#     mode = 'username',
+#     search_queries=['ga3far', 'Master_Ocelot8179'],         # 要加载帖子的用户名列表
+#     number_posts=20
+#     )
+
+# 注意：类别只能为以下值之一 - "controversial" "hot" "new" "rising" "top"
+```
+
+```python
+documents = loader.load()
+documents[:5]
+```
+
+```python
+[Document(page_content='大家好，我不是在寻求投资建议。我会自己进行尽职调查。不过，我想知道是否有人了解，作为英国居民，费用和汇率差异会如何影响投资表现？\n\n我计划创建一个指数基金组合（可能包括英国、美国、欧洲的基金），或者找一个长期增长记录良好且费率低的基金。\n\n有人有什么想法吗？', metadata={'post_subreddit': 'r/investing', 'post_category': 'new', 'post_title': '长期退休基金费用/汇率问题', 'post_score': 1, 'post_id': '130pa6m', 'post_url': 'https://www.reddit.com/r/investing/comments/130pa6m/long_term_retirement_funds_feesexchange_rate_query/', 'post_author': Redditor(name='Badmanshiz')}),
+ Document(page_content='我更喜欢 Roth IRA，宁愿每年将我的 401k 转入其中，而不是将其保留在有限的 401k 选项中。但如果我进行转入，我还能继续向 401k 供款吗？还是这会关闭我的账户？我意识到这样做会有税务影响，但我仍然认为这是更好的选择。', metadata={'post_subreddit': 'r/investing', 'post_category': 'new', 'post_title': '可以每年转入我的 401k 吗？', 'post_score': 3, 'post_id': '130ja0h', 'post_url': 'https://www.reddit.com/r/investing/comments/130ja0h/is_it_possible_to_rollover_my_401k_every_year/', 'post_author': Redditor(name='AnCap_Catholic')}),
+ Document(page_content='有一般性问题吗？想对市场发表一些评论吗？或者你只是想分享一个不值得单独发帖的有趣事实？欢迎在这里发帖！\n\n如果你的问题是“我有 10,000 美元，该怎么办？”或其他“针对我个人情况的建议”类问题，请包含以下相关信息：\n\n* 你多大了？你住在哪个国家？\n* 你有工作/有收入吗？收入多少？\n* 你对这笔钱的目标是什么？（买房？退休储蓄？）\n* 你的时间范围是多久？下个月需要这笔钱吗？还是未来 20 年？\n* 你的风险承受能力如何？（你介意在二十一点中冒险，还是需要确保 100% 安全？）\n* 你目前的持仓情况如何？（你是否已经持有特定基金和行业的敞口？有其他资产吗？）\n* 有大额债务（包括利率）或支出吗？\n* 任何其他相关的财务信息都将有助于给出合适的答案。\n\n请先查阅我们的常见问题解答 - https://www.reddit.com/r/investing/wiki/faq\n我们的[侧边栏](https://www.reddit.com/r/investing/about/sidebar)也有有用的资源。\n\n如果你是投资新手 - 请参考 Wiki - [入门指南](https://www.reddit.com/r/investing/wiki/index/gettingstarted/)\n\nWiki 中的阅读清单列出了从轻松阅读到高级主题的书籍，取决于你的知识水平。链接在此 - [阅读清单](https://www.reddit.com/r/investing/wiki/readinglist)\n\n查看侧边栏中的资源。\n\n请注意，这些答案仅是 Reddit 用户的观点，应作为你研究的起点。在做出任何财务决策之前，如果需专业支持，强烈建议咨询注册投资顾问！', metadata={'post_subreddit': 'r/investing', 'post_category': 'new', 'post_title': '每日综合讨论与建议帖 - 2023年4月27日', 'post_score': 5, 'post_id': '130eszz', 'post_url': 'https://www.reddit.com/r/investing/comments/130eszz/daily_general_discussion_and_advice_thread_april/', 'post_author': Redditor(name='AutoModerator')}),
+ Document(page_content='基于最近关于盐电池进展的新闻以及锂的整体问题，我想知道投资非锂基电池技术的可行方式有哪些？CATL 当然是一个选择，但我目前可用的经纪商根本不提供港股。', metadata={'post_subreddit': 'r/investing', 'post_category': 'new', 'post_title': '投资非锂电池技术？', 'post_score': 2, 'post_id': '130d6qp', 'post_url': 'https://www.reddit.com/r/investing/comments/130d6qp/investing_in_nonlithium_battery_technologies/', 'post_author': Redditor(name='-manabreak')}),
+ Document(page_content='大家好，\n\n我非常想投资一只跟踪标普指数或其他大盘指数的 ETF，因为我认为这种投资形式最适合我。\n\n问题是，我住在丹麦，那里的 ETF 和基金每年对未实现收益征收相当高的税率。这意味着一只年增长 10% 的 ETF 实际只增长约 6%，这确实破坏了复利的长期效果。\n\n然而，股票只在实现收益时征税，这就是为什么它们看起来更适合长期持有。\n\n我不喜欢这带来的缺乏分散性，因为我不想花大量时间挑选合适的长期股票。\n\n理想的情况是找到几只长期内能大致跟踪指数的股票。有人有建议吗？\n\n我研究过纳斯达克公司，它相当紧密地跟踪纳斯达克 100 指数。\n\n非常感谢任何帮助。', metadata={'post_subreddit': 'r/investing', 'post_category': 'new', 'post_title': '跟踪指数的股票', 'post_score': 7, 'post_id': '130auvj', 'post_url': 'https://www.reddit.com/r/investing/comments/130auvj/stocks_that_track_an_index/', 'post_author': Redditor(name='LeAlbertP')})]
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\reddit.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

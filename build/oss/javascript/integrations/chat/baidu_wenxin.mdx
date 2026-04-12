@@ -1,0 +1,83 @@
+---
+title: "ChatBaiduWenxin 集成"
+description: "使用 LangChain JavaScript 集成 ChatBaiduWenxin 聊天模型。"
+---
+
+<Warning>
+**此类已被弃用。**
+
+请改用 [`@langchain/baidu-qianfan`](/oss/javascript/integrations/chat/baidu_qianfan/) 包。
+</Warning>
+
+LangChain.js 支持百度的 ERNIE-bot 系列模型。以下是一个示例：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+可用模型：`ERNIE-Bot`、`ERNIE-Bot-turbo`、`ERNIE-Bot-4`、`ERNIE-Speed-8K`、`ERNIE-Speed-128K`、`ERNIE-4.0-8K`、
+`ERNIE-4.0-8K-Preview`、`ERNIE-3.5-8K`、`ERNIE-3.5-8K-Preview`、`ERNIE-Lite-8K`、`ERNIE-Tiny-8K`、`ERNIE-Character-8K`、
+`ERNIE Speed-AppBuilder`
+
+已弃用模型：`ERNIE-Bot-turbo`
+
+```typescript
+import { ChatBaiduWenxin } from "@langchain/community/chat_models/baiduwenxin";
+import { HumanMessage } from "@langchain/core/messages";
+
+// 默认模型为 ERNIE-Bot-turbo
+const ernieTurbo = new ChatBaiduWenxin({
+  baiduApiKey: "YOUR-API-KEY", // 在 Node.js 中默认为 process.env.BAIDU_API_KEY
+  baiduSecretKey: "YOUR-SECRET-KEY", // 在 Node.js 中默认为 process.env.BAIDU_SECRET_KEY
+});
+
+// 使用 ERNIE-Bot
+const ernie = new ChatBaiduWenxin({
+  model: "ERNIE-Bot", // 可用模型如上所示
+  temperature: 1,
+  baiduApiKey: "YOUR-API-KEY", // 在 Node.js 中默认为 process.env.BAIDU_API_KEY
+  baiduSecretKey: "YOUR-SECRET-KEY", // 在 Node.js 中默认为 process.env.BAIDU_SECRET_KEY
+});
+
+const messages = [new HumanMessage("Hello")];
+
+let res = await ernieTurbo.invoke(messages);
+/*
+AIChatMessage {
+  text: 'Hello! How may I assist you today?',
+  name: undefined,
+  additional_kwargs: {}
+  }
+}
+*/
+
+res = await ernie.invoke(messages);
+/*
+AIChatMessage {
+  text: 'Hello! How may I assist you today?',
+  name: undefined,
+  additional_kwargs: {}
+  }
+}
+*/
+```
+
+## 相关链接
+
+- 聊天模型[概念指南](/oss/javascript/langchain/models)
+- 聊天模型[操作指南](/oss/javascript/langchain/models)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\chat\baidu_wenxin.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

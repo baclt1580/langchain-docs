@@ -1,0 +1,185 @@
+---
+title: 提示工程概念
+sidebarTitle: 概念
+---
+
+
+传统软件应用通过编写代码构建，而AI应用通常从提示中推导其逻辑。
+
+本指南将介绍LangSmith中提示工程的关键概念。
+
+## 为何需要提示工程？
+
+提示在不改变模型底层能力的情况下引导其行为。通过提供指令、示例和上下文，提示塑造了模型对输入的响应方式。
+
+提示工程之所以重要，是因为它允许你调整模型行为。虽然存在其他方法（如微调），但提示工程通常具有最低的入门门槛，且往往能带来最高的投资回报。
+
+提示工程通常是一项跨学科工作。最高效的提示工程师可能是产品经理、领域专家或其他非技术团队成员，而非构建应用的软件工程师。适当的工具和基础设施对于支持这种跨职能协作至关重要。
+
+## 提示类型
+
+有两种不同类型的提示格式：`聊天`风格提示和`补全`风格提示。
+
+**聊天提示**是一个消息列表，每条消息都有一个角色（如`system`、`user`或`assistant`）。这是当前大多数模型API支持的提示风格，也是推荐的格式。
+
+**补全提示**是单个字符串。这是一种较旧的提示风格，主要为向后兼容而保留。
+
+<Note>
+除非有特定理由使用补全提示，否则新项目应使用聊天提示。聊天提示为多轮对话提供了更好的结构，并且受到现代LLM更好的支持。
+</Note>
+
+## 提示与提示模板
+
+虽然_提示_和_提示模板_经常互换使用，但理解其区别有助于澄清LangSmith如何管理和评估你的AI应用。
+
+- **提示**指的是传递给语言模型的消息。
+- **提示模板**允许你创建具有动态占位符的可重用提示，这些占位符在运行时被填充。你可以定义变量，LangSmith会在每次运行提示时用不同的输入替换这些变量，而不是硬编码值。这使得提示更加灵活、可测试且易于迭代。
+
+以下是模板在实际中的工作方式：
+
+1. **定义模板**：创建带有变量（用花括号标记）的提示，这些变量将在运行时被替换：
+
+    ```
+    你是一名客户支持代理。以下是退款政策：
+
+    {refund_policy}
+
+    请回应用户的问题：
+
+    {question}
+    ```
+
+1. **提供输入值**：为每个变量提供实际值：
+
+    ```json
+    {
+    "refund_policy": "任何情况下均不退款",
+    "question": "我能为这顶帽子退款吗？"
+    }
+    ```
+
+1. **获取最终提示**：LangSmith用你的输入替换变量，创建发送给模型的提示：
+
+    ```
+    你是一名客户支持代理。以下是退款政策：
+
+    任何情况下均不退款
+
+    请回应用户的问题：
+
+    我能为这顶帽子退款吗？
+    ```
+
+<Tip>
+在[提示模板格式](/langsmith/create-a-prompt#template-format)指南中了解更多关于模板变量语法和格式化选项的信息。
+</Tip>
+
+## LangSmith中的提示
+
+你可以在LangSmith中存储和版本化提示模板。这些模板可以在Playground中测试，通过提交和标签进行版本控制，并拉取到你的应用代码中。
+
+<Callout type="info" color="#4F46E5" icon="player-play" iconType="regular">
+打开[Playground](https://smith.langchain.com/playground)创建并测试你的第一个提示模板。如需分步指导，请参考[创建提示](/langsmith/create-a-prompt)。
+</Callout>
+
+以下部分描述了提示模板的关键方面。
+
+### F-string与Mustache
+
+你可以使用[f-string](https://realpython.com/python-f-strings/)或[mustache](https://mustache.github.io/mustache.5.html)格式来格式化带有输入变量的提示模板。
+
+有关如何在Playground中使用这些格式的详细信息，请参阅[模板格式](/langsmith/create-a-prompt#template-format)。
+
+<Check>
+[Playground](https://smith.langchain.com/playground)默认使用`f-string`作为模板格式，但你可以在提示设置/模板格式部分切换到`mustache`格式。`mustache`为你提供了更多关于条件变量、循环和嵌套键的灵活性。对于条件变量，你需要在“输入”部分手动添加json变量。阅读[文档](https://mustache.github.io/mustache.5.html)
+</Check>
+
+### 工具
+
+[工具](/langsmith/use-tools)是LLM用于与外部世界交互的接口。工具由名称、描述和用于调用工具的参数的JSON模式组成。
+
+### 结构化输出
+
+结构化输出是大多数先进LLM的一项功能，其中模型不是生成原始文本作为输出，而是遵循指定的模式。这可能使用也可能不使用底层的[工具](#tools)。
+
+<Check>
+结构化输出与工具有相似之处，但在几个关键方面有所不同。使用工具时，LLM选择调用哪个工具（或可能选择不调用任何工具）；使用结构化输出时，LLM**始终**以这种格式响应。使用工具时，LLM可能选择**多个**工具；使用结构化输出时，只生成一个响应。
+</Check>
+
+### 模型
+
+可选地，你可以将模型配置与提示模板一起存储。这包括模型名称和任何其他参数（温度等）。
+
+## 提示版本控制
+
+版本控制是迭代和协作处理提示的关键组成部分。
+
+### 提交
+
+每次保存对提示的更新都会创建一个具有唯一提交哈希的新提交。这允许你：
+
+- 查看提示的完整更改历史。
+- 查看早期版本。
+- 如果需要，恢复到之前的状态。
+- 使用提交哈希在代码中引用特定版本（例如，`client.pull_prompt("prompt_name:commit_hash")`）。
+
+在UI中，你可以在[提示详情页](/langsmith/manage-prompts#prompt-detail-page)的右上角切换**差异**来比较提交与其先前版本。
+
+### 标签
+
+提交标签是指向提示历史中特定提交的人类可读标签。与提交哈希不同，标签可以移动到指向不同的提交，允许你更新代码引用的版本而无需更改代码本身。
+
+提交标签的用例包括：
+
+- **环境**：`staging`和`production`标签是为[环境](/langsmith/manage-prompts#environments)功能保留的，该功能允许你在命名的部署目标之间提升提交，并在不更改代码的情况下切换版本。
+- **版本控制**：标记提示的稳定版本，例如`v1`、`v2`，这允许你在代码中引用特定版本并跟踪随时间的变化。
+- **协作**：标记准备就绪以供审查的版本，这使你能够与协作者共享特定版本并获得反馈。
+
+<Note>
+**不要与资源标签混淆**：提交标签引用特定的提示版本。[资源标签](/langsmith/set-up-resource-tags)是用于组织工作空间资源的键值对。
+</Note>
+
+有关创建和管理提交标签的详细信息，请参阅[管理提示](/langsmith/manage-prompts#commit-tags)。
+
+## Playground
+
+Playground提供了一个用于迭代和测试提示的界面。你可以从侧边栏或直接从已保存的提示访问Playground。
+
+在Playground中，你可以：
+
+* 更改使用的模型
+* 更改使用的提示模板
+* 更改输出模式
+* 更改可用的工具
+* 输入要通过提示模板运行的输入变量
+* 通过模型运行提示
+* 观察输出
+
+<Callout type="info" icon="feather">
+在Playground中使用**[Polly](/langsmith/polly)**，借助AI辅助优化提示、生成工具和创建输出模式。
+</Callout>
+
+## 测试多个提示
+
+你可以将多个提示添加到Playground中，以比较输出并评估性能：
+
+![向Playground添加提示](/langsmith/images/add-prompt-to-playground.gif)
+
+## 基于数据集测试
+
+要基于数据集进行测试，请从右上角选择数据集并点击开始。你可以配置结果是否流式传输以及测试的重复次数。
+
+![在Playground中基于数据集测试](/langsmith/images/test-over-dataset-in-playground.gif)
+
+点击“查看实验”按钮查看详细的测试结果。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\prompt-engineering-concepts.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

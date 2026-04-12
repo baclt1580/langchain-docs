@@ -1,0 +1,128 @@
+---
+title: "Context 集成"
+description: "使用 LangChain Python 与 Context 回调进行集成。"
+---
+
+>[Context](https://context.ai/) 为基于 LLM 的产品和功能提供用户分析。
+
+通过 `Context`，您可以在不到 30 分钟内开始了解您的用户并改善他们的体验。
+
+在本指南中，我们将向您展示如何与 Context 集成。
+
+## 安装与设置
+
+```python
+pip install -qU  langchain langchain-openai langchain-community context-python
+```
+
+### 获取 API 凭证
+
+要获取您的 Context API 令牌：
+
+1. 进入您的 Context 账户设置页面 ([with.context.ai/settings](https://with.context.ai/settings))。
+2. 生成一个新的 API 令牌。
+3. 将此令牌安全地存储在某处。
+
+### 设置 Context
+
+要使用 `ContextCallbackHandler`，请从 LangChain 导入该处理器，并使用您的 Context API 令牌实例化它。
+
+在使用处理器之前，请确保已安装 `context-python` 包。
+
+```python
+from langchain_community.callbacks.context_callback import ContextCallbackHandler
+```
+
+```python
+import os
+
+token = os.environ["CONTEXT_API_TOKEN"]
+
+context_callback = ContextCallbackHandler(token)
+```
+
+## 使用方法
+
+### 在聊天模型中使用 Context 回调
+
+Context 回调处理器可用于直接记录用户与 AI 助手之间的对话记录。
+
+```python
+import os
+
+from langchain.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+
+token = os.environ["CONTEXT_API_TOKEN"]
+
+chat = ChatOpenAI(
+    headers={"user_id": "123"}, temperature=0, callbacks=[ContextCallbackHandler(token)]
+)
+
+messages = [
+    SystemMessage(
+        content="你是一个将英语翻译成法语的助手。"
+    ),
+    HumanMessage(content="我喜欢编程。"),
+]
+
+print(chat(messages))
+```
+
+### 在链中使用 Context 回调
+
+Context 回调处理器也可用于记录链的输入和输出。请注意，链的中间步骤不会被记录——只有初始输入和最终输出。
+
+__注意：__ 确保将相同的 context 对象传递给聊天模型和链。
+
+错误示例：
+>
+> ```python
+> chat = ChatOpenAI(temperature=0.9, callbacks=[ContextCallbackHandler(token)])
+> chain = LLMChain(llm=chat, prompt=chat_prompt_template, callbacks=[ContextCallbackHandler(token)])
+> ```
+
+正确示例：
+>
+>```python
+>handler = ContextCallbackHandler(token)
+>chat = ChatOpenAI(temperature=0.9, callbacks=[callback])
+>chain = LLMChain(llm=chat, prompt=chat_prompt_template, callbacks=[callback])
+>```
+
+```python
+import os
+
+from langchain_classic.chains import LLMChain
+from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts.chat import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from langchain_openai import ChatOpenAI
+
+token = os.environ["CONTEXT_API_TOKEN"]
+
+human_message_prompt = HumanMessagePromptTemplate(
+    prompt=PromptTemplate(
+        template="为一家生产 {product} 的公司起一个好名字？",
+        input_variables=["product"],
+    )
+)
+chat_prompt_template = ChatPromptTemplate.from_messages([human_message_prompt])
+callback = ContextCallbackHandler(token)
+chat = ChatOpenAI(temperature=0.9, callbacks=[callback])
+chain = LLMChain(llm=chat, prompt=chat_prompt_template, callbacks=[callback])
+print(chain.run("彩色袜子"))
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\callbacks\context.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

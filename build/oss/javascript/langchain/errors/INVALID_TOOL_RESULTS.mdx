@@ -1,0 +1,56 @@
+---
+title: INVALID_TOOL_RESULTS
+---
+
+<Note>
+    目前仅在 `langchainjs`（JavaScript/TypeScript）中使用。
+</Note>
+
+此错误发生在工具调用操作期间，向模型传递不匹配、不足或过多的 [`ToolMessage`](https://reference.langchain.com/javascript/langchain-core/messages/ToolMessage) 对象时。
+
+该错误源于一个基本要求：带有 `tool_calls` 的助手消息之后，必须跟随响应每个 `tool_call_id` 的工具消息。
+
+当模型返回带有工具调用的 [`AIMessage`](https://reference.langchain.com/javascript/langchain-core/messages/AIMessage) 时，你必须为每个工具调用提供恰好一个对应的 [`ToolMessage`](https://reference.langchain.com/javascript/langchain-core/messages/ToolMessage)，且 `tool_call_id` 值需匹配。
+
+## 常见原因
+
+* **响应不足**：如果模型请求执行两个工具，但你只提供一个响应消息，模型会拒绝不完整的消息链
+* **重复响应**：为同一个工具调用 ID 提供多个 [`ToolMessage`](https://reference.langchain.com/javascript/langchain-core/messages/ToolMessage) 对象会导致拒绝，未匹配的 ID 也会导致同样问题
+* **孤立工具消息**：发送 [`ToolMessage`](https://reference.langchain.com/javascript/langchain-core/messages/ToolMessage) 而没有包含工具调用的前置 [`AIMessage`](https://reference.langchain.com/javascript/langchain-core/messages/AIMessage) 违反了协议要求
+
+
+
+以下是一个有问题的模式示例：
+
+```javascript
+// 模型请求两个工具调用
+responseMessage.tool_calls // 返回 2 个调用
+
+// 但只提供了一个 ToolMessage
+chatHistory.push({
+  role: "tool",
+  content: toolResponse,
+  tool_call_id: responseMessage.tool_calls[0].id
+});
+
+await modelWithTools.invoke(chatHistory); // 因 INVALID_TOOL_RESULTS 失败
+```
+
+
+## 故障排除
+
+要解决此错误：
+
+* **匹配计数**：确保前置 [`AIMessage`](https://reference.langchain.com/javascript/langchain-core/messages/AIMessage) 中的每个工具调用都有一个对应的 [`ToolMessage`](https://reference.langchain.com/javascript/langchain-core/messages/ToolMessage)
+* **验证 ID**：确认每个 `ToolMessage.tool_call_id` 都匹配实际的工具调用标识符
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\errors\INVALID_TOOL_RESULTS.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

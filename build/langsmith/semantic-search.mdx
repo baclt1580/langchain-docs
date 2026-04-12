@@ -1,0 +1,165 @@
+---
+title: 如何为智能体部署添加语义搜索功能
+sidebarTitle: 为智能体部署添加语义搜索
+---
+
+本指南将介绍如何为部署的跨线程[存储](/oss/python/langgraph/persistence#memory-store)添加语义搜索功能，使您的智能体能够根据语义相似性搜索记忆和其他文档。
+
+## 前提条件
+
+* 一个已部署的应用（参考[如何设置应用以进行部署](/langsmith/setup-app-requirements-txt)）以及[托管选项](/langsmith/platform-setup)的详细信息。
+* 您的嵌入提供商的 API 密钥（本例中使用 OpenAI）。
+* `langchain >= 0.3.8`（如果您使用下文所述的字符串格式指定）。
+
+## 步骤
+
+1. 更新您的 `langgraph.json` 配置文件以包含存储配置：
+
+```json
+{
+    ...
+    "store": {
+        "index": {
+            "embed": "openai:text-embedding-3-small",
+            "dims": 1536,
+            "fields": ["$"]
+        }
+    }
+}
+```
+
+此配置：
+
+* 使用 OpenAI 的 text-embedding-3-small 模型生成嵌入向量
+* 将嵌入维度设置为 1536（与模型的输出匹配）
+* 索引存储数据中的所有字段（`["$"]` 表示索引所有内容，或指定特定字段如 `["text", "metadata.title"]`）
+
+<Note>
+每个部署仅支持一个嵌入模型。不支持配置多个嵌入模型，因为这会导致 `/store` 端点产生歧义并引发混合索引问题。
+</Note>
+
+1. 要使用上述字符串嵌入格式，请确保您的依赖项中包含 `langchain >= 0.3.8`：
+
+```toml
+# 在 pyproject.toml 中
+[project]
+dependencies = [
+    "langchain>=0.3.8"
+]
+```
+
+如果使用 [requirements.txt](/langsmith/setup-app-requirements-txt)：
+
+```
+langchain>=0.3.8
+```
+
+## 使用方法
+
+配置完成后，您可以在[节点](/oss/python/langgraph/graph-api#nodes)中使用语义搜索。存储需要一个命名空间元组来组织记忆：
+
+```python
+async def search_memory(state: State, *, store: BaseStore):
+    # 使用语义相似性搜索存储
+    # 命名空间元组有助于组织不同类型的记忆
+    # 例如，("user_facts", "preferences") 或 ("conversation", "summaries")
+    results = await store.asearch(
+        namespace=("memory", "facts"),  # 按类型组织记忆
+        query="您的搜索查询",
+        limit=3  # 返回的结果数量
+    )
+    return results
+```
+
+每个结果都是一个 `SearchItem`（继承自 `Item`，并额外包含一个 `score` 字段）。当配置了语义搜索时，`score` 包含相似性分数：
+
+```python
+results[0].key       # "07e0caf4-1631-47b7-b15f-65515d4c1843"
+results[0].value     # {"text": "用户偏好深色模式"}
+results[0].namespace # ("memory", "facts")
+results[0].score     # 0.92 (相似性分数，配置语义搜索时存在)
+```
+
+### 更改嵌入模型
+
+<Warning>
+更改嵌入模型或维度需要重新嵌入所有现有数据。目前没有用于此操作的自动化迁移工具。如果您需要切换模型，请相应地进行规划。
+</Warning>
+
+## 自定义嵌入
+
+如果您想使用自定义嵌入，可以传递自定义嵌入函数的路径：
+
+```json
+{
+    ...
+    "store": {
+        "index": {
+            "embed": "path/to/embedding_function.py:embed",
+            "dims": 1536,
+            "fields": ["$"]
+        }
+    }
+}
+```
+
+部署将在指定路径中查找该函数。该函数必须是异步的并接受字符串列表：
+
+```python
+# path/to/embedding_function.py
+from openai import AsyncOpenAI
+
+client = AsyncOpenAI()
+
+async def aembed_texts(texts: list[str]) -> list[list[float]]:
+    """自定义嵌入函数必须：
+    1. 是异步的
+    2. 接受一个字符串列表
+    3. 返回一个浮点数组列表（嵌入向量）
+    """
+    response = await client.embeddings.create(
+        model="text-embedding-3-small",
+        input=texts
+    )
+    return [e.embedding for e in response.data]
+```
+
+## 通过 API 查询
+
+您也可以使用 LangGraph SDK 查询存储。由于 SDK 使用异步操作：
+
+```python
+from langgraph_sdk import get_client
+
+async def search_store():
+    client = get_client()
+    results = await client.store.search_items(
+        ("memory", "facts"),
+        query="您的搜索查询",
+        limit=3  # 返回的结果数量
+    )
+    return results
+
+# 在异步上下文中使用
+results = await search_store()
+```
+
+配置了语义搜索时，每个结果项都包含一个 `score` 字段：
+
+```python
+results["items"][0]["key"]       # "07e0caf4-1631-47b7-b15f-65515d4c1843"
+results["items"][0]["value"]     # {"text": "用户偏好深色模式"}
+results["items"][0]["namespace"] # ["memory", "facts"]
+results["items"][0]["score"]     # 0.92 (相似性分数)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\semantic-search.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

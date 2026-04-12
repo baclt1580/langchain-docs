@@ -1,0 +1,33 @@
+---
+title: "Blackboard 集成"
+description: "使用 LangChain Python 与 Blackboard 文档加载器集成。"
+---
+
+>[Blackboard Learn](https://en.wikipedia.org/wiki/Blackboard_Learn)（前身为 Blackboard 学习管理系统）是一个基于网络的虚拟学习环境和学习管理系统，由 Blackboard Inc. 开发。该软件具备课程管理、可定制的开放架构和可扩展设计，支持与学生信息系统和身份验证协议集成。它可以安装在本地服务器上，由 `Blackboard ASP Solutions` 托管，或作为软件即服务在亚马逊云服务上提供。其主要用途包括为传统面对面授课的课程增加在线元素，以及开发完全在线、极少或无需面对面会议的课程。
+
+本文介绍如何从 [Blackboard Learn](https://www.anthology.com/products/teaching-and-learning/learning-effectiveness/blackboard-learn) 实例加载数据。
+
+此加载器并非兼容所有 `Blackboard` 课程，仅适用于使用新版 `Blackboard` 界面的课程。
+使用此加载器时，您必须持有 BbRouter cookie。您可以通过登录课程后，从浏览器的开发者工具中复制 BbRouter cookie 的值来获取该 cookie。
+
+```python
+from langchain_community.document_loaders import BlackboardLoader
+
+loader = BlackboardLoader(
+    blackboard_course_url="https://blackboard.example.com/webapps/blackboard/execute/announcement?method=search&context=course_entry&course_id=_123456_1",
+    bbrouter="expires:12345...",
+    load_all_recursively=True,
+)
+documents = loader.load()
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\blackboard.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

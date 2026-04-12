@@ -1,0 +1,74 @@
+---
+title: 基于邮箱和密码的基础认证
+sidebarTitle: 设置基础认证
+---
+
+LangSmith 支持通过用户名/密码登录，但存在一些限制：
+
+* 无法将现有安装从基础认证模式切换为 OAuth with PKCE（已弃用），反之亦然——安装必须选择其中一种模式。**基础认证安装需要完全全新的安装，包括独立的 PostgreSQL 数据库/架构，除非是从现有的 `None` 类型安装迁移而来（见下文）。**
+* 用户在被邀请后必须获得其初始自动生成的密码。此密码后续可由任何组织管理员更改。
+* 无法同时使用基础认证和带客户端密钥的 OAuth。
+
+## 要求与特性
+
+* 初始安装时会预置一个单一的 `Default` 组织，不支持创建额外组织
+* 您的初始密码（如下配置）必须至少 12 个字符，并包含至少一个小写字母、一个大写字母和一个符号
+* 用于签名 JWT 的密钥没有严格的要求，但我们建议安全地生成至少 32 个字符的字符串。例如：`openssl rand -base64 32`
+
+### 从无认证迁移
+
+**仅支持 0.7 及以上版本。**
+
+从 [None](/langsmith/authentication-methods#none) 认证模式迁移安装，会将单一的“默认”用户替换为具有配置凭据的用户，并保留所有现有资源。迁移后，原有的单一工作空间 ID 仍为 `00000000-0000-0000-0000-000000000000`，但迁移后安装的其他方面均符合基础认证安装的标准。
+
+要迁移，只需按如下所示更新配置，并照常运行 `helm upgrade`（或 `docker-compose up`）。
+
+### 配置
+
+<Note>
+更改 JWT 密钥将使您的用户退出登录
+</Note>
+
+<CodeGroup>
+
+```yaml Helm
+config:
+  authType: mixed
+  basicAuth:
+    enabled: true
+    initialOrgAdminEmail: <您的邮箱地址>
+    initialOrgAdminPassword: <密码> # 必须至少 12 个字符，并包含至少一个小写字母、一个大写字母和一个符号
+    jwtSecret: <密钥>
+```
+
+```bash Docker
+# 在您的 .env 文件中
+AUTH_TYPE=mixed
+BASIC_AUTH_ENABLED=true
+INITIAL_ORG_ADMIN_EMAIL=<您的邮箱地址>
+INITIAL_ORG_ADMIN_PASSWORD=<密码> # 必须至少 12 个字符，并包含至少一个小写字母、一个大写字母和一个符号
+BASIC_AUTH_JWT_SECRET=<密钥>
+```
+
+</CodeGroup>
+
+此外，在 docker-compose 中，您需要运行引导命令来创建初始组织和用户：
+
+```bash
+docker-compose exec langchain-backend python hooks/auth_bootstrap.pyc
+```
+
+配置完成后，您将看到如下所示的登录界面。您应能使用 `initialOrgAdminEmail` 和 `initialOrgAdminPassword` 的值登录，您的用户将自动预置为 `组织管理员` 角色。有关组织角色的更多详情，请参阅[管理员指南](/langsmith/administration-overview#organization-roles)。
+
+![LangSmith 基础认证界面](/langsmith/images/langsmith-ui-basic-auth.png)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\self-host-basic-auth.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

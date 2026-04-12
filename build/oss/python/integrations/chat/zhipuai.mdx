@@ -1,0 +1,143 @@
+---
+title: "智谱AI集成"
+description: "使用LangChain Python与智谱AI聊天模型集成。"
+---
+
+本笔记本展示了如何在LangChain中使用[智谱AI API](https://open.bigmodel.cn/dev/api)，通过langchain.chat_models.ChatZhipuAI实现。
+
+>[*GLM-4*](https://open.bigmodel.cn/)是一个与人类意图对齐的多语言大语言模型，具备问答、多轮对话和代码生成能力。新一代基础模型GLM-4的整体性能相比前代显著提升，支持更长的上下文；具备更强的多模态能力；支持更快的推理速度、更高的并发量，大幅降低推理成本；同时，GLM-4增强了智能体能力。
+
+## 开始使用
+
+### 安装
+
+首先，确保您的Python环境中已安装zhipuai包。运行以下命令：
+
+```python
+#!pip install -U httpx httpx-sse PyJWT
+```
+
+### 导入所需模块
+
+安装完成后，将必要的模块导入到您的Python脚本中：
+
+```python
+from langchain_community.chat_models import ChatZhipuAI
+from langchain.messages import AIMessage, HumanMessage, SystemMessage
+```
+
+### 设置API密钥
+
+登录[智谱AI](https://open.bigmodel.cn/login?redirect=%2Fusercenter%2Fapikeys)获取API密钥以访问我们的模型。
+
+```python
+import os
+
+os.environ["ZHIPUAI_API_KEY"] = "zhipuai_api_key"
+```
+
+### 初始化智谱AI聊天模型
+
+以下是初始化聊天模型的方法：
+
+```python
+chat = ChatZhipuAI(
+    model="glm-4",
+    temperature=0.5,
+)
+```
+
+### 基本用法
+
+使用系统消息和人类消息调用模型，如下所示：
+
+```python
+messages = [
+    AIMessage(content="你好。"),
+    SystemMessage(content="你的角色是诗人。"),
+    HumanMessage(content="写一首关于AI的四行短诗。"),
+]
+```
+
+```python
+response = chat.invoke(messages)
+print(response.content)  # 显示AI生成的诗
+```
+
+## 高级功能
+
+### 流式支持
+
+如需连续交互，请使用流式功能：
+
+```python
+from langchain_core.callbacks.manager import CallbackManager
+from langchain_core.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+```
+
+```python
+streaming_chat = ChatZhipuAI(
+    model="glm-4",
+    temperature=0.5,
+    streaming=True,
+    callback_manager=CallbackManager([StreamingStdOutCallbackHandler()]),
+)
+```
+
+```python
+streaming_chat(messages)
+```
+
+### 异步调用
+
+如需非阻塞调用，请使用异步方式：
+
+```python
+async_chat = ChatZhipuAI(
+    model="glm-4",
+    temperature=0.5,
+)
+```
+
+```python
+response = await async_chat.agenerate([messages])
+print(response)
+```
+
+### 使用函数调用
+
+GLM-4模型也可与函数调用结合使用，使用以下代码运行一个简单的LangChain json_chat_agent。
+
+```python
+os.environ["TAVILY_API_KEY"] = "tavily_api_key"
+```
+
+```python
+from langchain_classic import hub
+from langchain.agents import AgentExecutor, create_json_chat_agent
+from langchain_community.tools.tavily_search import TavilySearchResults
+
+tools = [TavilySearchResults(max_results=1)]
+prompt = hub.pull("hwchase17/react-chat-json")
+llm = ChatZhipuAI(temperature=0.01, model="glm-4")
+
+agent = create_json_chat_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(
+    agent=agent, tools=tools, verbose=True, handle_parsing_errors=True
+)
+```
+
+```python
+agent_executor.invoke({"input": "什么是LangChain？"})
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\zhipuai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

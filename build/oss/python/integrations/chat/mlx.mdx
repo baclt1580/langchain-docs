@@ -1,0 +1,164 @@
+---
+title: "Mlx 集成"
+description: "使用 LangChain Python 与 Mlx 聊天模型集成。"
+---
+
+本笔记本展示了如何开始使用 `MLX` 大语言模型作为聊天模型。
+
+具体来说，我们将：
+
+1. 使用 [MLXPipeline](https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/llms/mlx_pipeline.py)，
+2. 使用 `ChatMLX` 类，使这些大语言模型能够与 LangChain 的 [聊天消息](https://python.langchain.com/docs/modules/model_io/chat/#messages) 抽象接口对接。
+3. 演示如何使用开源大语言模型来驱动 `ChatAgent` 流程
+
+```python
+pip install -qU  mlx-lm transformers huggingface_hub
+```
+
+## 1. 实例化一个大语言模型
+
+有三种大语言模型可供选择。
+
+```python
+from langchain_community.llms.mlx_pipeline import MLXPipeline
+
+llm = MLXPipeline.from_model_id(
+    "mlx-community/quantized-gemma-2b-it",
+    pipeline_kwargs={"max_tokens": 10, "temp": 0.1},
+)
+```
+
+## 2. 实例化 `ChatMLX` 以应用聊天模板
+
+实例化聊天模型和一些要传递的消息。
+
+```python
+from langchain_community.chat_models.mlx import ChatMLX
+from langchain.messages import HumanMessage
+
+messages = [
+    HumanMessage(
+        content="当不可阻挡的力量遇到不可移动的物体会发生什么？"
+    ),
+]
+
+chat_model = ChatMLX(llm=llm)
+```
+
+检查聊天消息是如何为大语言模型调用进行格式化的。
+
+```python
+chat_model._to_chat_prompt(messages)
+```
+
+调用模型。
+
+```python
+res = chat_model.invoke(messages)
+print(res.content)
+```
+
+## 3. 作为智能体进行尝试
+
+这里我们将测试 `gemma-2b-it` 作为零样本 `ReAct` 智能体。下面的示例基于 [LangChain ReAct 智能体文档](https://python.langchain.com/docs/modules/agents/agent_types/react#using-chat-models)。
+
+> 注意：要运行此部分，您需要将 [SerpApi Token](https://serpapi.com/) 保存为环境变量：`SERPAPI_API_KEY`
+
+```python
+from langchain_classic import hub
+from langchain.agents import AgentExecutor, load_tools
+from langchain.agents.format_scratchpad import format_log_to_str
+from langchain.agents.output_parsers import (
+    ReActJsonSingleInputOutputParser,
+)
+from langchain.tools.render import render_text_description
+from langchain_community.utilities import SerpAPIWrapper
+```
+
+使用 `react-json` 风格的提示词配置智能体，并赋予其访问搜索引擎和计算器的权限。
+
+```python
+# 设置工具
+tools = load_tools(["serpapi", "llm-math"], llm=llm)
+
+# 设置 ReAct 风格提示词
+# 基于 'hwchase17/react' 提示词修改，因为 mlx 不支持 `System` 角色
+human_prompt = """
+请尽可能回答以下问题。你可以使用以下工具：
+
+{tools}
+
+使用工具的方式是指定一个 JSON 对象。
+具体来说，这个 JSON 应该有一个 `action` 键（指定要使用的工具名称）和一个 `action_input` 键（指定传递给工具的输入）。
+
+"action" 字段中允许的值只能是：{tool_names}
+
+$JSON_BLOB 应只包含一个单一的操作，请勿返回多个操作的列表。以下是一个有效的 $JSON_BLOB 示例：
+
+\`\`\`
+{{
+  "action": $TOOL_NAME,
+  "action_input": $INPUT
+}}
+\`\`\`
+
+请始终使用以下格式：
+
+问题：需要回答的输入问题
+思考：你应该始终思考要做什么
+操作：
+\`\`\`
+$JSON_BLOB
+\`\`\`
+观察：操作的结果
+...（这个 思考/操作/观察 过程可以重复 N 次）
+思考：我现在知道最终答案了
+最终答案：对原始输入问题的最终答案
+
+开始！请记住，在回答时始终使用确切的字符 `最终答案`。
+
+{input}
+
+{agent_scratchpad}
+
+"""
+
+prompt = human_prompt.partial(
+    tools=render_text_description(tools),
+    tool_names=", ".join([t.name for t in tools]),
+)
+
+# 定义智能体
+chat_model_with_stop = chat_model.bind(stop=["\n观察"])
+agent = (
+    {
+        "input": lambda x: x["input"],
+        "agent_scratchpad": lambda x: format_log_to_str(x["intermediate_steps"]),
+    }
+    | prompt
+    | chat_model_with_stop
+    | ReActJsonSingleInputOutputParser()
+)
+
+# 实例化 AgentExecutor
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+```
+
+```python
+agent_executor.invoke(
+    {
+        "input": "莱昂纳多·迪卡普里奥的女朋友是谁？她现在的年龄的 0.43 次方是多少？"
+    }
+)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\mlx.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

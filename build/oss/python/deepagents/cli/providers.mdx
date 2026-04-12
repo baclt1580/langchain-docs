@@ -1,0 +1,202 @@
+---
+title: 自定义模型提供商
+sidebarTitle: 模型提供商
+description: 为 Deep Agents CLI 配置任何兼容 LangChain 的模型提供商
+---
+
+Deep Agents CLI 支持任何[兼容 LangChain 的聊天模型提供商](/oss/python/langchain/models)，从而解锁几乎所有支持工具调用的 LLM 的使用。任何提供 OpenAI 兼容或 Anthropic 兼容 API 的服务也可以开箱即用——请参阅[兼容的 API](/oss/python/deepagents/cli/configuration#compatible-apis)。
+
+## 快速开始
+
+CLI 会自动与[以下模型提供商](#provider-reference)集成：除了安装相关的提供商包之外，无需额外配置。
+
+1.  **安装提供商包**
+
+    每个模型提供商都需要安装其对应的 LangChain 集成包。这些包在安装 CLI 时可以作为可选附加项安装：
+
+    ```bash
+    # 快速安装并选择提供商（OpenAI 自动包含）
+    DEEPAGENTS_EXTRAS="anthropic,groq" curl -LsSf https://raw.githubusercontent.com/langchain-ai/deepagents/refs/heads/main/libs/cli/scripts/install.sh | bash
+
+    # 或者使用 uv 直接安装
+    uv tool install 'deepagents-cli[anthropic,groq]'
+
+    # 稍后添加额外的包
+    uv tool install deepagents-cli --with langchain-ollama
+
+    # 所有提供商
+    uv tool install 'deepagents-cli[anthropic,baseten,bedrock,cohere,deepseek,fireworks,google-genai,groq,huggingface,ibm,litellm,mistralai,nvidia,ollama,openai,openrouter,perplexity,vertexai,xai]'
+    ```
+
+2.  **设置凭据**
+
+    大多数提供商需要 API 密钥。请设置下表中列出的相应环境变量。一些提供商使用其他凭据（例如，Vertex AI 使用 `GOOGLE_CLOUD_PROJECT` 加上 ADC）。详情请参考每个集成包的文档。
+
+### 提供商参考
+
+使用的提供商不在此列表中？请参阅[任意提供商](/oss/python/deepagents/cli/configuration#arbitrary-providers)：任何兼容 LangChain 的提供商都可以通过一些额外设置在 CLI 中使用。
+
+| 提供商 | 包 | 凭据环境变量 | 模型配置文件 |
+| --- | --- | --- | --- |
+| OpenAI | [`langchain-openai`](/oss/python/integrations/chat/openai) | `OPENAI_API_KEY` | ✅ |
+| Azure OpenAI | [`langchain-openai`](/oss/python/integrations/chat/azure_chat_openai) | `AZURE_OPENAI_API_KEY` | ✅ |
+| Anthropic | [`langchain-anthropic`](/oss/python/integrations/chat/anthropic) | `ANTHROPIC_API_KEY` | ✅ |
+| Google Gemini API | [`langchain-google-genai`](/oss/python/integrations/chat/google_generative_ai) | `GOOGLE_API_KEY` | ✅ |
+| Google Vertex AI | [`langchain-google-vertexai`](/oss/python/integrations/chat/google_generative_ai#credentials) | `GOOGLE_CLOUD_PROJECT` | ✅ |
+| Baseten | [`langchain-baseten`](https://github.com/basetenlabs/langchain-baseten) | `BASETEN_API_KEY` | ✅ |
+| AWS Bedrock | [`langchain-aws`](/oss/python/integrations/chat/bedrock) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | ✅ |
+| AWS Bedrock Converse | [`langchain-aws`](/oss/python/integrations/chat/bedrock) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | ✅ |
+| Hugging Face | [`langchain-huggingface`](/oss/python/integrations/chat/huggingface) | `HUGGINGFACEHUB_API_TOKEN` | ✅ |
+| Ollama | [`langchain-ollama`](/oss/python/integrations/chat/ollama) | 可选 | ❌ |
+| Groq | [`langchain-groq`](/oss/python/integrations/chat/groq) | `GROQ_API_KEY` | ✅ |
+| Cohere | [`langchain-cohere`](/oss/python/integrations/chat/cohere) | `COHERE_API_KEY` | ❌ |
+| Fireworks | [`langchain-fireworks`](/oss/python/integrations/chat/fireworks) | `FIREWORKS_API_KEY` | ✅ |
+| Together | [`langchain-together`](/oss/python/integrations/chat/together) | `TOGETHER_API_KEY` | ❌ |
+| Mistral AI | [`langchain-mistralai`](/oss/python/integrations/chat/mistralai) | `MISTRAL_API_KEY` | ✅ |
+| DeepSeek | [`langchain-deepseek`](/oss/python/integrations/chat/deepseek) | `DEEPSEEK_API_KEY` | ✅ |
+| IBM (watsonx.ai) | [`langchain-ibm`](/oss/python/integrations/chat/ibm_watsonx) | `WATSONX_APIKEY` | ❌ |
+| Nvidia | [`langchain-nvidia-ai-endpoints`](/oss/python/integrations/chat/nvidia_ai_endpoints) | `NVIDIA_API_KEY` | ✅ |
+| xAI | [`langchain-xai`](/oss/python/integrations/chat/xai) | `XAI_API_KEY` | ✅ |
+| Perplexity | [`langchain-perplexity`](/oss/python/integrations/chat/perplexity) | `PPLX_API_KEY` | ✅ |
+| OpenRouter | [`langchain-openrouter`](/oss/python/integrations/chat/openrouter) | `OPENROUTER_API_KEY` | ✅ |
+| LiteLLM | [`langchain-litellm`](/oss/python/integrations/chat/litellm) | 按提供商（见[文档](https://docs.litellm.ai/)） | ❌ |
+
+<Tip>
+    **[模型配置文件](/oss/python/langchain/models#model-profiles)** 是一个包含元数据（模型名称、默认参数、能力等）的捆绑包，随提供商包一起提供，主要由 [models.dev](https://models.dev/) 项目驱动。包含模型配置文件的提供商的模型会自动列在交互式 `/model` 切换器中，但需满足[筛选条件](#which-models-appear-in-the-switcher)（特别是 `tool_calling` 必须启用）。没有模型配置文件的提供商需要您直接指定模型名称或通过 `config.toml` 添加模型。
+</Tip>
+
+
+
+### 切换模型
+
+要在 CLI 中切换模型，可以：
+
+1.  **使用交互式模型切换器**，通过 `/model` 命令。这会显示从每个已安装的 LangChain 提供商包的[模型配置文件](/oss/python/langchain/models#model-profiles)中获取的可用模型。
+
+    <Note>
+        这些配置文件并非可用模型的详尽列表。如果您想要的模型没有显示，请改用选项 2（对于尚未添加到配置文件的新发布模型很有用）。有关完整条件集，请参阅[哪些模型会出现在切换器中](#which-models-appear-in-the-switcher)。
+    </Note>
+2.  **直接指定模型名称**作为参数，例如 `/model openai:gpt-4o`。您可以使用所选提供商支持的任何模型，无论它是否出现在选项 1 的列表中。模型名称将被传递给 API 请求。
+3.  **在启动时指定模型**，通过 `--model`，例如：
+
+    ```txt
+    deepagents --model openai:gpt-4o
+    ```
+
+### 哪些模型会出现在切换器中
+
+交互式 `/model` 选择器动态构建其列表——它不是硬编码到 CLI 中的固定列表。当满足**所有**以下条件时，模型会出现在切换器中：
+
+1.  **提供商包已安装。** 每个提供商（例如 `langchain-anthropic`、`langchain-openai`）必须与 `deepagents-cli` 一起安装——可以作为[安装附加项](/oss/python/deepagents/cli/providers#quick-start)（例如 `uv tool install 'deepagents-cli[anthropic]'`）安装，或者稍后通过 `uv tool install deepagents-cli --with <package>` 添加。如果缺少某个包，其整个提供商部分将不会出现在切换器中。
+2.  **模型配置文件启用了 `tool_calling`。** CLI 是一个工具调用代理，因此它会过滤掉不支持工具调用的模型，如其配置文件数据所示。这是模型从列表中缺失的最常见原因。对于不捆绑配置文件的提供商（参见[提供商参考](#provider-reference)表），您可以在 `config.toml` 中定义一个：
+
+    ```toml
+    [models.providers.ollama.profile."qwen3:4b"]
+    tool_calling = true
+    max_input_tokens = 32768
+    max_output_tokens = 8192
+    ```
+
+    这并不是模型出现在切换器中的严格要求——将其添加到 [`models` 列表](/oss/python/deepagents/cli/configuration#adding-models-to-the-interactive-switcher)中也可以，而且更简单。当您希望 CLI 了解模型的上下文窗口和能力以支持自动摘要等功能时，配置文件很有用。有关所有可覆盖的字段，请参阅[配置文件覆盖](/oss/python/deepagents/cli/configuration#profile-overrides)。
+3.  **模型接受并生成文本。** 配置文件明确将 `text_inputs` 或 `text_outputs` 设置为 `false` 的模型（例如嵌入或图像生成模型）会被排除。
+
+在 `config.toml` 的 [`[models.providers.<name>].models`](/oss/python/deepagents/cli/configuration#adding-models-to-the-interactive-switcher) 下定义的模型会绕过配置文件过滤器——无论配置文件元数据如何，它们总是出现在切换器中。这是添加列表中缺失模型的推荐方法。
+
+<Tip>
+    凭据状态**不会**影响模型是否被列出。切换器显示所有符合条件的模型，并在每个提供商标题旁边显示凭据指示器：对已确认的凭据显示勾号，对缺失的凭据显示警告，对凭据状态未知的情况显示问号。您仍然可以选择凭据缺失的模型——提供商将在请求时报告身份验证错误。
+</Tip>
+
+#### 排查缺失模型问题
+
+| 现象 | 可能原因 | 解决方法 |
+| --- | --- | --- |
+| 整个提供商在切换器中缺失 | 提供商包未安装 | 安装该包（例如 `uv tool install deepagents-cli --with langchain-groq`） |
+| 提供商显示但特定模型缺失 | 模型配置文件有 `tool_calling: false` 或不存在配置文件 | 将模型添加到 `config.toml` 中的 `[models.providers.<name>].models`，或直接使用 `/model <provider>:<model>` |
+| 提供商显示 ⚠ "凭据缺失" | API 密钥环境变量未设置 | 设置[提供商参考](#provider-reference)表中的凭据环境变量 |
+| 提供商显示 ? "凭据未知" | 提供商使用 CLI 无法验证的非标准身份验证 | 凭据可能仍然有效——尝试切换到该模型。如果身份验证失败，请检查提供商的文档 |
+
+### 设置默认模型
+
+您可以设置一个持久的默认模型，用于所有未来的 CLI 启动：
+
+*   **通过模型选择器：** 打开 `/model`，导航到所需模型，然后按 `Ctrl+S` 将其固定为默认值。在当前默认模型上再次按 `Ctrl+S` 会清除它。
+*   **通过命令：** `/model --default provider:model`（例如，`/model --default anthropic:claude-opus-4-6`）
+*   **通过配置文件：** 在 `~/.deepagents/config.toml` 中设置 `[models].default`（参见[配置](/oss/python/deepagents/cli/configuration)）。
+*   **从 shell：**
+
+    ```bash
+    deepagents --default-model anthropic:claude-opus-4-6
+    ```
+
+要查看当前默认值：
+
+```bash
+deepagents --default-model
+```
+
+要清除默认值：
+
+*   **从 shell：**
+
+    ```bash
+    deepagents --clear-default-model
+    ```
+
+*   **通过命令：** `/model --default --clear`
+*   **通过模型选择器：** 在当前固定的默认模型上按 `Ctrl+S`。
+
+如果没有默认值，CLI 将默认使用最近使用的模型。
+
+### 模型解析顺序
+
+当 CLI 启动时，它按以下顺序解析使用哪个模型：
+
+1.  **`--model` 标志**在提供时总是优先。
+2.  **`~/.deepagents/config.toml` 中的 `[models].default`**——用户有意的长期偏好。
+3.  **`~/.deepagents/config.toml` 中的 `[models].recent`**——最近通过 `/model` 切换到的模型。自动写入；从不覆盖 `[models].default`。
+4.  **环境自动检测**：回退到第一个可用的启动凭据，按顺序检查：`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_CLOUD_PROJECT`（Vertex AI）。
+
+此启动回退有意仅检查这四个凭据。其他支持的提供商（例如 Groq）仍然可以通过 `--model`、`/model` 和保存的默认值（`[models].default` / `[models].recent`）使用。
+
+### 模型路由器和代理
+
+模型路由器如 [OpenRouter](https://openrouter.ai/) 和 [LiteLLM](https://docs.litellm.ai/) 通过单个端点提供对多个提供商模型的访问。
+
+使用这些服务的专用集成包：
+
+| 路由器 | 包 | 配置 |
+| --- | --- | --- |
+| OpenRouter | [`langchain-openrouter`](/oss/python/integrations/chat/openrouter) | `openrouter:<model>`（内置，见[提供商参考](#provider-reference)） |
+| LiteLLM | [`langchain-litellm`](/oss/python/integrations/chat/litellm) | `litellm:<model>`（内置，见[提供商参考](#provider-reference)） |
+
+
+
+
+**OpenRouter** 是一个内置提供商——安装包并直接使用：
+
+```bash
+uv tool install 'deepagents-cli[openrouter]'
+```
+
+**LiteLLM** 也是一个内置提供商：
+
+```bash
+uv tool install 'deepagents-cli[litellm]'
+```
+
+---
+
+## 高级配置
+
+有关提供商参数、配置文件覆盖、自定义基础 URL、兼容 API、任意提供商和生命周期钩子的详细配置，请参阅[配置](/oss/python/deepagents/cli/configuration)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\cli\providers.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

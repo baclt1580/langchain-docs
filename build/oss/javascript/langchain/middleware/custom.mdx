@@ -1,0 +1,772 @@
+---
+title: 自定义中间件
+---
+
+import MiddlewareDynamicPromptDecoratorPy from '/snippets/code-samples/middleware-dynamic-prompt-decorator-py.mdx';
+import MiddlewareDynamicPromptClassPy from '/snippets/code-samples/middleware-dynamic-prompt-class-py.mdx';
+import MiddlewareDynamicPromptJs from '/snippets/code-samples/middleware-dynamic-prompt-js.mdx';
+import MiddlewareDynamicModelSelectionDecoratorPy from '/snippets/code-samples/middleware-dynamic-model-selection-decorator-py.mdx';
+import MiddlewareDynamicModelSelectionClassPy from '/snippets/code-samples/middleware-dynamic-model-selection-class-py.mdx';
+import MiddlewareDynamicModelSelectionJs from '/snippets/code-samples/middleware-dynamic-model-selection-js.mdx';
+import MiddlewareToolCallMonitoringDecoratorPy from '/snippets/code-samples/middleware-tool-call-monitoring-decorator-py.mdx';
+import MiddlewareToolCallMonitoringClassPy from '/snippets/code-samples/middleware-tool-call-monitoring-class-py.mdx';
+import MiddlewareToolCallMonitoringJs from '/snippets/code-samples/middleware-tool-call-monitoring-js.mdx';
+
+通过实现运行在代理执行流程特定阶段的钩子来构建自定义中间件。
+
+## 钩子
+
+中间件提供两种风格的钩子来拦截代理执行：
+
+<CardGroup cols={2}>
+    <Card title="节点式钩子" icon="share" href="#node-style-hooks">
+        在特定的执行点按顺序运行。
+    </Card>
+    <Card title="包装式钩子" icon="container" href="#wrap-style-hooks">
+        在每个模型或工具调用周围运行。
+    </Card>
+</CardGroup>
+
+### 节点式钩子
+
+在特定的执行点按顺序运行。用于日志记录、验证和状态更新。
+
+选择您的中间件需要的钩子。您可以在节点式钩子和包装式钩子之间进行选择。
+
+**节点式钩子**在特定的执行点运行：
+
+
+
+| 钩子 | 何时运行 |
+|------|-------------|
+| `beforeAgent` | 代理启动前（每次调用一次） |
+| `beforeModel` | 每次模型调用前 |
+| `afterModel` | 每次模型响应后 |
+| `afterAgent` | 代理完成后（每次调用一次） |
+
+
+**包装式钩子**在每个调用周围运行，让您控制执行：
+
+
+
+| 钩子 | 何时运行 |
+|------|-------------|
+| `wrapModelCall` | 每个模型调用周围 |
+| `wrapToolCall` | 每个工具调用周围 |
+
+
+**示例：**
+
+
+
+```typescript
+import { createMiddleware, AIMessage } from "langchain";
+
+const createMessageLimitMiddleware = (maxMessages: number = 50) => {
+  return createMiddleware({
+    name: "MessageLimitMiddleware",
+    beforeModel: {
+      canJumpTo: ["end"],
+      hook: (state) => {
+        if (state.messages.length === maxMessages) {
+          return {
+            messages: [new AIMessage("Conversation limit reached.")],
+            jumpTo: "end",
+          };
+        }
+        return;
+      }
+    },
+    afterModel: (state) => {
+      const lastMessage = state.messages[state.messages.length - 1];
+      console.log(`Model returned: ${lastMessage.content}`);
+      return;
+    },
+  });
+};
+```
+
+
+
+### 包装式钩子
+
+拦截执行并控制处理程序的调用时机。用于重试、缓存和转换。
+
+您可以决定处理程序被调用零次（短路）、一次（正常流程）还是多次（重试逻辑）。
+
+**可用钩子：**
+
+
+
+- `wrapModelCall` - 每个模型调用周围
+- `wrapToolCall` - 每个工具调用周围
+
+
+**示例：**
+
+
+
+```typescript
+import { createMiddleware } from "langchain";
+
+const createRetryMiddleware = (maxRetries: number = 3) => {
+  return createMiddleware({
+    name: "RetryMiddleware",
+    wrapModelCall: (request, handler) => {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          return handler(request);
+        } catch (e) {
+          if (attempt === maxRetries - 1) {
+            throw e;
+          }
+          console.log(`Retry ${attempt + 1}/${maxRetries} after error: ${e}`);
+        }
+      }
+      throw new Error("Unreachable");
+    },
+  });
+};
+```
+
+
+
+## 状态更新
+
+节点式钩子和包装式钩子都可以更新代理状态。机制有所不同：
+
+
+
+- **节点式钩子** (`beforeAgent`, `beforeModel`, `afterModel`, `afterAgent`)：直接返回一个字典。该字典使用图的归约器应用于代理状态。
+- **包装式钩子** (`wrapModelCall`, `wrapToolCall`)：对于模型调用，直接返回 [`Command`](https://reference.langchain.com/javascript/langchain-langgraph/index/Command) 以将状态更新与模型响应一起注入。对于工具调用，直接返回 [`Command`](https://reference.langchain.com/javascript/langchain-langgraph/index/Command)。当您需要根据在模型或工具调用期间运行的逻辑来跟踪或更新状态时使用，例如摘要触发点、使用情况元数据，或从请求或响应计算出的自定义字段。
+
+
+### 节点式钩子
+
+从节点式钩子返回一个字典以将更新合并到代理状态中。字典键映射到状态字段。
+
+
+
+```typescript
+import { createMiddleware } from "langchain";
+import * as z from "zod";
+
+const trackingStateSchema = z.object({
+  modelCallCount: z.number().default(0),
+});
+
+const incrementAfterModel = createMiddleware({
+  name: "incrementAfterModel",
+  stateSchema: trackingStateSchema,
+  afterModel: (state) => {
+    return { modelCallCount: state.modelCallCount + 1 };
+  },
+});
+```
+
+
+
+### 包装式钩子
+
+
+
+从 `wrapModelCall` 直接返回 [`Command`](https://reference.langchain.com/javascript/langchain-langgraph/index/Command) 以从模型调用层注入状态更新：
+
+```typescript
+import * as z from "zod";
+import { createMiddleware } from "langchain";
+import { Command } from "@langchain/langgraph";
+
+const usageTrackingStateSchema = z.object({
+  lastModelCallTokens: z.number().optional(),
+});
+
+const trackUsage = createMiddleware({
+  name: "trackUsage",
+  stateSchema: usageTrackingStateSchema,
+  wrapModelCall: async (request, handler) => {
+    const response = await handler(request);
+    return new Command({ update: { lastModelCallTokens: 150 } });
+  },
+});
+```
+
+
+
+[`Command`](https://reference.langchain.com/javascript/langchain-langgraph/index/Command) 流经图的归约器，因此更新会正确应用，消息是累加的而不是替换现有状态。
+
+#### 与多个中间件的组合
+
+
+
+当多个中间件层返回响应时，框架会传递最后生成的 `AIMessage`：
+
+- **AIMessage 流经：** 每个中间件的 `handler()` 接收来自上一层的 `AIMessage`。当中间件返回 `AIMessage` 时，它将成为下一个中间件处理程序的输入。
+- **不带消息更新的 Command 为透传：** 如果中间件返回的 `Command` 的状态更新不触及 `messages`，框架将其视为消息流的空操作。下一个中间件的处理程序接收来自返回 Command 的中间件 *之前* 的中间件的 `AIMessage`。
+- **归约器行为和重试安全：** 命令仍然通过归约器应用（消息累加，冲突时外层获胜）。重试逻辑会丢弃早期调用的命令。
+
+
+
+
+
+```typescript
+import * as z from "zod";
+import { createMiddleware } from "langchain";
+import { Command, StateSchema, ReducedValue } from "@langchain/langgraph";
+import { AIMessage, SystemMessage } from "@langchain/core/messages";
+
+/** Last-wins reducer: when both middleware write, outer overwrites inner. */
+const customMiddlewareStateSchema = new StateSchema({
+  traceLayer: new ReducedValue(
+    z.string().optional(),
+    { reducer: (a, b) => b },
+  ),
+});
+
+const outerMiddleware = createMiddleware({
+  name: "OuterMiddleware",
+  stateSchema: customMiddlewareStateSchema,
+  wrapModelCall: async (_request, handler) => {
+    await handler(_request);
+    return new Command({
+      update: {
+        traceLayer: "outer",
+        messages: [new SystemMessage({ content: "[Outer ran]" })],
+      },
+    });
+  },
+});
+
+const innerMiddleware = createMiddleware({
+  name: "InnerMiddleware",
+  stateSchema: customMiddlewareStateSchema,
+  wrapModelCall: async (_request, handler) => {
+    await handler(_request);
+    return new Command({
+      update: {
+        traceLayer: "inner",
+        messages: [new SystemMessage({ content: "[Inner ran]" })],
+      },
+    });
+  },
+});
+```
+
+
+
+## 创建中间件
+
+
+
+使用 `createMiddleware` 函数定义自定义中间件：
+
+```typescript
+import { createMiddleware } from "langchain";
+
+const loggingMiddleware = createMiddleware({
+  name: "LoggingMiddleware",
+  beforeModel: (state) => {
+    console.log(`About to call model with ${state.messages.length} messages`);
+    return;
+  },
+  afterModel: (state) => {
+    const lastMessage = state.messages[state.messages.length - 1];
+    console.log(`Model returned: ${lastMessage.content}`);
+    return;
+  },
+});
+```
+
+
+
+## 自定义状态模式
+
+如果您的中间件需要在钩子之间跟踪状态，中间件可以使用自定义属性扩展代理状态。这使得中间件能够：
+
+- **在执行过程中跟踪状态**：维护在整个代理执行生命周期中持续存在的计数器、标志或其他值
+
+- **在钩子之间共享数据**：从 `beforeModel` 向 `afterModel` 或不同中间件实例之间传递信息
+
+- **实现横切关注点**：添加功能，如速率限制、使用情况跟踪、用户上下文或审计日志，而无需修改核心代理逻辑
+- **进行条件决策**：使用累积状态来确定是否继续执行、跳转到不同节点或动态修改行为
+
+
+
+```typescript
+import { createMiddleware, createAgent, HumanMessage } from "langchain";
+import { StateSchema } from "@langchain/langgraph";
+import * as z from "zod";
+
+const CustomState = new StateSchema({
+  modelCallCount: z.number().default(0),
+  userId: z.string().optional(),
+});
+
+const callCounterMiddleware = createMiddleware({
+  name: "CallCounterMiddleware",
+  stateSchema: CustomState,
+  beforeModel: {
+    canJumpTo: ["end"],
+    hook: (state) => {
+      if (state.modelCallCount > 10) {
+        return { jumpTo: "end" };
+      }
+
+      return;
+    },
+  },
+  afterModel: (state) => {
+    return { modelCallCount: state.modelCallCount + 1 };
+  },
+});
+
+const agent = createAgent({
+  model: "gpt-4.1",
+  tools: [...],
+  middleware: [callCounterMiddleware],
+});
+
+const result = await agent.invoke({
+  messages: [new HumanMessage("Hello")],
+  modelCallCount: 0,
+  userId: "user-123",
+});
+```
+
+状态字段可以是公共的也可以是私有的。以下划线 (`_`) 开头的字段被视为私有，不会包含在代理结果中。仅返回公共字段（没有前导下划线的字段）。
+
+这对于存储不应暴露给调用者的内部中间件状态非常有用，例如临时跟踪变量或内部标志：
+
+```typescript
+import { StateSchema } from "@langchain/langgraph";
+import * as z from "zod";
+
+const PrivateState = new StateSchema({
+  // Public field - included in invoke result
+  publicCounter: z.number().default(0),
+  // Private field - excluded from invoke result
+  _internalFlag: z.boolean().default(false),
+});
+
+const middleware = createMiddleware({
+  name: "ExampleMiddleware",
+  stateSchema: PrivateState,
+  afterModel: (state) => {
+    // Both fields are accessible during execution
+    if (state._internalFlag) {
+      return { publicCounter: state.publicCounter + 1 };
+    }
+    return { _internalFlag: true };
+  },
+});
+
+const result = await agent.invoke({
+  messages: [new HumanMessage("Hello")],
+  publicCounter: 0
+});
+
+// result only contains publicCounter, not _internalFlag
+console.log(result.publicCounter); // 1
+console.log(result._internalFlag); // undefined
+```
+
+
+
+## 自定义上下文
+
+中间件可以定义自定义上下文模式以访问每调用元数据。与状态不同，上下文是只读的，并且在调用之间不持久化。这使其非常适合：
+
+- **用户信息**：传递用户 ID、角色或偏好设置，这些在运行期间不会更改
+- **配置覆盖**：提供每调用设置，如速率限制或功能标志
+- **租户/工作区上下文**：包括多租户应用程序的组织特定数据
+- **请求元数据**：传递请求 ID、API 密钥或其他中间件所需的元数据
+
+使用 Zod 定义上下文模式，并通过 `runtime.context` 在中间件钩子中访问它。上下文模式中的必需字段将在 TypeScript 级别强制执行，确保您在调用 `agent.invoke()` 时必须提供它们。
+
+```typescript
+import { createAgent, createMiddleware, HumanMessage } from "langchain";
+import * as z from "zod";
+
+const contextSchema = z.object({
+  userId: z.string(),
+  tenantId: z.string(),
+  apiKey: z.string().optional(),
+});
+
+const userContextMiddleware = createMiddleware({
+  name: "UserContextMiddleware",
+  contextSchema,
+  wrapModelCall: (request, handler) => {
+    // Access context from runtime
+    const { userId, tenantId } = request.runtime.context;
+
+    // Add user context to system message
+    const contextText = `User ID: ${userId}, Tenant: ${tenantId}`;
+    const newSystemMessage = request.systemMessage.concat(contextText);
+
+    return handler({
+      ...request,
+      systemMessage: newSystemMessage,
+    });
+  },
+});
+
+const agent = createAgent({
+  model: "gpt-4.1",
+  middleware: [userContextMiddleware],
+  tools: [],
+  contextSchema,
+});
+
+const result = await agent.invoke(
+  { messages: [new HumanMessage("Hello")] },
+  // Required fields (userId, tenantId) must be provided
+  {
+    context: {
+      userId: "user-123",
+      tenantId: "acme-corp",
+    },
+  }
+);
+```
+
+**必需的上下文字段**：当您在 `contextSchema` 中定义必需字段（没有 `.optional()` 或 `.default()` 的字段）时，TypeScript 将强制要求在 `agent.invoke()` 调用期间提供这些字段。这确保了类型安全并防止因缺少必需上下文而导致的运行时错误。
+
+```typescript
+// This will cause a TypeScript error if userId or tenantId are missing
+const result = await agent.invoke(
+  { messages: [new HumanMessage("Hello")] },
+  { context: { userId: "user-123" } } // Error: tenantId is required
+);
+```
+
+
+## 执行顺序
+
+使用多个中间件时，了解它们的执行方式：
+
+
+
+```typescript
+const agent = createAgent({
+  model: "gpt-4.1",
+  middleware: [middleware1, middleware2, middleware3],
+  tools: [...],
+});
+```
+
+
+<Accordion title="执行流程">
+
+**Before 钩子按顺序运行：**
+1. `middleware1.before_agent()`
+2. `middleware2.before_agent()`
+3. `middleware3.before_agent()`
+
+__代理循环开始__
+
+4. `middleware1.before_model()`
+5. `middleware2.before_model()`
+6. `middleware3.before_model()`
+
+**包装钩子像函数调用一样嵌套：**
+
+7. `middleware1.wrap_model_call()` → `middleware2.wrap_model_call()` → `middleware3.wrap_model_call()` → 模型
+
+**After 钩子按相反顺序运行：**
+
+8. `middleware3.after_model()`
+9. `middleware2.after_model()`
+10. `middleware1.after_model()`
+
+__代理循环结束__
+
+11. `middleware3.after_agent()`
+12. `middleware2.after_agent()`
+13. `middleware1.after_agent()`
+
+</Accordion>
+
+**关键规则：**
+- `before_*` 钩子：第一个到最后
+- `after_*` 钩子：最后到第一个（反向）
+- `wrap_*` 钩子：嵌套（第一个中间件包装所有其他中间件）
+
+## 代理跳转
+
+要从中间件提前退出，返回包含 `jump_to` 的字典：
+
+**可用跳转目标：**
+- `'end'`：跳转到代理执行的末尾（或第一个 `after_agent` 钩子）
+- `'tools'`：跳转到工具节点
+- `'model'`：跳转到模型节点（或第一个 `before_model` 钩子）
+
+
+
+```typescript
+import { createAgent, createMiddleware, AIMessage } from "langchain";
+
+const agent = createAgent({
+  model: "gpt-4.1",
+  middleware: [
+    createMiddleware({
+      name: "BlockedContentMiddleware",
+      beforeModel: {
+        canJumpTo: ["end"],
+        hook: (state) => {
+          if (state.messages.at(-1)?.content.includes("BLOCKED")) {
+            return {
+              messages: [new AIMessage("I cannot respond to that request.")],
+              jumpTo: "end" as const,
+            };
+          }
+          return;
+        },
+      },
+    }),
+  ],
+});
+
+const result = await agent.invoke({
+    messages: "Hello, world! BLOCKED"
+});
+
+/**
+ * Expected output:
+ * I cannot respond to that request.
+ */
+console.log(result.messages.at(-1)?.content);
+```
+
+
+## 最佳实践
+
+1. 保持中间件专注 - 每个应做好一件事
+2. 优雅地处理错误 - 不要让中间件错误导致代理崩溃
+3. **使用适当的钩子类型**：
+    - 节点式用于顺序逻辑（日志记录、验证）
+    - 包装式用于控制流（重试、回退、缓存）
+4. 清楚记录任何自定义状态属性
+5. 集成前独立单元测试中间件
+6. 考虑执行顺序 - 将关键中间件放在列表前面
+7. 尽可能使用内置中间件
+
+## 示例
+
+### 动态提示词
+
+在运行时动态修改系统提示词，以便在每次模型调用之前注入上下文、用户特定指令或其他信息。这是最常见的中间件用例之一。
+
+
+
+使用 `ModelRequest` 中的 `systemMessage` 字段读取和修改系统提示词。它包含一个 [`SystemMessage`](https://reference.langchain.com/javascript/langchain-core/messages/SystemMessage) 对象（即使代理是使用字符串 [`systemPrompt`](https://reference.langchain.com/javascript/types/langchain.index.CreateAgentParams.html#systemprompt) 创建的）。
+
+<MiddlewareDynamicPromptJs />
+
+使用 [`SystemMessage.concat`](https://reference.langchain.com/javascript/langchain-core/utils/stream/concat) 保留由其他中间件创建的缓存控制元数据或结构化内容块。
+
+
+
+### 动态模型选择
+
+
+
+<MiddlewareDynamicModelSelectionJs />
+
+
+
+### 动态选择工具
+
+在运行时选择相关工具以提高性能和准确性。本节介绍过滤预注册的工具。有关注册在运行时发现的工具（例如来自 MCP 服务器），请参阅 [Runtime tool registration](/oss/javascript/langchain/agents#dynamic-tools)。
+
+**好处：**
+- **更短的提示词** - 通过仅暴露相关工具来降低复杂性
+- **更好的准确性** - 模型从较少的选项中正确选择
+- **权限控制** - 根据用户访问权限动态过滤工具
+
+
+
+```typescript
+import { createAgent, createMiddleware } from "langchain";
+
+const toolSelectorMiddleware = createMiddleware({
+  name: "ToolSelector",
+  wrapModelCall: (request, handler) => {
+    // Select a small, relevant subset of tools based on state/context
+    const relevantTools = selectRelevantTools(request.state, request.runtime);
+    const modifiedRequest = { ...request, tools: relevantTools };
+    return handler(modifiedRequest);
+  },
+});
+
+const agent = createAgent({
+  model: "gpt-4.1",
+  tools: allTools,
+  middleware: [toolSelectorMiddleware],
+});
+```
+
+
+
+### 工具调用监控
+
+
+
+<MiddlewareToolCallMonitoringJs />
+
+
+
+### 提示词缓存（Anthropic）
+
+在使用 Anthropic 模型时，使用带有缓存控制指令的结构化内容块来缓存大型系统提示词：
+
+<Tabs>
+<Tab title="装饰器">
+
+```python
+from langchain.agents.middleware import wrap_model_call, ModelRequest, ModelResponse
+from langchain.messages import SystemMessage
+from typing import Callable
+
+
+@wrap_model_call
+def add_cached_context(
+    request: ModelRequest,
+    handler: Callable[[ModelRequest], ModelResponse],
+) -> ModelResponse:
+    # Always work with content blocks
+    new_content = list(request.system_message.content_blocks) + [
+        {
+            "type": "text",
+            "text": "Here is a large document to analyze:\n\n<document>...</document>",
+            # content up until this point is cached
+            "cache_control": {"type": "ephemeral"}
+        }
+    ]
+
+    new_system_message = SystemMessage(content=new_content)
+    return handler(request.override(system_message=new_system_message))
+```
+
+</Tab>
+
+<Tab title="类">
+
+```python
+from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
+from langchain.messages import SystemMessage
+from typing import Callable
+
+
+class CachedContextMiddleware(AgentMiddleware):
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelResponse:
+        # Always work with content blocks
+        new_content = list(request.system_message.content_blocks) + [
+            {
+                "type": "text",
+                "text": "Here is a large document to analyze:\n\n<document>...</document>",
+                "cache_control": {"type": "ephemeral"}  # This content will be cached
+            }
+        ]
+
+        new_system_message = SystemMessage(content=new_content)
+        return handler(request.override(system_message=new_system_message))
+```
+
+</Tab>
+</Tabs>
+
+**注意：**
+- `ModelRequest.system_message` 始终是一个 [`SystemMessage`](https://reference.langchain.com/javascript/langchain-core/messages/SystemMessage) 对象，即使代理是使用 `system_prompt="string"` 创建的
+- 使用 `SystemMessage.content_blocks` 将内容作为块列表访问，无论原始内容是字符串还是列表
+- 修改系统消息时，使用 `content_blocks` 并追加新块以保留现有结构
+- 您可以直接将 [`SystemMessage`](https://reference.langchain.com/javascript/langchain-core/messages/SystemMessage) 对象传递给 `create_agent` 的 `system_prompt` 参数，用于高级用例，如缓存控制
+
+:::
+
+在中间件中修改系统消息，使用 `ModelRequest` 中的 `systemMessage` 字段。它包含一个 [`SystemMessage`](https://reference.langchain.com/javascript/langchain-core/messages/SystemMessage) 对象（即使代理是使用字符串 [`systemPrompt`](https://reference.langchain.com/javascript/types/langchain.index.CreateAgentParams.html#systemprompt) 创建的）。
+
+**示例：链式中间件** - 不同的中间件可以使用不同的方法：
+
+```typescript
+import { createMiddleware, SystemMessage, createAgent } from "langchain";
+
+// Middleware 1: Uses systemMessage with simple concatenation
+const myMiddleware = createMiddleware({
+  name: "MyMiddleware",
+  wrapModelCall: async (request, handler) => {
+    return handler({
+      ...request,
+      systemMessage: request.systemMessage.concat(`Additional context.`),
+    });
+  },
+});
+
+// Middleware 2: Uses systemMessage with structured content (preserves structure)
+const myOtherMiddleware = createMiddleware({
+  name: "MyOtherMiddleware",
+  wrapModelCall: async (request, handler) => {
+    return handler({
+      ...request,
+      systemMessage: request.systemMessage.concat(
+        new SystemMessage({
+          content: [
+            {
+              type: "text",
+              text: " More additional context. This will be cached.",
+              cache_control: { type: "ephemeral", ttl: "5m" },
+            },
+          ],
+        })
+      ),
+    });
+  },
+});
+
+const agent = createAgent({
+  model: "anthropic:claude-3-5-sonnet",
+  systemPrompt: "You are a helpful assistant.",
+  middleware: [myMiddleware, myOtherMiddleware],
+});
+```
+
+生成的系统消息将是：
+
+```typescript
+new SystemMessage({
+  content: [
+    { type: "text", text: "You are a helpful assistant." },
+    { type: "text", text: "Additional context." },
+    {
+        type: "text",
+        text: " More additional context. This will be cached.",
+        cache_control: { type: "ephemeral", ttl: "5m" },
+    },
+  ],
+});
+```
+
+使用 [`SystemMessage.concat`](https://reference.langchain.com/javascript/langchain-core/utils/stream/concat) 保留由其他中间件创建的缓存控制元数据或结构化内容块。
+
+
+
+## 其他资源
+
+- [中间件 API 参考](https://reference.langchain.com/python/langchain/middleware/)
+- [内置中间件](/oss/javascript/langchain/middleware/built-in)
+- [测试代理](/oss/javascript/langchain/test/)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\middleware\custom.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

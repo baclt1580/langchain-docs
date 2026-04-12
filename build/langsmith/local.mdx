@@ -1,0 +1,87 @@
+---
+title: 如何在本地运行评估（仅限Python）
+sidebarTitle: 在本地运行评估（Python）
+---
+
+有时，在不将任何结果上传到LangSmith的情况下在本地运行评估会很有帮助。例如，如果您正在快速迭代一个提示，并希望在一些示例上进行冒烟测试，或者如果您正在验证目标函数和评估器函数是否正确定义，您可能不希望记录这些评估。
+
+您可以通过使用LangSmith Python SDK，并向`evaluate()` / `aevaluate()`传递`upload_results=False`来实现这一点。
+
+这将像往常一样运行您的应用程序和评估器，并返回相同的输出，但不会向LangSmith记录任何内容。这不仅包括实验结果，还包括应用程序和评估器的追踪记录。
+
+<Note>
+如果您想将结果上传到LangSmith，但还需要在脚本中处理它们（用于质量门控、自定义聚合等），请参阅[在本地读取实验结果](/langsmith/read-local-experiment-results)。
+</Note>
+
+## 示例
+
+让我们来看一个示例：
+
+需要`langsmith>=0.2.0`。示例也使用了`pandas`。
+
+```python
+from langsmith import Client
+
+# 1. 创建和/或选择您的数据集
+ls_client = Client()
+dataset = ls_client.clone_public_dataset(
+    "https://smith.langchain.com/public/a63525f9-bdf2-4512-83e3-077dc9417f96/d"
+)
+
+# 2. 定义一个评估器
+def is_concise(outputs: dict, reference_outputs: dict) -> bool:
+    return len(outputs["answer"]) < (3 * len(reference_outputs["answer"]))
+
+# 3. 定义应用程序的接口
+def chatbot(inputs: dict) -> dict:
+    return {"answer": inputs["question"] + " is a good question. I don't know the answer."}
+
+# 4. 运行评估
+experiment = ls_client.evaluate(
+    chatbot,
+    data=dataset,
+    evaluators=[is_concise],
+    experiment_prefix="my-first-experiment",
+    # 'upload_results' 是相关参数。
+    upload_results=False
+)
+
+# 5. 在本地分析结果
+results = list(experiment)
+
+# 检查 'is_concise' 是否返回 False。
+failed = [r for r in results if not r["evaluation_results"]["results"][0].score]
+
+# 查看失败的输入和输出。
+for r in failed:
+    print(r["example"].inputs)
+    print(r["run"].outputs)
+
+# 将结果作为 Pandas DataFrame 查看。
+# 必须已安装 'pandas'。
+df = experiment.to_pandas()
+df[["inputs.question", "outputs.answer", "reference.answer", "feedback.is_concise"]]
+```
+
+```python
+{'question': 'What is the largest mammal?'}
+{'answer': "What is the largest mammal? is a good question. I don't know the answer."}
+{'question': 'What do mammals and birds have in common?'}
+{'answer': "What do mammals and birds have in common? is a good question. I don't know the answer."}
+```
+
+|   | inputs.question                           | outputs.answer                                                                         | reference.answer           | feedback.is\_concise |
+| - | ----------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------- | -------------------- |
+| 0 | What is the largest mammal?               | What is the largest mammal? is a good question. I don't know the answer.               | The blue whale             | False                |
+| 1 | What do mammals and birds have in common? | What do mammals and birds have in common? is a good question. I don't know the answer. | They are both warm-blooded | False                |
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\local.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

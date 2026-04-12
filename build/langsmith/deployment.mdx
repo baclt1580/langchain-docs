@@ -1,0 +1,126 @@
+---
+title: LangSmith 部署
+sidebarTitle: 概述
+mode: wide
+description: 通过持久化执行、实时流式处理和水平扩展来部署和管理智能体。
+icon: "layout-grid"
+---
+
+LangSmith 部署是一个专为智能体工作负载设计的工作流编排运行时。它提供了智能体在生产环境中大规模可靠运行所需的托管基础设施，支持从本地开发到部署的完整生命周期。LangSmith 部署是框架无关的：您可以部署使用 LangGraph 或[其他框架](/langsmith/deploy-other-frameworks)构建的智能体。
+
+<Note>
+LangSmith 部署需要 [Plus 计划或更高版本](https://www.langchain.com/pricing)。
+</Note>
+
+<Callout icon="rocket" color="#4F46E5" iconType="regular">
+**通过 [云端智能体部署快速入门](/langsmith/deployment-quickstart) 在几分钟内开始构建。**
+</Callout>
+
+<CardGroup cols={2}>
+
+<Card
+  title="智能体服务器"
+  cta="开始探索"
+  href="/langsmith/assistants"
+  icon="cpu"
+>
+智能体服务器的持久化执行引擎为核心原语提供动力：用于管理配置的 **助手**、用于持久化状态的 **线程** 以及用于执行工作负载的 **运行**。
+</Card>
+
+<Card
+  title="核心能力"
+  cta="开始构建"
+  href="/langsmith/streaming"
+  icon="bolt"
+>
+向用户流式传输输出、暂停以进行人工审核、处理并发输入，以及通过 MCP 和 A2A 连接智能体——所有这些功能在智能体服务器中都可用。
+</Card>
+
+<Card
+  title="教程"
+  cta="浏览教程"
+  href="/langsmith/agent-server-feedback"
+  icon="book"
+>
+为您的用例构建生产就绪智能体的引导式示例。
+</Card>
+
+<Card
+  title="高级配置"
+  cta="配置您的服务器"
+  href="/langsmith/auth"
+  icon="lock"
+>
+身份验证、加密、自定义路由以及短期和长期记忆存储。
+</Card>
+
+</CardGroup>
+
+## 智能体部署工作流
+
+<Note>
+**如果您正在构建或运营智能体应用程序，请从这里开始。** 本节是关于部署 **您的应用程序**。如果您需要设置 LangSmith 基础设施，[平台设置部分](/langsmith/platform-setup) 涵盖了基础设施选项。
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="1. 本地测试" href="/langsmith/local-dev-testing" icon="terminal">
+    在本地开发服务器上运行您的应用程序。
+  </Card>
+  <Card title="2. 配置" href="/langsmith/application-structure" icon="file-code">
+    设置依赖项、项目结构和环境配置。
+  </Card>
+  <Card title="3. 选择托管方式并部署智能体" href="/langsmith/platform-setup" icon="rocket">
+    选择云端、混合或自托管，然后通过 git push、Docker 镜像或独立服务器进行部署。
+  </Card>
+  <Card title="4. 监控" href="/langsmith/observability" icon="chart-bar">
+    跟踪链路、警报和仪表板。
+  </Card>
+</CardGroup>
+
+## 能力
+
+### Studio
+
+[Studio](/langsmith/studio) 可以连接到任何智能体服务器（本地或已部署的），并为您提供一个用于开发和调试智能体的交互式环境。可视化执行图、在任何检查点检查状态、单步执行运行、在执行过程中修改状态，以及分支以探索替代路径。
+
+### 智能体组合
+
+智能体并非孤立运行。[RemoteGraph](/langsmith/use-remote-graph) 允许任何智能体调用其他已部署的智能体，使用与本地相同的接口：研究智能体委托给不同部署上的搜索智能体，路由智能体分派给专门的子智能体。智能体无需知道它们调用的是本地还是远程服务。
+
+对 [MCP](/langsmith/server-mcp) 和 [A2A](/langsmith/server-a2a) 的原生支持意味着您部署的智能体可以暴露和使用工具接口以及智能体间协议，并与更广泛的生态系统集成。
+
+### 部署选项
+
+- **[云端](/langsmith/deploy-to-cloud)**：完全托管。从 git 仓库推送或使用 [`langgraph deploy`](/langsmith/cli#deploy)。
+- **[混合](/langsmith/deploy-with-control-plane)**：在您的云中运行，由 LangSmith [控制平面](/langsmith/control-plane) 管理。
+- **[自托管](/langsmith/self-hosted)**：在您自己的基础设施中完全自我管理。
+
+相同的运行时，相同的 API。变化的是谁管理基础设施。有关比较，请参阅 [平台设置](/langsmith/platform-setup)。
+
+### 参考与运维
+
+#### 保护和自定义您的服务器
+
+- [自定义身份验证](/langsmith/auth)：身份验证和多租户访问控制
+- [服务器自定义](/langsmith/custom-routes)：自定义路由、[中间件](/langsmith/custom-middleware)、[生命周期钩子](/langsmith/custom-lifespan)、[加密](/langsmith/encryption)
+
+#### 运维
+
+- [CI/CD 流水线](/langsmith/cicd-pipeline-example)
+- 用于状态和线程管理的 [TTL 配置](/langsmith/configure-ttl)
+- [语义搜索](/langsmith/semantic-search)
+
+#### 参考
+
+- [智能体服务器](/langsmith/agent-server)：运行时架构参考
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\deployment.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

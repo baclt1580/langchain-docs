@@ -1,0 +1,79 @@
+---
+title: 沙盒模板
+sidebarTitle: 模板
+description: 使用模板定义沙盒的容器镜像、资源限制和配置。
+---
+
+import SandboxPreview from "/snippets/langsmith/sandbox-preview-warning.mdx";
+
+<SandboxPreview />
+
+在创建沙盒之前，你需要一个**模板**。模板定义了沙盒实例的蓝图，包括容器镜像、资源分配以及可选配置，如卷和身份验证代理规则。
+
+![模板列表视图](/images/langsmith/sandboxes/sb-templates.png)
+
+## 模板定义的内容
+
+| 设置项 | 描述 |
+|---------|-------------|
+| **容器镜像** | 要使用的 Docker 镜像（支持私有仓库） |
+| **资源容量** | CPU、内存和存储限制 |
+| **卷** | 要附加的持久化存储（可选） |
+| **身份验证代理配置** | 用于将密钥注入出站请求的规则（可选）——参见[身份验证代理](/langsmith/sandbox-auth-proxy) |
+
+## 创建模板
+
+<CodeGroup>
+
+```python Python
+from langsmith.sandbox import SandboxClient
+
+client = SandboxClient()
+
+client.create_template(
+    name="python-sandbox",
+    image="python:3.12-slim",
+)
+```
+
+```ts TypeScript
+import { SandboxClient } from "langsmith/experimental/sandbox";
+
+const client = new SandboxClient();
+
+await client.createTemplate("node-sandbox", {
+  image: "node:20-slim",
+});
+```
+
+</CodeGroup>
+
+你也可以通过 REST API 创建模板，并完全控制资源和代理配置：
+
+```bash
+curl -X POST "$LANGSMITH_ENDPOINT/api/v2/sandboxes/templates" \
+  -H "x-api-key: $LANGSMITH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "python-sandbox",
+    "image": "python:3.12-slim",
+    "resources": {"cpu": "500m", "memory": "512Mi", "storage": "2Gi"}
+  }'
+```
+
+## 后续步骤
+
+- 从你的模板[创建沙盒](/langsmith/sandbox-sdk)
+- [配置身份验证代理规则](/langsmith/sandbox-auth-proxy)以将密钥注入出站请求
+- [设置预热池](/langsmith/sandbox-warm-pools)以预置沙盒，实现更快的启动速度
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\sandbox-templates.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,48 @@
+---
+title: "ScraperAPI 集成"
+description: "使用 LangChain Python 与 ScraperAPI 集成。"
+---
+
+[ScraperAPI](https://www.scraperapi.com/) 通过其网络爬虫 API 实现从任何公共网站收集数据，无需担心代理、浏览器或验证码处理。[langchain-scraperapi](https://github.com/scraperapi/langchain-scraperapi) 封装了此服务，使 AI 代理能够轻松浏览网页并从中抓取数据。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install langchain-scraperapi
+```
+
+```bash uv
+uv add langchain-scraperapi
+```
+</CodeGroup>
+
+从 [ScraperAPI](https://www.scraperapi.com/) 获取 API 密钥，并将其设置为环境变量：
+
+```python
+import os
+
+os.environ["SCRAPERAPI_API_KEY"] = "your-api-key"
+```
+
+## 工具
+
+该软件包提供 3 个工具，分别用于抓取任何网站、获取结构化的 Google 搜索结果以及获取结构化的 Amazon 搜索结果。
+
+查看每个工具的详细文档：
+- [ScraperAPITool](/oss/python/integrations/tools/scraperapi) - 浏览和抓取任何网站
+- ScraperAPIGoogleSearchTool - 获取结构化的 Google 搜索 SERP 数据
+- ScraperAPIAmazonSearchTool - 获取结构化的 Amazon 产品搜索数据
+
+如需更详细的逐步指南，请参阅 [官方仓库](https://github.com/scraperapi/langchain-scraperapi)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\scraperapi.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

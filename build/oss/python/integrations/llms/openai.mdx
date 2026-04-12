@@ -1,0 +1,135 @@
+---
+title: "OpenAI 集成"
+description: "使用 LangChain Python 与 OpenAI LLM 集成。"
+---
+
+<Warning>
+**您当前所在的页面是关于使用 OpenAI 文本补全模型的文档。最新且最受欢迎的 OpenAI 模型是 [聊天完成模型](/oss/python/langchain/models)。**
+
+除非您专门在使用 gpt-3.5-turbo-instruct，否则您可能正在寻找 [此页面](/oss/python/integrations/chat/openai/)。
+</Warning>
+
+[OpenAI](https://platform.openai.com/docs/introduction) 提供了一系列不同强度的模型，适用于不同的任务。
+
+本示例介绍如何使用 LangChain 与 OpenAI [模型](https://platform.openai.com/docs/models) 进行交互
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/chat/openai) | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |  :---: | :---: | :---: |
+| [`ChatOpenAI`](https://reference.langchain.com/python/langchain-openai/chat_models/base/ChatOpenAI) | [`langchain-openai`](https://reference.langchain.com/python/langchain-openai) | ❌ | beta | ✅ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-openai?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-openai?style=flat-square&label=%20) |
+
+## 设置
+
+要访问 OpenAI 模型，您需要创建一个 OpenAI 账户，获取 API 密钥，并安装 langchain-openai 集成包。
+
+### 凭据
+
+前往 [platform.openai.com](https://platform.openai.com) 注册 OpenAI 并生成 API 密钥。完成后，请设置 OPENAI_API_KEY 环境变量：
+
+```python
+import getpass
+import os
+
+if "OPENAI_API_KEY" not in os.environ:
+    os.environ["OPENAI_API_KEY"] = getpass.getpass("Enter your OpenAI API key: ")
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+LangChain OpenAI 集成位于 langchain-openai 包中：
+
+```python
+pip install -qU langchain-openai
+```
+
+如果您需要指定您的组织 ID，可以使用以下代码块。但是，如果您仅属于一个组织或打算使用默认组织，则不需要这样做。您可以在 [OpenAI API 密钥页面](https://platform.openai.com/account/api-keys) 查看您的默认组织。
+
+要指定您的组织，您可以使用以下内容：
+
+```python
+OPENAI_ORGANIZATION = getpass()
+
+os.environ["OPENAI_ORGANIZATION"] = OPENAI_ORGANIZATION
+```
+
+## 实例化
+
+现在我们可以实例化我们的模型对象并生成聊天补全：
+
+```python
+from langchain_openai import OpenAI
+
+llm = OpenAI()
+```
+
+## 调用
+
+```python
+llm.invoke("Hello how are you?")
+```
+
+```text
+'\n\nI am an AI and do not have emotions like humans do, so I am always functioning at my optimal level. Thank you for asking! How can I assist you today?'
+```
+
+## 链式调用
+
+```python
+from langchain_core.prompts import PromptTemplate
+
+prompt = PromptTemplate.from_template("How to say {input} in {output_language}:\n")
+
+chain = prompt | llm
+chain.invoke(
+    {
+        "output_language": "German",
+        "input": "I love programming.",
+    }
+)
+```
+
+```text
+'\nIch liebe Programmieren.'
+```
+
+## 使用代理
+
+如果您处于显式代理之后，可以指定 http_client 以通过它
+
+```python
+pip install httpx
+
+import httpx
+
+openai = OpenAI(
+    model_name="gpt-3.5-turbo-instruct",
+    http_client=httpx.Client(proxies="http://proxy.yourcompany.com:8080"),
+)
+```
+
+---
+
+## API 参考
+
+有关所有 [`OpenAI`](https://reference.langchain.com/python/langchain-openai/llms/base/OpenAI) llm 功能和配置的详细文档，请访问 API 参考：[reference.langchain.com/python/langchain-openai/llms/base/OpenAI](https://reference.langchain.com/python/langchain-openai/llms/base/OpenAI)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\openai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

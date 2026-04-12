@@ -1,0 +1,208 @@
+---
+title: "JSONLoader 集成"
+description: "使用 LangChain Python 集成 JSONLoader 文档加载器。"
+---
+
+本指南提供了快速入门 `JSONLoader` [文档加载器](/oss/python/integrations/document_loaders) 的简要概述。有关 `JSONLoader` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/json_loader/JSONLoader)。
+
+- TODO: 添加任何其他相关链接，例如关于底层 API 的信息等。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/document_loaders/file_loaders/json/) |
+| :--- | :--- | :---: | :---: | :---: |
+| [`JSONLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/json_loader/JSONLoader) | [`langchain-community`](https://reference.langchain.com/python/langchain-community) | ✅ | ❌ | ✅ |
+
+### 加载器特性
+
+| 来源 | 文档惰性加载 | 原生异步支持 |
+| :---: | :---: | :---: |
+| `JSONLoader` | ✅ | ❌ |
+
+## 设置
+
+要使用 JSON 文档加载器，您需要安装 `langchain-community` 集成包以及 `jq` Python 包。
+
+### 凭证
+
+使用 `JSONLoader` 类不需要任何凭证。
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+安装 **langchain-community** 和 **jq**：
+
+```python
+pip install -qU langchain-community jq
+```
+
+## 初始化
+
+现在我们可以实例化模型对象并加载文档：
+
+- TODO: 使用相关参数更新模型实例化。
+
+```python
+from langchain_community.document_loaders import JSONLoader
+
+loader = JSONLoader(
+    file_path="./example_data/facebook_chat.json",
+    jq_schema=".messages[].content",
+    text_content=False,
+)
+```
+
+## 加载
+
+```python
+docs = loader.load()
+docs[0]
+```
+
+```text
+Document(metadata={'source': '/Users/isaachershenson/Documents/langchain/docs/docs/integrations/document_loaders/example_data/facebook_chat.json', 'seq_num': 1}, page_content='Bye!')
+```
+
+```python
+print(docs[0].metadata)
+```
+
+```python
+{'source': '/Users/isaachershenson/Documents/langchain/docs/docs/integrations/document_loaders/example_data/facebook_chat.json', 'seq_num': 1}
+```
+
+## 惰性加载
+
+```python
+pages = []
+for doc in loader.lazy_load():
+    pages.append(doc)
+    if len(pages) >= 10:
+        # 执行一些分页操作，例如
+        # index.upsert(pages)
+
+        pages = []
+```
+
+## 从 JSON Lines 文件读取
+
+如果您想从 JSON Lines 文件加载文档，可以传递 `json_lines=True` 并指定 `jq_schema` 以从单个 JSON 对象中提取 `page_content`。
+
+```python
+loader = JSONLoader(
+    file_path="./example_data/facebook_chat_messages.jsonl",
+    jq_schema=".content",
+    text_content=False,
+    json_lines=True,
+)
+
+docs = loader.load()
+print(docs[0])
+```
+
+```python
+page_content='Bye!' metadata={'source': '/Users/isaachershenson/Documents/langchain/docs/docs/integrations/document_loaders/example_data/facebook_chat_messages.jsonl', 'seq_num': 1}
+```
+
+## 读取特定内容键
+
+另一种选择是设置 `jq_schema='.'` 并提供 `content_key`，以便仅加载特定内容：
+
+```python
+loader = JSONLoader(
+    file_path="./example_data/facebook_chat_messages.jsonl",
+    jq_schema=".",
+    content_key="sender_name",
+    json_lines=True,
+)
+
+docs = loader.load()
+print(docs[0])
+```
+
+```python
+page_content='User 2' metadata={'source': '/Users/isaachershenson/Documents/langchain/docs/docs/integrations/document_loaders/example_data/facebook_chat_messages.jsonl', 'seq_num': 1}
+```
+
+## 使用 jq 模式 `content_key` 的 JSON 文件
+
+要使用 jq 模式内的 `content_key` 从 JSON 文件加载文档，请设置 `is_content_key_jq_parsable=True`。确保 `content_key` 兼容并可以使用 jq 模式解析。
+
+```python
+loader = JSONLoader(
+    file_path="./example_data/facebook_chat.json",
+    jq_schema=".messages[]",
+    content_key=".content",
+    is_content_key_jq_parsable=True,
+)
+
+docs = loader.load()
+print(docs[0])
+```
+
+```python
+page_content='Bye!' metadata={'source': '/Users/isaachershenson/Documents/langchain/docs/docs/integrations/document_loaders/example_data/facebook_chat.json', 'seq_num': 1}
+```
+
+## 提取元数据
+
+通常，我们希望将 JSON 文件中可用的元数据包含到我们从内容创建的文档中。
+
+以下演示了如何使用 `JSONLoader` 提取元数据。
+
+需要注意一些关键变化。在之前没有收集元数据的示例中，我们设法直接在模式中指定了可以从哪里提取 `page_content` 的值。
+
+在这个示例中，我们必须告诉加载器遍历 `messages` 字段中的记录。jq_schema 因此必须是 `.messages[]`
+
+这允许我们将记录（字典）传递到必须实现的 `metadata_func` 中。`metadata_func` 负责识别记录中的哪些信息应包含在最终 [`Document`](https://reference.langchain.com/python/langchain-core/documents/base/Document) 对象存储的元数据中。
+
+此外，我们现在必须通过 `content_key` 参数在加载器中明确指定，从记录的哪个键提取 `page_content` 的值。
+
+```python
+# 定义元数据提取函数。
+def metadata_func(record: dict, metadata: dict) -> dict:
+    metadata["sender_name"] = record.get("sender_name")
+    metadata["timestamp_ms"] = record.get("timestamp_ms")
+
+    return metadata
+
+
+loader = JSONLoader(
+    file_path="./example_data/facebook_chat.json",
+    jq_schema=".messages[]",
+    content_key="content",
+    metadata_func=metadata_func,
+)
+
+docs = loader.load()
+print(docs[0].metadata)
+```
+
+```python
+{'source': '/Users/isaachershenson/Documents/langchain/docs/docs/integrations/document_loaders/example_data/facebook_chat.json', 'seq_num': 1, 'sender_name': 'User 2', 'timestamp_ms': 1675597571851}
+```
+
+---
+
+## API 参考
+
+有关 `JSONLoader` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/json_loader/JSONLoader)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\json.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

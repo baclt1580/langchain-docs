@@ -1,0 +1,99 @@
+---
+title: "Tf-idf 集成"
+description: "使用 LangChain Python 与 Tf-idf 检索器集成。"
+---
+
+> [TF-IDF](https://scikit-learn.org/stable/modules/feature_extraction.html#tfidf-term-weighting) 表示词频乘以逆文档频率。
+
+本笔记本介绍如何使用一个检索器，其底层使用 `scikit-learn` 包实现 [TF-IDF](https://en.wikipedia.org/wiki/Tf%E2%80%93idf)。
+
+有关 TF-IDF 详情的更多信息，请参阅 [这篇博客文章](https://medium.com/data-science-bootcamp/tf-idf-basics-of-information-retrieval-48de122b2a4c)。
+
+```python
+pip install -qU  scikit-learn
+```
+
+```python
+from langchain_community.retrievers import TFIDFRetriever
+```
+
+## 使用文本创建新检索器
+
+```python
+retriever = TFIDFRetriever.from_texts(["foo", "bar", "world", "hello", "foo bar"])
+```
+
+## 使用文档创建新检索器
+
+现在您可以使用已创建的文档创建新的检索器。
+
+```python
+from langchain_core.documents import Document
+
+retriever = TFIDFRetriever.from_documents(
+    [
+        Document(page_content="foo"),
+        Document(page_content="bar"),
+        Document(page_content="world"),
+        Document(page_content="hello"),
+        Document(page_content="foo bar"),
+    ]
+)
+```
+
+## 使用检索器
+
+我们现在可以使用检索器了！
+
+```python
+result = retriever.invoke("foo")
+```
+
+```python
+result
+```
+
+```python
+[Document(page_content='foo', metadata={}),
+ Document(page_content='foo bar', metadata={}),
+ Document(page_content='hello', metadata={}),
+ Document(page_content='world', metadata={})]
+```
+
+## 保存和加载
+
+您可以轻松保存和加载此检索器，使其便于本地开发！
+
+```python
+retriever.save_local("testing.pkl")
+```
+
+```python
+retriever_copy = TFIDFRetriever.load_local("testing.pkl")
+```
+
+```python
+retriever_copy.invoke("foo")
+```
+
+```python
+[Document(page_content='foo', metadata={}),
+ Document(page_content='foo bar', metadata={}),
+ Document(page_content='hello', metadata={}),
+ Document(page_content='world', metadata={})]
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\retrievers\tf_idf.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,67 @@
+---
+title: "Confluence 集成"
+description: "使用 LangChain JavaScript 与 Confluence 文档加载器集成。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+本文介绍如何从 Confluence 空间中的页面加载文档对象。
+
+## 凭证设置
+
+- 您需要设置一个访问令牌，并将其与您的 Confluence 用户名一起提供，以验证请求
+- 您还需要包含待加载页面的空间的 `space key`（空间键）。该信息可在访问空间时的 URL 中找到，例如：`https://example.atlassian.net/wiki/spaces/{SPACE_KEY}`
+- 此外，您需要安装 `html-to-text` 来将页面解析为纯文本
+
+```bash npm
+npm install @langchain/community @langchain/core html-to-text
+```
+
+## 使用方法
+
+```typescript
+import { ConfluencePagesLoader } from "@langchain/community/document_loaders/web/confluence";
+
+const username = process.env.CONFLUENCE_USERNAME;
+const accessToken = process.env.CONFLUENCE_ACCESS_TOKEN;
+const personalAccessToken = process.env.CONFLUENCE_PAT;
+
+if (username && accessToken) {
+  const loader = new ConfluencePagesLoader({
+    baseUrl: "https://example.atlassian.net/wiki",
+    spaceKey: "~EXAMPLE362906de5d343d49dcdbae5dEXAMPLE",
+    username,
+    accessToken,
+  });
+
+  const documents = await loader.load();
+  console.log(documents);
+} else if (personalAccessToken) {
+  const loader = new ConfluencePagesLoader({
+    baseUrl: "https://example.atlassian.net/wiki",
+    spaceKey: "~EXAMPLE362906de5d343d49dcdbae5dEXAMPLE",
+    personalAccessToken,
+  });
+  const documents = await loader.load();
+  console.log(documents);
+} else {
+  console.log(
+    "您需要提供用户名和访问令牌，或个人访问令牌（PAT），才能运行此示例。"
+  );
+}
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\web_loaders\confluence.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

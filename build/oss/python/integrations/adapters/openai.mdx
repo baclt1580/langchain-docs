@@ -1,0 +1,158 @@
+---
+title: "OpenAI 适配器集成"
+description: "使用 LangChain Python 集成 OpenAI 适配器。"
+---
+
+**请确保 OpenAI 库版本为 1.0.0 或更高；否则，请参考旧版文档 [OpenAI 适配器（旧版）](/oss/python/integrations/adapters/openai-old/)。**
+
+许多人从 OpenAI 开始，但希望探索其他模型。LangChain 与众多模型提供商的集成使得这一点变得容易实现。虽然 LangChain 拥有自己的消息和模型 API，但我们也通过公开一个适配器，将 LangChain 模型适配到 OpenAI API，尽可能简化了探索其他模型的过程。
+
+目前，这仅处理输出，不返回其他信息（如 token 计数、停止原因等）。
+
+```python
+import openai
+from langchain_community.adapters import openai as lc_openai
+```
+
+## chat.completions.create
+
+```python
+messages = [{"role": "user", "content": "hi"}]
+```
+
+原始 OpenAI 调用
+
+```python
+result = openai.chat.completions.create(
+    messages=messages, model="gpt-3.5-turbo", temperature=0
+)
+result.choices[0].message.model_dump()
+```
+
+```text
+{'content': 'Hello! How can I assist you today?',
+ 'role': 'assistant',
+ 'function_call': None,
+ 'tool_calls': None}
+```
+
+LangChain OpenAI 包装器调用
+
+```python
+lc_result = lc_openai.chat.completions.create(
+    messages=messages, model="gpt-3.5-turbo", temperature=0
+)
+
+lc_result.choices[0].message  # 属性访问
+```
+
+```python
+{'role': 'assistant', 'content': 'Hello! How can I help you today?'}
+```
+
+```python
+lc_result["choices"][0]["message"]  # 也支持索引访问
+```
+
+```python
+{'role': 'assistant', 'content': 'Hello! How can I help you today?'}
+```
+
+切换模型提供商
+
+```python
+lc_result = lc_openai.chat.completions.create(
+    messages=messages, model="claude-2", temperature=0, provider="ChatAnthropic"
+)
+lc_result.choices[0].message
+```
+
+```python
+{'role': 'assistant', 'content': 'Hello! How can I assist you today?'}
+```
+
+## chat.completions.stream
+
+原始 OpenAI 调用
+
+```python
+for c in openai.chat.completions.create(
+    messages=messages, model="gpt-3.5-turbo", temperature=0, stream=True
+):
+    print(c.choices[0].delta.model_dump())
+```
+
+```python
+{'content': '', 'function_call': None, 'role': 'assistant', 'tool_calls': None}
+{'content': 'Hello', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': '!', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': ' How', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': ' can', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': ' I', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': ' assist', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': ' you', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': ' today', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': '?', 'function_call': None, 'role': None, 'tool_calls': None}
+{'content': None, 'function_call': None, 'role': None, 'tool_calls': None}
+```
+
+LangChain OpenAI 包装器调用
+
+```python
+for c in lc_openai.chat.completions.create(
+    messages=messages, model="gpt-3.5-turbo", temperature=0, stream=True
+):
+    print(c.choices[0].delta)
+```
+
+```python
+{'role': 'assistant', 'content': ''}
+{'content': 'Hello'}
+{'content': '!'}
+{'content': ' How'}
+{'content': ' can'}
+{'content': ' I'}
+{'content': ' assist'}
+{'content': ' you'}
+{'content': ' today'}
+{'content': '?'}
+{}
+```
+
+切换模型提供商
+
+```python
+for c in lc_openai.chat.completions.create(
+    messages=messages,
+    model="claude-2",
+    temperature=0,
+    stream=True,
+    provider="ChatAnthropic",
+):
+    print(c["choices"][0]["delta"])
+```
+
+```python
+{'role': 'assistant', 'content': ''}
+{'content': 'Hello'}
+{'content': '!'}
+{'content': ' How'}
+{'content': ' can'}
+{'content': ' I'}
+{'content': ' assist'}
+{'content': ' you'}
+{'content': ' today'}
+{'content': '?'}
+{}
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\adapters\openai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

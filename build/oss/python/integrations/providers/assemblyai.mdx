@@ -1,0 +1,57 @@
+---
+title: "AssemblyAI 集成"
+description: "使用 LangChain Python 与 AssemblyAI 进行集成。"
+---
+
+>[AssemblyAI](https://www.assemblyai.com/) 为语音转文本、说话人分离、语音摘要等任务构建 `Speech AI` 模型
+语音转文本、说话人分离、语音摘要等。
+> `AssemblyAI’s` Speech AI 模型包括针对语音数据的准确语音转文本
+> 说话人检测、情感分析、
+章节检测、PII 脱敏。
+
+## 安装和设置
+
+获取您的 [API 密钥](https://www.assemblyai.com/dashboard/signup)。
+
+安装 `assemblyai` 包。
+
+<CodeGroup>
+```bash pip
+pip install -U assemblyai
+```
+
+```bash uv
+uv add assemblyai
+```
+</CodeGroup>
+
+## 文档加载器
+
+### AssemblyAI 音频转录
+
+`AssemblyAIAudioTranscriptLoader` 使用 `AssemblyAI API` 转录音频文件，并将转录后的文本加载到文档中。
+
+查看 [使用示例](/oss/python/integrations/document_loaders/assemblyai)。
+
+```python
+from langchain_community.document_loaders import AssemblyAIAudioTranscriptLoader
+```
+
+### AssemblyAI 音频加载器（按 ID）
+
+`AssemblyAIAudioLoaderById` 使用 AssemblyAI API 获取现有转录内容，并根据指定格式将转录后的文本加载到一个或多个文档中。
+
+```python
+from langchain_community.document_loaders import AssemblyAIAudioLoaderById
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\assemblyai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

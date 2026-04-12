@@ -1,0 +1,96 @@
+---
+title: "Amazon Bedrock 知识库集成"
+description: "使用 LangChain JavaScript 与 Amazon Bedrock 知识库检索器集成。"
+---
+
+## 概述
+
+本文将帮助您开始使用 `AmazonKnowledgeBaseRetriever` [检索](/oss/javascript/langchain/retrieval)。有关 `AmazonKnowledgeBaseRetriever` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-aws/AmazonKnowledgeBaseRetriever)。
+
+Amazon Bedrock 知识库是亚马逊云科技（AWS）提供的一项全托管服务，支持端到端的 RAG（检索增强生成）工作流。它提供完整的文档摄取流程，将您的文档转换为嵌入向量并存储到专用的向量数据库中。Amazon Bedrock 知识库支持多种流行的向量存储数据库，包括 Amazon OpenSearch Serverless 向量引擎、Pinecone、Redis Enterprise Cloud，以及即将推出的 Amazon Aurora 和 MongoDB。
+
+### 集成详情
+
+| 检索器 | 自托管 | 云服务 | 包 | [Python 支持](https://python.langchain.com/docs/integrations/retrievers/bedrock/) |
+| :--- | :--- | :---: | :---: | :---: |
+| [AmazonKnowledgeBaseRetriever](https://reference.langchain.com/javascript/langchain-aws/AmazonKnowledgeBaseRetriever) | 🟠（详见下文） | ✅ | @langchain/aws | ✅ |
+
+> AWS 知识库检索器可以在“自托管”的意义上运行在您自己的 AWS 基础设施上。但无法在其他云服务商或本地环境中运行。
+
+## 设置
+
+要使用 AmazonKnowledgeBaseRetriever，您需要拥有一个 AWS 账户，以便管理索引和文档。设置账户后，请配置以下环境变量：
+
+```bash
+process.env.AWS_KNOWLEDGE_BASE_ID=your-knowledge-base-id
+process.env.AWS_ACCESS_KEY_ID=your-access-key-id
+process.env.AWS_SECRET_ACCESS_KEY=your-secret-access-key
+```
+
+如果您希望从单个查询中获取自动追踪信息，还可以通过取消注释以下代码来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```typescript
+// process.env.LANGSMITH_API_KEY = "<YOUR API KEY HERE>";
+// process.env.LANGSMITH_TRACING = "true";
+```
+
+### 安装
+
+该检索器位于 `@langchain/aws` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/aws @langchain/core
+```
+```bash yarn
+yarn add @langchain/aws @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/aws @langchain/core
+```
+</CodeGroup>
+
+## 实例化
+
+现在我们可以实例化检索器：
+
+```typescript
+import { AmazonKnowledgeBaseRetriever } from "@langchain/aws";
+
+const retriever = new AmazonKnowledgeBaseRetriever({
+  topK: 10,
+  knowledgeBaseId: process.env.AWS_KNOWLEDGE_BASE_ID,
+  region: "us-east-2",
+  clientOptions: {
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+  },
+});
+```
+
+## 使用
+
+```typescript
+const query = "..."
+
+await retriever.invoke(query);
+```
+
+---
+
+## API 参考
+
+有关 `AmazonKnowledgeBaseRetriever` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-aws/AmazonKnowledgeBaseRetriever)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\bedrock-knowledge-bases.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

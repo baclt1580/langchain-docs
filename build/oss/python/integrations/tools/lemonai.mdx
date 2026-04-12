@@ -1,0 +1,113 @@
+---
+title: "Lemon agent 集成"
+description: "使用 LangChain Python 与 Lemon agent 工具集成。"
+---
+
+>[Lemon Agent](https://github.com/felixbrock/lemon-agent) 帮助您在几分钟内构建强大的 AI 助手，并通过允许在 `Airtable`、`Hubspot`、`Discord`、`Notion`、`Slack` 和 `GitHub` 等工具中进行准确可靠的读写操作来自动化工作流。
+
+在此查看 [完整文档](https://github.com/felixbrock/lemonai-py-client)。
+
+目前大多数连接器都专注于只读操作，限制了大语言模型（LLM）的潜力。另一方面，代理（Agents）由于缺乏上下文或指令，有时会倾向于产生幻觉。
+
+通过 `Lemon AI`，可以让您的代理访问定义良好的 API，以实现可靠的读写操作。此外，`Lemon AI` 函数允许您进一步降低幻觉风险，通过提供一种静态定义工作流的方式，以便模型在不确定时可以依赖这些工作流。
+
+## 快速开始
+
+以下快速入门演示了如何结合 Lemon AI 和 Agents 来自动化涉及内部工具交互的工作流。
+
+### 1. 安装 lemon AI
+
+需要 Python 3.8.1 及以上版本。
+
+要在 Python 项目中使用 Lemon AI，请运行 `pip install lemonai`
+
+这将安装相应的 Lemon AI 客户端，随后可将其导入脚本中。
+
+该工具使用 Python 包 langchain 和 loguru。如果 Lemon AI 出现任何安装错误，请先安装这两个包，然后再安装 Lemon AI 包。
+
+### 2. 启动服务器
+
+您的代理与 Lemon AI 提供的所有工具之间的交互由 [Lemon AI Server](https://github.com/felixbrock/lemonai-server) 处理。要使用 Lemon AI，需要在本地机器上运行服务器，以便 Lemon AI Python 客户端能够连接。
+
+### 3. 使用 lemon AI 配合 LangChain
+
+Lemon AI 通过找到相关工具的正确组合自动解决给定任务，或者使用 Lemon AI Functions 作为替代。以下示例演示如何从 Hackernews 检索用户并将其写入 Airtable 中的表格：
+
+#### (可选) 定义您的 lemon AI 函数
+
+类似于 [OpenAI functions](https://openai.com/blog/function-calling-and-other-api-updates)，Lemon AI 提供了将工作流定义为可重用函数的选项。这些函数可以针对特别需要尽可能接近确定性行为的使用场景进行定义。特定工作流可以在单独的 lemonai.json 中定义：
+
+```json
+[
+  {
+    "name": "Hackernews Airtable User Workflow",
+    "description": "retrieves user data from Hackernews and appends it to a table in Airtable",
+    "tools": ["hackernews-get-user", "airtable-append-data"]
+  }
+]
+```
+
+您的模型将能够访问这些函数，并优先于自行选择的工具来解决给定任务。您需要做的只是通过在提示中包含函数名称，让代理知道它应该使用给定的函数。
+
+#### 将 lemon AI 包含到您的 LangChain 项目中
+
+```python
+import os
+
+from langchain_openai import OpenAI
+from lemonai import execute_workflow
+```
+
+#### 加载 API 密钥和访问令牌
+
+要使用需要身份验证的工具，您必须在环境中以 `"{tool name}_{authentication string}"` 格式存储相应的访问凭据，其中认证字符串对于 API 密钥是 ["API_KEY", "SECRET_KEY", "SUBSCRIPTION_KEY", "ACCESS_KEY"] 之一，对于认证令牌是 ["ACCESS_TOKEN", "SECRET_TOKEN"] 之一。示例包括 "OPENAI_API_KEY"、"BING_SUBSCRIPTION_KEY"、"AIRTABLE_ACCESS_TOKEN"。
+
+```python
+""" Load all relevant API Keys and Access Tokens into your environment variables """
+os.environ["OPENAI_API_KEY"] = "*INSERT OPENAI API KEY HERE*"
+os.environ["AIRTABLE_ACCESS_TOKEN"] = "*INSERT AIRTABLE TOKEN HERE*"
+```
+
+```python
+hackernews_username = "*INSERT HACKERNEWS USERNAME HERE*"
+airtable_base_id = "*INSERT BASE ID HERE*"
+airtable_table_id = "*INSERT TABLE ID HERE*"
+
+""" Define your instruction to be given to your LLM """
+prompt = f"""Read information from Hackernews for user {hackernews_username} and then write the results to
+Airtable (baseId: {airtable_base_id}, tableId: {airtable_table_id}). Only write the fields "username", "karma"
+and "created_at_i". Please make sure that Airtable does NOT automatically convert the field types.
+"""
+
+"""
+Use the Lemon AI execute_workflow wrapper
+to run your LangChain agent in combination with Lemon AI
+"""
+model = OpenAI(temperature=0)
+
+execute_workflow(llm=model, prompt_string=prompt)
+```
+
+### 4. 了解代理的决策过程
+
+为了了解您的代理如何与 Lemon AI 工具交互以解决给定任务，所有做出的决策、使用的工具和执行的操作都会写入本地的 `lemonai.log` 文件。每当您的 LLM 代理与 Lemon AI 工具栈交互时，都会创建相应的日志条目。
+
+```log
+2023-06-26T11:50:27.708785+0100 - b5f91c59-8487-45c2-800a-156eac0c7dae - hackernews-get-user
+2023-06-26T11:50:39.624035+0100 - b5f91c59-8487-45c2-800a-156eac0c7dae - airtable-append-data
+2023-06-26T11:58:32.925228+0100 - 5efe603c-9898-4143-b99a-55b50007ed9d - hackernews-get-user
+2023-06-26T11:58:43.988788+0100 - 5efe603c-9898-4143-b99a-55b50007ed9d - airtable-append-data
+```
+
+通过使用 [Lemon AI Analytics](https://github.com/felixbrock/lemon-agent/blob/main/apps/analytics/README.md)，您可以轻松更好地了解工具使用的频率和顺序。结果，您可以识别代理决策能力的薄弱环节，并通过定义 Lemon AI 函数转向更确定的行为。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\tools\lemonai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,118 @@
+---
+title: "AWS SageMakerEndpoint 集成"
+description: "使用 LangChain JavaScript 与 AWS SageMakerEndpoint LLM 集成。"
+---
+
+LangChain.js 支持与 AWS SageMaker 托管的端点集成。查看 [Amazon SageMaker JumpStart](https://aws.amazon.com/sagemaker/jumpstart/) 以获取可用模型列表，以及如何部署您自己的模型。
+
+## 设置
+
+您需要安装官方的 SageMaker SDK 作为对等依赖项：
+
+```bash npm
+npm install @aws-sdk/client-sagemaker-runtime
+```
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+## 使用方式
+
+```typescript
+import {
+  SageMakerEndpoint,
+  SageMakerLLMContentHandler,
+} from "@langchain/community/llms/sagemaker_endpoint";
+
+interface ResponseJsonInterface {
+  generation: {
+    content: string;
+  };
+}
+
+// 根据您将使用的模型进行自定义
+class LLama213BHandler implements SageMakerLLMContentHandler {
+  contentType = "application/json";
+
+  accepts = "application/json";
+
+  async transformInput(
+    prompt: string,
+    modelKwargs: Record<string, unknown>
+  ): Promise<Uint8Array> {
+    const payload = {
+      inputs: [[{ role: "user", content: prompt }]],
+      parameters: modelKwargs,
+    };
+
+    const stringifiedPayload = JSON.stringify(payload);
+
+    return new TextEncoder().encode(stringifiedPayload);
+  }
+
+  async transformOutput(output: Uint8Array): Promise<string> {
+    const response_json = JSON.parse(
+      new TextDecoder("utf-8").decode(output)
+    ) as ResponseJsonInterface[];
+    const content = response_json[0]?.generation.content ?? "";
+    return content;
+  }
+}
+
+const contentHandler = new LLama213BHandler();
+
+const model = new SageMakerEndpoint({
+  endpointName: "aws-llama-2-13b-chat",
+  modelKwargs: {
+    temperature: 0.5,
+    max_new_tokens: 700,
+    top_p: 0.9,
+  },
+  endpointKwargs: {
+    CustomAttributes: "accept_eula=true",
+  },
+  contentHandler,
+  clientOptions: {
+    region: "您的 AWS 端点区域",
+    credentials: {
+      accessKeyId: "您的 AWS 访问密钥 ID",
+      secretAccessKey: "您的 AWS 秘密访问密钥",
+    },
+  },
+});
+
+const res = await model.invoke(
+  "你好，我的名字是 John Doe，给我讲一个关于羊驼的笑话 "
+);
+
+console.log(res);
+
+/*
+  [
+    {
+      content: "你好，John Doe！这里有一个关于羊驼的笑话：
+        为什么羊驼成了园丁？
+        因为它擅长羊驼景观设计！"
+    }
+  ]
+ */
+```
+
+## 相关链接
+
+- [模型指南](/oss/javascript/langchain/models)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\llms\aws_sagemaker.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

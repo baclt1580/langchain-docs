@@ -1,0 +1,85 @@
+---
+title: "Greennode 集成"
+description: "使用 LangChain Python 与 Greennode 集成。"
+---
+
+>**GreenNode** 是一家全球性的 AI 解决方案提供商，也是 **NVIDIA 首选合作伙伴**，为美国、中东及北非（MENA）和亚太地区的企业提供从基础设施到应用的完整堆栈 AI 能力。
+>依托 **世界级的基础设施**（LEED Gold, TIA‑942, Uptime Tier III），**GreenNode** 为企业、初创公司和研究人员提供全面的 AI 服务套件：
+>
+>- [强大的 AI 基础设施：](https://greennode.ai/) 作为亚太地区首批超大规模 AI 集群之一，由 NVIDIA H100 GPU 驱动，GreenNode 的基础设施针对高吞吐量机器学习和深度学习工作负载进行了优化。
+>- [GreenNode AI 平台：](https://greennode.ai/product/ai-platform) 专为技术团队设计，GreenNode 的自助式 AI 平台支持快速部署 Jupyter notebook 环境，预配置了优化的计算实例。通过此门户，开发者可以以最小的设置时间启动 ML 训练、微调、超参数优化和推理工作流。该平台包括访问 100+ 精选开源模型，并支持与常见的 MLOps 工具和存储框架集成。
+>- [GreenNode Serverless AI：](https://greennode.ai/product/model-as-a-service) GreenNode Serverless AI 拥有涵盖文本生成、代码生成、文转语音、语转文、嵌入和重排序模型等领域的预训练生产就绪模型库。此服务非常适合希望在不管理模型基础设施的情况下原型设计或部署 AI 解决方案的团队。
+>- [AI 应用：](https://vngcloud.vn/en/solution) 从智能数据管理和文档处理（IDP）到智能视频分析——GreenNode 支持大规模的现实 AI 用例。
+>无论您是在构建下一个 LLM 工作流、扩展 AI 研究，还是部署企业级应用程序，**GreenNode** 都提供加速您旅程所需的工具和基础设施。
+
+## 安装和设置
+
+GreenNode 集成可以通过 pip 安装：
+
+```python
+pip install -qU langchain-greennode
+```
+
+### API 密钥
+
+要使用 GreenNode Serverless AI，您需要一个 API 密钥，您可以从 [GreenNode Serverless AI](https://aiplatform.console.greennode.ai/api-keys) 获取。API 密钥可以作为初始化参数 `api_key` 传递，或者设置为环境变量 `GREENNODE_API_KEY`。
+
+```python
+import getpass
+import os
+
+if not os.getenv("GREENNODE_API_KEY"):
+    os.environ["GREENNODE_API_KEY"] = getpass.getpass("Enter your GreenNode API key: ")
+```
+
+## 聊天模型
+
+```python
+from langchain_greennode import ChatGreenNode
+
+chat = ChatGreenNode(
+    model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",  # Choose from available models
+    temperature=0.6,
+    top_p=0.95,
+)
+```
+
+GreenNode [聊天模型](https://python.langchain.com/docs/integrations/chat/greennode/) 的使用
+
+## 嵌入模型
+
+```python
+from langchain_greennode import GreenNodeEmbeddings
+
+# Initialize embeddings
+embeddings = GreenNodeEmbeddings(
+    model="BAAI/bge-m3"  # Choose from available models
+)
+```
+
+GreenNode [嵌入模型](https://python.langchain.com/docs/integrations/embeddings/greennode) 的使用
+
+## 重排序
+
+```python
+from langchain_greennode import GreenNodeRerank
+
+# Initialize reranker
+rerank = GreenNodeRerank(
+    model="BAAI/bge-reranker-v2-m3",  # Choose from available models
+    top_n=-1,
+)
+```
+
+GreenNode [重排序模型](https://python.langchain.com/docs/integrations/retrievers/greennode-reranker) 的使用
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\greennode.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

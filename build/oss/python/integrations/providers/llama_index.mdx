@@ -1,0 +1,53 @@
+---
+title: "LlamaIndex 集成"
+sidebarTitle: "LlamaIndex"
+description: "使用 LangChain Python 与 LlamaIndex 集成。"
+---
+
+>[LlamaIndex](https://www.llamaindex.ai/) 是构建 LLM 应用程序的首选数据框架
+
+
+## 安装和设置
+
+您需要安装 `llama-index` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install llama-index
+```
+
+```bash uv
+uv add llama-index
+```
+</CodeGroup>
+
+请参阅 [安装说明](https://docs.llamaindex.ai/en/stable/getting_started/installation/)。
+
+## 检索器
+
+### LlamaIndexRetriever
+
+>它用于在 LlamaIndex 数据结构上进行带来源的问答。
+
+```python
+from langchain_community.retrievers.llama_index import LlamaIndexRetriever
+```
+
+### LlamaIndexGraphRetriever
+
+>它用于在 LlamaIndex 图数据结构上进行带来源的问答。
+
+```python
+from langchain_community.retrievers.llama_index import LlamaIndexGraphRetriever
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\llama_index.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

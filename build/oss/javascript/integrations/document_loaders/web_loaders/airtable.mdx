@@ -1,0 +1,77 @@
+---
+title: "AirtableLoader 集成"
+description: "使用 LangChain JavaScript 集成 AirtableLoader 文档加载器。"
+---
+
+`AirtableLoader` 类提供了从 Airtable 表格加载文档的功能。它支持两种主要方法：
+
+1. `load()`：一次性检索所有记录，适用于中小型数据集。
+2. `loadLazy()`：逐条获取记录，对于大型数据集内存效率更高。
+
+## 前提条件
+
+确保您的 Airtable API 令牌已作为环境变量提供：
+
+```typescript
+process.env.AIRTABLE_API_TOKEN = "YOUR_AIRTABLE_API_TOKEN";
+```
+
+## 使用方法
+
+```typescript
+import { AirtableLoader } from "@langchain/community/document_loaders/web/airtable";
+import { Document } from "@langchain/core/documents";
+
+// 默认 Airtable 加载器
+const loader = new AirtableLoader({
+  tableId: "YOUR_TABLE_ID",
+  baseId: "YOUR_BASE_ID",
+});
+
+try {
+  const documents: Document[] = await loader.load();
+  console.log("已加载文档：", documents);
+} catch (error) {
+  console.error("加载文档时出错：", error);
+}
+
+// 惰性 Airtable 加载器
+const loaderLazy = new AirtableLoader({
+  tableId: "YOUR_TABLE_ID",
+  baseId: "YOUR_BASE_ID",
+});
+
+try {
+  console.log("正在惰性加载文档：");
+  for await (const document of loader.loadLazy()) {
+    console.log("已加载文档：", document);
+  }
+} catch (error) {
+  console.error("惰性加载文档时出错：", error);
+}
+
+// 指定视图的 Airtable 加载器
+const loaderView = new AirtableLoader({
+  tableId: "YOUR_TABLE_ID",
+  baseId: "YOUR_BASE_ID",
+  kwargs: { view: "YOUR_VIEW_NAME" },
+});
+
+try {
+  const documents: Document[] = await loader.load();
+  console.log("已加载带视图的文档：", documents);
+} catch (error) {
+  console.error("加载带视图的文档时出错：", error);
+}
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\web_loaders\airtable.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,50 @@
+---
+title: "Cerebras 集成"
+description: "使用 LangChain Python 与 Cerebras 集成。"
+---
+
+在 Cerebras，我们开发了世界上最大、最快的 AI 处理器——Wafer-Scale Engine-3 (WSE-3)。由 WSE-3 驱动的 Cerebras CS-3 系统代表了一类新的 AI 超级计算机，以其无与伦比的性能和可扩展性，为生成式 AI 的训练和推理树立了标准。
+
+将 Cerebras 作为您的推理提供商，您可以：
+- 实现前所未有的 AI 推理工作负载速度
+- 以高吞吐量进行商业化构建
+- 利用我们无缝的集群技术轻松扩展您的 AI 工作负载
+
+我们的 CS-3 系统可以快速且轻松地集群化，以创建世界上最大的 AI 超级计算机，使得部署和运行最大的模型变得简单。领先的跨国公司、研究机构和政府机构已经在使用 Cerebras 解决方案来开发专有模型并训练流行的开源模型。
+
+想体验 Cerebras 的强大功能吗？查看我们的 [网站](https://cerebras.ai) 获取更多资源，并探索通过 Cerebras Cloud 或本地部署访问我们技术的选项！
+
+有关 Cerebras Cloud 的更多信息，请访问 [cloud.cerebras.ai](https://cloud.cerebras.ai/)。我们的 API 参考文档位于 [inference-docs.cerebras.ai](https://inference-docs.cerebras.ai/)。
+
+## 安装和设置
+安装集成包：
+
+<CodeGroup>
+```bash pip
+pip install langchain-cerebras
+```
+
+```bash uv
+uv add langchain-cerebras
+```
+</CodeGroup>
+
+## API 密钥
+从 [cloud.cerebras.ai](https://cloud.cerebras.ai/) 获取 API 密钥，并将其添加到您的环境变量中：
+```
+export CEREBRAS_API_KEY="your-api-key-here"
+```
+
+## 聊天模型
+查看 [使用示例](/oss/python/integrations/chat/cerebras)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\cerebras.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

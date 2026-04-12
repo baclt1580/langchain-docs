@@ -1,0 +1,265 @@
+---
+title: Fleet Webhooks
+sidebarTitle: Webhooks
+description: 将智能体发布与外部系统、CI/CD 流水线或自定义部署工作流集成。
+---
+
+当触发时，Webhook 会将您智能体的完整配置和文件包发送到指定的端点。
+
+<Callout icon="lock" color="#4F46E5" iconType="regular">
+**安全须知：**
+
+- Webhook URL 必须使用 HTTPS。
+- 自定义请求头（例如 API 密钥）会加密存储。
+- 包含发布者身份信息以供审计追踪。
+- Webhook 仅对智能体所有者可见。
+</Callout>
+
+## 添加 Webhook
+
+1.  导航至 [设置 > Fleet Webhooks](https://smith.langchain.com/settings/workspaces/agent-builder-webhooks)。
+2.  点击 **添加 Webhook**。
+3.  配置：
+    - **名称**：描述性名称（例如，“发布智能体”、“部署到生产环境”）。
+    - **URL**：将接收 Webhook 的 HTTPS 端点。
+    - **请求头**（可选）：用于身份验证的自定义请求头（加密存储）。
+    - **表单模式**（可选）：定义用户触发时必须填写的自定义输入字段。
+4.  点击 **保存**。
+
+## 触发 Webhook
+
+1.  在 Fleet 编辑器中打开您的智能体。
+2.  点击 **设置** 菜单（齿轮图标）。
+3.  在 **Webhooks** 下，点击 Webhook 名称。
+4.  填写表单模式中定义的任何自定义字段。
+5.  点击 **运行 Webhook**。
+
+## 编辑 Webhook
+
+1.  导航至 [设置 > Fleet Webhooks](https://smith.langchain.com/settings/workspaces/agent-builder-webhooks)。
+2.  对于要编辑的 Webhook，点击 **编辑**。
+3.  进行更改后点击 **保存**。
+
+## 删除 Webhook
+
+1.  导航至 [设置 > Fleet Webhooks](https://smith.langchain.com/settings/workspaces/agent-builder-webhooks)。
+2.  对于要删除的 Webhook，点击 **删除**。
+3.  点击 **删除** 以确认删除操作。
+
+## Webhook 负载
+
+Webhook 负载是一个包含以下字段的 JSON 对象：
+
+| 字段 | 描述 |
+|-------|-------------|
+| `action` | Webhook 的名称。 |
+| `input` | 来自自定义表单字段的值（若无自定义字段则为空对象）。 |
+| `publisher` | 触发 Webhook 的用户的 ID 和电子邮件。 |
+| `agent` | 智能体名称和描述。 |
+| [`tool_auth_requirements`](#工具认证要求) | 智能体使用的每个工具所需的认证信息。 |
+| [`files`](#zip-文件结构) | 包含所有智能体文件的 Base64 编码 ZIP 包。 |
+| [`fields`](#自定义输入字段) | 自定义输入字段。 |
+
+例如：
+
+```json
+{
+  "action": "Webhook 名称",
+  "input": {
+    "notes": "用户提供的值",
+    "environment": "prod",
+    "dry_run": true
+  },
+  "publisher": {
+    "user_id": "发布用户的uuid",
+    "email": "user@example.com"
+  },
+  "agent": {
+    "name": "我的智能体",
+    "description": "智能体描述文本"
+  },
+  "tool_auth_requirements": [
+    {
+      "tool_name": "tavily_web_search",
+      "auth_type": "api_key",
+      "required_env_vars": ["TAVILY_API_KEY"]
+    },
+    {
+      "tool_name": "google_calendar",
+      "auth_type": "oauth",
+      "auth_provider": "google",
+      "scopes": ["calendar.readonly"]
+    }
+  ],
+  "files": {
+    "type": "zip",
+    "filename": "我的智能体.zip",
+    "content_base64": "<base64编码的zip>"
+  },
+  "fields": [
+    {
+      "name": "notes",
+      "label": "部署说明",
+      "type": "textarea"
+    }
+  ]
+}
+```
+
+### 工具认证要求
+
+`tool_auth_requirements` 数组描述了每个工具所需的认证：
+
+| 认证类型 | 字段 | 描述 |
+|-----------|--------|-------------|
+| `none` | - | 工具无需认证 |
+| `api_key` | `required_env_vars` | 工具需要环境变量中的 API 密钥 |
+| `oauth` | `auth_provider`, `scopes` | 工具需要具有指定作用域的 OAuth 令牌 |
+
+使用此信息在您的部署环境中配置必要的凭据。
+
+### ZIP 文件结构
+
+`files.content_base64` 字段包含一个 ZIP 归档文件，其结构如下：
+
+```
+.
+├── AGENTS.md           # 智能体系统提示和指令
+├── config.json         # 智能体元数据（名称、描述、可见性）
+├── tools.json          # 工具配置和中断设置
+├── skills/             # 可选技能定义
+│   └── skill-name/
+│       └── SKILL.md
+└── subagents/          # 可选子智能体配置
+    └── research_worker/
+        ├── AGENTS.md
+        └── tools.json
+```
+
+`config.json` 和 `tools.json` 文件的结构如下：
+
+<Tabs>
+  <Tab title="`config.json`">
+    ```json
+    {
+      "name": "我的智能体",
+      "description": "智能体描述",
+      "visibility_scope": "tenant",
+      "triggers_paused": false
+    }
+    ```
+  </Tab>
+  <Tab title="`tools.json`">
+    ```json
+    {
+      "tools": [
+        {
+          "name": "tavily_web_search",
+          "mcp_server_url": "http://localhost:8084",
+          "mcp_server_name": "Fleet",
+          "display_name": "tavily_web_search"
+        }
+      ],
+      "interrupt_config": {
+        "http://localhost:8084::tavily_web_search::Fleet": false
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### 自定义输入字段
+
+您可以定义自定义输入字段，以便在触发 Webhook 时收集信息。支持的字段类型如下：
+
+| 类型 | 描述 |
+|------|-------------|
+| `string` | 单行文本输入（默认）。 |
+| `number` | 数字输入。 |
+| `boolean` | 复选框（真/假）。 |
+| `textarea` | 多行文本输入。 |
+| `json` | JSON 编辑器。 |
+| `select` | 带有预定义选项的下拉菜单。 |
+
+例如：
+
+```json
+{
+  "fields": [
+    {
+      "name": "notes",
+      "label": "部署说明",
+      "type": "textarea"
+    },
+    {
+      "name": "environment",
+      "label": "环境",
+      "type": "select",
+      "options": [
+        { "label": "开发", "value": "dev" },
+        { "label": "预发布", "value": "staging" },
+        { "label": "生产", "value": "prod" }
+      ]
+    },
+    {
+      "name": "dry_run",
+      "label": "试运行",
+      "type": "boolean",
+      "default": true
+    }
+  ]
+}
+```
+
+## 示例：Webhook 服务器
+
+以下是一个用 Python 编写的 Webhook 服务器示例：
+
+```python
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import json
+import base64
+import zipfile
+import io
+
+class WebhookHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        content_length = int(self.headers['Content-Length'])
+        body = json.loads(self.rfile.read(content_length))
+
+        action = body.get("action")
+        input_data = body.get("input", {})
+        publisher = body.get("publisher", {})
+        agent = body.get("agent", {})
+        tool_auth = body.get("tool_auth_requirements", [])
+        files = body.get("files", {})
+
+        print(f"Webhook: {action}")
+        print(f"发布者: {publisher.get('email')}")
+        print(f"智能体: {agent.get('name')}")
+        print(f"自定义输入: {input_data}")
+
+        # 提取 ZIP 内容
+        if files.get("content_base64"):
+            zip_bytes = base64.b64decode(files["content_base64"])
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                print(f"文件: {zf.namelist()}")
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({"status": "ok"}).encode())
+
+HTTPServer(("", 8000), WebhookHandler).serve_forever()
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\webhooks.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

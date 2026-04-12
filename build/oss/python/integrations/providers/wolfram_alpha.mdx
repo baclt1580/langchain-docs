@@ -1,0 +1,59 @@
+---
+title: "Wolfram Alpha 集成"
+description: "使用 LangChain Python 与 Wolfram Alpha 集成。"
+---
+
+>[WolframAlpha](https://en.wikipedia.org/wiki/WolframAlpha) 是由 `Wolfram Research` 开发的答案引擎。
+> 它通过计算外部来源的数据来回答事实性查询。
+
+本页面介绍如何在 LangChain 中使用 `Wolfram Alpha API`。
+
+## 安装和设置
+- 使用以下命令安装依赖项
+<CodeGroup>
+```bash pip
+pip install wolframalpha
+```
+
+```bash uv
+uv add wolframalpha
+```
+</CodeGroup>
+
+- 注册 [Wolfram Alpha 开发者账户](https://developer.wolframalpha.com/)
+- 创建一个应用并获取你的 `APP ID`
+- 将你的 APP ID 设置为环境变量 `WOLFRAM_ALPHA_APPID`
+
+## 包装器
+
+### 实用工具
+
+存在一个 WolframAlphaAPIWrapper 实用工具，用于封装此 API。要导入此实用工具：
+
+```python
+from langchain_community.utilities.wolfram_alpha import WolframAlphaAPIWrapper
+```
+
+有关此包装器的更详细教程，请参阅 [此笔记本](/oss/python/integrations/tools/wolfram_alpha)。
+
+### 工具
+
+你也可以轻松地将此包装器加载为工具（以便与 Agent 一起使用）。
+你可以这样做：
+```python
+from langchain_community.agent_toolkits.load_tools import load_tools
+tools = load_tools(["wolfram-alpha"])
+```
+
+有关工具的更多信息，请参阅 [工具](/oss/python/integrations/tools)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\wolfram_alpha.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

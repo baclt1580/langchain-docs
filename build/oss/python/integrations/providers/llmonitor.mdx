@@ -1,0 +1,36 @@
+---
+title: "Llmonitor 集成"
+description: "使用 LangChain Python 与 Llmonitor 集成。"
+---
+
+>[LLMonitor](https://llmonitor.com?utm_source=langchain&utm_medium=py&utm_campaign=docs) 是一个开源的可观测性平台，提供成本和用量分析、用户追踪、链路追踪和评估工具。
+
+## 安装和设置
+
+在 [llmonitor.com](https://llmonitor.com?utm_source=langchain&utm_medium=py&utm_campaign=docs) 上创建账户，然后复制新应用的跟踪 ID。
+
+Once you have it, set it as an environment variable by running:
+
+```bash
+export LLMONITOR_APP_ID="..."
+```
+
+
+## Callbacks
+
+See a [usage example](/oss/python/integrations/callbacks/llmonitor).
+
+```python
+from langchain.callbacks import LLMonitorCallbackHandler
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\llmonitor.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

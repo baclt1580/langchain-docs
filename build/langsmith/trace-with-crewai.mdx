@@ -1,0 +1,172 @@
+---
+title: 追踪 CrewAI 应用
+sidebarTitle: CrewAI
+---
+
+LangSmith 可以通过 OpenTelemetry 工具捕获 [CrewAI](https://github.com/crewAIInc/crewAI) 生成的追踪数据。本指南将展示如何自动捕获来自 CrewAI 多智能体工作流的追踪数据，并将其发送到 LangSmith 进行监控和分析。
+
+## 安装
+
+使用你偏好的包管理器安装所需软件包：
+
+<CodeGroup>
+
+```bash pip
+pip install langsmith crewai opentelemetry-instrumentation-crewai opentelemetry-instrumentation-openai
+```
+
+```bash uv
+uv add langsmith crewai opentelemetry-instrumentation-crewai opentelemetry-instrumentation-openai
+```
+
+</CodeGroup>
+
+## 设置
+
+### 1. 配置环境变量
+
+设置你的 [API 密钥](/langsmith/create-account-api-key) 和项目名称：
+
+```bash
+export LANGSMITH_API_KEY=<你的_langsmith_api密钥>
+export LANGSMITH_PROJECT=<你的项目名称>
+export OPENAI_API_KEY=<你的_openai_api密钥>
+```
+
+### 2. 配置 OpenTelemetry 集成
+
+在你的 CrewAI 应用中，配置 LangSmith OpenTelemetry 集成以及 CrewAI 和 OpenAI 的检测器：
+
+```python
+from langsmith.integrations.otel import OtelSpanProcessor
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+
+# 获取或创建追踪器提供者
+current_provider = trace.get_tracer_provider()
+if isinstance(current_provider, TracerProvider):
+    tracer_provider = current_provider
+else:
+    tracer_provider = TracerProvider()
+    trace.set_tracer_provider(tracer_provider)
+
+# 将 OtelSpanProcessor 添加到追踪器提供者
+tracer_provider.add_span_processor(OtelSpanProcessor())
+
+# 检测 CrewAI 和 OpenAI
+CrewAIInstrumentor().instrument(tracer_provider=tracer_provider)
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+```
+
+### 3. 创建并运行你的 CrewAI 应用
+
+配置完成后，你的 CrewAI 应用将自动向 LangSmith 发送追踪数据：
+
+```python
+from crewai import Agent, Crew, Task
+from crewai.llm import LLM
+from langsmith.integrations.otel import OtelSpanProcessor
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+
+# 配置 OpenTelemetry
+current_provider = trace.get_tracer_provider()
+if isinstance(current_provider, TracerProvider):
+    tracer_provider = current_provider
+else:
+    tracer_provider = TracerProvider()
+    trace.set_tracer_provider(tracer_provider)
+
+tracer_provider.add_span_processor(OtelSpanProcessor())
+
+# 检测 CrewAI 和 OpenAI
+CrewAIInstrumentor().instrument(tracer_provider=tracer_provider)
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+# 定义你的智能体
+llm = LLM(model="gpt-4o-mini")
+
+coder = Agent(
+    role="软件开发人员",
+    goal="按需编写清晰、简洁的代码",
+    backstory="一位精通编码、对软件趋势有敏锐眼光的专家。",
+    verbose=True,
+    llm=llm,
+)
+
+# 定义你的任务
+task = Task(
+    description="编写一个检查数字是否为质数的 Python 函数。",
+    expected_output="一个清晰、简洁且带有文档说明的 Python 函数。",
+    agent=coder,
+)
+
+# 创建并运行团队
+crew = Crew(
+    agents=[coder],
+    tasks=[task],
+    verbose=True,
+)
+
+def run_crew():
+    result = crew.kickoff()
+    return result
+
+if __name__ == "__main__":
+    output = run_crew()
+    print(output)
+```
+
+## 高级用法
+
+### 自定义元数据和标签
+
+你可以通过设置跨度属性来为追踪数据添加自定义元数据：
+
+```python
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+
+def run_crew_with_metadata():
+    with tracer.start_as_current_span("crewai_workflow") as span:
+        span.set_attribute("langsmith.metadata.crew_type", "code_generation")
+        span.set_attribute("langsmith.metadata.agent_count", "1")
+        span.set_attribute("langsmith.span.tags", "crewai,code-generation")
+
+        result = crew.kickoff()
+        return result
+```
+
+### 与其他检测器结合使用
+
+你可以将 CrewAI 检测器与其他 OpenTelemetry 检测器结合使用：
+
+```python
+from opentelemetry.instrumentation.crewai import CrewAIInstrumentor
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+
+# 初始化多个检测器
+CrewAIInstrumentor().instrument(tracer_provider=tracer_provider)
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+```
+
+## 资源
+
+- [CrewAI 文档](https://docs.crewai.com/)
+- [LangSmith OpenTelemetry 指南](/langsmith/trace-with-opentelemetry)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\trace-with-crewai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

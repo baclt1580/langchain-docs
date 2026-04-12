@@ -1,0 +1,493 @@
+---
+title: 从代码调用智能体
+description: 通过 REST API 从 Python、JavaScript 或任何语言调用 Fleet 智能体。
+sidebarTitle: 从代码调用
+---
+
+您可以使用 [LangGraph SDK](/langsmith/reference) 或 REST API 从您的应用程序调用 LangSmith Fleet 智能体。Fleet 智能体运行在 [Agent Server](/langsmith/agent-server) 上，因此您可以使用与任何其他 [LangSmith 部署](/langsmith/deployments) 相同的 API 方法。
+
+REST API 允许您从任何支持 HTTP 请求的语言或平台调用您的智能体。
+
+## 先决条件
+
+- 拥有 Fleet 智能体的 LangSmith 账户
+- 用于身份验证的 [个人访问令牌 (PAT)](/langsmith/create-account-api-key)
+- （仅限 SDK）已安装 [LangGraph SDK](/langsmith/reference)：
+
+<CodeGroup>
+    ```bash Python
+    pip install langgraph-sdk python-dotenv
+    ```
+
+    ```bash TypeScript
+    yarn add @langchain/langgraph-sdk
+    ```
+</CodeGroup>
+
+## 身份验证
+要验证您的智能体 Fleet 部署的身份，请在实例化 LangGraph SDK 客户端时向 `api_key` 参数提供 LangSmith [个人访问令牌 (PAT)](/langsmith/create-account-api-key)，或通过 `X-API-Key` 请求头提供。如果使用 `X-API-Key`，您还必须将 `X-Auth-Scheme` 请求头设置为 `langsmith-api-key`。
+
+如果您传递的 PAT 不属于该智能体的所有者，您的请求将被拒绝并返回 `404 Not Found` 错误。
+
+如果您尝试调用的智能体是 <Tooltip tip="与 LangSmith 工作空间所有成员共享的智能体。私有智能体仅对创建者可见。" cta="了解更多" href="/langsmith/fleet/manage-agent-settings">工作空间智能体</Tooltip> 且您不是所有者，您可以执行与在 UI 中相同的所有操作（只读）。
+
+## 1. 获取智能体 ID 和 URL
+
+要获取您的智能体的 `agent_id` 和 `api_url`：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体的收件箱。
+1. 在智能体名称旁边，点击 <Icon icon="pencil" /> **编辑智能体** 图标。
+2. 点击右上角的 <Icon icon="settings" /> **设置** 图标。
+3. 点击 **查看代码片段** 以查看为您的智能体预填充的值。
+
+复制下面的代码，并将 `agent_id` 和 `api_url` 替换为来自您智能体代码片段的值。
+
+在您的项目根目录中创建一个 `.env` 文件，其中包含您的 [个人访问令牌](/langsmith/create-account-api-key)：
+
+```bash .env
+LANGGRAPH_API_KEY=您的个人访问令牌
+```
+
+## 2. 获取智能体配置
+
+通过获取您的智能体配置来验证连接：
+
+<Tabs>
+    <Tab title="Python">
+```python
+import os
+from dotenv import load_dotenv
+from langgraph_sdk.client import get_client
+
+load_dotenv()
+
+agent_id = "您的智能体 ID"
+
+api_key = os.getenv("LANGGRAPH_API_KEY")
+api_url = "<AGENT-BUILDER-URL>.us.langgraph.app"
+
+client = get_client(
+    url=api_url,
+    api_key=api_key,
+    headers={
+        "X-Auth-Scheme": "langsmith-api-key",
+    },
+)
+
+async def get_assistant(agent_id: str):
+    agent = await client.assistants.get(agent_id)
+    print(agent)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(get_assistant(agent_id))
+```
+    </Tab>
+    <Tab title="TypeScript">
+```ts
+import "dotenv/config";
+import { Client } from "@langchain/langgraph-sdk";
+
+const agentId = "您的智能体 ID";
+
+const apiKey = process.env.LANGGRAPH_API_KEY;
+const apiUrl = "<AGENT-BUILDER-URL>.us.langgraph.app";
+
+const client = new Client({
+  apiUrl,
+  apiKey,
+  defaultHeaders: {
+    "X-Auth-Scheme": "langsmith-api-key",
+  },
+});
+
+async function main(agentId: string) {
+  const agent = await client.assistants.get(agentId);
+  console.log(agent);
+}
+
+main(agentId).catch(console.error);
+```
+    </Tab>
+    <Tab title="cURL">
+```bash
+curl --request GET \
+    --url "<AGENT-BUILDER-URL>.us.langgraph.app/assistants/您的智能体 ID" \
+    --header 'Content-Type: application/json' \
+    --header 'X-Api-Key: 您的个人访问令牌' \
+    --header 'X-Auth-Scheme: langsmith-api-key'
+```
+    </Tab>
+</Tabs>
+
+<Callout icon="key" color="#FEF3C7" iconType="regular">
+    使用与您的 LangSmith 账户绑定的 [个人访问令牌 (PAT)](/langsmith/create-account-api-key)。将 `X-Auth-Scheme` 请求头设置为 `langsmith-api-key` 以进行身份验证。如果您实现了自定义身份验证，请在请求头中传递用户的令牌，以便智能体可以使用用户作用域的工具。请参阅 [添加自定义身份验证](/langsmith/custom-auth)。
+</Callout>
+
+## 3. 调用智能体
+
+以下示例展示了如何向您的智能体发送消息并接收响应。您可以使用 **无状态** 运行（无线程，无对话历史记录）或 **有状态** 运行（使用线程来维护跨多次交互的对话历史记录）。
+
+### 无状态运行
+
+无状态运行发送单个请求并返回完整响应。不保留对话历史记录。这是调用智能体的最简单方式：
+
+<Tabs>
+    <Tab title="Python">
+```python
+import os
+from dotenv import load_dotenv
+from langgraph_sdk.client import get_client
+
+load_dotenv()
+
+agent_id = "您的智能体 ID"
+
+api_key = os.getenv("LANGGRAPH_API_KEY")
+api_url = "https://<AGENT-BUILDER-URL>.us.langgraph.app"
+
+client = get_client(
+    url=api_url,
+    api_key=api_key,
+    headers={
+        "X-Auth-Scheme": "langsmith-api-key",
+    },
+)
+
+result = await client.runs.wait(
+    None,
+    agent_id,
+    input={
+        "messages": [
+            {"role": "user", "content": "你能帮我做什么？"}
+        ]
+    },
+)
+print(result)
+```
+    </Tab>
+    <Tab title="TypeScript">
+```ts
+import "dotenv/config";
+import { Client } from "@langchain/langgraph-sdk";
+
+const agentId = "您的智能体 ID";
+
+const apiKey = process.env.LANGGRAPH_API_KEY;
+const apiUrl = "<AGENT-BUILDER-URL>.us.langgraph.app";
+
+const client = new Client({
+  apiUrl,
+  apiKey,
+  defaultHeaders: {
+    "X-Auth-Scheme": "langsmith-api-key",
+  },
+});
+
+const result = await client.runs.wait(
+  null,
+  agentId,
+  {
+    input: {
+      messages: [
+        { role: "user", content: "你能帮我做什么？" }
+      ]
+    }
+  }
+);
+console.log(result);
+```
+    </Tab>
+    <Tab title="cURL">
+```bash
+curl --request POST \
+    --url "<AGENT-BUILDER-URL>.us.langgraph.app/runs/wait" \
+    --header 'Content-Type: application/json' \
+    --header 'X-Api-Key: 您的个人访问令牌' \
+    --header 'X-Auth-Scheme: langsmith-api-key' \
+    --data '{
+        "assistant_id": "您的智能体 ID",
+        "input": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "你能帮我做什么？"
+                }
+            ]
+        }
+    }'
+```
+    </Tab>
+</Tabs>
+
+### 无状态流式运行
+
+要在生成时流式传输响应，而不是等待完整结果，请使用流式端点：
+
+<Tabs>
+    <Tab title="Python">
+```python
+async for chunk in client.runs.stream(
+    None,
+    agent_id,
+    input={
+        "messages": [
+            {"role": "user", "content": "你能帮我做什么？"}
+        ]
+    },
+    stream_mode="updates",
+):
+    if chunk.data and "run_id" not in chunk.data:
+        print(chunk.data)
+```
+    </Tab>
+    <Tab title="TypeScript">
+```ts
+const streamResponse = client.runs.stream(
+  null,
+  agentId,
+  {
+    input: {
+      messages: [
+        { role: "user", content: "你能帮我做什么？" }
+      ]
+    },
+    streamMode: "updates"
+  }
+);
+for await (const chunk of streamResponse) {
+  if (chunk.data && !("run_id" in chunk.data)) {
+    console.log(chunk.data);
+  }
+}
+```
+    </Tab>
+    <Tab title="cURL">
+```bash
+curl --request POST \
+    --url "<AGENT-BUILDER-URL>.us.langgraph.app/runs/stream" \
+    --header 'Content-Type: application/json' \
+    --header 'X-Api-Key: 您的个人访问令牌' \
+    --header 'X-Auth-Scheme: langsmith-api-key' \
+    --data '{
+        "assistant_id": "您的智能体 ID",
+        "input": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "你能帮我做什么？"
+                }
+            ]
+        },
+        "stream_mode": [
+            "updates"
+        ]
+    }'
+```
+    </Tab>
+</Tabs>
+
+### 使用线程的有状态运行
+
+要在多次交互中维护对话历史记录，请首先创建一个线程，然后在该线程上运行您的智能体。同一线程上的每次后续运行都可以访问完整的消息历史记录：
+
+<Tabs>
+    <Tab title="Python">
+```python
+import os
+from dotenv import load_dotenv
+from langgraph_sdk.client import get_client
+
+load_dotenv()
+
+agent_id = "您的智能体 ID"
+
+api_key = os.getenv("LANGGRAPH_API_KEY")
+api_url = "<AGENT-BUILDER-URL>.us.langgraph.app"
+
+client = get_client(
+    url=api_url,
+    api_key=api_key,
+    headers={
+        "X-Auth-Scheme": "langsmith-api-key",
+    },
+)
+
+thread = await client.threads.create()
+
+async for chunk in client.runs.stream(
+    thread["thread_id"],
+    agent_id,
+    input={
+        "messages": [
+            {"role": "user", "content": "你好，我叫 Alice。"}
+        ]
+    },
+    stream_mode="updates",
+):
+    if chunk.data and "run_id" not in chunk.data:
+        print(chunk.data)
+
+async for chunk in client.runs.stream(
+    thread["thread_id"],
+    agent_id,
+    input={
+        "messages": [
+            {"role": "user", "content": "我叫什么名字？"}
+        ]
+    },
+    stream_mode="updates",
+):
+    if chunk.data and "run_id" not in chunk.data:
+        print(chunk.data)
+```
+    </Tab>
+    <Tab title="TypeScript">
+```ts
+import "dotenv/config";
+import { Client } from "@langchain/langgraph-sdk";
+
+const agentId = "您的智能体 ID";
+
+const apiKey = process.env.LANGGRAPH_API_KEY;
+const apiUrl = "<AGENT-BUILDER-URL>.us.langgraph.app";
+
+const client = new Client({
+  apiUrl,
+  apiKey,
+  defaultHeaders: {
+    "X-Auth-Scheme": "langsmith-api-key",
+  },
+});
+
+const thread = await client.threads.create();
+
+let streamResponse = client.runs.stream(
+  thread["thread_id"],
+  agentId,
+  {
+    input: {
+      messages: [
+        { role: "user", content: "你好，我叫 Alice。" }
+      ]
+    },
+    streamMode: "updates"
+  }
+);
+for await (const chunk of streamResponse) {
+  if (chunk.data && !("run_id" in chunk.data)) {
+    console.log(chunk.data);
+  }
+}
+
+streamResponse = client.runs.stream(
+  thread["thread_id"],
+  agentId,
+  {
+    input: {
+      messages: [
+        { role: "user", content: "我叫什么名字？" }
+      ]
+    },
+    streamMode: "updates"
+  }
+);
+for await (const chunk of streamResponse) {
+  if (chunk.data && !("run_id" in chunk.data)) {
+    console.log(chunk.data);
+  }
+}
+```
+    </Tab>
+    <Tab title="cURL">
+首先，创建一个线程：
+
+```bash
+curl --request POST \
+    --url "<AGENT-BUILDER-URL>.us.langgraph.app/threads" \
+    --header 'Content-Type: application/json' \
+    --header 'X-Api-Key: 您的个人访问令牌' \
+    --header 'X-Auth-Scheme: langsmith-api-key' \
+    --data '{}'
+```
+
+使用响应中的 `thread_id` 在线程上发送消息：
+
+```bash
+curl --request POST \
+    --url "<AGENT-BUILDER-URL>.us.langgraph.app/threads/<THREAD_ID>/runs/stream" \
+    --header 'Content-Type: application/json' \
+    --header 'X-Api-Key: 您的个人访问令牌' \
+    --header 'X-Auth-Scheme: langsmith-api-key' \
+    --data '{
+        "assistant_id": "您的智能体 ID",
+        "input": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "你好，我叫 Alice。"
+                }
+            ]
+        },
+        "stream_mode": [
+            "updates"
+        ]
+    }'
+```
+
+在同一线程上发送后续消息：
+
+```bash
+curl --request POST \
+    --url "<AGENT-BUILDER-URL>.us.langgraph.app/threads/<THREAD_ID>/runs/stream" \
+    --header 'Content-Type: application/json' \
+    --header 'X-Api-Key: 您的个人访问令牌' \
+    --header 'X-Auth-Scheme: langsmith-api-key' \
+    --data '{
+        "assistant_id": "您的智能体 ID",
+        "input": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "我叫什么名字？"
+                }
+            ]
+        },
+        "stream_mode": [
+            "updates"
+        ]
+    }'
+```
+    </Tab>
+</Tabs>
+
+## REST API 参考
+
+下表总结了关键端点。将 `<API_URL>` 替换为您的智能体部署 URL。
+
+| 操作 | 方法 | 端点 |
+|---|---|---|
+| [获取智能体信息](/langsmith/agent-server-api/assistants/get-assistant) | `GET` | `<API_URL>/assistants/<AGENT_ID>` |
+| [创建线程](/langsmith/agent-server-api/threads/create-thread) | `POST` | `<API_URL>/threads` |
+| [运行（等待结果）](https://docs.langchain.com/langsmith/agent-server-api/stateless-runs/create-run-wait-for-output) | `POST` | `<API_URL>/runs/wait` |
+| [运行（流式）](/langsmith/agent-server-api/stateless-runs/create-run-stream-output) | `POST` | `<API_URL>/runs/stream` |
+| [在线程上运行（等待）](/langsmith/agent-server-api/thread-runs/create-run-wait-for-output) | `POST` | `<API_URL>/threads/<THREAD_ID>/runs/wait` |
+| /langsmith/agent-server-api/thread-runs/create-run-stream-output | `POST` | `<API_URL>/threads/<THREAD_ID>/runs/stream` |
+
+所有端点都需要以下请求头：
+- `Content-Type: application/json`
+- `X-Api-Key:` 您的 [个人访问令牌](/langsmith/create-account-api-key)
+- `X-Auth-Scheme: langsmith-api-key`
+
+有关完整的 API 规范，请参阅 [Agent Server API 参考](/langsmith/server-api-ref)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\code.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

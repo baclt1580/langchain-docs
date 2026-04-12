@@ -1,0 +1,66 @@
+---
+title: "Near 区块链集成"
+description: "使用 LangChain Python 集成 Near 区块链文档加载器。"
+---
+
+本笔记本旨在提供测试 LangChain 文档加载器中 Near 区块链功能的方法。
+
+目前该加载器支持：
+
+* 从 NFT 智能合约（NEP-171 和 NEP-177）加载 NFT 作为文档
+* Near 主网、Near 测试网（默认为主网）
+* Mintbase 的 Graph API
+
+如果社区认为此加载器有价值，可以进一步扩展。具体包括：
+
+* 可添加其他 API（例如交易相关 API）
+
+此文档加载器需要：
+
+* 免费的 [Mintbase API 密钥](https://docs.mintbase.xyz/dev/mintbase-graph/)
+
+输出格式如下：
+
+* pageContent= 单个 NFT
+* metadata=\{'source': 'nft.yearofchef.near', 'blockchain': 'mainnet', 'tokenId': '1846'\}
+
+## 将 NFT 加载到文档加载器
+
+```python
+# 从 https://docs.mintbase.xyz/dev/mintbase-graph/ 获取 MINTBASE_API_KEY
+
+mintbaseApiKey = "..."
+```
+
+### 选项 1：以太坊主网（默认 BlockchainType）
+
+```python
+from MintbaseLoader import MintbaseDocumentLoader
+
+contractAddress = "nft.yearofchef.near"  # Year of chef 合约地址
+
+
+blockchainLoader = MintbaseDocumentLoader(
+    contract_address=contractAddress, blockchain_type="mainnet", api_key="omni-site"
+)
+
+nfts = blockchainLoader.load()
+
+print(nfts[:1])
+
+for doc in blockchainLoader.lazy_load():
+    print()
+    print(type(doc))
+    print(doc)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\mintbase.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

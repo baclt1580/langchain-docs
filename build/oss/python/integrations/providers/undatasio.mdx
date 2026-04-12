@@ -1,0 +1,44 @@
+---
+title: "Undatasio 集成"
+description: "使用 LangChain Python 与 Undatasio 进行集成。"
+---
+
+> `undatasio` 包来自
+> [UnDatasIO](https://undatas.io) 从 PDF 等原始源文档中提取干净的文本。
+> 本页面介绍如何在 LangChain 中使用 `undatasio`
+> 生态系统。
+
+## 安装和设置
+
+- 使用以下命令安装 Python SDK：  
+  `pip install undatasio`  
+  以及  
+  `pip install langchain-undatasio`  
+  以使用 `UnDatasIOLoader` 并针对 UnDatasIO API 进行远程分块。
+  你需要一个 API 密钥，你可以免费在  
+  [undatas.io](https://undatas.io) 生成。
+
+- 无需本地系统依赖；所有处理均在云端运行。
+
+## 数据加载器
+
+`UnDatasIO` 的主要用途是通过 **文档加载器**。
+
+### UnDatasIOLoader
+
+请参阅 [使用示例](/oss/python/integrations/document_loaders/undatasio) 以了解单文件解析和懒加载。
+
+```python
+from langchain_undatasio import UnDatasIOLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\undatasio.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

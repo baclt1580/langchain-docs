@@ -1,0 +1,26 @@
+---
+title: OUTPUT_PARSING_FAILURE
+---
+
+某个[输出解析器](https://reference.langchain.com/python/langchain_core/output_parsers/)未能按预期处理模型输出。
+
+<Note>
+    一些预构建的组件（如旧版 LangChain 代理和链）可能在内部使用输出解析器，因此即使你没有显式实例化或使用输出解析器，也可能遇到此错误。
+</Note>
+
+## 故障排除
+
+- 如果可能，考虑使用工具调用或其他结构化输出技术，以避免依赖输出解析器来可靠生成可解析的值。
+- 在提示中添加更精确的格式说明。
+- 如果你正在使用较小或能力较弱的模型，尝试换用能力更强的模型。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\errors\OUTPUT_PARSING_FAILURE.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

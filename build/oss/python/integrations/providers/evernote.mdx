@@ -1,0 +1,41 @@
+---
+title: "Evernote 集成"
+description: "使用 LangChain Python 与 Evernote 集成。"
+---
+
+>[EverNote](https://evernote.com/) 旨在用于归档和创建笔记，其中可嵌入照片、音频及保存的网页内容。笔记存储在虚拟“笔记本”中，支持标记、注释、编辑、搜索和导出。
+
+## 安装和设置
+
+首先，您需要安装 `lxml` 和 `html2text` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install lxml
+pip install html2text
+```
+
+```bash uv
+uv add lxml
+uv add html2text
+```
+</CodeGroup>
+
+## 文档加载器
+
+查看 [使用示例](/oss/python/integrations/document_loaders/evernote)。
+
+```python
+from langchain_community.document_loaders import EverNoteLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\evernote.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

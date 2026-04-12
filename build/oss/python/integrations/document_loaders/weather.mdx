@@ -1,0 +1,48 @@
+---
+title: "天气集成"
+description: "使用 LangChain Python 与天气文档加载器集成。"
+---
+
+>[OpenWeatherMap](https://openweathermap.org/) 是一个开源的天气服务提供商
+
+该加载器通过 pyowm Python 包从 OpenWeatherMap 的 OneCall API 获取天气数据。您必须使用您的 OpenWeatherMap API 令牌以及所需天气数据的城市名称来初始化加载器。
+
+```python
+from langchain_community.document_loaders import WeatherDataLoader
+```
+
+```python
+pip install -qU  pyowm
+```
+
+```python
+# 首先获取一个 [API 密钥](https://home.openweathermap.org/api_keys)。
+# 可以通过直接传入构造函数来设置 API 密钥，
+# 或者通过设置环境变量 "OPENWEATHERMAP_API_KEY"。
+
+from getpass import getpass
+
+OPENWEATHERMAP_API_KEY = getpass()
+```
+
+```python
+loader = WeatherDataLoader.from_params(
+    ["chennai", "vellore"], openweathermap_api_key=OPENWEATHERMAP_API_KEY
+)
+```
+
+```python
+documents = loader.load()
+documents
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\weather.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

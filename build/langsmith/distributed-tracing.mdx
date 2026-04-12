@@ -1,0 +1,189 @@
+---
+title: 实现分布式追踪
+sidebarTitle: 实现分布式追踪
+---
+
+有时，您需要跨多个服务追踪一个请求。
+
+LangSmith 开箱即用地支持分布式追踪，通过上下文传播头部（`langsmith-trace` 和可选的 `baggage` 用于元数据/标签）来链接跨服务的追踪中的运行记录。
+
+客户端-服务器设置示例：
+
+* 追踪在客户端开始
+* 在服务器上继续
+
+## Python 中的分布式追踪
+
+```python
+# client.py
+from langsmith.run_helpers import get_current_run_tree, traceable
+import httpx
+
+@traceable
+async def my_client_function():
+    headers = {}
+    async with httpx.AsyncClient(base_url="...") as client:
+        if run_tree := get_current_run_tree():
+            # 将 langsmith-id 添加到头部
+            headers.update(run_tree.to_headers())
+        return await client.post("/my-route", headers=headers)
+```
+
+然后，服务器（或其他服务）可以通过适当处理头部来继续追踪。如果您使用的是 Starlette 或 FastAPI 等 asgi 应用，可以使用 LangSmith 的 `TracingMiddleware` 来连接分布式追踪。
+
+<Info>
+`TracingMiddleware` 类在 `langsmith==0.1.133` 版本中添加。
+</Info>
+
+使用 FastAPI 的示例：
+
+```python
+from langsmith import traceable
+from langsmith.middleware import TracingMiddleware
+from fastapi import FastAPI, Request
+
+app = FastAPI()  # 或 Flask、Django 或其他任何框架
+app.add_middleware(TracingMiddleware)
+
+@traceable
+async def some_function():
+    ...
+
+@app.post("/my-route")
+async def fake_route(request: Request):
+    return await some_function()
+```
+
+或在 Starlette 中：
+
+```python
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from langsmith.middleware import TracingMiddleware
+
+routes = ...
+middleware = [
+    Middleware(TracingMiddleware),
+]
+app = Starlette(..., middleware=middleware)
+```
+
+如果您使用其他服务器框架，始终可以通过 `langsmith_extra` 传递头部来“接收”分布式追踪：
+
+```python
+# server.py
+import langsmith as ls
+from fastapi import FastAPI, Request
+
+@ls.traceable
+async def my_application():
+    ...
+
+app = FastAPI()  # 或 Flask、Django 或其他任何框架
+
+@app.post("/my-route")
+async def fake_route(request: Request):
+    # request.headers:  {"langsmith-trace": "..."}
+    # 以及可选的元数据/标签在 `baggage` 中
+    with ls.tracing_context(parent=request.headers):
+        return await my_application()
+```
+
+上面的示例使用了 `tracing_context` 上下文管理器。您也可以直接在用 `@traceable` 包装的方法的 `langsmith_extra` 参数中指定父运行上下文。
+
+```python
+# ... 同上
+
+@app.post("/my-route")
+async def fake_route(request: Request):
+    # request.headers:  {"langsmith-trace": "..."}
+    my_application(langsmith_extra={"parent": request.headers})
+```
+
+## TypeScript 中的分布式追踪
+
+<Note>
+TypeScript 中的分布式追踪需要 `langsmith` 版本 `>=0.1.31`
+</Note>
+
+首先，我们从客户端获取当前的运行树，并将其转换为 `langsmith-trace` 和 `baggage` 头部值，然后传递给服务器：
+
+```typescript
+// client.mts
+import { getCurrentRunTree, traceable } from "langsmith/traceable";
+
+const client = traceable(
+    async () => {
+        const runTree = getCurrentRunTree();
+        return await fetch("...", {
+            method: "POST",
+            headers: runTree.toHeaders(),
+        }).then((a) => a.text());
+    },
+    { name: "client" }
+);
+
+await client();
+```
+
+然后，服务器将头部转换回运行树，并利用它来进一步继续追踪。
+
+为了将新创建的运行树传递给可追踪函数，我们可以使用 `withRunTree` 辅助函数，它将确保运行树在可追踪调用中传播。
+
+<CodeGroup>
+
+```typescript Express.JS
+// server.mts
+import { RunTree } from "langsmith";
+import { traceable, withRunTree } from "langsmith/traceable";
+import express from "express";
+import bodyParser from "body-parser";
+
+    const server = traceable(
+        (text: string) => `Hello from the server! Received "${text}"`,
+        { name: "server" }
+    );
+
+    const app = express();
+    app.use(bodyParser.text());
+
+app.post("/", async (req, res) => {
+    const runTree = RunTree.fromHeaders(req.headers);
+    const result = await withRunTree(runTree, () => server(req.body));
+    res.send(result);
+});
+```
+
+```typescript Hono
+// server.mts
+import { RunTree } from "langsmith";
+import { traceable, withRunTree } from "langsmith/traceable";
+import { Hono } from "hono";
+
+    const server = traceable(
+        (text: string) => `Hello from the server! Received "${text}"`,
+        { name: "server" }
+    );
+
+    const app = new Hono();
+
+app.post("/", async (c) => {
+    const body = await c.req.text();
+    const runTree = RunTree.fromHeaders(c.req.raw.headers);
+    const result = await withRunTree(runTree, () => server(body));
+    return c.body(result);
+});
+```
+
+</CodeGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\distributed-tracing.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

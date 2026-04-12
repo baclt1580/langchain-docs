@@ -1,0 +1,66 @@
+---
+title: 创建账户和API密钥
+sidebarTitle: 创建账户和API密钥
+icon: "key"
+---
+
+要开始使用 LangSmith，您需要创建一个账户。您可以在 [LangSmith UI](https://smith.langchain.com) 注册一个免费账户。LangSmith 支持通过 Google、GitHub 和电子邮件登录。
+
+## API 密钥
+
+LangSmith 支持两种类型的 API 密钥。您可以使用这两种令牌来验证对 LangSmith API 的请求，但它们有不同的使用场景：
+
+- [**个人访问令牌（PATs）**](/langsmith/administration-overview#personal-access-tokens-pats) 继承创建它们的用户的权限。请将 PATs 用于个人脚本或工具。
+- [**服务密钥**](/langsmith/administration-overview#service-keys) 可以限定到特定的[工作空间](/langsmith/administration-overview#workspaces)或整个[组织](/langsmith/administration-overview#organizations)。请将服务密钥用于应用程序和生产服务。
+
+### 创建 API 密钥
+
+要使用 LangSmith 记录追踪和运行评估，您需要创建一个 API 密钥来验证您的请求。
+
+要创建任一类型的 API 密钥：
+
+1. 导航到[设置页面](https://smith.langchain.com/settings)，选择 **API 密钥** 部分。
+1. 对于服务密钥，选择组织范围或工作空间范围的密钥。如果密钥是工作空间范围的，您必须指定工作空间。
+
+    [企业版](/langsmith/pricing-plans)用户还可以[为服务密钥分配特定的工作空间角色](/langsmith/administration-overview#workspace-roles-rbac)，这会独立于任何用户调整其权限。
+1. 设置密钥的过期时间；密钥将在所选天数后失效，如果选择“永不过期”，则不会失效。
+1. 点击 **创建 API 密钥**。
+
+<Note>
+LangSmith 只会显示 API 密钥一次，因此请务必复制并将其存储在安全的地方。
+</Note>
+
+### 删除 API 密钥
+
+要删除 API 密钥：
+
+1. 导航到[设置页面](https://smith.langchain.com/settings)，滚动到 **API 密钥** 部分。
+1. 从表格中找到需要删除的 API 密钥。根据需要切换 **个人** 或 **服务**。
+1. 在 **操作** 列中选择垃圾桶图标 <Icon icon="trash" iconType="solid"/> 并确认删除。
+
+## 配置 SDK
+
+除了 `LANGSMITH_API_KEY` 外，您还可以设置以下环境变量。
+
+这仅在需要使用欧盟实例时才需要。
+
+`LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com`
+
+这仅在密钥限定到多个工作空间时才需要。
+
+`LANGSMITH_WORKSPACE_ID=<工作空间 ID>`
+
+## 在 SDK 之外使用 API 密钥
+
+请参阅[通过 API 管理组织的说明](/langsmith/manage-organization-by-api)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\create-account-api-key.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

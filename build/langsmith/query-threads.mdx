@@ -1,0 +1,280 @@
+---
+title: 使用 SDK 查询对话线程
+sidebarTitle: 查询线程
+description: 以编程方式从您的 LangSmith 项目中获取和检查多轮对话线程。
+tag: "SDK"
+---
+
+如果您正在构建对话代理或任何多轮交互应用，LangSmith 会自动将您的[运行记录](/langsmith/run-data-format)分组为[_线程_](/langsmith/observability-concepts#threads)。查询线程可以让您重放完整对话、跨会话审计代理行为、构建关于对话长度和延迟的分析，并支持下游工作流（如微调和评估）。
+
+SDK 提供了两种处理线程的方法：
+
+| 方法 | 适用场景 |
+|--------|-------------|
+| [`list_threads`](https://reference.langchain.com/python/langsmith/client/Client/list_threads) / [`listThreads`](https://reference.langchain.com/javascript/langsmith/client/Client/listThreads) | 您想要浏览项目中的所有线程 |
+| [`read_thread`](https://reference.langchain.com/python/langsmith/client/Client/read_thread) / [`readThread`](https://reference.langchain.com/javascript/langsmith/client/Client/readThread) | 您已知线程 ID 并需要获取其运行记录 |
+
+## 线程的工作原理
+
+您创建的每个运行记录都可以在其元数据中携带一个 `thread_id`。LangSmith 使用此 ID 将运行记录分组到线程中。后端会在 `metadata` 中查找 `thread_id`（回退到 `session_id` 或 `conversation_id`）。
+
+如果您使用[追踪集成](/langsmith/integrations)，请在运行元数据中传递 `thread_id`：
+
+<CodeGroup>
+
+```python Python
+from langsmith import traceable
+
+@traceable(metadata={"thread_id": "conv-abc123"})
+def my_agent(user_message: str) -> str:
+    ...
+```
+
+```typescript TypeScript
+import { traceable } from "langsmith/traceable";
+
+const myAgent = traceable(
+  async (userMessage: string) => {
+    // ...
+  },
+  { metadata: { thread_id: "conv-abc123" } }
+);
+```
+
+</CodeGroup>
+
+## 列出项目中的所有线程
+
+`list_threads` / `listThreads` 获取项目中的所有线程并将其运行记录分组。结果按最近活动时间降序排序。
+
+<CodeGroup>
+
+```python Python
+from langsmith import Client
+
+client = Client()
+
+threads = client.list_threads(project_name="my-project")
+
+for thread in threads:
+    print(thread["thread_id"])
+    print(f"  {thread['count']} 条运行记录")
+    print(f"  最后活动时间: {thread['max_start_time']}")
+```
+
+```typescript TypeScript
+import { Client } from "langsmith";
+
+const client = new Client();
+
+const threads = await client.listThreads({ projectName: "my-project" });
+
+for (const thread of threads) {
+  console.log(thread.thread_id);
+  console.log(`  ${thread.count} 条运行记录`);
+  console.log(`  最后活动时间: ${thread.max_start_time}`);
+}
+```
+
+</CodeGroup>
+
+结果按最近活动时间排序：
+
+```text 输出
+conv-abc123
+  3 条运行记录
+  最后活动时间: 2026-02-25T10:05:42+00:00
+conv-def456
+  1 条运行记录
+  最后活动时间: 2026-02-25T09:30:00+00:00
+```
+
+### 参数
+
+| 参数 | 类型 | 默认值 | 描述 |
+|-----------|------|---------|-------------|
+| `project_name` / `projectName` | `string` | — | 项目名称。如果未设置 `project_id` 则为必需。 |
+| `project_id` / `projectId` | `string` | — | 项目 ID。如果未设置 `project_name` 则为必需。 |
+| `limit` | `int` | 全部 | 要返回的最大线程数。 |
+| `offset` | `int` | `0` | 要跳过的线程数（用于分页）。 |
+| `filter` | `string` | — | 获取运行记录时应用的过滤表达式，使用 [LangSmith 追踪查询语法](/langsmith/trace-query-syntax)。 |
+| `start_time` / `startTime` | `datetime` / `Date` | 1 天前 | 仅包含在此时间之后开始的运行记录。扩大此时间窗口可显示更早的线程。 |
+
+### 返回值
+
+线程对象列表，每个对象包含：
+
+| 字段 | 类型 | 描述 |
+|-------|------|-------------|
+| `thread_id` | `string` | 线程标识符。 |
+| `runs` | `[Run](https://reference.langchain.com/python/langsmith/schemas/Run)[]` | 此线程中的根运行记录，按时间顺序排序（最早优先）。 |
+| `count` | `int` | 此线程中的运行记录数量。 |
+| `min_start_time` | `string \| null` | 最早运行记录的 ISO 时间戳。 |
+| `max_start_time` | `string \| null` | 最近运行记录的 ISO 时间戳。 |
+
+<Note>
+`list_threads` 始终仅返回根运行记录。如果您需要子运行记录（例如工具调用、子链），请改用 `read_thread`，它接受一个 `is_root` / `isRoot` 参数，您可以将其设置为 `false`。
+</Note>
+
+## 读取单个线程的运行记录
+
+当您已知 `thread_id` 时，使用 `read_thread` / `readThread`。它直接返回线程运行记录的迭代器，无需先获取所有线程。
+
+<CodeGroup>
+
+```python Python
+from langsmith import Client
+
+client = Client()
+
+for run in client.read_thread(
+    thread_id="conv-abc123",
+    project_name="my-project",
+):
+    print(run.id, run.name, run.start_time)
+```
+
+```typescript TypeScript
+import { Client } from "langsmith";
+
+const client = new Client();
+
+for await (const run of client.readThread({
+  threadId: "conv-abc123",
+  projectName: "my-project",
+})) {
+  console.log(run.id, run.name, run.start_time);
+}
+```
+
+</CodeGroup>
+
+与 `list_threads` 不同，这里的每个项目直接是一个 `Run` 对象——没有分组包装器。默认情况下，运行记录按升序时间顺序返回。
+
+```python 输出
+[
+    Run(id=UUID("a1b2..."), name="my_agent", run_type="chain", status="success", start_time=datetime(2026, 2, 25, 10, 0, 0, tzinfo=utc), ...),
+    Run(id=UUID("c3d4..."), name="my_agent", run_type="chain", status="success", start_time=datetime(2026, 2, 25, 10, 3, 11, tzinfo=utc), ...),
+    Run(id=UUID("e5f6..."), name="my_agent", run_type="chain", status="error",   start_time=datetime(2026, 2, 25, 10, 5, 42, tzinfo=utc), ...),
+]
+```
+
+### 参数
+
+| 参数 | 类型 | 默认值 | 描述 |
+|-----------|------|---------|-------------|
+| `thread_id` / `threadId` | `string` | — | **必需。** 要查询的线程。 |
+| `project_name` / `projectName` | `string` | — | 项目名称。如果未设置 `project_id` 则为必需。 |
+| `project_id` / `projectId` | `string \| string[]` | — | 项目 ID 或 ID 列表。如果未设置 `project_name` 则为必需。 |
+| `is_root` / `isRoot` | `bool` | `true` | 仅返回根运行记录。设置为 `false` 以包含子运行记录。 |
+| `limit` | `int` | 全部 | 要返回的最大运行记录数。 |
+| `filter` | `string` | — | 额外的过滤表达式（与线程过滤器结合使用）。 |
+| `order` | `"asc" \| "desc"` | `"asc"` | 排序顺序。`"asc"` 按最早优先（时间顺序）返回运行记录。 |
+| `select` | `string[]` | 所有字段 | 要返回的特定运行字段，以减小响应大小。 |
+
+### 返回值
+
+`Run` 对象的迭代器（[Python](https://reference.langchain.com/python/langsmith)）或异步迭代器（[TypeScript](https://reference.langchain.com/javascript/langsmith)）。
+
+## 示例
+
+### 按运行属性过滤线程
+
+传递过滤表达式以使用 [LangSmith 追踪查询语法](/langsmith/trace-query-syntax) 缩小结果范围。例如，仅显示包含至少一条失败运行记录的线程：
+
+<CodeGroup>
+
+```python Python
+threads = client.list_threads(
+    project_name="my-project",
+    filter='eq(status, "error")',
+)
+```
+
+```typescript TypeScript
+const threads = await client.listThreads({
+  projectName: "my-project",
+  filter: 'eq(status, "error")',
+});
+```
+
+</CodeGroup>
+
+### 查看超过 24 小时前的记录
+
+默认情况下，`list_threads` 仅显示过去一天内有运行记录的线程。传递 `start_time` 以扩大时间窗口：
+
+<CodeGroup>
+
+```python Python
+import datetime
+
+threads = client.list_threads(
+    project_name="my-project",
+    start_time=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2),
+)
+```
+
+```typescript TypeScript
+const threads = await client.listThreads({
+  projectName: "my-project",
+  startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+});
+```
+
+</CodeGroup>
+
+### 重建对话
+
+使用 `read_thread` 并设置 `order="asc"` 以逐轮重放对话：
+
+<CodeGroup>
+
+```python Python
+runs = list(
+    client.read_thread(
+        thread_id="conv-abc123",
+        project_name="my-project",
+        order="asc",
+    )
+)
+
+for run in runs:
+    user_msg = run.inputs.get("messages", [{}])[-1].get("content", "")
+    assistant_msg = (run.outputs or {}).get("content", "")
+    print(f"用户:      {user_msg}")
+    print(f"助手: {assistant_msg}")
+    print()
+```
+
+```typescript TypeScript
+const runs: Run[] = [];
+for await (const run of client.readThread({
+  threadId: "conv-abc123",
+  projectName: "my-project",
+  order: "asc",
+})) {
+  runs.push(run);
+}
+
+for (const run of runs) {
+  const messages = (run.inputs?.messages ?? []) as Array<Record<string, string>>;
+  const userMsg = messages.at(-1)?.content ?? "";
+  const assistantMsg = (run.outputs as Record<string, string>)?.content ?? "";
+  console.log(`用户:      ${userMsg}`);
+  console.log(`助手: ${assistantMsg}`);
+}
+```
+
+</CodeGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\query-threads.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

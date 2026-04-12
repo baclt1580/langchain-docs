@@ -1,0 +1,122 @@
+---
+title: "Elasticsearch 集成"
+description: "使用 LangChain Python 与 Elasticsearch 嵌入模型进行集成。"
+---
+
+通过托管在 Elasticsearch 中的嵌入模型生成嵌入向量的操作指南
+
+实例化 `ElasticsearchEmbeddings` 类最简单的方式是：
+
+- 如果使用 Elastic Cloud，则使用 `from_credentials` 构造函数
+- 或者使用 `from_es_connection` 构造函数连接任意 Elasticsearch 集群
+
+```python
+!pip -q install langchain-elasticsearch
+```
+
+```python
+from langchain_elasticsearch import ElasticsearchEmbeddings
+```
+
+```python
+# 定义模型 ID
+model_id = "your_model_id"
+```
+
+## 使用 `from_credentials` 进行测试
+
+这需要 Elastic Cloud 的 `cloud_id`
+
+```python
+# 使用凭据实例化 ElasticsearchEmbeddings
+embeddings = ElasticsearchEmbeddings.from_credentials(
+    model_id,
+    es_cloud_id="your_cloud_id",
+    es_user="your_user",
+    es_password="your_password",
+)
+```
+
+```python
+# 为多个文档创建嵌入向量
+documents = [
+    "这是一个示例文档。",
+    "另一个用于生成嵌入向量的示例文档。",
+]
+document_embeddings = embeddings.embed_documents(documents)
+```
+
+```python
+# 打印文档嵌入向量
+for i, embedding in enumerate(document_embeddings):
+    print(f"文档 {i + 1} 的嵌入向量: {embedding}")
+```
+
+```python
+# 为单个查询创建嵌入向量
+query = "这是一个单独的查询。"
+query_embedding = embeddings.embed_query(query)
+```
+
+```python
+# 打印查询嵌入向量
+print(f"查询的嵌入向量: {query_embedding}")
+```
+
+## 使用现有的 Elasticsearch 客户端连接进行测试
+
+这可用于任何 Elasticsearch 部署
+
+```python
+# 创建 Elasticsearch 连接
+from elasticsearch import Elasticsearch
+
+es_connection = Elasticsearch(
+    hosts=["https://es_cluster_url:port"], basic_auth=("user", "password")
+)
+```
+
+```python
+# 使用 es_connection 实例化 ElasticsearchEmbeddings
+embeddings = ElasticsearchEmbeddings.from_es_connection(
+    model_id,
+    es_connection,
+)
+```
+
+```python
+# 为多个文档创建嵌入向量
+documents = [
+    "这是一个示例文档。",
+    "另一个用于生成嵌入向量的示例文档。",
+]
+document_embeddings = embeddings.embed_documents(documents)
+```
+
+```python
+# 打印文档嵌入向量
+for i, embedding in enumerate(document_embeddings):
+    print(f"文档 {i + 1} 的嵌入向量: {embedding}")
+```
+
+```python
+# 为单个查询创建嵌入向量
+query = "这是一个单独的查询。"
+query_embedding = embeddings.embed_query(query)
+```
+
+```python
+# 打印查询嵌入向量
+print(f"查询的嵌入向量: {query_embedding}")
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\elasticsearch.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

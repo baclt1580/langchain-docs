@@ -1,0 +1,178 @@
+---
+title: "WatsonxToolkit 集成"
+description: "使用 LangChain JavaScript 集成 WatsonxToolkit 工具。"
+---
+
+本文将帮助您开始使用 `WatsonxToolkit` [工具包](/oss/javascript/concepts/#toolkits)。有关 `WatsonxToolkit` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/agents/toolkits/ibm/WatsonxToolkit)。
+
+该工具包包含以下工具：
+
+| 名称 | 描述 |
+| ---- | ----------- |
+| `GoogleSearch` | 搜索在线趋势、新闻、时事、实时信息或研究主题。 |
+| `WebCrawler` | 适用于需要总结网页内容的情况。请勿用于网络搜索。 |
+| `SDXLTurbo` | 使用 Stability.ai 根据文本生成图像。 |
+| `Weather` | 查询城市的天气。 |
+| `RAGQuery` | 在向量索引中搜索文档。 |
+
+### 集成详情
+
+| 类 | 包 | [Python 支持](https://python.langchain.com/docs/integrations/tools/ibm_watsonx/) | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`WatsonxToolkit`](https://reference.langchain.com/python/langchain-ibm/agent_toolkits/utility/toolkit/WatsonxToolkit) | [`@langchain/community`](https://www.npmjs.com/package/@langchain/community) | ✅ | ![NPM - 版本](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+## 设置
+
+如果您希望从单个工具的运行中获取自动化追踪，也可以通过取消注释以下代码来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+`typescript
+process.env.LANGSMITH_TRACING="true"
+process.env.LANGSMITH_API_KEY="your-api-key"
+`
+
+### 安装
+
+此工具包位于 `@langchain/community` 包中：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅 [此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+## 实例化
+
+现在我们可以实例化我们的工具包：
+
+```typescript
+import { WatsonxToolkit } from "@langchain/community/agents/toolkits/ibm";
+import "dotenv/config"
+
+const toolkit = await WatsonxToolkit.init({
+   version: '2024-05-31',
+   serviceUrl: process.env.WATSONX_AI_SERVICE_URL
+});
+```
+
+```text
+[Module: null prototype] { default: {} }
+```
+
+## 工具
+
+查看可用工具：
+
+```typescript
+const tools = toolkit.getTools();
+
+console.log(tools.map((tool) => ({
+   name: tool.name,
+   description: tool.description,
+})))
+```
+```text
+[
+ {
+ name: "GoogleSearch",
+ description: "搜索在线趋势、新闻、时事、实时信息或研究主题。"
+ },
+ {
+ name: "WebCrawler",
+ description: "适用于需要总结网页内容的情况。请勿用于网络搜索。"
+ },
+ {
+ name: "SDXLTurbo",
+ description: "使用 Stability.ai 根据文本生成图像。"
+ },
+ { name: "Weather", description: "查询城市的天气。" },
+ {
+ name: "RAGQuery",
+ description: "在向量索引中搜索文档。"
+ }
+]
+```
+有关工具的详细信息，请访问 [watsonx.ai API 文档](https://cloud.ibm.com/apidocs/watsonx-ai#get-utility-agent-tools)
+
+## 在智能体中使用
+
+首先，确保已安装 LangGraph：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/langgraph
+```
+```bash yarn
+yarn add @langchain/langgraph
+```
+```bash pnpm
+pnpm add @langchain/langgraph
+```
+</CodeGroup>
+
+然后，实例化将在 React 智能体中使用的 LLM：
+
+```typescript
+import { ChatWatsonx } from "@langchain/community/chat_models/ibm";
+
+const llm = new ChatWatsonx({
+   version: '2024-05-31',
+   serviceUrl: process.env.WATSONX_AI_SERVICE_URL,
+   model: 'ibm/granite-3-8b-instruct',
+   projectId: process.env.WATSONX_AI_PROJECT_ID
+});
+```
+```typescript
+import { createAgent } from "@langchain/classic"
+
+const agent = createAgent({ llm, tools });
+```
+
+```typescript
+const exampleQuery = "2022 年 F1 冠军是谁？"
+
+const events = await agent.stream(
+   { messages: [{ role: "user", content: exampleQuery }]},
+   { streamMode: "values", }
+)
+
+for await (const event of events) {
+  const lastMsg = event.messages[event.messages.length - 1];
+   if (lastMsg.tool_calls?.length) {
+      console.dir(lastMsg.tool_calls, { depth: null });
+   } else if (lastMsg.content) {
+      console.log(lastMsg.content);
+   }
+}
+```
+```text
+2022 年 F1 冠军是谁？
+[
+ {
+ name: "GoogleSearch",
+ args: { input: "F1 championship 2022" },
+ type: "tool_call",
+ id: "chatcmpl-tool-9da3456b9bbc475fb822296fdb8353a8"
+ }
+]
+[{"title":"2022 年车手积分榜","description":"官方 F1® 赛事日程 · 现代奴隶制声明；请勿出售或分享我的个人信息。Formula 1. © 2003-2025 Formula One World Championship ...","url":"https://www.formula1.com/en/results/2022/drivers"},{"title":"2022 年一级方程式世界锦标赛 - 维基百科","description":"2022 年一级方程式世界锦标赛 · 马克斯·维斯塔潘驾驶红牛车队赛车赢得了他的第二个连续世界车手冠军。· 查尔斯·勒克莱尔 ...","url":"https://en.wikipedia.org/wiki/2022_Formula_One_World_Championship"},{"title":"2022 年一级方程式世界锦标赛 - 维基百科（简体中文）","description":"卫冕车手冠军马克斯·维斯塔潘在日本大奖赛上赢得了他的第二个冠军头衔，而他的车队红牛车队则实现了他们的 ...","url":"https://simple.wikipedia.org/wiki/2022_Formula_One_World_Championship"},{"title":"马克斯·维斯塔潘赢得 2022 年 F1 车手世界冠军 : r ...","description":"2022年10月9日 ... 总有一天，这家伙会通过完成比赛并在夺冠当天进行世界冠军圈庆祝来赢得冠军。","url":"https://www.reddit.com/r/sports/comments/xzg8pf/max_verstappen_wins_the_2022_f1_drivers_world/"},{"title":"红牛模拟器冠军版 | F1 正品","description":"基于 2022 年甲骨文红牛车队冠军赛车 RB18 的涂装，这款 F1 模拟器由 Memento ... 精心设计和制造。","url":"https://www.f1authentics.com/products/red-bull-simulator-championship-edition"},{"title":"没有马克斯·维斯塔潘的 F1 2022 车手冠军 : r/formula1","description":"2022年11月26日 ... 1.1K 票，65 条评论。r/formula1 社区拥有 5.2M 订阅者。欢迎来到 r/Formula1，最好的独立在线一级方程式社区！","url":"https://www.reddit.com/r/formula1/comments/z5cwl7/f1_2022_drivers_championship_without_max/"},{"title":"F1® 模拟赛车世界锦标赛 2022","description":"世界锦标赛 2022 巴林国际赛道 巴林国际赛道 比赛距离：29 圈 赛道长度：5.412 公里","url":"https://f1esports.com/world/results/2022"},{"title":"我们个人的 F1 2022 预测冠军 : r/formula1","description":"2022年5月5日 ... 来自数学模型的 F1 2025 车手预测。勒克莱尔和塞恩斯预计将击败汉密尔顿和阿尔本。r/formula1 - F1 2025 车手 ...","url":"https://www.reddit.com/r/formula1/comments/uitbbu/our_personal_f1_2022_predictions_championship/"},{"title":"哈斯 F1 车队电竞宣布 2022 年 F1 电竞系列赛 ... 阵容","description":"2022年9月13日 ... 哈斯 F1 车队已准备好在本赛季更新阵容的 2022 年 F1 电竞系列职业锦标赛中展开战斗。","url":"https://www.haasf1team.com/news/haas-f1-team-esports-announces-roster-2022-f1-esports-series-pro-championship"},{"title":"2022 年 F1 解构者冠军 : r/formula1","description":"2022年11月22日 ... 祝贺我们的 2022 年冠军卡洛斯·塞恩斯。阿隆索后期发力，但不得不屈居第二。阿尔法罗密欧车队付出了最大努力 ...","url":"https://www.reddit.com/r/formula1/comments/z1pkkx/2022_f1_deconstructors_championship/"}]
+马克斯·维斯塔潘赢得了 2022 年 F1 冠军，他驾驶红牛车队赛车。他在日本大奖赛上赢得了他的第二个冠军头衔。
+```
+
+---
+
+## API 参考
+
+有关 `WatsonxToolkit` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/agents/toolkits/ibm/WatsonxToolkit)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\ibm.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

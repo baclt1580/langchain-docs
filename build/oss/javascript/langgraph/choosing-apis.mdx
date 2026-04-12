@@ -1,0 +1,449 @@
+---
+title: 在图 API 与函数式 API 之间选择
+sidebarTitle: 选择 API
+---
+
+LangGraph 提供了两种不同的 API 来构建智能体工作流：**图 API** 和 **函数式 API**。这两种 API 共享相同的底层运行时，可以在同一个应用程序中混合使用，但它们针对不同的用例和开发偏好而设计。
+
+本指南将帮助您根据具体需求理解何时使用每种 API。
+
+## 快速决策指南
+
+在以下情况下使用 **图 API**：
+- 用于调试和文档的**复杂工作流可视化**
+- 跨多个节点共享数据的**显式状态管理**
+- 具有多个决策点的**条件分支**
+- 需要后期合并的**并行执行路径**
+- 视觉呈现有助于理解的**团队协作**
+
+在以下情况下使用 **函数式 API**：
+- 对现有过程式代码进行**最小的代码改动**
+- 使用**标准控制流**（if/else、循环、函数调用）
+- **函数作用域的状态管理**，无需显式状态管理
+- 使用更少样板代码进行**快速原型设计**
+- 具有简单分支逻辑的**线性工作流**
+
+## 详细比较
+
+### 何时使用图 API
+
+[图 API](/oss/javascript/langgraph/graph-api) 采用声明式方法，您需要定义节点、边和共享状态来创建可视化的图结构。
+
+**1. 复杂的决策树和分支逻辑**
+
+当您的工作流具有多个依赖于各种条件的决策点时，图 API 使这些分支变得明确且易于可视化。
+
+
+
+```typescript
+import * as z from "zod";
+import {
+  StateGraph,
+  StateSchema,
+  MessagesValue,
+  START,
+  END,
+  type GraphNode,
+  type ConditionalEdgeRouter,
+} from "@langchain/langgraph";
+
+// 图 API：决策路径清晰可视化
+const AgentState = new StateSchema({
+  messages: MessagesValue,
+  currentTool: z.string(),
+  retryCount: z.number().default(0),
+});
+
+const shouldContinue: ConditionalEdgeRouter<typeof AgentState> = (state) => {
+  if (state.retryCount > 3) {
+    return END;
+  } else if (state.currentTool === "search") {
+    return "processSearch";
+  } else {
+    return "callLlm";
+  }
+};
+
+const workflow = new StateGraph(AgentState)
+  .addNode("callLlm", callLlmNode)
+  .addNode("processSearch", searchNode)
+  .addConditionalEdges("callLlm", shouldContinue);
+```
+
+
+
+**2. 跨多个组件的状态管理**
+
+当您需要在工作流的不同部分之间共享和协调状态时，图 API 的显式状态管理非常有益。
+
+
+
+```typescript
+import * as z from "zod";
+import { StateSchema, type GraphNode } from "@langchain/langgraph";
+
+// 多个节点可以访问和修改共享状态
+const WorkflowState = new StateSchema({
+  userInput: z.string(),
+  searchResults: z.array(z.string()).default([]),
+  generatedResponse: z.string().optional(),
+  validationStatus: z.string().optional(),
+});
+
+const searchNode: GraphNode<typeof WorkflowState> = async (state) => {
+  // 访问共享状态
+  const results = await search(state.userInput);
+  return { searchResults: results };
+};
+
+const validationNode: GraphNode<typeof WorkflowState> = async (state) => {
+  // 访问前一个节点的结果
+  const isValid = await validate(state.generatedResponse);
+  return { validationStatus: isValid ? "valid" : "invalid" };
+};
+```
+
+
+
+**3. 带同步的并行处理**
+
+当您需要并行运行多个操作然后合并其结果时，图 API 可以自然地处理这种情况。
+
+
+
+```typescript
+import { START } from "@langchain/langgraph";
+
+// 多个数据源的并行处理
+workflow
+  .addNode("fetchNews", fetchNews)
+  .addNode("fetchWeather", fetchWeather)
+  .addNode("fetchStocks", fetchStocks)
+  .addNode("combineData", combineAllData)
+  // 所有获取操作并行运行
+  .addEdge(START, "fetchNews")
+  .addEdge(START, "fetchWeather")
+  .addEdge(START, "fetchStocks")
+  // 合并操作等待所有并行操作完成
+  .addEdge("fetchNews", "combineData")
+  .addEdge("fetchWeather", "combineData")
+  .addEdge("fetchStocks", "combineData");
+```
+
+
+
+**4. 团队开发和文档**
+
+图 API 的可视化特性使团队更容易理解、记录和维护复杂的工作流。
+
+
+
+```typescript
+// 关注点清晰分离 - 每个团队成员可以处理不同的节点
+workflow
+  .addNode("dataIngestion", dataTeamFunction)
+  .addNode("mlProcessing", mlTeamFunction)
+  .addNode("businessLogic", productTeamFunction)
+  .addNode("outputFormatting", frontendTeamFunction);
+```
+
+
+
+### 何时使用函数式 API
+
+[函数式 API](/oss/javascript/langgraph/functional-api) 采用命令式方法，将 LangGraph 功能集成到标准的过程式代码中。
+
+**1. 现有的过程式代码**
+
+当您已有使用标准控制流的代码，并希望以最小的重构添加 LangGraph 功能时。
+
+
+
+```typescript
+import { task, entrypoint } from "@langchain/langgraph";
+
+// 函数式 API：对现有代码进行最小改动
+const processUserInput = task(
+  "processUserInput",
+  async (userInput: string) => {
+    // 现有函数，改动最小
+    return { processed: userInput.toLowerCase().trim() };
+  }
+);
+
+const workflow = entrypoint(
+  { checkpointer },
+  async (userInput: string) => {
+    // 标准控制流
+    const processed = await processUserInput(userInput);
+
+    let response: string;
+    if (processed.processed.includes("urgent")) {
+      response = await handleUrgentRequest(processed);
+    } else {
+      response = await handleNormalRequest(processed);
+    }
+
+    return response;
+  }
+);
+```
+
+
+
+**2. 具有简单逻辑的线性工作流**
+
+当您的工作流主要是顺序性的，具有简单的条件逻辑时。
+
+
+
+```typescript
+import { entrypoint, interrupt } from "@langchain/langgraph";
+
+const essayWorkflow = entrypoint(
+  { checkpointer },
+  async (topic: string) => {
+    // 具有简单分支的线性流程
+    let outline = await createOutline(topic);
+
+    if (outline.points.length < 3) {
+      outline = await expandOutline(outline);
+    }
+
+    const draft = await writeDraft(outline);
+
+    // 人工审核检查点
+    const feedback = interrupt({ draft, action: "Please review" });
+
+    let finalEssay: string;
+    if (feedback === "approve") {
+      finalEssay = draft;
+    } else {
+      finalEssay = await reviseEssay(draft, feedback);
+    }
+
+    return { essay: finalEssay };
+  }
+);
+```
+
+
+
+**3. 快速原型设计**
+
+当您希望快速测试想法，而无需定义状态模式和图形结构的开销时。
+
+
+
+```typescript
+import { entrypoint } from "@langchain/langgraph";
+
+const quickPrototype = entrypoint(
+  { checkpointer },
+  async (data: Record<string, unknown>) => {
+    // 快速迭代 - 无需状态模式
+    const step1Result = await processStep1(data);
+    const step2Result = await processStep2(step1Result);
+
+    return { finalResult: step2Result };
+  }
+);
+```
+
+
+
+**4. 函数作用域的状态管理**
+
+当您的状态自然地限定在单个函数内，不需要广泛共享时。
+
+
+
+```typescript
+import { task, entrypoint } from "@langchain/langgraph";
+
+const analyzeDocument = task("analyzeDocument", async (document: string) => {
+  // 函数内的本地状态管理
+  const sections = extractSections(document);
+  const summaries = await Promise.all(sections.map(summarize));
+  const keyPoints = extractKeyPoints(summaries);
+
+  return {
+    sections: sections.length,
+    summaries,
+    keyPoints,
+  };
+});
+
+const documentProcessor = entrypoint(
+  { checkpointer },
+  async (document: string) => {
+    const analysis = await analyzeDocument(document);
+    // 状态在函数之间按需传递
+    return await generateReport(analysis);
+  }
+);
+```
+
+
+
+## 结合使用两种 API
+
+您可以在同一个应用程序中同时使用两种 API。这在系统的不同部分有不同需求时非常有用。
+
+
+
+```typescript
+import * as z from "zod";
+import {
+  StateGraph,
+  StateSchema,
+  entrypoint,
+  type GraphNode,
+} from "@langchain/langgraph";
+
+// 为复杂的多智能体协调定义状态
+const CoordinationState = new StateSchema({
+  rawData: z.record(z.string(), z.unknown()),
+  processedData: z.record(z.string(), z.unknown()).optional(),
+});
+
+// 使用函数式 API 进行简单的数据处理
+const dataProcessor = entrypoint({}, async (rawData: Record<string, unknown>) => {
+  const cleaned = await cleanData(rawData);
+  const transformed = await transformData(cleaned);
+  return transformed;
+});
+
+// 在图 API 中使用函数式 API 的结果
+const orchestratorNode: GraphNode<typeof CoordinationState> = async (state) => {
+  const processedData = await dataProcessor.invoke(state.rawData);
+  return { processedData };
+};
+
+// 使用图 API 进行复杂的多智能体协调
+const coordinationGraph = new StateGraph(CoordinationState)
+  .addNode("orchestrator", orchestratorNode)
+  .addNode("agentA", agentANode)
+  .addNode("agentB", agentBNode);
+```
+
+
+
+## API 之间的迁移
+
+### 从函数式 API 迁移到图 API
+
+当您的函数式工作流变得复杂时，可以迁移到图 API：
+
+
+
+```typescript
+import * as z from "zod";
+import { entrypoint } from "@langchain/langgraph";
+
+// 之前：函数式 API
+const complexWorkflow = entrypoint(
+  { checkpointer },
+  async (inputData: Record<string, unknown>) => {
+    const step1 = await processStep1(inputData);
+
+    let result: unknown;
+    if (step1.needsAnalysis) {
+      const analysis = await analyzeData(step1);
+      if (analysis.confidence > 0.8) {
+        result = await highConfidencePath(analysis);
+      } else {
+        result = await lowConfidencePath(analysis);
+      }
+    } else {
+      result = await simplePath(step1);
+    }
+
+    return result;
+  }
+);
+
+// 之后：图 API
+import {
+  StateGraph,
+  StateSchema,
+  type GraphNode,
+  type ConditionalEdgeRouter,
+} from "@langchain/langgraph";
+
+const WorkflowState = new StateSchema({
+  inputData: z.record(z.string(), z.unknown()),
+  step1Result: z.record(z.string(), z.unknown()).optional(),
+  analysis: z.record(z.string(), z.unknown()).optional(),
+  finalResult: z.unknown().optional(),
+});
+
+const shouldAnalyze: ConditionalEdgeRouter<typeof WorkflowState> = (state) => {
+  return state.step1Result?.needsAnalysis ? "analyze" : "simplePath";
+};
+
+const confidenceCheck: ConditionalEdgeRouter<typeof WorkflowState> = (state) => {
+  return (state.analysis?.confidence as number) > 0.8
+    ? "highConfidence"
+    : "lowConfidence";
+};
+
+const workflow = new StateGraph(WorkflowState)
+  .addNode("step1", processStep1Node)
+  .addConditionalEdges("step1", shouldAnalyze)
+  .addNode("analyze", analyzeDataNode)
+  .addConditionalEdges("analyze", confidenceCheck);
+// ... 添加剩余的节点和边
+```
+
+
+
+### 从图 API 迁移到函数式 API
+
+当您的图对于简单的线性过程变得过于复杂时：
+
+
+
+```typescript
+import { z } from "zod/v4";
+import { StateGraph, StateSchema, entrypoint } from "@langchain/langgraph";
+
+// 之前：过度设计的图 API
+const SimpleState = new StateSchema({
+  input: z.string(),
+  step1: z.string().optional(),
+  step2: z.string().optional(),
+  result: z.string().optional(),
+});
+
+// 之后：简化的函数式 API
+const simpleWorkflow = entrypoint(
+  { checkpointer },
+  async (inputData: string) => {
+    const step1 = await processStep1(inputData);
+    const step2 = await processStep2(step1);
+    return await finalizeResult(step2);
+  }
+);
+```
+
+
+
+## 总结
+
+当您需要对工作流结构、复杂分支、并行处理或团队协作优势进行显式控制时，选择 **图 API**。
+
+当您希望以最小的改动将 LangGraph 功能添加到现有代码中、拥有简单的线性工作流或需要快速原型设计能力时，选择 **函数式 API**。
+
+两种 API 都提供相同的核心 LangGraph 功能（持久化、流式传输、人在回路、记忆），但以不同的范式打包，以适应不同的开发风格和用例。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\choosing-apis.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,73 @@
+---
+title: "Brave 搜索集成"
+description: "使用 LangChain Python 与 Brave 搜索文档加载器集成。"
+---
+
+>[Brave Search](https://en.wikipedia.org/wiki/Brave_Search) 是由 Brave Software 开发的搜索引擎。
+>
+> - `Brave Search` 使用其自身的网页索引。截至 2022 年 5 月，它覆盖了超过 100 亿个页面，并且 92% 的搜索结果无需依赖任何第三方即可提供，其余部分则通过服务器端从 Bing API 获取，或（在用户选择加入的情况下）通过客户端从 Google 获取。据 Brave 称，该索引“有意保持比 Google 或 Bing 更小的规模”，以帮助避免垃圾信息和低质量内容，但缺点是“Brave Search 在处理长尾查询方面尚不如 Google”。
+>- `Brave Search Premium`：截至 2023 年 4 月，Brave Search 是一个无广告网站，但最终将转向包含广告的新模式，而高级用户将获得无广告体验。默认情况下，不会收集包括 IP 地址在内的用户数据。选择加入数据收集需要高级账户。
+
+## 安装与设置
+
+要访问 Brave Search API，您需要[创建账户并获取 API 密钥](https://api.search.brave.com/app/dashboard)。
+
+```python
+api_key = "..."
+```
+
+```python
+from langchain_community.document_loaders import BraveSearchLoader
+```
+
+## 示例
+
+```python
+loader = BraveSearchLoader(
+    query="obama middle name", api_key=api_key, search_kwargs={"count": 3}
+)
+docs = loader.load()
+len(docs)
+```
+
+```text
+3
+```
+
+```python
+[doc.metadata for doc in docs]
+```
+
+```text
+[{'title': "Obama's Middle Name -- My Last Name -- is 'Hussein.' So?",
+  'link': 'https://www.cair.com/cair_in_the_news/obamas-middle-name-my-last-name-is-hussein-so/'},
+ {'title': "What's up with Obama's middle name? - Quora",
+  'link': 'https://www.quora.com/Whats-up-with-Obamas-middle-name'},
+ {'title': 'Barack Obama | Biography, Parents, Education, Presidency, Books, ...',
+  'link': 'https://www.britannica.com/biography/Barack-Obama'}]
+```
+
+```python
+[doc.page_content for doc in docs]
+```
+
+```python
+['I wasn’t sure whether to laugh or cry a few days back listening to radio talk show host Bill Cunningham repeatedly scream Barack <strong>Obama</strong>’<strong>s</strong> <strong>middle</strong> <strong>name</strong> — my last <strong>name</strong> — as if he had anti-Muslim Tourette’s. “Hussein,” Cunningham hissed like he was beckoning Satan when shouting the ...',
+ 'Answer (1 of 15): A better question would be, “What’s up with <strong>Obama</strong>’s first <strong>name</strong>?” President Barack Hussein <strong>Obama</strong>’s father’s <strong>name</strong> was Barack Hussein <strong>Obama</strong>. He was <strong>named</strong> after his father. Hussein, <strong>Obama</strong>’<strong>s</strong> <strong>middle</strong> <strong>name</strong>, is a very common Arabic <strong>name</strong>, meaning &quot;good,&quot; &quot;handsome,&quot; or ...',
+ 'Barack <strong>Obama</strong>, in full Barack Hussein <strong>Obama</strong> II, (born August 4, 1961, Honolulu, Hawaii, U.S.), 44th president of the United States (2009–17) and the first African American to hold the office. Before winning the presidency, <strong>Obama</strong> represented Illinois in the U.S.']
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\brave_search.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,95 @@
+---
+title: 使用 HTTP 头部进行运行时配置
+sidebarTitle: 可配置的头部
+---
+LangGraph 允许通过运行时配置动态调整代理行为与权限。在使用 [LangSmith 部署](/langsmith/deployment-quickstart) 时，您可以通过请求体 (`config`) 或特定的请求头部传递此配置。这使得能够基于用户身份或其他请求进行调整。
+
+出于隐私考虑，您可以通过 [`langgraph.json`](/langsmith/application-structure#configuration-file) 文件中的 `http.configurable_headers` 部分来控制哪些头部会传递到运行时配置。
+
+以下是如何自定义包含和排除的头部：
+
+```json
+{
+  "http": {
+    "configurable_headers": {
+      "includes": ["x-user-id", "x-organization-id", "my-prefix-*"],
+      "excludes": ["authorization", "x-api-key"]
+    }
+  }
+}
+```
+
+`includes` 和 `excludes` 列表接受确切的头部名称或使用 `*` 匹配任意数量字符的模式。出于安全考虑，不支持其他正则表达式模式。
+
+## 在图中使用
+
+您可以在任何节点的 `config` 参数中访问已包含的头部。
+
+```python
+def my_node(state, config):
+  organization_id = config["configurable"].get("x-organization-id")
+  ...
+```
+
+或者通过从上下文中获取（这在工具或其他嵌套函数中很有用）。
+
+```python
+from langgraph.config import get_config
+
+def search_everything(query: str):
+  organization_id = get_config()["configurable"].get("x-organization-id")
+  ...
+```
+
+您甚至可以使用此功能动态编译图。
+
+```python
+# my_graph.py.
+import contextlib
+
+@contextlib.asynccontextmanager
+async def generate_agent(config):
+  organization_id = config["configurable"].get("x-organization-id")
+  if organization_id == "org1":
+    graph = ...
+    yield graph
+  else:
+    graph = ...
+    yield graph
+
+```
+
+```json
+{
+  "graphs": {"agent": "my_grph.py:generate_agent"}
+}
+```
+
+### 选择退出可配置头部
+
+如果您希望选择退出可配置头部，只需在 `excludes` 列表中设置一个通配符模式：
+
+```json
+{
+  "http": {
+    "configurable_headers": {
+      "excludes": ["*"]
+    }
+  }
+}
+```
+
+这将排除所有头部被添加到您的运行配置中。
+
+请注意，排除规则优先于包含规则。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\configurable-headers.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

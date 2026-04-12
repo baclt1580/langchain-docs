@@ -1,0 +1,93 @@
+---
+title: 追踪 Instructor 应用
+sidebarTitle: Instructor（仅限 Python）
+---
+
+LangSmith 提供了与 [Instructor](https://python.useinstructor.com/) 的便捷集成，这是一个流行的开源库，用于通过 LLM 生成结构化输出。
+
+要使用此功能，首先需要设置你的 LangSmith API 密钥。
+
+```shell
+export LANGSMITH_API_KEY=<你的-api-key>
+# 对于关联到多个工作空间的 LangSmith API 密钥，设置 LANGSMITH_WORKSPACE_ID 环境变量以指定要使用的工作空间。
+export LANGSMITH_WORKSPACE_ID=<你的-workspace-id>
+```
+
+接下来，你需要安装 LangSmith SDK：
+
+<CodeGroup>
+```bash pip
+pip install -U langsmith
+```
+
+```bash uv
+uv add langsmith
+```
+</CodeGroup>
+
+使用 `langsmith.wrappers.wrap_openai` 包装你的 OpenAI 客户端
+
+```python
+from openai import OpenAI
+from langsmith import wrappers
+
+client = wrappers.wrap_openai(OpenAI())
+```
+
+之后，你可以使用 `instructor` 对包装后的 OpenAI 客户端进行补丁：
+
+```python
+import instructor
+
+client = instructor.patch(client)
+```
+
+现在，你可以像往常一样使用 `instructor`，但所有操作都会被记录到 LangSmith！
+
+```python
+from pydantic import BaseModel
+
+
+class UserDetail(BaseModel):
+    name: str
+    age: int
+
+
+user = client.chat.completions.create(
+    model="gpt-4.1-mini",
+    response_model=UserDetail,
+    messages=[
+        {"role": "user", "content": "提取 Jason 25 岁"},
+    ]
+)
+```
+
+通常，你会在其他函数内部使用 `instructor`。
+你可以通过使用这个包装后的客户端，并用 `@traceable` 装饰这些函数来获得嵌套的追踪记录。
+有关如何使用 `@traceable` 装饰器为代码添加追踪注释的更多信息，请参阅[自定义插装](/langsmith/annotate-code)。
+
+```python {highlight={2}}
+# 你可以使用 `name` 关键字参数自定义运行名称
+@traceable(name="提取用户详情")
+def my_function(text: str) -> UserDetail:
+    return client.chat.completions.create(
+        model="gpt-4.1-mini",
+        response_model=UserDetail,
+        messages=[
+            {"role": "user", "content": f"提取 {text}"},
+        ]
+    )
+
+my_function("Jason 25 岁")
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\trace-with-instructor.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

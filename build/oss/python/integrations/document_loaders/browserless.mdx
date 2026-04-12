@@ -1,0 +1,66 @@
+---
+title: "Browserless 集成"
+description: "使用 LangChain Python 与 Browserless 文档加载器集成。"
+---
+
+Browserless 是一项服务，允许您在云端运行无头 Chrome 实例。这是一种无需自行管理基础设施即可大规模运行基于浏览器的自动化的绝佳方式。
+
+要将 Browserless 用作文档加载器，请按此笔记本所示初始化 `BrowserlessLoader` 实例。请注意，默认情况下，`BrowserlessLoader` 会返回页面 `body` 元素的 `innerText`。若要禁用此功能并获取原始 HTML，请将 `text_content` 设置为 `False`。
+
+```python
+from langchain_community.document_loaders import BrowserlessLoader
+```
+
+```python
+BROWSERLESS_API_TOKEN = "YOUR_BROWSERLESS_API_TOKEN"
+```
+
+```python
+loader = BrowserlessLoader(
+    api_token=BROWSERLESS_API_TOKEN,
+    urls=[
+        "https://en.wikipedia.org/wiki/Document_classification",
+    ],
+    text_content=True,
+)
+
+documents = loader.load()
+
+print(documents[0].page_content[:1000])
+```
+
+```text
+跳转到内容
+主菜单
+搜索
+创建账户
+登录
+个人工具
+切换目录
+文档分类
+17 种语言
+条目
+讨论
+阅读
+编辑
+查看历史
+工具
+来自维基百科，自由的百科全书
+
+文档分类或文档归类是图书馆学、信息科学和计算机科学中的一个问题。其任务是将文档分配到一个或多个类别或分类中。这可以“手动”（或“智能地”）或通过算法完成。文档的智能分类主要属于图书馆学的范畴，而文档的算法分类则主要在信息科学和计算机科学中进行。然而，这些问题相互重叠，因此存在关于文档分类的跨学科研究。
+
+待分类的文档可以是文本、图像、音乐等。每种文档都有其特殊的分类问题。当未另行说明时，通常指的是文本分类。
+
+做
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\browserless.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

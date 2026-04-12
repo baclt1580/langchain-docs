@@ -1,0 +1,136 @@
+---
+title: 模型
+---
+
+Deep Agents 可与任何支持[工具调用](/oss/javascript/langchain/models#tool-calling)的 [LangChain 聊天模型](/oss/javascript/langchain/models) 协同工作。
+
+## 传入模型字符串
+
+
+
+指定模型的最简单方式是向 [`createDeepAgent`](https://reference.langchain.com/javascript/deepagents/agent/createDeepAgent) 传入一个字符串。使用 `provider:model` 格式来选择特定的提供商：
+
+
+
+
+```typescript
+const agent = createDeepAgent({ model: "openai:gpt-5.3-codex" });
+```
+
+
+在底层，这会使用默认参数调用 [`init_chat_model`](https://reference.langchain.com/javascript/langchain/chat_models/universal/initChatModel)。
+
+## 配置模型参数
+
+要配置模型特定的参数，请使用 [`init_chat_model`](https://reference.langchain.com/javascript/langchain/chat_models/universal/initChatModel) 或直接实例化提供商模型类：
+
+
+
+<CodeGroup>
+    ```typescript initChatModel
+    import { initChatModel } from "langchain/chat_models/universal";
+    import { createDeepAgent } from "deepagents";
+
+    const model = await initChatModel("anthropic:claude-sonnet-4-6", {
+        maxTokens: 16000,
+        thinking: { type: "enabled", budgetTokens: 10000 },  // [!code highlight]
+    });
+    const agent = createDeepAgent({ model });
+    ```
+
+    ```typescript Provider package
+    import { ChatAnthropic } from "@langchain/anthropic";
+    import { createDeepAgent } from "deepagents";
+
+    const model = new ChatAnthropic({
+        model: "claude-sonnet-4-6",
+        maxTokens: 16000,
+        thinking: { type: "enabled", budgetTokens: 10000 },  // [!code highlight]
+    });
+    const agent = createDeepAgent({ model });
+    ```
+</CodeGroup>
+
+
+<Note>
+  可用参数因提供商而异。有关提供商特定的配置选项，请参阅[聊天模型集成](/oss/javascript/integrations/chat)页面。
+</Note>
+
+## 在运行时选择模型
+
+如果你的应用程序允许用户选择模型（例如通过 UI 中的下拉菜单），可以使用[中间件](/oss/javascript/langchain/middleware)在运行时切换模型，而无需重新构建智能体。
+
+通过[运行时上下文](/oss/javascript/langchain/agents#dynamic-model)传递用户的模型选择，然后使用 `wrap_model_call` 中间件，通过 @[`@wrap_model_call`] 装饰器在每次调用时覆盖模型：
+
+
+
+```typescript
+import { initChatModel, createMiddleware } from "langchain";
+import { createDeepAgent } from "deepagents";
+import * as z from "zod";
+
+const contextSchema = z.object({
+  model: z.string(),
+});
+
+const configurableModel = createMiddleware({
+  name: "ConfigurableModel",
+  wrapModelCall: async (request, handler) => {
+    const modelName = request.runtime.context.model;
+    const model = await initChatModel(modelName);
+    return handler({ ...request, model });
+  },
+});
+
+const agent = await createDeepAgent({
+  model: "anthropic:claude-sonnet-4-6",
+  middleware: [configurableModel],
+  contextSchema,
+});
+
+// 使用用户选择的模型进行调用
+const result = await agent.invoke(
+  { messages: [{ role: "user", content: "Hello!" }] },
+  { context: { model: "openai:gpt-4.1" } },
+);
+```
+
+
+<Tip>
+  关于更多动态模型模式（例如基于对话复杂性或成本优化的路由），请参阅 LangChain 智能体指南中的[动态模型](/oss/javascript/langchain/agents#dynamic-model)。
+</Tip>
+
+## 支持的模型
+
+Deep Agents 可与任何支持[工具调用](/oss/javascript/langchain/models#tool-calling)的聊天模型协同工作。有关支持的提供商的完整列表，请参阅[聊天模型集成](/oss/javascript/integrations/chat)。
+
+### 推荐模型
+
+这些模型在 [Deep Agents 评估套件](https://github.com/langchain-ai/deepagents/tree/main/libs/deepagents/tests/evals) 上表现良好，该套件测试基本的智能体操作。通过这些评估是必要的，但对于在更长、更复杂的任务上获得强大性能来说还不够充分。
+
+| 提供商 | 模型 |
+|----------|--------|
+| [Anthropic](/oss/javascript/integrations/providers/anthropic) | `claude-opus-4-6`, `claude-opus-4-5`, `claude-sonnet-4-6`, `claude-sonnet-4`, `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-1` |
+| [OpenAI](/oss/javascript/integrations/providers/openai) | `gpt-5.4`, `gpt-4o`, `gpt-4.1`, `o4-mini`, `gpt-5.2-codex`, `gpt-4o-mini`, `o3` |
+| [Google](/oss/javascript/integrations/providers/google) | `gemini-3-flash-preview`, `gemini-3.1-pro-preview` |
+| 开源权重模型 | `GLM-5`, `Kimi-K2.5`, `MiniMax-M2.5`, `qwen3.5-397B-A17B`, `devstral-2-123B` |
+
+
+
+开源权重模型可通过 [OpenRouter](/oss/javascript/integrations/chat/openrouter)、[Fireworks](/oss/javascript/integrations/chat/fireworks) 或 [Ollama](/oss/javascript/integrations/chat/ollama) 等提供商获取。
+
+
+## 了解更多
+
+- [LangChain 中的模型](/oss/javascript/langchain/models)：聊天模型功能，包括工具调用、结构化输出和多模态
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\models.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

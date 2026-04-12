@@ -1,0 +1,102 @@
+---
+title: 与 Claude Agent SDK 和 Codex 的对比
+sidebarTitle: 对比
+description: 比较 LangChain Deep Agents 与 Claude Agent SDK 和 Codex SDK，为您的用例选择合适的工具
+---
+
+本页面帮助您了解 [LangChain Deep Agents](/oss/javascript/deepagents/overview) 与 [Claude Agent SDK](https://platform.anthropic.com/docs/en/agent-sdk/overview) 和 [Codex SDK](https://developers.openai.com/codex/sdk) 的对比。
+
+<Info>
+Deep Agents 已被 [OpenSWE](https://github.com/langchain-ai/open-swe) 和 [LangSmith Fleet](/langsmith/fleet/index) 用于生产环境。
+</Info>
+
+## 概述
+
+| 方面 | **LangChain Deep Agents** | **Claude Agent SDK** | **Codex SDK** |
+| ---- | ------------------------- | -------------------- | ------------- |
+| **用例** | 自定义通用代理（包括编码） | 自定义 AI 编码代理 | 可执行编码任务的预构建编码代理 |
+| **模型支持** | 灵活且模型无关（Anthropic、OpenAI 及其他 100 多种） | 与 Claude 模型紧密集成（Anthropic、Azure、Vertex AI、AWS Bedrock） | 与 OpenAI 模型紧密集成（GPT-5.3-Codex 及其变体） |
+| **架构** | Python SDK、TypeScript SDK 和 CLI | Python SDK、TypeScript SDK | TypeScript SDK、CLI、桌面应用、IDE 扩展、云界面 |
+| **执行环境** | 本地、远程沙箱、虚拟文件系统 | 本地 | 本地、云端 |
+| **部署** | LangGraph Platform | 自托管 | 不适用 |
+| **前端** | [与 React 集成](/oss/javascript/langchain/streaming/frontend) | 仅限服务器端 | 仅限服务器端 |
+| **可观测性** | LangSmith 追踪与评估 | 不适用 | OpenAI 追踪与命令行评估 |
+| **安全可配置性** | 可组合、按工具的人机协同 | 具有模式、规则和钩子的权限系统 | 使用审批模式和操作系统级沙箱的内置层级 |
+| **许可证** | MIT | MIT（底层 Claude Code 是专有的） | Apache-2.0 |
+
+### 主要差异
+
+**LangChain Deep Agents**：
+- **模型灵活性**：随时切换模型提供商（Anthropic、OpenAI 或其他 100 多种）并运行评估。
+- **长期记忆**：通过 [记忆存储](/oss/javascript/deepagents/memory) 在会话和线程间持久化上下文
+- **沙箱即工具模式**：在来自 [不同提供商](/oss/javascript/deepagents/sandboxes) 的隔离沙箱中运行单个操作，而代理在外部运行；或者将整个代理运行在沙箱内
+- **虚拟文件系统**：使用可插拔后端（内存、磁盘、持久存储、沙箱）进行上下文和检查点管理
+- **生产部署**：通过 [LangSmith](/oss/javascript/langgraph/deploy) 部署或使用 Agent Server 自托管
+- **可观测性**：使用 [LangSmith](/langsmith/home) 进行原生追踪和调试
+
+**Claude Agent SDK**：
+- **标准化于 Claude**：在 Anthropic、Azure、Vertex AI 和 AWS Bedrock 上对 Claude 模型提供一流支持
+- **自定义托管**：构建自己的 HTTP/WebSocket 层并在容器中运行 SDK
+- **钩子**：轻松拦截和控制代理行为
+
+**Codex SDK**：
+- **标准化于 OpenAI**：GPT-5.3-Codex 和 OpenAI 特定工具
+- **操作系统级沙箱模式**：使用内置的 `read-only`、`workspace-write` 或 `danger-full-access` 模式
+- **MCP 服务器模式**：通过 `codex mcp-server` 将您的代理暴露为 MCP 服务器
+- **可观测性**：使用 [OpenAI Traces](https://developers.openai.com/codex/guides/agents-sdk/#trace-the-workflow)
+
+## 功能对比
+
+| 功能 | **Deep Agents** | **Claude Agent SDK** | **Codex SDK** |
+| ---- | --------------- | -------------------- | ------------- |
+<tr><td colspan="4"><strong>核心工具</strong></td></tr>
+| 文件读/写/编辑 | ✅ [`read_file`、`write_file`、`edit_file`](/oss/javascript/deepagents/harness#virtual-filesystem-access) | ✅ [读、写、编辑](https://platform.claude.com/docs/en/agent-sdk/overview#capabilities) | ✅ 读、写、编辑 |
+| Shell 执行 | ✅ [`execute`](/oss/javascript/deepagents/) | ✅ [bash](https://platform.claude.com/docs/en/agent-sdk/overview#capabilities) | ✅ [`exec`](https://developers.openai.com/codex/cli/features#scripting-codex) |
+| Glob/Grep | ✅ [`glob`、`grep`](/oss/javascript/deepagents/harness#virtual-filesystem-access) | ✅ [glob、grep](https://platform.claude.com/docs/en/agent-sdk/overview#capabilities) | ✅ 内置 |
+| 网络搜索 | ✅ 支持 [第三方](/oss/javascript/deepagents/customization#tools) 和 [提供商原生](/oss/javascript/integrations/chat/openai#web-search) | ✅ [WebSearch、WebFetch](https://platform.claude.com/docs/en/agent-sdk/overview#capabilities) | ✅ [`web_search`](https://developers.openai.com/codex/cli/features#web-search) |
+| 规划/待办事项 | ✅ [`write_todos`](/oss/javascript/deepagents/harness#planning-capabilities) | ✅ [待办事项列表](https://platform.claude.com/docs/en/agent-sdk/todo-tracking) | ✅ [变更前规划](https://developers.openai.com/codex/cli/features) |
+| 子代理 | ✅ [子代理](/oss/javascript/deepagents/subagents) | ✅ [子代理](https://platform.claude.com/docs/en/agent-sdk/subagents) | ✅ [多代理工作流](https://developers.openai.com/codex/concepts/multi-agents)（实验性），通过 MCP + Agents SDK |
+| MCP 客户端 | ✅ | ✅ [MCP](https://platform.claude.com/docs/en/agent-sdk/mcp) | ✅ [MCP 客户端](https://developers.openai.com/codex/mcp) |
+| 人机协同 | ✅ [批准/编辑/拒绝](/oss/javascript/deepagents/human-in-the-loop#decision-types) | ✅ [权限模式](https://platform.claude.com/docs/en/agent-sdk/permissions) | ✅ [审批模式](https://developers.openai.com/codex/cli/features#approval-modes)（完全访问、只读、自动） |
+| 技能系统 | ✅ [技能](/oss/javascript/deepagents/skills) | ✅ [技能](https://platform.claude.com/docs/en/agent-sdk/skills) | ✅ [技能](https://developers.openai.com/codex/skills) |
+| 附加指令 | ✅ [记忆](/oss/javascript/deepagents/customization#memory) | ✅ [CLAUDE.md 文件](https://platform.claude.com/docs/en/agent-sdk/modifying-system-prompts#method-1-claude-md-files-project-level-instructions) | ✅ [AGENTS.md](https://developers.openai.com/codex/guides/agents-md) |
+| 长期记忆 | ✅ [记忆存储](/oss/javascript/deepagents/memory) | ❌ | ❌ |
+| 流式传输 | ✅ [流式传输](/oss/javascript/deepagents/streaming/overview) | ✅ [流式传输](https://platform.claude.com/docs/en/agent-sdk/streaming-output) | ✅ [流式传输](https://github.com/openai/codex/blob/main/sdk/typescript/README.md#streaming-responses) |
+<tr><td colspan="4"><strong>沙箱集成</strong></td></tr>
+| 代理在沙箱中运行 | ✅ [可在沙箱中运行](/oss/javascript/deepagents/sandboxes#agent-in-sandbox-pattern) | ✅ [可在沙箱中运行](https://platform.claude.com/docs/en/agent-sdk/hosting) | ✅ [可在沙箱中运行](https://developers.openai.com/codex/security#os-level-sandbox) |
+| 代理在沙箱中运行操作 | ✅ [将沙箱用作工具](/oss/javascript/deepagents/sandboxes#sandbox-as-tool-pattern) | ❌ | ❌ |
+| 操作系统级沙箱模式 | ❌ | ❌ | ✅ `read-only`、`workspace-write`、`danger-full-access` |
+<tr><td colspan="4"><strong>架构</strong></td></tr>
+| 可组合中间件 | ✅ | ✅ [钩子](https://platform.claude.com/docs/en/agent-sdk/hooks) | ❌ |
+| 虚拟文件系统 | ✅ [虚拟文件系统](/oss/javascript/deepagents/harness#virtual-filesystem-access)，具有 [可插拔后端](/oss/javascript/deepagents/backends) | ❌ | ❌ |
+<tr><td colspan="4"><strong>部署</strong></td></tr>
+| 生产托管 | ✅ [LangGraph Platform](/oss/javascript/langgraph/deploy)、自托管或独立运行 | 构建自己的 HTTP/WebSocket 层；在 [容器](https://platform.anthropic.com/docs/en/agent-sdk/hosting) 中运行 SDK | ❌ |
+| 本地执行环境 | ✅ | ✅ | ✅ |
+| 云端执行环境 | ❌ | ❌ | ✅ |
+<tr><td colspan="4"><strong>支持的协议</strong></td></tr>
+| ACP 服务器（IDE 集成） | ✅ [ACP 服务器](/oss/javascript/deepagents/acp) | ✅（第三方） | ✅（第三方） |
+| MCP 服务器模式 | [通过 Agent Server 的 MCP 端点](/langsmith/server-mcp) | ❌ | ✅ [`codex mcp-server`](https://developers.openai.com/codex/guides/agents-sdk) |
+| A2A 端点 | ✅ [Agent Server 中的 A2A 端点](https://docs.langchain.com/langsmith/server-a2a#a2a-endpoint-in-agent-server) | ✅ | ❌ |
+<tr><td colspan="4"><strong>状态管理</strong></td></tr>
+| 会话恢复 | ✅ | ✅ [会话管理](https://platform.claude.com/docs/en/agent-sdk/sessions) | ✅ [恢复线程](https://developers.openai.com/codex/cli/features#resuming-conversations)；SDK `resumeThread()` |
+| 文件检查点 | ✅ [后端和检查点](/oss/javascript/deepagents/backends#built-in-backends) | ✅ [文件检查点](https://platform.claude.com/docs/en/agent-sdk/file-checkpointing) | ✅ [Git 检查点](https://developers.openai.com/codex/config-basic) |
+| 时间旅行（状态分支） | ✅ | ✅ | ✅ |
+<tr><td colspan="4"><strong>可观测性</strong></td></tr>
+| 原生追踪 | ✅ [LangSmith](/langsmith/home) | ❌ | ✅ [OpenAI Traces](https://developers.openai.com/codex/guides/agents-sdk/#trace-the-workflow) |
+| 评估 | ✅ [LangSmith](/langsmith/evaluation-concepts) | ❌ | [评估模式](https://developers.openai.com/blog/eval-skills)（使用 `codex exec --json` 命令行） |
+
+## 发现错误？
+
+我们于 2026 年 3 月 4 日起草了此对比。
+如果您发现产品有错误或变更，请 [提交问题](https://github.com/langchain-ai/docs/issues)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\comparison.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

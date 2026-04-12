@@ -1,0 +1,81 @@
+---
+title: "Aleph Alpha 集成"
+description: "使用 LangChain Python 与 Aleph Alpha LLM 进行集成。"
+---
+
+[Luminous 系列](https://docs.aleph-alpha.com/docs/category/luminous/) 是一个大型语言模型（LLM）家族。
+
+本示例介绍如何使用 LangChain 与 Aleph Alpha 模型进行交互。
+
+```python
+# Installing the langchain package needed to use the integration
+pip install -qU langchain-community
+```
+
+```python
+# Install the package
+pip install -qU  aleph-alpha-client
+```
+
+```python
+# create a new token: https://docs.aleph-alpha.com/docs/account/#create-a-new-token
+
+from getpass import getpass
+
+ALEPH_ALPHA_API_KEY = getpass()
+```
+
+```text
+········
+```
+
+```python
+from langchain_community.llms import AlephAlpha
+from langchain_core.prompts import PromptTemplate
+```
+
+```python
+template = """Q: {question}
+
+A:"""
+
+prompt = PromptTemplate.from_template(template)
+```
+
+```python
+llm = AlephAlpha(
+    model="luminous-extended",
+    maximum_tokens=20,
+    stop_sequences=["Q:"],
+    aleph_alpha_api_key=ALEPH_ALPHA_API_KEY,
+)
+```
+
+```python
+llm_chain = prompt | llm
+```
+
+```python
+question = "What is AI?"
+
+llm_chain.invoke({"question": question})
+```
+
+```text
+' Artificial Intelligence is the simulation of human intelligence processes by machines.\n\n'
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\aleph_alpha.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

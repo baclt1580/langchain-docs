@@ -1,0 +1,74 @@
+---
+title: "Microsoft Excel 集成"
+description: "使用 LangChain Python 与 Microsoft Excel 文档加载器集成。"
+---
+
+`UnstructuredExcelLoader` 用于加载 `Microsoft Excel` 文件。该加载器支持 `.xlsx` 和 `.xls` 格式的文件。页面内容将是 Excel 文件的原始文本。如果你在 `"elements"` 模式下使用加载器，Excel 文件的 HTML 表示形式将在文档元数据的 `text_as_html` 键下可用。
+
+有关在本地设置 Unstructured 的更多说明，包括设置所需的系统依赖项，请参阅 [Unstructured](/oss/python/integrations/providers/unstructured/)。
+
+```python
+pip install -qU langchain-community unstructured openpyxl
+```
+
+```python
+from langchain_community.document_loaders import UnstructuredExcelLoader
+
+loader = UnstructuredExcelLoader("./example_data/stanley-cups.xlsx", mode="elements")
+docs = loader.load()
+
+print(len(docs))
+
+docs
+```
+
+```text
+4
+```
+
+```python
+[Document(page_content='Stanley Cups', metadata={'source': './example_data/stanley-cups.xlsx', 'file_directory': './example_data', 'filename': 'stanley-cups.xlsx', 'last_modified': '2023-12-19T13:42:18', 'page_name': 'Stanley Cups', 'page_number': 1, 'languages': ['eng'], 'filetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'category': 'Title'}),
+ Document(page_content='\n\n\nTeam\nLocation\nStanley Cups\n\n\nBlues\nSTL\n1\n\n\nFlyers\nPHI\n2\n\n\nMaple Leafs\nTOR\n13\n\n\n', metadata={'source': './example_data/stanley-cups.xlsx', 'file_directory': './example_data', 'filename': 'stanley-cups.xlsx', 'last_modified': '2023-12-19T13:42:18', 'page_name': 'Stanley Cups', 'page_number': 1, 'text_as_html': '<table border="1" class="dataframe">\n  <tbody>\n    <tr>\n      <td>Team</td>\n      <td>Location</td>\n      <td>Stanley Cups</td>\n    </tr>\n    <tr>\n      <td>Blues</td>\n      <td>STL</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <td>Flyers</td>\n      <td>PHI</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <td>Maple Leafs</td>\n      <td>TOR</td>\n      <td>13</td>\n    </tr>\n  </tbody>\n</table>', 'languages': ['eng'], 'parent_id': '17e9a90f9616f2abed8cf32b5bd3810d', 'filetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'category': 'Table'}),
+ Document(page_content='Stanley Cups Since 67', metadata={'source': './example_data/stanley-cups.xlsx', 'file_directory': './example_data', 'filename': 'stanley-cups.xlsx', 'last_modified': '2023-12-19T13:42:18', 'page_name': 'Stanley Cups Since 67', 'page_number': 2, 'languages': ['eng'], 'filetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'category': 'Title'}),
+ Document(page_content='\n\n\nTeam\nLocation\nStanley Cups\n\n\nBlues\nSTL\n1\n\n\nFlyers\nPHI\n2\n\n\nMaple Leafs\nTOR\n0\n\n\n', metadata={'source': './example_data/stanley-cups.xlsx', 'file_directory': './example_data', 'filename': 'stanley-cups.xlsx', 'last_modified': '2023-12-19T13:42:18', 'page_name': 'Stanley Cups Since 67', 'page_number': 2, 'text_as_html': '<table border="1" class="dataframe">\n  <tbody>\n    <tr>\n      <td>Team</td>\n      <td>Location</td>\n      <td>Stanley Cups</td>\n    </tr>\n    <tr>\n      <td>Blues</td>\n      <td>STL</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <td>Flyers</td>\n      <td>PHI</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <td>Maple Leafs</td>\n      <td>TOR</td>\n      <td>0</td>\n    </tr>\n  </tbody>\n</table>', 'languages': ['eng'], 'parent_id': 'ee34bd8c186b57e3530d5443ffa58122', 'filetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'category': 'Table'})]
+```
+
+## 使用 Azure AI 文档智能
+
+>[Azure AI 文档智能](https://aka.ms/doc-intelligence)（原名 `Azure 表单识别器`）是一项基于机器学习的服务，可从数字或扫描的 PDF、图像、Office 和 HTML 文件中提取文本（包括手写内容）、表格、文档结构（例如标题、章节标题等）以及键值对。
+>
+>文档智能支持 `PDF`、`JPEG/JPG`、`PNG`、`BMP`、`TIFF`、`HEIF`、`DOCX`、`XLSX`、`PPTX` 和 `HTML` 格式。
+
+当前使用 `文档智能` 的加载器实现可以按页面整合内容，并将其转换为 LangChain 文档。默认输出格式为 Markdown，可以轻松与 `MarkdownHeaderTextSplitter` 链接以实现语义文档分块。你也可以使用 `mode="single"` 或 `mode="page"` 来返回单页的纯文本或按页面分割的文档。
+
+### 前提条件
+
+一个位于以下三个预览区域之一的 Azure AI 文档智能资源：**美国东部**、**美国西部 2**、**西欧**——如果你还没有，请按照[此文档](https://learn.microsoft.com/azure/ai-services/document-intelligence/create-document-intelligence-resource?view=doc-intel-4.0.0)创建一个。你将把 `<endpoint>` 和 `<key>` 作为参数传递给加载器。
+
+```python
+pip install -qU langchain langchain-community azure-ai-documentintelligence
+```
+
+```python
+from langchain_community.document_loaders import AzureAIDocumentIntelligenceLoader
+
+file_path = "<filepath>"
+endpoint = "<endpoint>"
+key = "<key>"
+loader = AzureAIDocumentIntelligenceLoader(
+    api_endpoint=endpoint, api_key=key, file_path=file_path, api_model="prebuilt-layout"
+)
+
+documents = loader.load()
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\microsoft_excel.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

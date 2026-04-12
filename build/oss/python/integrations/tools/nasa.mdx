@@ -1,0 +1,63 @@
+---
+title: "NASA 工具包集成"
+description: "使用 LangChain Python 与 NASA 工具包集成。"
+---
+
+本笔记本展示了如何使用代理与 NASA 工具包进行交互。该工具包提供对 NASA 图像和视频库 API 的访问，并有可能在未来的迭代中扩展并包含其他可访问的 NASA API。
+
+**注意：当未指定所需媒体结果的数量时，NASA 图像和视频库搜索查询可能会导致大量响应。在使用代理和 LLM Token 积分之前请考虑这一点。**
+
+## 示例用法
+
+---
+
+### 初始化代理
+
+```python
+pip install -qU langchain langchain-community langchain-openai
+```
+
+```python
+from langchain.agents import create_agent
+from langchain_community.agent_toolkits.nasa.toolkit import NasaToolkit
+from langchain_community.utilities.nasa import NasaAPIWrapper
+from langchain_openai import OpenAI
+
+llm = OpenAI(model="gpt-4o-mini", temperature=0)
+nasa = NasaAPIWrapper()
+toolkit = NasaToolkit.from_nasa_api_wrapper(nasa)
+
+agent = create_agent(
+    model=llm,
+    tools=toolkit.get_tools(),
+)
+```
+
+### 查询媒体资产
+
+```python
+agent.invoke(
+    "Can you find three pictures of the moon published between 2014 and 2020?"
+)
+```
+
+### 查询媒体资产详情
+
+```python
+output = agent.invoke(
+    "Where can I find the metadata manifest for NASA asset NHQ_2019_0311?"
+)
+
+print(output)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\tools\nasa.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

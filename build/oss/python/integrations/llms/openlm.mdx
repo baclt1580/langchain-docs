@@ -1,0 +1,84 @@
+---
+title: "OpenLM 集成"
+description: "使用 LangChain Python 与 OpenLM LLM 进行集成。"
+---
+
+[OpenLM](https://github.com/r2d4/openlm) 是一个零依赖的 OpenAI 兼容 LLM 提供商，可以直接通过 HTTP 调用不同的推理端点。
+
+它实现了 OpenAI Completion 类，因此可以用作 OpenAI API 的即插即用替代品。此代码实现利用 BaseOpenAI 以最小化附加代码。
+
+本示例介绍了如何使用 LangChain 与 OpenAI 和 HuggingFace 进行交互。你需要两者的 API 密钥。
+
+### 设置
+
+安装依赖项并设置 API 密钥。
+
+```python
+# Uncomment to install openlm and openai if you haven't already
+
+pip install -qU  openlm
+pip install -qU  langchain-openai
+```
+
+```python
+import os
+from getpass import getpass
+
+# Check if OPENAI_API_KEY environment variable is set
+if "OPENAI_API_KEY" not in os.environ:
+    print("Enter your OpenAI API key:")
+    os.environ["OPENAI_API_KEY"] = getpass()
+
+# Check if HF_API_TOKEN environment variable is set
+if "HF_API_TOKEN" not in os.environ:
+    print("Enter your HuggingFace Hub API key:")
+    os.environ["HF_API_TOKEN"] = getpass()
+```
+
+### 使用 LangChain 与 OpenLM
+
+这里我们将在 LLMChain 中调用两个模型，来自 OpenAI 的 `text-davinci-003` 和 HuggingFace 上的 `gpt2`。
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain_community.llms import OpenLM
+from langchain_core.prompts import PromptTemplate
+```
+
+```python
+question = "What is the capital of France?"
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+prompt = PromptTemplate.from_template(template)
+
+for model in ["text-davinci-003", "huggingface.co/gpt2"]:
+    llm = OpenLM(model=model)
+    llm_chain = LLMChain(prompt=prompt, llm=llm)
+    result = llm_chain.run(question)
+    print(
+        """Model: {}
+Result: {}""".format(model, result)
+    )
+```
+
+```text
+Model: text-davinci-003
+Result:  France is a country in Europe. The capital of France is Paris.
+Model: huggingface.co/gpt2
+Result: Question: What is the capital of France?
+
+Answer: Let's think step by step. I am not going to lie, this is a complicated issue, and I don't see any solutions to all this, but it is still far more
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\openlm.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

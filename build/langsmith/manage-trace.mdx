@@ -1,0 +1,97 @@
+---
+title: 管理追踪记录
+description: 在 LangSmith 的追踪视图中，可以并排比较追踪记录、公开分享追踪记录，以及查看服务器日志。
+---
+
+在追踪视图中，您可以[并排比较两个追踪记录](#比较追踪记录)、[公开分享追踪记录](#分享追踪记录)，以及查看与追踪执行相关的[服务器日志](#查看服务器日志)。
+
+## 比较追踪记录
+
+您可以从 [UI](https://smith.langchain.com) 的两个区域开始比较追踪记录：
+
+1. 在 **追踪** 项目视图的 **运行** 标签页中，选中要比较的追踪记录旁边的复选框。然后，选择页面底部的 **比较运行**，打开并排比较视图。
+1. 当您查看某个追踪记录时，选择更多 <Icon icon="dots-vertical" /> 菜单，导航到 **比较**。这将打开追踪运行表。选择要与原始追踪记录进行比较的追踪记录。侧边窗格将打开，并以并排比较视图显示两个选中的追踪记录。
+
+要停止比较，请关闭窗格或点击窗格右上角的 **停止比较**。
+
+## 分享追踪记录
+
+<Warning>
+**公开分享追踪记录将使任何拥有链接的人都能访问它。请确保您没有分享敏感信息。**
+
+如果您的[自托管](/langsmith/self-hosted)或[混合](/langsmith/hybrid) LangSmith 部署位于 VPC 内，则公开链接仅对在您 VPC 内通过身份验证的成员可访问。为了增强安全性，我们建议将您的实例配置为仅对有权访问您网络的用户可访问的私有 URL。
+</Warning>
+
+要公开分享追踪记录：
+
+1. 在 [UI](https://smith.langchain.com) 中打开任意追踪记录。
+1. 点击追踪视图顶部更多 <Icon icon="dots-vertical" /> 菜单中的 **分享** 按钮。
+1. 在出现的对话框中，复制公开链接。
+
+分享的追踪记录对任何拥有链接的人都是可访问的，即使他们没有 LangSmith 账户。他们可以查看追踪记录，但不能编辑它。
+
+要取消分享追踪记录，请使用以下任一方法：
+
+1. 打开已分享的追踪记录，点击追踪视图顶部工具栏中的 **公开**，然后在对话框中点击 **取消分享**。
+1. 转到 **设置** → **已分享的 URL**，查看所选工作区中所有公开分享的追踪记录。点击要取消分享的追踪记录旁边的 **取消分享**。
+
+## 查看服务器日志
+
+<Note>
+查看追踪记录的服务器日志仅适用于[云端 SaaS](/langsmith/cloud) 和[完全自托管](/langsmith/self-hosted)部署选项。
+</Note>
+
+当查看由 LangSmith 中的运行生成的追踪记录时，您可以直接从追踪视图访问相关的服务器日志。
+
+在追踪视图中，使用右上角 **在 Studio 中运行** 按钮旁边的 **查看日志** 按钮。
+
+点击此按钮将带您进入 LangSmith 中相关部署的服务器日志视图。
+
+服务器日志视图显示以下两方面的日志：
+
+- **代理服务器自身的运行日志**：内部服务器操作、API 调用和系统事件
+- **用户应用程序日志**：在您的图中写入的日志，使用：
+  - Python：使用 `logging` 或 `structlog` 库。
+  - JavaScript：使用从 `@langchain/langgraph-sdk/logging` 重新导出的 Winston 日志记录器：
+
+    ```javascript
+    import { getLogger } from "@langchain/langgraph-sdk/logging";
+
+    const logger = getLogger();
+    logger.info("您的日志消息");
+    ```
+
+当您从追踪视图导航时，**过滤器** 框将自动预填充您刚刚查看的追踪记录的追踪 ID，以便您可以快速过滤日志，仅查看与您特定追踪执行相关的日志。
+
+![部署服务器日志过滤器](/langsmith/images/lgp-server-logs-filters.png)
+
+## 删除追踪记录
+
+如果您需要在过期日期之前从 LangSmith 中移除追踪记录，可以删除整个项目或删除特定的追踪记录。
+
+### 删除整个项目
+
+- 在 [LangSmith UI](https://smith.langchain.com) 中，选择项目溢出菜单上的 **删除** 选项。
+- 使用 [`delete_tracer_sessions`](https://api.smith.langchain.com/redoc#tag/tracer-sessions/operation/delete_tracer_session_api_v1_sessions__session_id__delete) API 端点。
+- 使用 LangSmith SDK 中的 `delete_project()` ([Python](https://reference.langchain.com/python/langsmith/observability/sdk/)) 或 `deleteProject()` ([JS/TS](https://reference.langchain.com/javascript/modules/langsmith.html))。
+
+### 删除特定追踪记录：
+
+使用 [`delete_runs`](https://api.smith.langchain.com/redoc#tag/run/operation/delete_runs_api_v1_runs_delete_post) API 端点，通过追踪 ID 或元数据键值对删除运行。请求体接受：
+
+- `session_id`：将删除范围限定到特定项目。
+- `trace_ids`：要删除的追踪 ID 列表。
+- `metadata`：删除所有匹配给定元数据键值对的运行。
+
+有关完整的 API 使用说明，包括代码示例、每次请求 1000 条追踪记录的限制、删除时间线以及元数据匹配行为，请参阅[合规性数据清除](/langsmith/data-purging-compliance#追踪记录删除)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\manage-trace.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,73 @@
+---
+title: 单元测试
+description: 使用模拟聊天模型和内存持久化，无需调用 API 即可测试智能体逻辑。
+---
+
+单元测试用于在隔离环境中测试智能体的小型、确定性组件。通过将真实的 LLM 替换为内存中的模拟对象（也称为夹具），您可以编写精确的响应（文本、工具调用和错误），从而使测试变得快速、免费且可重复，无需 API 密钥。
+
+## 模拟聊天模型
+
+LangChain 提供了 [`GenericFakeChatModel`](https://reference.langchain.com/python/langchain-core/language_models/fake_chat_models/GenericFakeChatModel) 用于模拟文本响应。它接受一个响应迭代器（[`AIMessage`](https://reference.langchain.com/python/langchain-core/messages/ai/AIMessage) 对象或字符串），并在每次调用时返回一个响应。它支持常规和流式两种使用方式。
+
+```python
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+
+model = GenericFakeChatModel(messages=iter([
+    AIMessage(content="", tool_calls=[ToolCall(name="foo", args={"bar": "baz"}, id="call_1")]),
+    "bar"
+]))
+
+model.invoke("hello")
+# AIMessage(content='', ..., tool_calls=[{'name': 'foo', 'args': {'bar': 'baz'}, 'id': 'call_1', 'type': 'tool_call'}])
+```
+
+如果我们再次调用模型，它将返回迭代器中的下一个项目：
+
+```python
+model.invoke("hello, again!")
+# AIMessage(content='bar', ...)
+```
+
+## InMemorySaver 检查点
+
+为了在测试期间启用持久化，您可以使用 [`InMemorySaver`](https://reference.langchain.com/python/langgraph/checkpoints/#langgraph.checkpoint.memory.InMemorySaver) 检查点。这允许您模拟多个轮次以测试依赖于状态的行为：
+
+```python
+from langgraph.checkpoint.memory import InMemorySaver
+
+agent = create_agent(
+    model,
+    tools=[],
+    checkpointer=InMemorySaver()
+)
+
+# 第一次调用
+agent.invoke(
+    {"messages": [HumanMessage(content="I live in Sydney, Australia")]},
+    config={"configurable": {"thread_id": "session-1"}}
+)
+
+# 第二次调用：第一条消息已持久化（悉尼位置），因此模型返回 GMT+10 时间
+agent.invoke(
+    {"messages": [HumanMessage(content="What's my local time?")]},
+    config={"configurable": {"thread_id": "session-1"}}
+)
+```
+
+
+
+
+## 后续步骤
+
+了解如何在[集成测试](/oss/python/langchain/test/integration-testing)中使用真实的模型提供商 API 测试您的智能体。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\test\unit-testing.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,64 @@
+---
+title: "VolcengineMaaSChat 集成"
+description: "使用 LangChain Python 集成 VolcengineMaaSChat 聊天模型。"
+---
+
+本指南将为您介绍如何开始使用火山引擎 MaaS 聊天模型。
+
+```python
+# 安装包
+pip install -qU  volcengine
+```
+
+```python
+from langchain_community.chat_models import VolcEngineMaasChat
+from langchain.messages import HumanMessage
+```
+
+```python
+chat = VolcEngineMaasChat(volc_engine_maas_ak="your ak", volc_engine_maas_sk="your sk")
+```
+
+或者您可以在环境变量中设置 access_key 和 secret_key
+
+```bash
+export VOLC_ACCESSKEY=YOUR_AK
+export VOLC_SECRETKEY=YOUR_SK
+```
+
+```python
+chat([HumanMessage(content="给我讲个笑话")])
+```
+
+```text
+AIMessage(content='好的，这是一个笑话：\n\n为什么鸟儿不会玩电脑游戏？\n\n因为它们没有翅膀！')
+```
+
+# 火山引擎 MaaS 聊天流式传输
+
+```python
+chat = VolcEngineMaasChat(
+    volc_engine_maas_ak="your ak",
+    volc_engine_maas_sk="your sk",
+    streaming=True,
+)
+```
+
+```python
+chat([HumanMessage(content="给我讲个笑话")])
+```
+
+```text
+AIMessage(content='好的，这是一个笑话：\n\n三岁的女儿说她会造句了，妈妈让她用“年轻”造句，女儿说：“妈妈减肥，一年轻了好几斤”。')
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\volcengine_maas.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

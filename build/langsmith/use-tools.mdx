@@ -1,0 +1,126 @@
+---
+title: 在提示词中使用工具
+sidebarTitle: 在提示词中使用工具
+---
+
+工具使语言模型能够与外部系统交互，并执行超越单纯文本生成的操作。在 Playground 中，您可以使用两种类型的工具：
+
+1.  [**内置工具**](#内置工具)：由模型提供商（如 OpenAI 和 Anthropic）提供的预配置工具，开箱即用。当您需要常见功能（如网络搜索或代码解释）时，请使用内置工具。
+2.  [**自定义工具**](#创建自定义工具)：您定义的用于执行特定任务的函数。当您需要与自己的系统集成或创建专门功能时，这些工具非常有用。当您在 Playground 中定义自定义工具时，可以验证模型是否正确识别并使用正确的参数调用这些工具。
+
+LangSmith 会自动将您创建的工具保存到工作区范围的[工具注册表](#使用注册表管理工具)中，这使得它们可以在您所有的提示词和会话中重复使用。
+
+## 内置工具
+
+Playground 原生支持来自 OpenAI 和 Anthropic 的各种工具。如果您想使用 Playground 中未明确列出的工具，仍然可以通过手动指定其 `type` 和任何必需的参数来添加它。
+
+### OpenAI 工具
+
+*   **网络搜索**：[搜索网络以获取实时信息](https://platform.openai.com/docs/guides/tools-web-search?api-mode=responses)。
+*   **图像生成**：[基于文本提示生成图像](https://platform.openai.com/docs/guides/tools-image-generation)。
+*   **MCP**：[为模型提供对远程 MCP 服务器上托管的工具的访问权限](https://platform.openai.com/docs/guides/tools-remote-mcp)。
+*   [查看所有 OpenAI 工具](https://platform.openai.com/docs/guides/tools?api-mode=responses)。
+
+### Anthropic 工具
+
+*   **网络搜索**：[搜索网络以获取最新信息](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool)。
+*   [查看所有 Anthropic 工具](https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview)。
+
+## 添加和使用工具
+
+Playground 允许您一键快速[添加工具](#添加工具)到任何提示词。您可以选择由 OpenAI 和 Anthropic 等模型提供商提供的内置工具，也可以定义适合您特定需求的[自定义工具](#创建自定义工具)。一旦创建了自定义工具，它会自动添加到工作区范围的[工具注册表](#使用注册表管理工具)中，您可以在不同的提示词中启用、禁用或编辑它，而无需重新创建。
+
+### 添加工具
+
+要向提示词添加工具，请点击提示词编辑器底部的 **+ 工具** 按钮。
+
+<img
+  className="block dark:hidden"
+  src="/langsmith/images/add-tool-light.png"
+  alt="提示词界面，编辑框后跟着 + 工具按钮。"
+/>
+
+<img
+  className="hidden dark:block"
+  src="/langsmith/images/add-tool-dark.png"
+  alt="提示词界面，编辑框后跟着 + 工具按钮。"
+/>
+
+### 使用内置工具
+
+1.  在工具部分，选择您要使用的内置工具。您只会看到与您选择的提供商和模型兼容的工具。
+2.  当模型调用该工具时，Playground 将显示响应。
+
+    ![网络搜索工具](/langsmith/images/web-search-tool.gif)
+
+### 创建自定义工具
+
+要创建自定义工具，您需要提供：
+
+*   **名称**：工具的描述性名称。
+*   **描述**：对工具功能的清晰说明。
+*   **参数**：您的工具所需的输入。
+
+![自定义工具](/langsmith/images/custom-tool.gif)
+
+在 Playground 中运行自定义工具时，模型将返回一个包含工具名称和工具调用的 JSON 对象。
+
+![工具调用](/langsmith/images/tool-call.png)
+
+### 使用注册表管理工具
+
+Playground 包含一个[工作区](/langsmith/administration-overview#workspaces)范围的**工具注册表**，它能在提示词和会话之间持久保存自定义和内置工具。当您创建自定义工具或添加内置工具时，它会自动保存到您的工作区注册表中，并可在任何提示词中重复使用。您可以按提示词启用或禁用工具，以控制每个特定提示词的活动工具；在编辑共享工具时，您可以选择更新注册表版本或另存为新工具。
+
+点击 Playground 中的 **+ 工具** 按钮以打开**管理工具**。您可以执行以下操作：
+
+*   在**可用工具**选项卡中选择和查看现有工具。
+*   使用**启用**开关切换单个工具的开启/关闭状态。
+*   通过点击列表中的工具来编辑现有工具。
+*   使用**管理工具**底部的**删除**按钮删除工具。
+
+<img
+  className="block dark:hidden"
+  src="/langsmith/images/tool-registry-manage-light.png"
+  alt="管理工具界面，显示可用工具列表、启用开关和编辑功能。"
+/>
+
+<img
+  className="hidden dark:block"
+  src="/langsmith/images/tool-registry-manage-dark.png"
+  alt="管理工具界面，显示可用工具列表、启用开关和编辑功能。"
+/>
+
+工具与其完整配置（包括名称、描述、参数和元数据）一起存储。注册表支持自定义函数工具和内置工具配置。
+
+## 工具选择设置
+
+某些模型提供对调用哪些工具的控制。要配置此功能：
+
+1.  在提示词编辑器下选择 **+ 工具**。
+2.  导航到**工具选择设置**选项卡。
+3.  选择您的工具选择。
+
+要了解可用的工具选择选项，请查阅您特定提供商的文档。例如，[OpenAI 关于工具选择的文档](https://platform.openai.com/docs/guides/function-calling/function-calling-behavior?api-mode=responses#tool-choice)。
+
+<img
+  className="block dark:hidden"
+  src="/langsmith/images/tool-choice-light.png"
+  alt="从工具选择设置选项卡中选择工具。"
+/>
+
+<img
+  className="hidden dark:block"
+  src="/langsmith/images/tool-choice-dark.png"
+  alt="从工具选择设置选项卡中选择工具。"
+/>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\use-tools.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,60 @@
+---
+title: "PubMed 集成"
+description: "使用 LangChain Python 与 PubMed 文档加载器集成。"
+---
+
+>[PubMed®](https://pubmed.ncbi.nlm.nih.gov/) 由 `美国国家生物技术信息中心、国家医学图书馆` 维护，收录了来自 `MEDLINE`、生命科学期刊和在线图书的超过 3500 万条生物医学文献引用。引用可能包含指向 `PubMed Central` 和出版商网站全文内容的链接。
+
+```python
+from langchain_community.document_loaders import PubMedLoader
+```
+
+```python
+loader = PubMedLoader("chatgpt")
+```
+
+```python
+docs = loader.load()
+```
+
+```python
+len(docs)
+```
+
+```text
+3
+```
+
+```python
+docs[1].metadata
+```
+
+```text
+{'uid': '37548997',
+ 'Title': 'ChatGPT 在英国医生情境判断测试（一种基于职业困境的考试）中的表现。',
+ 'Published': '2023-08-07',
+ 'Copyright Information': '©Robin J Borchert, Charlotte R Hickman, Jack Pepys, Timothy J Sadler. Originally published in JMIR Medical Education (https://mededu.jmir.org), 07.08.2023.'}
+```
+
+```python
+docs[1].page_content
+```
+
+```text
+"背景：ChatGPT 是一个大型语言模型，在医学、法律和商业领域的专业考试中表现良好。然而，尚不清楚 ChatGPT 在评估医生职业素养和情境判断的考试中表现如何。\n目的：我们评估了 ChatGPT 在英国所有医学生最后一年参加的国家考试——情境判断测试（SJT）中的表现。该考试旨在评估沟通、团队合作、患者安全、优先级排序能力、职业素养和道德等属性。\n方法：将英国基础医学培训办公室（UKFPO）2023 年 SJT 模拟考试的所有问题输入 ChatGPT。针对每个问题，记录 ChatGPT 的答案和推理，并依据官方 UKFPO 评分模板进行评估。根据评分表中提供的推理所涉及的领域，将问题归类到《良好医疗实践》的各个领域。对于没有明确领域关联的问题，由评审员筛选并分配一个或多个领域。评估了 ChatGPT 的整体表现，以及其在《良好医疗实践》各领域中的表现。\n结果：总体而言，ChatGPT 表现良好，在 SJT 中得分为 76%，但仅在少数问题（9%）上获得满分，这可能反映了 ChatGPT 在情境判断上的潜在缺陷，或考试本身问题间推理的不一致性（或两者兼有）。ChatGPT 在《良好医疗实践》为医生概述的四个领域中表现一致。\n结论：需要进一步研究以了解大型语言模型（如 ChatGPT）在医学教育中的潜在应用，特别是在标准化问题和为评估职业素养与道德的考试提供一致推理方面。"
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\pubmed.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,282 @@
+---
+title: 在云端部署
+sidebarTitle: 云端
+icon: "cloud"
+iconType: "solid"
+description: 创建和管理 LangSmith 云端部署，包括修订版本、日志、指标和设置。
+---
+
+这是将应用程序部署到 LangSmith 云端的综合设置和管理指南。它涵盖两种部署方法：[LangSmith UI](https://smith.langchain.com)（从连接的 GitHub 仓库部署）和 [`langgraph deploy` CLI 命令](/langsmith/cli#deploy)（直接从本地机器构建和推送）。
+
+<Callout icon="bolt" color="#4F46E5" iconType="regular">
+**如果您想快速上手**，请先尝试[快速入门指南](/langsmith/deployment-quickstart)。
+</Callout>
+
+在开始设置之前，请查看[云端概览页面](/langsmith/cloud)以了解云端托管模型。
+
+## 先决条件
+
+- 一个 LangSmith 账户，且为 [Plus 计划或更高](https://www.langchain.com/pricing)。
+- [验证 LangGraph API 在本地运行](/langsmith/local-dev-testing)。如果 API 无法成功运行（即 `langgraph dev`），那么部署到 LangSmith 也会失败。
+
+## 创建新部署
+
+选择适合您工作流程的部署方法——LangSmith UI 连接到 GitHub 仓库并支持推送时自动部署，而 `langgraph deploy` CLI 命令则直接从本地项目目录构建和部署。
+
+<Tabs>
+  <Tab title="LangSmith UI">
+    <Note>
+    **需要一次性设置**：GitHub 组织所有者或管理员必须在 LangSmith UI 中完成 OAuth 流程，以授权 `hosted-langserve` GitHub 应用。每个工作空间只需执行一次。在初始 OAuth 授权之后，所有具有部署权限的开发人员都可以创建和管理部署，而无需 GitHub 管理员访问权限。
+    </Note>
+
+    从 [LangSmith UI](https://smith.langchain.com) 开始，在左侧导航面板中选择 **Deployments**。在右上角，选择 **+ New Deployment** 以创建新部署：
+
+    1. 在 **Create New Deployment** 面板中，填写必填字段。对于 **Deployment details**：
+        1. 选择 **Import from GitHub** 并按照 GitHub OAuth 工作流程安装并授权 LangChain 的 `hosted-langserve` GitHub 应用以访问选定的仓库。安装完成后，返回 **Create New Deployment** 面板，并从下拉菜单中选择要部署的 GitHub 仓库。
+            <Note> 安装 LangChain `hosted-langserve` GitHub 应用的 GitHub 用户必须是组织或账户的[所有者](https://docs.github.com/zh/organizations/managing-peoples-access-to-your-organization-with-roles/roles-in-an-organization#organization-owners)。此授权每个 LangSmith 工作空间只需完成一次——后续部署可以由任何具有部署权限的用户创建。</Note>
+        1. 为部署指定一个名称。
+        1. 指定所需的 **Git Branch**。部署与一个分支相关联。创建新修订版本时，将部署关联分支的代码。稍后可以在[部署设置](#deployment-settings)中更新分支。
+        1. 指定 [LangGraph API 配置文件](/langsmith/cli#configuration-file)的完整路径，包括文件名。例如，如果文件 `langgraph.json` 位于仓库根目录，则指定 `langgraph.json`。
+        1. 使用复选框选择 **Automatically update deployment on push to branch**。如果选中，当更改推送到指定的 **Git Branch** 时，部署将自动更新。您可以在[部署设置](#deployment-settings)中通过[UI](https://smith.langchain.com)启用或禁用此设置。
+        对于 **Deployment Type**：
+            - 开发部署适用于非生产用例，并配置了最少的资源。
+            - 生产部署每秒最多可处理 500 个请求，并配置了具有自动备份功能的高可用存储。
+        1. 确定部署是否应 **Shareable through Studio**。
+            1. 如果未选中，部署将仅对[工作空间](/langsmith/administration-overview#workspaces)的有效 LangSmith API 密钥可访问。
+            1. 如果选中，部署将通过 [Studio](/langsmith/studio) 对任何 LangSmith 用户可访问。将提供一个指向该部署 Studio 的直接 URL，以便与其他 LangSmith 用户共享。
+        1. 指定 **Environment Variables** 和密钥。要为部署配置其他变量，请参阅[环境变量参考](/langsmith/env-var)。
+            1. 敏感值（如 API 密钥，例如 `OPENAI_API_KEY`）应指定为密钥。
+            1. 也可以指定其他非密钥环境变量。
+        1. 将自动创建一个新的 LangSmith [追踪项目](/langsmith/observability)，其名称与部署相同。
+    1. 在右上角，选择 **Submit**。几秒钟后，将出现 **Deployment** 视图，新部署将排队等待配置。
+  </Tab>
+  <Tab title="LangGraph CLI">
+    <Note>
+    `langgraph deploy` 命令处于 **测试版**。它需要安装并运行 [Docker](https://docs.docker.com/get-docker/)。在 Apple Silicon (M1/M2/M3) 上，还需要 [Docker Buildx](https://docs.docker.com/build/install-buildx/) 以交叉编译到 `linux/amd64`。
+    </Note>
+
+    1. 安装 [LangGraph CLI](/langsmith/cli)：
+        ```shell
+        uv tool install langgraph-cli
+        ```
+    1. 将您的 LangSmith API 密钥添加到项目根目录的 `.env` 文件中：
+        ```shell
+        LANGSMITH_API_KEY=lsv2_...
+        ```
+    1. 从您的项目目录运行部署命令：
+        ```shell
+        langgraph deploy
+        ```
+        这将创建一个名为项目目录的 `dev` 部署。使用 `--name` 指定不同的名称，或使用 `--deployment-type prod` 创建生产部署：
+        ```shell
+        langgraph deploy --name my-agent --deployment-type prod
+        ```
+        命令完成后，部署将排队等待配置。环境变量可以在部署创建后通过 [LangSmith UI](https://smith.langchain.com) 管理，也可以在 [`langgraph.json` 的 `env` 字段](/langsmith/cli#configuration-file)中配置。
+  </Tab>
+</Tabs>
+
+## 创建新修订版本
+
+[创建新部署](#create-new-deployment)时，默认会创建一个新修订版本。您可以创建后续修订版本来部署新的代码更改。
+
+<Tabs>
+  <Tab title="LangSmith UI">
+    从 [LangSmith UI](https://smith.langchain.com) 开始，在左侧导航面板中选择 **Deployments**。选择一个现有部署以为其创建新修订版本。
+
+    1. 在 **Deployment** 视图中，在右上角选择 **+ New Revision**。
+    1. 在 **New Revision** 模态框中，填写必填字段。
+        1. 指定 [API 配置文件](/langsmith/cli#configuration-file)的完整路径，包括文件名。例如，如果文件 `langgraph.json` 位于仓库根目录，则指定 `langgraph.json`。
+        1. 确定部署是否应 **Shareable through Studio**。
+            - 如果未选中，部署将仅对[工作空间](/langsmith/administration-overview#workspaces)的有效 LangSmith API 密钥可访问。
+            - 如果选中，部署将通过 [Studio](/langsmith/studio) 对任何 LangSmith 用户可访问。将提供一个指向该部署 Studio 的直接 URL，以便与其他 LangSmith 用户共享。
+        1. 指定 **Environment Variables** 和密钥。现有的密钥和环境变量会预先填充。要为修订版本配置其他变量，请参阅[环境变量参考](/langsmith/env-var)。
+            1. 添加新的密钥或环境变量。
+            1. 移除现有的密钥或环境变量。
+            1. 更新现有密钥或环境变量的值。
+    1. 选择 **Submit**。几秒钟后，**New Revision** 模态框将关闭，新修订版本将排队等待部署。
+  </Tab>
+  <Tab title="LangGraph CLI">
+    从您的项目目录重新运行 `langgraph deploy`。该命令会按名称查找现有部署，并使用您最新的代码更改创建一个新修订版本：
+
+    ```shell
+    langgraph deploy
+    ```
+
+    要按 ID 而非名称定位特定部署，请使用 `--deployment-id`：
+
+    ```shell
+    langgraph deploy --deployment-id <DEPLOYMENT_ID>
+    ```
+
+    使用 `langgraph deploy list` 查看所有部署并找到它们的 ID：
+
+    ```shell
+    langgraph deploy list
+    ```
+
+    <Note>
+    `langgraph deploy` 只能更新最初由 `langgraph deploy` 创建的部署。通过 LangSmith UI 或 GitHub 集成创建的部署无法使用此命令更新。
+    </Note>
+  </Tab>
+</Tabs>
+
+## 查看构建和服务器日志
+
+每个修订版本都可以查看构建和服务器日志。
+
+<Tabs>
+  <Tab title="LangSmith UI">
+    从 **Deployments** 视图开始：
+
+    1. 从 **Revisions** 表中选择所需的修订版本。右侧会滑出一个面板，默认选中 **Build** 选项卡，其中显示该修订版本的构建日志。
+    1. 在面板中，选择 **Server** 选项卡以查看该修订版本的服务器日志。服务器日志仅在修订版本部署后才可用。
+    1. 在 **Server** 选项卡内，根据需要调整日期/时间范围选择器。默认情况下，日期/时间范围选择器设置为 **Last 7 days**。
+  </Tab>
+  <Tab title="LangGraph CLI">
+    使用 `langgraph deploy logs` 获取部署的日志。
+
+    查看服务器（运行时）日志：
+
+    ```shell
+    langgraph deploy logs
+    ```
+
+    查看构建日志：
+
+    ```shell
+    langgraph deploy logs --type build
+    ```
+
+    持续跟踪实时到达的日志：
+
+    ```shell
+    langgraph deploy logs --follow
+    ```
+
+    按时间范围、日志级别或搜索字符串过滤日志：
+
+    ```shell
+    langgraph deploy logs --start-time 2026-03-01T00:00:00Z --level ERROR
+    ```
+
+    如果您有多个部署，请按名称或 ID 指定目标：
+
+    ```shell
+    langgraph deploy logs --name my-agent
+    langgraph deploy logs --deployment-id <DEPLOYMENT_ID>
+    ```
+
+    有关所有可用选项，请参阅 [`deploy logs` CLI 参考](/langsmith/cli#deploy-logs)。
+  </Tab>
+</Tabs>
+
+## 查看部署指标
+
+部署上线后，您可以从 [LangSmith UI](https://smith.langchain.com) 监控其性能。
+
+从 LangSmith UI 开始：
+
+1. 在左侧导航面板中，选择 **Deployments**。
+1. 选择一个现有部署进行监控。
+1. 选择 **Monitoring** 选项卡以查看部署指标。请参阅[所有可用指标列表](/langsmith/control-plane#monitoring)。
+1. 在 **Monitoring** 选项卡内，根据需要调整日期/时间范围选择器。默认情况下，日期/时间范围选择器设置为 **Last 15 minutes**。
+
+## 中断修订版本
+
+中断修订版本将停止该修订版本的部署。
+
+<Warning>
+**未定义行为**
+中断的修订版本具有未定义的行为。这仅在您需要部署新修订版本，而现有修订版本“卡住”进行中时有用。未来此功能可能会被移除。
+</Warning>
+
+从 **Deployments** 视图开始：
+
+1. 从 **Revisions** 表中，在所需修订版本行的右侧选择菜单图标（三个点）。
+1. 从菜单中选择 **Interrupt**。
+1. 将出现一个模态框。查看确认信息。选择 **Interrupt revision**。
+
+## 删除部署
+
+<Tabs>
+  <Tab title="LangSmith UI">
+    从 [LangSmith UI](https://smith.langchain.com) 开始：
+
+    1. 在左侧导航面板中，选择 **Deployments**，其中包含现有部署的列表。
+    1. 在所需部署行的右侧选择菜单图标（三个点），然后选择 **Delete**。
+    1. 将出现 **Confirmation** 模态框。选择 **Delete**。
+  </Tab>
+  <Tab title="LangGraph CLI">
+    使用 `langgraph deploy list` 查找要删除的部署的 ID：
+
+    ```shell
+    langgraph deploy list
+    ```
+
+    然后按 ID 删除：
+
+    ```shell
+    langgraph deploy delete <DEPLOYMENT_ID>
+    ```
+
+    要跳过确认提示，请使用 `--force`：
+
+    ```shell
+    langgraph deploy delete --force <DEPLOYMENT_ID>
+    ```
+  </Tab>
+</Tabs>
+
+## 部署设置
+
+从 **Deployments** 视图开始：
+
+1. 在右上角，选择齿轮图标 (**Deployment Settings**)。
+1. 将 `Git Branch` 更新为所需分支。
+1. 勾选/取消勾选 **Automatically update deployment on push to branch** 复选框。
+    1. 分支创建/删除和标签创建/删除事件不会触发更新。只有推送到现有分支才会触发更新。
+    1. 快速连续推送到一个分支将排队后续更新。一旦构建完成，最新的提交将开始构建，其他排队的构建将被跳过。
+
+## 添加或移除 GitHub 仓库
+
+安装并授权 LangChain 的 `hosted-langserve` GitHub 应用后，可以修改该应用的仓库访问权限，以添加新仓库或移除现有仓库。如果创建了新仓库，可能需要显式添加。
+
+1. 从 GitHub 个人资料，导航到 **Settings** > **Applications** > `hosted-langserve` > 点击 **Configure**。
+1. 在 **Repository access** 下，选择 **All repositories** 或 **Only select repositories**。如果选择 **Only select repositories**，则必须显式添加新仓库。
+1. 点击 **Save**。
+1. 创建新部署时，下拉菜单中的 GitHub 仓库列表将更新以反映仓库访问权限的更改。
+
+## 允许列表 IP 地址
+
+2025年1月6日之后创建的所有 LangSmith 部署的流量都将通过 NAT 网关。
+此 NAT 网关将根据您部署的区域拥有多个静态 IP 地址。请参考下表以获取需要加入允许列表的 IP 地址：
+
+| 美国             | 欧盟              |
+|----------------|-----------------|
+| 35.197.29.146  | 34.90.213.236   |
+| 34.145.102.123 | 34.13.244.114   |
+| 34.169.45.153  | 34.32.180.189   |
+| 34.82.222.17   | 34.34.69.108    |
+| 35.227.171.135 | 34.32.145.240   |
+| 34.169.88.30   | 34.90.157.44    |
+| 34.19.93.202   | 34.141.242.180  |
+| 34.19.34.50    | 34.32.141.108   |
+| 34.59.244.194  |                 |
+| 34.9.99.224    |                 |
+| 34.68.27.146   |                 |
+| 34.41.178.137  |                 |
+| 34.123.151.210 |                 |
+| 34.135.61.140  |                 |
+| 34.121.166.52  |                 |
+| 34.31.121.70   |                 |
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\deploy-to-cloud.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,41 @@
+---
+title: MULTIPLE_SUBGRAPHS
+---
+
+当你在一个节点中[多次调用子图](/oss/javascript/langgraph/use-subgraphs#call-a-subgraph-inside-a-node)，并且该子图是以 `checkpointer=True`（延续模式）编译时，会出现此错误。
+
+## 故障排除
+
+根据你的需求选择以下方案之一：
+
+
+
+1. **不需要中断？** 使用 `checkpointer: false` 完全退出检查点机制：
+   ```typescript
+   const subgraph = subgraphBuilder.compile({ checkpointer: false });
+   ```
+
+2. **需要中断但不需要跨调用持久化？** 省略 `checkpointer` 参数以使用默认的继承模式：
+   ```typescript
+   const subgraph = subgraphBuilder.compile();
+   ```
+   每次调用都会获得唯一的命名空间，因此支持并行执行。子图每次都会重新开始，但可以使用 `interrupt()`。
+
+3. **需要跨调用持久化？** 使用 `checkpointer: true`。LangGraph 会为每次调用分配一个基于位置的命名空间后缀（`calling_node`、`calling_node|1` 等）以防止冲突。如需稳定的、基于名称的命名空间，请用唯一的节点名称包装每个子图——参见[并行子图](/oss/javascript/langgraph/use-subgraphs#subgraph-persistence)。
+
+
+## 相关链接
+
+- [子图持久化](/oss/javascript/langgraph/use-subgraphs#subgraph-persistence) —— 检查点模式的完整对比
+- [持久化](/oss/javascript/langgraph/persistence) —— LangGraph 中检查点机制的工作原理
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\errors\MULTIPLE_SUBGRAPHS.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

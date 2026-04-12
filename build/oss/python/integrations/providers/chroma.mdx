@@ -1,0 +1,46 @@
+---
+title: "Chroma 集成"
+description: "使用 LangChain Python 与 Chroma 进行集成。"
+---
+
+> [Chroma](https://docs.trychroma.com/getting-started) 是一个用于构建带有嵌入功能的 AI 应用程序的数据库。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install langchain-chroma
+```
+
+```bash uv
+uv add langchain-chroma
+```
+</CodeGroup>
+
+
+## 向量存储
+
+存在一个针对 Chroma 向量数据库的包装器，允许您将其用作向量存储，无论是用于语义搜索还是示例选择。
+
+```python
+from langchain_chroma import Chroma
+```
+
+有关 Chroma 包装器的更详细教程，请参阅 [此笔记本](/oss/python/integrations/vectorstores/chroma)
+
+## 检索器
+
+```python
+from langchain_classic.retrievers import SelfQueryRetriever
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\chroma.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,64 @@
+---
+title: "Meta AI 的 LASER 语言无关句子表示集成"
+description: "使用 LangChain Python 集成 Meta AI 嵌入模型的 LASER 语言无关句子表示。"
+---
+
+>[LASER](https://github.com/facebookresearch/LASER/) 是由 Meta AI 研究团队开发的 Python 库，截至 2024 年 2 月 25 日，用于为超过 147 种语言创建多语言句子嵌入。
+>
+>- 支持的语言列表位于 [github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
+
+## 依赖项
+
+要使用 LaserEmbed 与 LangChain，请安装 `laser_encoders` Python 包。
+
+```python
+pip install laser_encoders
+```
+
+## 导入
+
+```python
+from langchain_community.embeddings.laser import LaserEmbeddings
+```
+
+## 实例化 laser
+
+### 参数
+
+- `lang: Optional[str]`
+        >如果为空，则默认
+    使用多语言 LASER 编码器模型（称为"laser2"）。
+    您可以在 [FLORES-200 语言列表](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
+    和 [LASER 语言列表](https://github.com/facebookresearch/LASER/blob/main/laser_encoders/language_list.py) 中找到支持的语言和 lang_codes。
+
+```python
+# Ex Instantiationz
+embeddings = LaserEmbeddings(lang="eng_Latn")
+```
+
+## 用法
+
+### 生成文档嵌入
+
+```python
+document_embeddings = embeddings.embed_documents(
+    ["This is a sentence", "This is some other sentence"]
+)
+```
+
+### 生成查询嵌入
+
+```python
+query_embeddings = embeddings.embed_query("This is a query")
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\laser.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

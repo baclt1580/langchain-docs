@@ -1,0 +1,171 @@
+---
+title: "Libsql 集成"
+description: "使用 LangChain JavaScript 与 Libsql 向量存储集成。"
+---
+
+[Turso](https://turso.tech) 是一个基于 [libSQL](https://docs.turso.tech/libsql)（SQLite 的开源贡献分支）构建的 SQLite 兼容数据库。向量相似性搜索作为原生数据类型内置于 Turso 和 libSQL 中，使您能够直接在数据库中存储和查询向量。
+
+LangChain.js 支持使用本地 libSQL 或远程 Turso 数据库作为向量存储，并提供了简单的 API 与之交互。
+
+本指南提供了快速入门 `LibSQLVectorStore` [向量存储](/oss/javascript/integrations/vectorstores) 的简要概述。
+
+## 概述
+
+## 集成详情
+
+| 类                 | 包                     | Python 支持 | 版本                                                              |
+| ------------------ | ---------------------- | ----------- | ----------------------------------------------------------------- |
+| `LibSQLVectorStore` | `@langchain/community` | ❌          | ![npm 版本](https://img.shields.io/npm/v/@langchain/community) |
+
+## 设置
+
+要使用 libSQL 向量存储，您需要创建一个 Turso 账户或设置一个本地 SQLite 数据库，并安装 `@langchain/community` 集成包。
+
+本指南还将使用 OpenAI 嵌入模型，这需要您安装 `@langchain/openai` 集成包。您也可以使用其他支持的嵌入模型。
+
+在使用 libSQL 向量存储时，您可以使用本地 SQLite，或使用托管的 Turso 数据库。
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @libsql/client @langchain/openai @langchain/community
+```
+现在需要创建一个数据库。您可以创建一个本地数据库，或使用托管的 Turso 数据库。
+
+### 本地 libSQL
+
+创建一个新的本地 SQLite 文件并连接到 shell：
+
+```bash
+sqlite3 file.db
+```
+### 托管 Turso
+
+访问 [sqlite.new](https://sqlite.new) 创建一个新数据库，为其命名，并创建数据库认证令牌。
+
+请务必复制数据库认证令牌和数据库 URL，它应该类似于：
+
+```text
+libsql://[数据库名称]-[您的用户名].turso.io
+```
+### 设置表和索引
+
+执行以下 SQL 命令来创建新表或向现有表添加嵌入列。
+
+请确保修改 SQL 的以下部分：
+
+- `TABLE_NAME` 是您要创建的表的名称。
+- `content` 用于存储 `Document.pageContent` 值。
+- `metadata` 用于存储 `Document.metadata` 对象。
+- `EMBEDDING_COLUMN` 用于存储向量值，使用您计划使用的模型的维度大小（OpenAI 为 1536）。
+
+```sql
+CREATE TABLE IF NOT EXISTS TABLE_NAME (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT,
+    metadata TEXT,
+    EMBEDDING_COLUMN F32_BLOB(1536) -- 1536 维 f32 向量，适用于 OpenAI
+);
+```
+现在在 `EMBEDDING_COLUMN` 列上创建索引——索引名称很重要！：
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_TABLE_NAME_EMBEDDING_COLUMN ON TABLE_NAME(libsql_vector_idx(EMBEDDING_COLUMN));
+```
+请确保将 `TABLE_NAME` 和 `EMBEDDING_COLUMN` 替换为前一步中使用的值。
+
+## 实例化
+
+要初始化一个新的 `LibSQL` 向量存储，您需要提供数据库 URL 和认证令牌（远程工作时），或通过传递本地 SQLite 的文件名。
+
+```typescript
+import { LibSQLVectorStore } from "@langchain/community/vectorstores/libsql";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { createClient } from "@libsql/client";
+
+const embeddings = new OpenAIEmbeddings({
+  model: "text-embedding-3-small",
+});
+
+const libsqlClient = createClient({
+  url: "libsql://[数据库名称]-[您的用户名].turso.io",
+  authToken: "...",
+});
+
+// 本地实例化
+// const libsqlClient = createClient({
+//  url: "file:./dev.db",
+// });
+
+const vectorStore = new LibSQLVectorStore(embeddings, {
+  db: libsqlClient,
+  table: "TABLE_NAME",
+  column: "EMBEDDING_COLUMN",
+});
+```
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```typescript
+import type { Document } from "@langchain/core/documents";
+
+const documents: Document[] = [
+  { pageContent: "Hello", metadata: { topic: "greeting" } },
+  { pageContent: "Bye bye", metadata: { topic: "greeting" } },
+];
+
+await vectorStore.addDocuments(documents);
+```
+### 从向量存储删除项目
+
+```typescript
+await vectorStore.deleteDocuments({ ids: [1, 2] });
+```
+## 查询向量存储
+
+插入文档后，您可以查询向量存储。
+
+### 直接查询
+
+执行简单的相似性搜索可以按如下方式进行：
+
+```typescript
+const resultOne = await vectorStore.similaritySearch("hola", 1);
+
+for (const doc of similaritySearchResults) {
+  console.log(`${doc.pageContent} [${JSON.stringify(doc.metadata, null)}]`);
+}
+```
+对于带分数的相似性搜索：
+
+```typescript
+const similaritySearchWithScoreResults =
+  await vectorStore.similaritySearchWithScore("hola", 1);
+
+for (const [doc, score] of similaritySearchWithScoreResults) {
+  console.log(
+    `${score.toFixed(3)} ${doc.pageContent} [${JSON.stringify(doc.metadata)}]`
+  );
+}
+```
+
+---
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储[操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\libsql.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

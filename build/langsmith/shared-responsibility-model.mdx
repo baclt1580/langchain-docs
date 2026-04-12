@@ -1,0 +1,52 @@
+---
+title: LangSmith 责任共担模型
+sidebarTitle: 责任共担模型
+description: 概述 LangChain 与客户在 LangSmith 平台安全责任上的划分。
+---
+
+LangSmith 作为一个多租户 SaaS 解决方案运行。我们的安全模型设计力求简洁：LangChain 负责保障平台基础设施和应用的安全，而您则负责保障您的具体使用方式、数据输入以及您构建的 AI 智能体的安全。
+
+## 责任矩阵
+
+| 领域 | LangChain 责任（提供方） | 客户责任（使用方） |
+| :---- | :---- | :---- |
+| **基础设施** | 我们管理底层云基础设施（通过 GCP），包括服务器、网络、操作系统补丁和容量规划。GCP 拥有物理数据中心。 | 不适用。您无需在 SaaS 环境中配置或维护计算资源。 |
+| **应用** | 我们保障 LangSmith 应用代码、API 端点和数据库集群的安全，包括代码扫描和渗透测试。 | 您负责保障使用我们 SDK 构建的 AI 链和智能体的安全性与可靠性。 |
+| **数据** | 我们强制执行租户隔离，并对静态数据使用 AES-256 加密，对传输中数据使用 TLS 1.2 或更高版本加密。 | 您控制发送给我们的数据，并必须在数据离开您的环境之前，通过 SDK 过滤掉敏感的个人身份信息。 |
+| **身份** | 我们提供安全护栏，包括 SSO/SCIM、MFA 强制执行选项和 RBAC 框架。 | 您管理您的用户名单，分配角色（例如，管理员与查看者），并为离职员工撤销访问权限。 |
+| **密钥** | 我们安全地存储您托付给平台的密钥。 | 您负责轮换您的 API 密钥，并确保它们没有硬编码在您的应用程序中。 |
+
+## LangChain 的责任（平台方）
+
+- 我们维持 SOC 2 Type II、GDPR 和 HIPAA 合规性，并接受年度第三方审计和渗透测试。
+- 我们在 Google Cloud Platform 上管理所有底层基础设施，包括网络防火墙、通过 Cloud Armor 实现的 DDoS 防护以及容器安全。
+- 我们根据 SLA 维持高可用性，执行每日备份，并处理 LangSmith 服务的灾难恢复。
+- 我们在严格的服务水平协议内修补已确认的平台漏洞，关键严重性问题在 2 周内修复，高严重性问题在 30 天内修复。
+- 我们对所有客户数据使用 AES-256 进行静态加密，使用 TLS 1.2 或更高版本进行传输加密。
+
+## 客户的责任（使用方）
+
+- 您必须强制执行最小权限访问，并立即移除离开您组织的员工的访问权限。
+- 您必须确保不向平台发送任何禁止数据（例如 PCI DSS 持卡人数据），并使用 SDK 中的脱敏功能在源头对 PII 进行编辑。
+- 您负责运行 LangChain SDK 的环境（包括您的笔记本电脑和服务器）的安全。
+- 您必须定期轮换您的 API 密钥，并确保它们存储在环境变量中，而不是硬编码在源代码里。
+
+## 客户安全最佳实践
+
+为了与我们 SOC 2 Type II 框架中的安全假设保持一致，我们建议客户遵循以下内部准则：
+
+- 在您的租户设置中保持最新的技术和安全联系人信息，以便我们的团队在发生事件时能够联系到您。
+- 如果您怀疑密钥泄露，请立即通过自助服务门户轮换您的密钥。如果您有任何疑问或需要协助处理安全漏洞，可以随时联系 LangChain 安全团队。
+- 为您特定的应用程序制定灾难恢复计划，以应对 LangSmith 服务可能不可用的情况。
+- 确保用于访问 LangSmith UI 的工作站和终端设备定期打补丁并得到安全保护。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\shared-responsibility-model.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

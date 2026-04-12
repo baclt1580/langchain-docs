@@ -1,0 +1,46 @@
+---
+title: "EPUB 文件 - 集成"
+description: "使用 LangChain JavaScript 与 EPUB 文件文档加载器进行集成。"
+---
+
+本示例介绍了如何从 EPUB 文件中加载数据。默认情况下，EPUB 文件中的每个章节将创建一个文档，您可以通过将 `splitChapters` 选项设置为 `false` 来更改此行为。
+
+# 安装
+
+```bash npm
+npm install @langchain/community @langchain/core epub2 html-to-text
+```
+# 使用方式，每个章节一个文档
+
+```typescript
+import { EPubLoader } from "@langchain/community/document_loaders/fs/epub";
+
+const loader = new EPubLoader("src/document_loaders/example_data/example.epub");
+
+const docs = await loader.load();
+```
+# 使用方式，每个文件一个文档
+
+```typescript
+import { EPubLoader } from "@langchain/community/document_loaders/fs/epub";
+
+const loader = new EPubLoader(
+  "src/document_loaders/example_data/example.epub",
+  {
+    splitChapters: false,
+  }
+);
+
+const docs = await loader.load();
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\file_loaders\epub.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

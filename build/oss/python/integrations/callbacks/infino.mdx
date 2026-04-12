@@ -1,0 +1,295 @@
+---
+title: "Infino 集成"
+description: "使用 LangChain Python 与 Infino 回调进行集成。"
+---
+
+>[Infino](https://github.com/infinohq/infino) 是一个为日志、指标和追踪设计的可扩展遥测存储。Infino 可以作为独立的可观测性解决方案，也可以作为您可观测性栈中的存储层。
+
+本示例展示了如何通过 `LangChain` 和 [Infino](https://github.com/infinohq/infino) 在调用 OpenAI 和 ChatOpenAI 模型时追踪以下内容：
+
+* 提示输入
+* 来自 `ChatGPT` 或任何其他 `LangChain` 模型的响应
+* 延迟
+* 错误
+* 消耗的令牌数量
+
+## 初始化
+
+```python
+# 安装必要的依赖。
+pip install -qU  infinopy
+pip install -qU  matplotlib
+pip install -qU  tiktoken
+pip install -qU  langchain langchain-openai langchain-community
+pip install -qU  beautifulsoup4
+```
+
+```python
+from langchain_community.callbacks.infino_callback import InfinoCallbackHandler
+```
+
+```python
+import datetime as dt
+import json
+import time
+
+import matplotlib.dates as md
+import matplotlib.pyplot as plt
+from infinopy import InfinoClient
+from langchain_openai import OpenAI
+```
+
+## 启动 infino 服务器，初始化 infino 客户端
+
+```python
+# 使用 Infino docker 镜像启动服务器。
+!docker run --rm --detach --name infino-example -p 3000:3000 infinohq/infino:latest
+
+# 创建 Infino 客户端。
+client = InfinoClient()
+```
+
+```text
+a1159e99c6bdb3101139157acee6aba7ae9319375e77ab6fbc79beff75abeca3
+```
+
+## 读取问题数据集
+
+```python
+# 这些是斯坦福 QA 数据集的一个子集问题 -
+# https://rajpurkar.github.io/SQuAD-explorer/
+data = """诺曼底位于哪个国家？
+诺曼人何时在诺曼底？
+诺斯人起源于哪些国家？
+诺斯人的领袖是谁？
+诺曼人首次获得独立身份是在哪个世纪？
+谁在 1000 年代和 1100 年代将他们的名字赋予了诺曼底？
+法国是哪个地区的一部分？
+查理三世国王向谁宣誓效忠？
+法兰克身份何时出现？
+黑斯廷斯战役中的公爵是谁？
+谁统治了诺曼底公国？
+诺曼人信仰什么宗教？
+诺曼王朝对现代欧洲产生了何种重大影响？
+谁以其基督教精神而闻名？
+谁同化了罗马语言？
+谁统治了诺曼底国家？
+征服者威廉建立了哪个公国？
+“诺曼”一词的原始含义是什么？
+“诺曼”一词的拉丁版本首次记录于何时？
+哪个名字来源于英语单词 Normans/Normanz？"""
+
+questions = data.split("\n")
+```
+
+## 示例 1：LangChain OpenAI 问答；将指标和日志发布到 infino
+
+```python
+# 在此处设置您的密钥。
+# os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
+
+# 创建回调处理器。这将向 Infino 记录延迟、错误、令牌使用情况、提示以及提示响应。
+handler = InfinoCallbackHandler(
+    model_id="test_openai", model_version="0.1", verbose=False
+)
+
+# 创建 LLM。
+llm = OpenAI(temperature=0.1)
+
+# 向 OpenAI 模型提问的问题数量。为了在运行此演示时节省 $$，我们限制在一个较小的数字。
+num_questions = 10
+
+questions = questions[0:num_questions]
+for question in questions:
+    print(question)
+
+    # 我们将问题发送到 OpenAI API，并使用 Infino 回调。
+    llm_result = llm.generate([question], callbacks=[handler])
+    print(llm_result)
+```
+
+```text
+诺曼底位于哪个国家？
+generations=[[Generation(text='\n\n诺曼底位于法国。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 16, 'prompt_tokens': 7, 'completion_tokens': 9}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('67a516e3-d48a-4e83-92ba-a139079bd3b1'))]
+诺曼人何时在诺曼底？
+generations=[[Generation(text='\n\n诺曼人于 9 世纪末首次定居在诺曼底。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 24, 'prompt_tokens': 8, 'completion_tokens': 16}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('6417a773-c863-4942-9607-c8a0c5d486e7'))]
+诺斯人起源于哪些国家？
+generations=[[Generation(text='\n\n诺斯人起源于斯堪的纳维亚，包括现代挪威、瑞典和丹麦。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 32, 'prompt_tokens': 8, 'completion_tokens': 24}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('70547d72-7925-454e-97fb-5539f8788c3f'))]
+诺斯人的领袖是谁？
+generations=[[Generation(text='\n\n最著名的诺斯人领袖是传奇的维京国王拉格纳·洛德布罗克。他是一位传奇的维京英雄和统治者，据说生活在 9 世纪。他以传奇事迹闻名，包括在 845 年领导维京突袭巴黎。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 62, 'prompt_tokens': 6, 'completion_tokens': 56}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('04500e37-44ab-4e56-9017-76fe8c19e2ca'))]
+诺曼人首次获得独立身份是在哪个世纪？
+generations=[[Generation(text='\n\n诺曼人首次获得独立身份是在 11 世纪。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 28, 'prompt_tokens': 12, 'completion_tokens': 16}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('adf319b7-1022-40df-9afe-1d65f869d83d'))]
+谁在 1000 年代和 1100 年代将他们的名字赋予了诺曼底？
+generations=[[Generation(text='\n\n诺曼人，来自法国北部的一个民族，在 1000 年代和 1100 年代将他们的名字赋予了诺曼底。诺曼人是 800 年代末定居在该地区的维京人的后裔。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 57, 'prompt_tokens': 13, 'completion_tokens': 44}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('1a0503bc-d033-4b69-a5fa-5e1796566133'))]
+法国是哪个地区的一部分？
+generations=[[Generation(text='\n\n法国是欧洲的一个地区。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 16, 'prompt_tokens': 7, 'completion_tokens': 9}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('7485d954-1c14-4dff-988a-25a0aa0871cc'))]
+查理三世国王向谁宣誓效忠？
+generations=[[Generation(text='\n\n查理三世国王向西班牙国王菲利普二世宣誓效忠。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 25, 'prompt_tokens': 10, 'completion_tokens': 15}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('292c7143-4a08-43cd-a1e1-42cb1f594f33'))]
+法兰克身份何时出现？
+generations=[[Generation(text='\n\n法兰克身份开始出现于 5 世纪末，当时法兰克人开始在该地区扩张其权力和影响力。法兰克人是定居在现代法国和德国地区的一个日耳曼部落。他们最终建立了墨洛温王朝，该王朝从 6 世纪中叶到 751 年统治了西欧大部分地区。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 85, 'prompt_tokens': 8, 'completion_tokens': 77}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('3d9475c2-931e-4217-8bc3-b3e970e7597c'))]
+黑斯廷斯战役中的公爵是谁？
+generations=[[Generation(text='\n\n诺曼底公爵，征服者威廉，是 1066 年黑斯廷斯战役中诺曼军队的领袖。', generation_info={'finish_reason': 'stop', 'logprobs': None})]] llm_output={'token_usage': {'total_tokens': 39, 'prompt_tokens': 11, 'completion_tokens': 28}, 'model_name': 'text-davinci-003'} run=[RunInfo(run_id=UUID('b8f84619-ea5f-4c18-b411-b62194f36fe0'))]
+```
+
+## 创建指标图表
+
+我们现在使用 matplotlib 创建延迟、错误和消耗令牌的图表。
+
+```python
+# 使用 matplotlib 创建图表的辅助函数。
+def plot(data, title):
+    data = json.loads(data)
+
+    # 从数据中提取 x 和 y 值
+    timestamps = [item["time"] for item in data]
+    dates = [dt.datetime.fromtimestamp(ts) for ts in timestamps]
+    y = [item["value"] for item in data]
+
+    plt.rcParams["figure.figsize"] = [6, 4]
+    plt.subplots_adjust(bottom=0.2)
+    plt.xticks(rotation=25)
+    ax = plt.gca()
+    xfmt = md.DateFormatter("%Y-%m-%d %H:%M:%S")
+    ax.xaxis.set_major_formatter(xfmt)
+
+    # 创建图表
+    plt.plot(dates, y)
+
+    # 设置标签和标题
+    plt.xlabel("时间")
+    plt.ylabel("值")
+    plt.title(title)
+
+    plt.show()
+```
+
+```python
+response = client.search_ts("__name__", "latency", 0, int(time.time()))
+plot(response.text, "延迟")
+
+response = client.search_ts("__name__", "error", 0, int(time.time()))
+plot(response.text, "错误")
+
+response = client.search_ts("__name__", "prompt_tokens", 0, int(time.time()))
+plot(response.text, "提示令牌")
+
+response = client.search_ts("__name__", "completion_tokens", 0, int(time.time()))
+plot(response.text, "完成令牌")
+
+response = client.search_ts("__name__", "total_tokens", 0, int(time.time()))
+plot(response.text, "总令牌数")
+```
+
+## 对提示或提示输出进行全文查询
+
+```python
+# 搜索特定的提示文本。
+query = "normandy"
+response = client.search_log(query, 0, int(time.time()))
+print("结果 for", query, ":", response.text)
+
+print("===")
+
+query = "king charles III"
+response = client.search_log("king charles III", 0, int(time.time()))
+print("结果 for", query, ":", response.text)
+```
+
+```text
+结果 for normandy : [{"time":1696947743,"fields":{"prompt_response":"\n\n诺曼人，来自法国北部的一个民族，在 1000 年代和 1100 年代将他们的名字赋予了诺曼底。诺曼人是 800 年代末定居在该地区的维京人的后裔。"},"text":"\n\n诺曼人，来自法国北部的一个民族，在 1000 年代和 1100 年代将他们的名字赋予了诺曼底。诺曼人是 800 年代末定居在该地区的维京人的后裔。"},{"time":1696947740,"fields":{"prompt":"谁在 1000 年代和 1100 年代将他们的名字赋予了诺曼底？"},"text":"谁在 1000 年代和 1100 年代将他们的名字赋予了诺曼底？"},{"time":1696947733,"fields":{"prompt_response":"\n\n诺曼人于 9 世纪末首次定居在诺曼底。"},"text":"\n\n诺曼人于 9 世纪末首次定居在诺曼底。"},{"time":1696947732,"fields":{"prompt_response":"\n\n诺曼底位于法国。"},"text":"\n\n诺曼底位于法国。"},{"time":1696947731,"fields":{"prompt":"诺曼底位于哪个国家？"},"text":"诺曼底位于哪个国家？"}]
+===
+结果 for king charles III : [{"time":1696947745,"fields":{"prompt_response":"\n\n查理三世国王向西班牙国王菲利普二世宣誓效忠。"},"text":"\n\n查理三世国王向西班牙国王菲利普二世宣誓效忠。"},{"time":1696947744,"fields":{"prompt":"查理三世国王向谁宣誓效忠？"},"text":"查理三世国王向谁宣誓效忠？"}]
+```
+
+# 示例 2：使用 ChatOpenAI 总结一段文本
+
+```python
+# 在此处设置您的密钥。
+# os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
+
+from langchain_classic.chains.summarize import load_summarize_chain
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_openai import ChatOpenAI
+
+# 创建回调处理器。这将向 Infino 记录延迟、错误、令牌使用情况、提示以及提示响应。
+handler = InfinoCallbackHandler(
+    model_id="test_chatopenai", model_version="0.1", verbose=False
+)
+
+urls = [
+    "https://lilianweng.github.io/posts/2023-06-23-agent/",
+    "https://medium.com/lyft-engineering/lyftlearn-ml-model-training-infrastructure-built-on-kubernetes-aef8218842bb",
+    "https://blog.langchain.dev/week-of-10-2-langchain-release-notes/",
+]
+
+for url in urls:
+    loader = WebBaseLoader(url)
+    docs = loader.load()
+
+    llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo-16k", callbacks=[handler])
+    chain = load_summarize_chain(llm, chain_type="stuff", verbose=False)
+
+    chain.run(docs)
+```
+
+## 创建指标图表
+
+```python
+response = client.search_ts("__name__", "latency", 0, int(time.time()))
+plot(response.text, "延迟")
+
+response = client.search_ts("__name__", "error", 0, int(time.time()))
+plot(response.text, "错误")
+
+response = client.search_ts("__name__", "prompt_tokens", 0, int(time.time()))
+plot(response.text, "提示令牌")
+
+response = client.search_ts("__name__", "completion_tokens", 0, int(time.time()))
+plot(response.text, "完成令牌")
+```
+
+```python
+## 对提示或提示输出进行全文查询
+```
+
+```python
+# 搜索特定的提示文本。
+query = "machine learning"
+response = client.search_log(query, 0, int(time.time()))
+
+# 输出可能很冗长 - 如果需要打印，请取消下面的注释。
+# print("结果 for", query, ":", response.text)
+
+print("===")
+```
+
+```text
+===
+```
+
+```python
+## 停止 Infino 服务器
+```
+
+```python
+!docker rm -f infino-example
+```
+
+```text
+infino-example
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\callbacks\infino.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

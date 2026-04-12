@@ -1,0 +1,50 @@
+---
+title: "HuggingFace Hub 集成"
+description: "使用 LangChain Python 与 HuggingFace Hub 工具集成。"
+---
+
+>[Huggingface Tools](https://huggingface.co/docs/transformers/v4.29.0/en/custom_tools) 支持文本输入输出，可以直接使用 `load_huggingface_tool` 函数加载。
+
+```python
+# Requires transformers>=4.29.0 and huggingface_hub>=0.14.1
+pip install -qU  transformers huggingface_hub > /dev/null
+```
+
+```python
+pip install -qU  langchain-community
+```
+
+```python
+from langchain_community.agent_toolkits.load_tools import load_huggingface_tool
+
+tool = load_huggingface_tool("lysandre/hf-model-downloads")
+
+print(f"{tool.name}: {tool.description}")
+```
+
+```text
+model_download_counter: This is a tool that returns the most downloaded model of a given task on the Hugging Face Hub. It takes the name of the category (such as text-classification, depth-estimation, etc), and returns the name of the checkpoint
+```
+
+```python
+tool.run("text-classification")
+```
+
+```text
+'facebook/bart-large-mnli'
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\tools\huggingface_tools.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

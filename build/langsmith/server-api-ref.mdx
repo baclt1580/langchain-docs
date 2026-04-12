@@ -1,0 +1,47 @@
+---
+title: LangSmith 部署的 Agent Server API 参考
+sidebarTitle: 概述
+---
+
+Agent Server API 参考可在每个[部署](/langsmith/deployment)的 `/docs` 端点内获取（例如 `http://localhost:8124/docs`）。
+
+在侧边栏的 **Agent Server API** 部分浏览完整的 API 参考，或查看以下端点分组：
+
+- [助手](/langsmith/agent-server-api/assistants) - 已配置的图实例
+- [线程](/langsmith/agent-server-api/threads) - 一组运行累积的输出
+- [线程运行](/langsmith/agent-server-api/thread-runs) - 在某个线程上调用图/助手
+- [无状态运行](/langsmith/agent-server-api/stateless-runs) - 无状态持久化的调用
+- [定时任务](/langsmith/agent-server-api/crons) - 按计划定期运行
+- [存储](/langsmith/agent-server-api/store) - 用于长期记忆的持久化键值存储
+- [A2A](/langsmith/agent-server-api/a2a) - 代理到代理协议端点
+- [MCP](/langsmith/agent-server-api/mcp) - 模型上下文协议端点
+- [系统](/langsmith/agent-server-api/system) - 健康检查和服务器信息
+
+## 身份验证
+
+对于部署到 LangSmith 的情况，需要进行身份验证。向 Agent Server 发送每个请求时，请传递 `X-Api-Key` 请求头。该请求头的值应设置为部署 Agent Server 的组织对应的有效 LangSmith API 密钥。
+
+示例 `curl` 命令：
+
+```shell
+curl --request POST \
+  --url http://localhost:8124/assistants/search \
+  --header 'Content-Type: application/json' \
+  --header 'X-Api-Key: LANGSMITH_API_KEY' \
+  --data '{
+  "metadata": {},
+  "limit": 10,
+  "offset": 0
+}'
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\server-api-ref.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

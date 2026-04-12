@@ -1,0 +1,430 @@
+---
+title: SpiceDB 检索器
+sidebar_label: SpiceDB
+---
+
+`SpiceDBRetriever` 是 LangChain 的 `BaseRetriever`，它用 SpiceDB 授权包装了任何现有的检索器。它遵循后过滤授权模式：首先基于语义搜索检索文档，然后根据用户权限进行过滤。
+
+## 安装
+
+```bash
+pip install langchain-spicedb
+```
+
+## 设置
+
+<Tip>
+    此检索器需要一个正在运行的 SpiceDB 实例。有关设置说明，请参阅 [SpiceDB 提供者页面](/oss/python/integrations/providers/spicedb)。
+</Tip>
+
+### 环境设置
+
+```python
+import os
+
+# SpiceDB connection details
+os.environ["SPICEDB_ENDPOINT"] = "localhost:50051"
+os.environ["SPICEDB_TOKEN"] = "sometoken"
+```
+
+## 初始化
+
+```python
+from langchain_spicedb import SpiceDBRetriever
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+
+# Create base retriever (any vector store works)
+vectorstore = FAISS.from_documents(documents, OpenAIEmbeddings())
+base_retriever = vectorstore.as_retriever()
+
+# Wrap with SpiceDB authorization
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="article",
+    subject_type="user",
+    permission="view",
+    resource_id_key="article_id",
+)
+```
+
+### 参数
+
+- **base_retriever** (BaseRetriever): 要包装授权的底层检索器（必需）
+- **subject_id** (str): 检查权限的用户 ID（必需）
+- **spicedb_endpoint** (str): SpiceDB 服务器地址（默认："localhost:50051"）
+- **spicedb_token** (str): 用于 SpiceDB 认证的预共享密钥（默认："sometoken"）
+- **resource_type** (str): SpiceDB 资源类型，例如 "document", "article"（默认："document"）
+- **subject_type** (str): SpiceDB 主体类型，例如 "user"（默认："user"）
+- **permission** (str): 要检查的权限，例如 "view", "edit"（默认："view"）
+- **resource_id_key** (str): 包含资源 ID 的文档元数据键（默认："resource_id"）
+- **fail_open** (bool): 如果为 True，允许在出错时访问；如果为 False，在出错时拒绝访问（默认：False）
+- **use_tls** (bool): 是否对 SpiceDB 连接使用 TLS（默认：False）
+
+<Warning>
+  **所有参数对于 SpiceDB 做出访问决策都是必需的。** 虽然有些有默认值，但您应该显式设置它们以匹配您的 SpiceDB 架构。
+</Warning>
+
+## 用法
+
+### 基本 RAG 流程
+
+```python
+from langchain_spicedb import SpiceDBRetriever
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+# Setup vector store
+documents = [...]  # Your documents with metadata
+vectorstore = FAISS.from_documents(documents, OpenAIEmbeddings())
+base_retriever = vectorstore.as_retriever()
+
+# Wrap with authorization
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="article",
+    subject_type="user",
+    permission="view",
+    resource_id_key="article_id",
+)
+
+# Build RAG chain
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "Answer based only on the provided context."),
+    ("human", "Question: {question}\n\nContext:\n{context}")
+])
+
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+chain = (
+    {"context": auth_retriever | format_docs, "question": lambda x: x}
+    | prompt
+    | ChatOpenAI(model="gpt-4o-mini")
+    | StrOutputParser()
+)
+
+# Query with authorization
+answer = await chain.ainvoke("What is SpiceDB?")
+print(answer)
+```
+
+### 向量存储兼容性
+
+该检索器适用于任何 LangChain 兼容的向量存储：
+
+#### FAISS
+
+```python
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+
+vectorstore = FAISS.from_documents(documents, OpenAIEmbeddings())
+base_retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
+
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="article",
+    resource_id_key="article_id",
+    permission="view",
+)
+```
+
+#### Chroma
+
+```python
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+vectorstore = Chroma.from_documents(documents, OpenAIEmbeddings())
+base_retriever = vectorstore.as_retriever()
+
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="document",
+    resource_id_key="doc_id",
+    permission="view",
+)
+```
+
+#### Pinecone
+
+```python
+from langchain_pinecone import PineconeVectorStore
+from langchain_openai import OpenAIEmbeddings
+
+vectorstore = PineconeVectorStore.from_existing_index(
+    index_name="my-index",
+    embedding=OpenAIEmbeddings()
+)
+base_retriever = vectorstore.as_retriever()
+
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="article",
+    resource_id_key="article_id",
+    permission="view",
+)
+```
+
+#### Weaviate
+
+```python
+from langchain_weaviate import WeaviateVectorStore
+from langchain_openai import OpenAIEmbeddings
+
+vectorstore = WeaviateVectorStore.from_documents(
+    documents,
+    OpenAIEmbeddings(),
+    client=weaviate_client,
+    index_name="Article"
+)
+base_retriever = vectorstore.as_retriever()
+
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="article",
+    resource_id_key="article_id",
+    permission="view",
+)
+```
+
+## 文档元数据要求
+
+文档 **必须** 在元数据中包含资源 ID：
+
+```python
+from langchain_core.documents import Document
+
+# Correct: Document with resource ID
+doc = Document(
+    page_content="SpiceDB is an open-source authorization system...",
+    metadata={
+        "article_id": "doc123",  # Must match resource_id_key parameter
+        "title": "Introduction to SpiceDB",
+        "author": "AuthZed",
+    }
+)
+
+# The retriever will filter this document based on whether the user
+# has permission to view article:doc123 in SpiceDB
+```
+
+<Warning>
+  如果文档在元数据中缺少资源 ID，它将被过滤掉（视为未授权）。
+</Warning>
+
+## 授权流程
+
+检索器遵循以下流程：
+
+1. **语义搜索**：基础检索器执行语义搜索并返回前 K 个文档
+2. **提取资源 ID**：从文档元数据中提取资源 ID
+3. **批量权限检查**：在单个 SpiceDB API 调用中检查所有权限
+4. **过滤**：仅返回用户有权查看的文档
+5. **指标**：跟踪授权率、延迟和拒绝的资源
+
+```mermaid
+graph LR
+    A[User Query] --> B[Base Retriever]
+    B --> C[Top K Documents]
+    C --> D[Extract Resource IDs]
+    D --> E[SpiceDB Bulk Check]
+    E --> F[Filter by Permissions]
+    F --> G[Authorized Documents]
+```
+
+## 性能
+
+该检索器使用 SpiceDB 原生的 `CheckBulkPermissionsRequest` API 以获得最佳性能：
+
+- **单次 API 调用**：所有权限在一个请求中检查，而不是 N 个单独调用
+- **高效**：比单独的权限检查快得多
+- **可扩展**：能高效处理数百个文档
+
+### 性能示例
+
+```python
+# Retrieve 100 documents
+base_docs = await base_retriever.ainvoke("query")
+print(f"Retrieved: {len(base_docs)} documents")  # 100
+
+# Filter with SpiceDB (single API call)
+auth_docs = await auth_retriever.ainvoke("query")
+print(f"Authorized: {len(auth_docs)} documents")  # e.g., 25
+
+# All 100 permission checks happen in ~50ms (single bulk request)
+# vs ~5000ms for 100 individual requests
+```
+
+## 错误处理
+
+### 失败关闭（默认）
+
+默认情况下，检索器会失败关闭——如果在检查权限时出错，文档将被过滤掉：
+
+```python
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="article",
+    resource_id_key="article_id",
+    permission="view",
+    fail_open=False,  # Default - deny on errors
+)
+```
+
+### 失败开放
+
+用于开发或特定用例：
+
+```python
+auth_retriever = SpiceDBRetriever(
+    base_retriever=base_retriever,
+    subject_id="alice",
+    spicedb_endpoint="localhost:50051",
+    spicedb_token="sometoken",
+    resource_type="article",
+    resource_id_key="article_id",
+    permission="view",
+    fail_open=True,  # Allow access on errors
+)
+```
+
+## 完整示例：多用户 RAG
+
+```python
+import os
+from langchain_spicedb import SpiceDBRetriever
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document
+
+# Setup
+os.environ["OPENAI_API_KEY"] = "your-api-key"
+
+# Create documents with metadata
+documents = [
+    Document(
+        page_content="SpiceDB is an open-source authorization system.",
+        metadata={"article_id": "doc1", "title": "Intro to SpiceDB"}
+    ),
+    Document(
+        page_content="LangChain is a framework for LLM applications.",
+        metadata={"article_id": "doc2", "title": "Intro to LangChain"}
+    ),
+    Document(
+        page_content="Authorization is critical for RAG systems.",
+        metadata={"article_id": "doc3", "title": "RAG Security"}
+    ),
+]
+
+# Create vector store
+vectorstore = FAISS.from_documents(documents, OpenAIEmbeddings())
+base_retriever = vectorstore.as_retriever()
+
+# Factory function for per-request retriever creation
+def create_user_rag_chain(subject_id: str):
+    """Create a RAG chain for a specific user (called per-request in production)."""
+    auth_retriever = SpiceDBRetriever(
+        base_retriever=base_retriever,
+        subject_id=subject_id,
+        spicedb_endpoint="localhost:50051",
+        spicedb_token="sometoken",
+        resource_type="article",
+        resource_id_key="article_id",
+        permission="view",
+    )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "Answer based only on the provided context."),
+        ("human", "Question: {question}\n\nContext:\n{context}")
+    ])
+
+    def format_docs(docs):
+        if not docs:
+            return "No authorized documents found."
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    return (
+        {"context": auth_retriever | format_docs, "question": lambda x: x}
+        | prompt
+        | ChatOpenAI(model="gpt-4o-mini")
+        | StrOutputParser()
+    )
+
+# Query different users (each request creates its own chain)
+question = "What is SpiceDB?"
+
+alice_answer = await create_user_rag_chain("alice").ainvoke(question)
+print(f"Alice's answer: {alice_answer}")
+
+bob_answer = await create_user_rag_chain("bob").ainvoke(question)
+print(f"Bob's answer: {bob_answer}")
+
+# In production web app:
+# @app.post("/query")
+# async def query(question: str, user_id: str):
+#     chain = create_user_rag_chain(user_id)
+#     return await chain.ainvoke(question)
+
+# Different users see different documents and get different answers
+```
+
+## API 参考
+
+### SpiceDBRetriever
+
+**继承自**：`BaseRetriever`
+
+**方法**：
+- `invoke(query: str) -> List[Document]`: 同步检索授权文档
+- `ainvoke(query: str) -> List[Document]`: 异步检索授权文档
+- `with_config(subject_id: str, **kwargs) -> SpiceDBRetriever`: 使用更新的配置创建新检索器
+
+**属性**：
+- `base_retriever`: 被包装的检索器
+- `subject_id`: 当前用户 ID
+- `spicedb_endpoint`: SpiceDB 服务器地址
+- `resource_type`: 权限的资源类型
+- `permission`: 正在检查的权限
+
+## 相关组件
+
+- [SpiceDB 提供者概述](/oss/python/integrations/providers/spicedb)
+- [SpiceDB 权限工具](/oss/python/integrations/tools/spicedb)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\retrievers\spicedb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

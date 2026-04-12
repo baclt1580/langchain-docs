@@ -1,0 +1,114 @@
+---
+title: "Tensorlake 集成"
+description: "使用 LangChain Python 与 Tensorlake 集成。"
+---
+
+Tensorlake 是 AI 数据云平台，能够可靠地将来自非结构化来源的数据转换为供 AI 应用使用的摄入就绪格式。
+
+`langchain-tensorlake` 包在 [Tensorlake](https://tensorlake.ai) 和 [LangChain](https://langchain.com) 之间提供了无缝集成，使您能够构建具有增强解析功能（如签名检测）的复杂文档处理代理。
+
+## Tensorlake 功能概览
+
+Tensorlake 为您提供以下工具：
+- 提取：基于模式的结构化数据提取，用于从文档中提取特定字段。
+- 解析：将文档转换为 Markdown，以构建 RAG/知识图谱系统。
+- 编排：为大规模摄入和丰富文档、文本、音频、视频等构建可编程工作流。
+
+更多信息请访问 [docs.tensorlake.ai](https://docs.tensorlake.ai/introduction)
+
+---
+
+## 安装
+
+<CodeGroup>
+```bash pip
+pip install -U langchain-tensorlake
+```
+
+```bash uv
+uv add langchain-tensorlake
+```
+</CodeGroup>
+
+---
+
+## 示例
+
+请遵循 [完整教程](https://docs.tensorlake.ai/examples/tutorials/real-estate-agent-with-langgraph-cli)，了解如何使用 `langchain-tensorlake` 工具在非结构化文档中检测签名。
+
+或者查看此 [Colab 笔记本](https://colab.research.google.com/drive/1VRWIPCWYnjcRtQL864Bqm9CJ6g4EpRqs?usp=sharing) 以快速开始。
+
+---
+## 快速开始
+
+### 1. 设置您的环境
+
+您应通过设置以下环境变量来配置 Tensorlake 和 OpenAI 的凭据：
+```
+export TENSORLAKE_API_KEY="your-tensorlake-api-key"
+export OPENAI_API_KEY = "your-openai-api-key"
+```
+
+从 [Tensorlake 云控制台](https://cloud.tensorlake.ai/) 获取您的 Tensorlake API 密钥。新用户可获得 100 个免费积分。
+
+### 2. 导入必要的包
+
+```python
+from langchain_tensorlake import document_markdown_tool
+from langchain.agents import create_agent
+import asyncio
+import os
+```
+
+### 3. 构建签名检测代理
+
+```python
+async def main(question):
+    # Create the agent with the Tensorlake tool
+    agent = create_agent(
+            model="gpt-4.1-mini",
+            tools=[document_markdown_tool],
+            prompt=(
+                """
+                I have a document that needs to be parsed. \n\nPlease parse this document and answer the question about it.
+                """
+            ),
+            name="real-estate-agent",
+        )
+
+    # Run the agent
+    result = await agent.ainvoke({"messages": [{"role": "user", "content": question}]})
+
+    # Print the result
+    print(result["messages"][-1].content)
+```
+
+*注意：* 我们强烈建议使用 `openai` 作为代理模型，以确保代理设置正确的解析参数
+
+### 4. 示例用法
+
+```python
+# Define the path to the document to be parsed
+path = "path/to/your/document.pdf"
+
+# Define the question to be asked and create the agent
+question = f"What contextual information can you extract about the signatures in my document found at {path}?"
+
+if __name__ == "__main__":
+    asyncio.run(main(question))
+```
+
+## 需要帮助？
+
+请在 [Slack](https://join.slack.com/t/tensorlakecloud/shared_invite/zt-32fq4nmib-gO0OM5RIar3zLOBm~ZGqKg) 上联系我们，或直接访问 [GitHub 上的软件包仓库](https://github.com/tensorlakeai/langchain-tensorlake)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\tensorlake.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,64 @@
+---
+title: "Dria 集成"
+description: "使用 LangChain JavaScript 与 Dria 检索器集成。"
+---
+
+[Dria](https://dria.co/) 检索器允许代理在一个综合知识库中进行基于文本的搜索。
+
+## 设置
+
+要使用 Dria 检索器，首先安装 Dria JS 客户端：
+
+```bash npm
+npm install dria
+```
+你需要为检索器提供两样东西：
+
+- **API 密钥**：创建账户后，你可以在[个人资料页面](https://dria.co/)获取你的 API 密钥。
+- **合约 ID**：在查看知识库时，可在页面顶部或 URL 中找到。
+  例如，比特币白皮书在 Dria 上的地址是 https://dria.co/knowledge/2KxNbEb040GKQ1DSDNDsA-Fsj_BlQIEAlzBNuiapBR0，因此其合约 ID 为 `2KxNbEb040GKQ1DSDNDsA-Fsj_BlQIEAlzBNuiapBR0`。
+    合约 ID 可以在实例化时省略，稍后通过 `dria.contractId = "your-contract"` 设置。
+
+Dria 检索器也暴露了底层的 [Dria 客户端](https://npmjs.com/package/dria)，更多关于客户端的信息，请参考 [Dria 文档](https://github.com/firstbatchxyz/dria-js-client?tab=readme-ov-file#usage)。
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install dria @langchain/community @langchain/core
+```
+
+```typescript
+import { DriaRetriever } from "@langchain/community/retrievers/dria";
+
+// 上传到 Dria 的 TypeScript 手册 v4.9 的合约
+// https://dria.co/knowledge/-B64DjhUtCwBdXSpsRytlRQCu-bie-vSTvTIT8Ap3g0
+const contractId = "-B64DjhUtCwBdXSpsRytlRQCu-bie-vSTvTIT8Ap3g0";
+
+const retriever = new DriaRetriever({
+  contractId, // 要连接的知识库
+  apiKey: "DRIA_API_KEY", // 如果不提供，将从环境变量 `DRIA_API_KEY` 中检查
+  topK: 15, // 可选：默认值为 10
+});
+
+const docs = await retriever.invoke("什么是联合类型？");
+console.log(docs);
+```
+
+## 相关
+
+- [检索指南](/oss/javascript/langchain/retrieval)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\dria.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

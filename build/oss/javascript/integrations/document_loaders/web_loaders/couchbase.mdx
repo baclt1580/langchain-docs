@@ -1,0 +1,113 @@
+---
+title: "Couchbase 集成"
+description: "使用 LangChain JavaScript 与 Couchbase 文档加载器集成。"
+---
+
+[Couchbase](http://couchbase.com/) 是一款屡获殊荣的分布式 NoSQL 云数据库，为您的所有云、移动、AI 和边缘计算应用提供无与伦比的多功能性、性能、可扩展性和财务价值。
+
+本指南展示了如何从 Couchbase 数据库加载文档。
+
+# 安装
+
+```bash npm
+npm install @langchain/community @langchain/core couchbase
+```
+
+## 使用方法
+
+### 从 Couchbase 查询文档
+
+有关连接到 Couchbase 集群的更多详细信息，请查阅 [Node.js SDK 文档](https://docs.couchbase.com/nodejs-sdk/current/howtos/managing-connections.html#connection-strings)。
+
+有关使用 SQL++（JSON 的 SQL）查询文档的帮助，请查阅 [文档](https://docs.couchbase.com/server/current/n1ql/n1ql-language-reference/index.html)。
+
+```typescript
+import { CouchbaseDocumentLoader } from "@langchain/community/document_loaders/web/couchbase";
+import { Cluster } from "couchbase";
+
+const connectionString = "couchbase://localhost"; // 有效的 Couchbase 连接字符串
+const dbUsername = "Administrator"; // 具有对查询桶读取权限的有效数据库用户
+const dbPassword = "Password"; // 数据库用户的密码
+
+// query 是一个有效的 SQL++ 查询
+const query = `
+    SELECT h.* FROM \`travel-sample\`.inventory.hotel h
+    WHERE h.country = 'United States'
+    LIMIT 1
+`;
+```
+
+### 连接到 Couchbase 集群
+
+```typescript
+const couchbaseClient = await Cluster.connect(connectionString, {
+  username: dbUsername,
+  password: dbPassword,
+  configProfile: "wanDevelopment",
+});
+```
+
+### 创建加载器
+
+```typescript
+const loader = new CouchbaseDocumentLoader(
+  couchbaseClient, // 已连接的 Couchbase 集群客户端
+  query // 一个有效的 SQL++ 查询，将返回所需数据
+);
+```
+
+### 加载文档
+
+您可以通过调用加载器的 `load` 方法来获取文档。它将返回包含所有文档的列表。如果您希望避免这种阻塞调用，可以调用 `lazy_load` 方法，该方法返回一个迭代器。
+
+```typescript
+// 使用 load 方法
+docs = await loader.load();
+console.log(docs);
+```
+
+```typescript
+// 使用 lazy_load
+for await (const doc of this.lazyLoad()) {
+  console.log(doc);
+  break; // 根据所需条件中断
+}
+```
+
+### 指定包含内容和元数据的字段
+
+可以使用 `pageContentFields` 参数指定构成文档内容的字段。
+可以使用 `metadataFields` 参数指定文档的元数据字段。
+
+```typescript
+const loaderWithSelectedFields = new CouchbaseDocumentLoader(
+  couchbaseClient,
+  query,
+  // pageContentFields
+  [
+    "address",
+    "name",
+    "city",
+    "phone",
+    "country",
+    "geo",
+    "description",
+    "reviews",
+  ],
+  ["id"] // metadataFields
+);
+
+const filtered_docs = await loaderWithSelectedFields.load();
+console.log(filtered_docs);
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\web_loaders\couchbase.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

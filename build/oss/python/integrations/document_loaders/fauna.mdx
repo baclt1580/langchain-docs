@@ -1,0 +1,53 @@
+---
+title: "Fauna 集成"
+description: "使用 LangChain Python 与 Fauna 文档加载器集成。"
+---
+
+>[Fauna](https://fauna.com/) 是一个文档数据库。
+
+查询 `Fauna` 文档
+
+```python
+pip install -qU  fauna
+```
+
+## 查询数据示例
+
+```python
+from langchain_community.document_loaders.fauna import FaunaLoader
+
+secret = "<输入有效的 fauna 密钥>"
+query = "Item.all()"  # Fauna 查询。假设集合名为 "Item"
+field = "text"  # 包含页面内容的字段。假设字段名为 "text"
+
+loader = FaunaLoader(query, field, secret)
+docs = loader.lazy_load()
+
+for value in docs:
+    print(value)
+```
+
+### 带分页的查询
+
+如果还有更多数据，你会得到一个 `after` 值。你可以通过在查询中传入 `after` 字符串来获取游标之后的值。
+
+了解更多请访问[此链接](https://fqlx-beta--fauna-docs.netlify.app/fqlx/beta/reference/schema_entities/set/static-paginate)
+
+```python
+query = """
+Item.paginate("hs+DzoPOg ... aY1hOohozrV7A")
+Item.all()
+"""
+loader = FaunaLoader(query, field, secret)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\fauna.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

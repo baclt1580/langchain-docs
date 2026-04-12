@@ -1,0 +1,123 @@
+---
+title: "Cohere 集成"
+description: "使用 LangChain JavaScript 与 Cohere 大语言模型集成。"
+---
+
+<Warning>
+**旧版说明**
+
+Cohere 已将其用于大语言模型的 `generate` 端点标记为弃用。请遵循其[迁移指南](https://docs.cohere.com/docs/migrating-from-cogenerate-to-cochat)，通过 [`ChatCohere`](/oss/javascript/integrations/chat/cohere) 集成开始使用其聊天 API。
+</Warning>
+
+本文将帮助您使用 LangChain 开始使用 Cohere 的补全模型（大语言模型）。有关 `Cohere` 功能和配置选项的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-cohere/Cohere)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [Python 支持](https://python.langchain.com/docs/integrations/llms/cohere) | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |  :---: | :---: | :---: |
+| [`Cohere`](https://reference.langchain.com/javascript/langchain-cohere/Cohere) | [`@langchain/cohere`](https://www.npmjs.com/package/@langchain/cohere) | ❌ | ✅ | ✅ | ![NPM - Downloads](https://img.shields.io/npm/dm/@langchain/cohere?style=flat-square&label=%20&) | ![NPM - Version](https://img.shields.io/npm/v/@langchain/cohere?style=flat-square&label=%20&) |
+
+## 设置
+
+要访问 Cohere 模型，您需要创建一个 Cohere 账户，获取 API 密钥，并安装 `@langchain/cohere` 集成包。
+
+### 凭证
+
+前往 [cohere.com](https://cohere.com) 注册 Cohere 并生成 API 密钥。完成后，请设置 `COHERE_API_KEY` 环境变量：
+
+```bash
+export COHERE_API_KEY="your-api-key"
+```
+
+如果您希望自动追踪模型调用，还可以通过取消注释以下内容来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```bash
+# export LANGSMITH_TRACING="true"
+# export LANGSMITH_API_KEY="your-api-key"
+```
+
+### 安装
+
+LangChain 的 Cohere 集成位于 `@langchain/cohere` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/cohere @langchain/core
+```
+```bash yarn
+yarn add @langchain/cohere @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/cohere @langchain/core
+```
+</CodeGroup>
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+```typescript
+import { Cohere } from "@langchain/cohere"
+
+const llm = new Cohere({
+  model: "command",
+  temperature: 0,
+  maxTokens: undefined,
+  maxRetries: 2,
+  // 其他参数...
+})
+```
+
+### 为 Azure 上的 Cohere、AWS Bedrock 上的 Cohere 以及独立 Cohere 实例自定义客户端
+
+我们可以实例化一个自定义的 `CohereClient` 并将其传递给 ChatCohere 构造函数。
+
+**注意：** 如果提供了自定义客户端，则 `COHERE_API_KEY` 环境变量和构造函数中的 `apiKey` 参数都将被忽略。
+
+```typescript
+import { Cohere } from "@langchain/cohere";
+import { CohereClient } from "cohere-ai";
+
+const client = new CohereClient({
+  token: "<your-api-key>",
+  environment: "<your-cohere-deployment-url>", //可选
+  // 其他参数
+});
+
+const llmWithCustomClient = new Cohere({
+  client,
+  // 其他参数...
+});
+```
+
+## 调用
+
+```typescript
+const inputText = "Cohere is an AI company that "
+
+const completion = await llm.invoke(inputText)
+completion
+```
+
+```text
+Cohere 是一家提供自然语言处理模型的公司，帮助改善人机交互。Cohere 由 Aidan Gomez、Ivan Zhang 和 Nick Frosst 于 2019 年创立。
+```
+
+---
+
+## API 参考
+
+有关所有 Cohere 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/javascript/langchain-cohere/Cohere)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\llms\cohere.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,257 @@
+---
+title: MCP 工具
+sidebarTitle: MCP 工具
+description: 从 MCP（模型上下文协议）服务器加载额外工具
+---
+
+[MCP（模型上下文协议）](https://modelcontextprotocol.io/) 允许您通过外部服务器（文件系统、API、数据库等）的工具来扩展 Deep Agents CLI，而无需修改代理本身。CLI 在启动时连接到 MCP 服务器，发现其工具，并将它们与内置工具一起提供给代理使用。
+
+## 快速开始
+
+<Steps>
+    <Step title="创建配置文件" icon="file">
+        在项目根目录创建一个 `.mcp.json` 文件。格式遵循 [Claude Desktop 约定](https://modelcontextprotocol.io/quickstart/user)：
+
+        ```json title=".mcp.json"
+        {
+            "mcpServers": {
+                "docs-langchain": {
+                "type": "http",
+                "url": "https://docs.langchain.com/mcp"
+                }
+            }
+        }
+        ```
+    </Step>
+
+    <Step title="启动 CLI" icon="terminal">
+        ```bash
+        deepagents
+        ```
+
+        启动时，CLI 会自动发现您的 `.mcp.json`，生成每个配置的服务器，发现其工具，并打印确认信息：
+
+        ```
+        ✓ 已加载 3 个 MCP 工具
+        ```
+
+        代理现在可以在整个会话期间使用这些工具。会话会保持活动状态——stdio 服务器在工具调用之间不会重启。
+    </Step>
+</Steps>
+
+## 自动发现
+
+CLI 会自动在标准位置搜索 `.mcp.json` 文件。无需任何标志——只需放置配置文件，它就会被自动识别。
+
+### 发现位置
+
+按以下顺序检查配置（优先级从低到高）：
+
+| 优先级 | 位置 | 作用范围 |
+|----------|----------|-------|
+| 1 (最低) | `~/.deepagents/.mcp.json` | 用户级别——适用于所有项目 |
+| 2 | `<项目>/.deepagents/.mcp.json` | 项目级别——`.deepagents` 子目录 |
+| 3 (最高) | `<项目>/.mcp.json` | 项目级别——根目录（与 Claude Code 兼容） |
+
+项目根目录是包含 `.git` 文件夹的最近父目录，如果没有则回退到当前工作目录。
+
+当存在多个配置文件时，它们的 `mcpServers` 条目会被合并。如果同一个服务器名称出现在多个文件中，优先级更高的配置将覆盖优先级低的。
+
+### 标志
+
+| 标志 | 行为 |
+|------|----------|
+| `--mcp-config PATH` | 添加一个显式配置作为最高优先级的来源（合并到自动发现的配置之上） |
+| `--no-mcp` | 完全禁用 MCP——不加载任何服务器 |
+
+<Note>
+    `--mcp-config` 和 `--no-mcp` 是互斥的。
+</Note>
+
+### Claude Code 兼容性
+
+如果您已经为 Claude Code 在项目根目录有一个 `.mcp.json`，Deep Agents CLI 会自动识别它——无需额外设置。
+
+## 配置格式
+
+`mcpServers` 下的每个键都是一个服务器名称。服务器的字段决定了 CLI 如何连接到它。
+
+### stdio 服务器（默认）
+
+stdio 服务器作为子进程生成。CLI 通过 stdin/stdout 与它们通信。
+
+```json title="mcp-config.json"
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "env": {}
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "your-token" }
+    }
+  }
+}
+```
+
+<ResponseField name="command" type="string" required>
+    要运行的可执行文件。
+</ResponseField>
+
+<ResponseField name="args" type="string[]">
+    传递给命令的参数。
+</ResponseField>
+
+<ResponseField name="env" type="object">
+    为子进程设置的环境变量。使用此字段传递 API 密钥和其他凭据，避免在 shell 历史记录中暴露。
+</ResponseField>
+
+### SSE 和 HTTP 服务器
+
+对于远程 MCP 服务器，将 `type` 设置为 `"sse"` 或 `"http"` 并提供 `url`：
+
+```json title="mcp-config.json"
+{
+  "mcpServers": {
+    "remote-api": {
+      "type": "sse",
+      "url": "https://api.example.com/mcp",
+      "headers": { "Authorization": "Bearer your-token" }
+    }
+  }
+}
+```
+
+<ResponseField name="type" type="string" required>
+    传输类型：`"sse"` 用于服务器发送事件，`"http"` 用于可流式传输的 HTTP。
+</ResponseField>
+
+<ResponseField name="url" type="string" required>
+    服务器端点 URL。
+</ResponseField>
+
+<ResponseField name="headers" type="object">
+    随每个请求发送的 HTTP 头。通常用于身份验证。
+</ResponseField>
+
+### 服务器类型总结
+
+| 类型 | 必需字段 | 可选字段 |
+|------|-----------------|-----------------|
+| stdio (默认) | `command` | `args`, `env` |
+| sse | `type: "sse"`, `url` | `headers` |
+| http | `type: "http"`, `url` | `headers` |
+
+<Note>
+    为了与其他 MCP 客户端兼容，`type` 字段也可以写作 `transport`。
+</Note>
+
+## 多个服务器
+
+您可以根据需要配置任意数量的服务器。所有服务器的工具都会被合并并可供代理使用：
+
+```json title="mcp-config.json"
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "ghp_..." }
+    },
+    "database": {
+      "type": "sse",
+      "url": "https://db-mcp.internal:8080/mcp",
+      "headers": { "Authorization": "Bearer ..." }
+    }
+  }
+}
+```
+
+## 项目级别信任
+
+项目级别的配置可能包含执行本地命令的 stdio 服务器。为了防止不受信任的仓库在 CLI 启动时运行任意代码，CLI 对项目级别的 stdio 服务器强制执行 **默认拒绝** 策略。
+
+### 工作原理
+
+- **交互模式：** CLI 在启动项目 stdio 服务器之前会提示您批准，并显示确切的命令。批准会使用 SHA-256 内容指纹持久化——如果配置发生更改，您将再次收到提示。
+- **非交互模式 (`-n`):** 除非传递 `--trust-project-mcp` 标志，否则项目 stdio 服务器会被静默跳过。
+- 来自项目配置的**远程服务器 (SSE/HTTP)** 始终被允许，因为它们不执行本地代码。
+- **用户级别配置** (`~/.deepagents/.mcp.json`) 始终受信任——与 `config.toml` 和 `hooks.json` 的信任模型相同。
+
+### 标志
+
+| 标志 | 行为 |
+|------|----------|
+| `--trust-project-mcp` | 无需提示即信任所有项目级别的 stdio 服务器（用于 CI 和自动化） |
+
+```bash
+# 跳过批准提示
+deepagents --trust-project-mcp
+
+# 非交互模式：显式信任项目服务器
+deepagents -n "run tests" --trust-project-mcp
+```
+
+### 信任存储
+
+信任决策存储在 `~/.deepagents/config.toml` 中：
+
+```toml
+[mcp_trust.projects]
+"/Users/you/myproject" = "sha256:abc123..."
+```
+
+每个键是一个绝对项目根路径。值是对项目级别配置内容连接后计算的 SHA-256 摘要。要撤销信任，请删除该条目或修改项目的 `.mcp.json`（这将自动使指纹失效）。
+
+<Warning>
+    受信任的 stdio MCP 服务器拥有与您的用户帐户相同的权限。仅批准来自您信任的仓库的服务器。在批准前，请仔细查看批准提示中显示的命令。
+</Warning>
+
+## 系统提示感知
+
+已连接的 MCP 服务器及其工具会自动列在代理的系统提示中，按服务器名称和传输类型分组。这有助于模型推理工具的来源和故障域，而无需手动添加上下文。
+
+## 故障排除
+
+<AccordionGroup>
+    <Accordion title="服务器启动失败 (stdio)">
+        验证命令在 CLI 外部可以正常工作：
+
+        ```bash
+        npx -y @modelcontextprotocol/server-filesystem /tmp
+        ```
+
+        常见原因：包未安装、`npx` 不在 `PATH` 中，或者缺少必需的环境变量。
+    </Accordion>
+
+    <Accordion title="连接被拒绝 (SSE/HTTP)">
+        检查远程服务器是否正在运行以及 URL 是否正确。如果服务器需要身份验证，请确保 `headers` 中包含正确的凭据。
+    </Accordion>
+
+    <Accordion title="工具未出现">
+        CLI 在启动时会打印加载的工具数量（例如，`✓ 已加载 3 个 MCP 工具`）。如果看到 `0`，表示服务器启动成功但没有通告任何工具——请检查服务器自身的日志或文档。
+    </Accordion>
+</AccordionGroup>
+
+## 延伸阅读
+
+- [LangChain MCP 指南](/oss/javascript/langchain/mcp)：协议详情、构建自定义服务器以及以编程方式使用 `langchain-mcp-adapters`
+- [MCP 规范](https://modelcontextprotocol.io/)：官方协议规范和服务器注册表
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\cli\mcp-tools.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

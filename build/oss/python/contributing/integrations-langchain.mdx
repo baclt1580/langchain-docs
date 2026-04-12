@@ -1,0 +1,111 @@
+---
+title: 贡献集成
+sidebarTitle: 指南
+---
+
+**集成是 LangChain 的核心组成部分。**
+
+LangChain 为构建 LLM 应用至关重要的多种不同组件（语言模型、向量存储等）提供了标准接口。实现一个新的集成有助于扩展 LangChain 的生态系统，并使您的服务能够被数百万开发者发现。
+
+<Warning>
+    新的集成**不会作为 PR 被接受**到任何 `langchain-ai` 代码库。所有新的集成必须作为独立的包发布到 PyPI（例如 `langchain-yourprovider`）。您应该向 `langchain-ai` 仓库提交的唯一 PR 是为您已发布的包添加文档。
+</Warning>
+
+## 为什么要实现 LangChain 集成？
+
+<Card title="可发现性" icon="search">
+    LangChain 是构建 LLM 应用最常用的框架，每月下载量超过 2 亿次。
+</Card>
+
+<Card title="互操作性" icon="refresh">
+    LangChain 组件暴露了标准接口，允许开发者轻松地将它们相互替换。如果您实现了 LangChain 集成，任何使用不同组件的开发者都能轻松地替换成您的组件。
+</Card>
+
+<Card title="最佳实践" icon="star">
+    通过其标准接口，LangChain 组件鼓励并促进了最佳实践（流式传输、异步等），从而改善了开发者体验和应用性能。
+</Card>
+
+## 可集成的组件
+
+虽然任何组件都可以集成到 LangChain 中，但我们更鼓励集成特定类型的组件：
+
+**推荐集成这些 ✅**：
+
+- [**聊天模型**](/oss/python/integrations/chat)：最活跃使用的组件类型
+- [**工具/工具包**](/oss/python/integrations/tools)：启用智能体能力
+- [**检索器**](/oss/python/integrations/retrievers)：RAG 应用的核心
+- [**嵌入模型**](/oss/python/integrations/embeddings)：向量操作的基础
+- [**向量存储**](/oss/python/integrations/vectorstores)：语义搜索的关键
+- [**中间件**](/oss/python/integrations/middleware)：通过钩子扩展智能体行为
+- [**沙盒**](/oss/python/deepagents/sandboxes)：使用深度智能体安全运行代码
+
+<Accordion title="第三方沙盒集成的额外标准">
+请注意，我们仅在以下情况下收录第三方沙盒集成：
+
+- 该集成由提供沙盒的公司编写和维护。
+- **或者** 该集成被广泛使用，即该集成在 PyPI 或 npm 上必须至少有 10,000 次每日下载量才会被考虑收录。
+</Accordion>
+
+**不推荐集成这些 ❌**：
+
+- **LLM（文本补全模型）**：已弃用，推荐使用[聊天模型](/oss/python/integrations/chat)
+- [**文档加载器**](/oss/python/integrations/document_loaders)：维护负担高
+- [**键值存储**](/oss/python/integrations/stores)：使用有限
+- **文档转换器**：小众用例
+- **模型缓存**：基础设施问题
+- **图**：复杂抽象
+- **消息历史记录**：存储抽象
+- **回调**：系统级组件
+- **聊天加载器**：需求有限
+- **适配器**：边缘情况工具
+
+## 如何贡献集成
+
+<Steps>
+    <Step title="实现您的包">
+        <Card title="如何实现 LangChain 集成" icon="link" href="/oss/python/contributing/implement-langchain" arrow />
+    </Step>
+
+    <Step title="通过标准测试">
+        如果适用，请为您的集成实现 LangChain [标准测试](/oss/python/contributing/standard-tests-langchain)套件的支持，并成功运行它们。
+    </Step>
+
+    <Step title="发布集成">
+        <Card title="如何发布集成" icon="upload" href="/oss/python/contributing/publish-langchain" arrow />
+    </Step>
+
+    <Step title="添加文档">
+        提交一个 PR，将您的集成文档添加到官方的 LangChain 文档中。
+
+        <Accordion title="集成文档指南" icon="book">
+            一个集成的价值取决于其文档。为了确保用户获得一致的体验，所有新集成都需要提供文档。我们为每种类型的集成提供了标准的起始模板供您复制和修改。
+
+            在 LangChain [文档仓库](https://github.com/langchain-ai/docs) 的新 PR 中，使用相应的模板文件，在 `src/oss/python/integrations/<component_type>/integration_name.mdx` 下的相关目录中创建一个新文件：
+
+            - [聊天模型](https://github.com/langchain-ai/docs/blob/main/src/oss/python/integrations/chat/TEMPLATE.mdx)
+            - [工具和工具包](https://github.com/langchain-ai/docs/blob/main/src/oss/python/integrations/tools/TEMPLATE.mdx)
+            - [中间件](https://github.com/langchain-ai/docs/blob/main/src/oss/python/integrations/middleware/TEMPLATE.mdx)
+            - 检索器 - 即将推出
+            - 文本分割器 - 即将推出
+            - 嵌入模型 - 即将推出
+            - [向量存储](https://github.com/langchain-ai/docs/blob/main/src/oss/python/integrations/vectorstores/TEMPLATE.mdx)
+            - 文档加载器 - 即将推出
+            - 键值存储 - 即将推出
+        </Accordion>
+    </Step>
+
+    <Step title="联合营销" icon="speakerphone">
+        （可选）与 LangChain 团队合作进行[联合营销](/oss/python/contributing/comarketing)。
+    </Step>
+</Steps>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\contributing\integrations-langchain.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

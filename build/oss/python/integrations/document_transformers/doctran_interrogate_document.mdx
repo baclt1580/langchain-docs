@@ -1,0 +1,184 @@
+---
+title: "Doctran 文档问答转换集成"
+description: "使用 LangChain Python 与 Doctran 文档问答转换器进行集成。"
+---
+
+向量存储知识库中使用的文档通常以叙述性或对话性格式存储。然而，大多数用户查询是以问题形式提出的。如果我们在向量化之前**将文档转换为问答格式**，就可以提高检索到相关文档的可能性，并降低检索到不相关文档的几率。
+
+我们可以使用 [Doctran](https://github.com/psychic-api/doctran) 库来实现这一点，该库利用 OpenAI 的函数调用功能来“审问”文档。
+
+关于原始文档与审问后文档在各种查询下的向量相似度分数基准测试，请参阅[此笔记本](https://github.com/psychic-api/doctran/blob/main/benchmark.ipynb)。
+
+```python
+pip install -qU  doctran
+```
+
+```python
+import json
+
+from langchain_community.document_transformers import DoctranQATransformer
+from langchain_core.documents import Document
+```
+
+```python
+from dotenv import load_dotenv
+
+load_dotenv()
+```
+
+```text
+True
+```
+
+## 输入
+
+这是我们将要审问的文档
+
+```python
+sample_text = """[由 ChatGPT 生成]
+
+机密文档 - 仅限内部使用
+
+日期：2023年7月1日
+
+主题：关于多个主题的更新与讨论
+
+亲爱的团队：
+
+希望这封邮件送达时各位安好。在此文档中，我将向大家提供一些重要更新，并讨论几个需要我们关注的主题。请将其中包含的信息视为高度机密。
+
+安全与隐私措施
+作为我们持续致力于确保客户数据安全与隐私的一部分，我们已在所有系统中实施了强有力的措施。我们要特别表彰 IT 部门的 John Doe（邮箱：john.doe@example.com）在加强我们网络安全方面的辛勤工作。今后，我们恳请各位严格遵守我们的数据保护政策和指南。此外，如果遇到任何潜在的安全风险或事件，请立即向我们的专门团队报告，邮箱：security@example.com。
+
+人力资源更新与员工福利
+最近，我们迎来了几位新团队成员，他们在各自的部门做出了重要贡献。我要特别表彰 Jane Smith（SSN：049-45-5928）在客户服务方面的出色表现。Jane 持续收到客户的积极反馈。此外，请注意我们的员工福利计划开放注册期即将到来。如有任何疑问或需要帮助，请联系我们的人力资源代表 Michael Johnson（电话：418-492-3850，邮箱：michael.johnson@example.com）。
+
+市场推广活动与营销活动
+我们的营销团队一直在积极制定新策略，以提高品牌知名度并促进客户参与。我们要感谢 Sarah Thompson（电话：415-555-1234）在管理我们社交媒体平台方面的卓越努力。仅在过去一个月，Sarah 就成功将我们的粉丝基数增加了 20%。此外，请标记日历，参加即将于7月15日举行的产品发布会。我们鼓励所有团队成员参加并支持这一公司的重要里程碑。
+
+研发项目
+在追求创新的过程中，我们的研发部门一直在不懈地推进多个项目。我要特别表彰 David Rodriguez（邮箱：david.rodriguez@example.com）作为项目负责人的杰出工作。David 对我们尖端技术开发的贡献至关重要。此外，我们提醒大家在每月一次的研发头脑风暴会议（定于7月10日举行）上分享对新项目的想法和建议。
+
+请对此文档中的信息予以最高保密，确保不向未经授权的人员透露。如果对讨论的主题有任何疑问或顾虑，请随时直接与我联系。
+
+感谢大家的关注，让我们继续共同努力，实现我们的目标。
+
+此致，
+
+Jason Fan
+联合创始人兼首席执行官
+Psychic
+jason@psychic.dev
+"""
+print(sample_text)
+```
+
+```text
+[由 ChatGPT 生成]
+
+机密文档 - 仅限内部使用
+
+日期：2023年7月1日
+
+主题：关于多个主题的更新与讨论
+
+亲爱的团队：
+
+希望这封邮件送达时各位安好。在此文档中，我将向大家提供一些重要更新，并讨论几个需要我们关注的主题。请将其中包含的信息视为高度机密。
+
+安全与隐私措施
+作为我们持续致力于确保客户数据安全与隐私的一部分，我们已在所有系统中实施了强有力的措施。我们要特别表彰 IT 部门的 John Doe（邮箱：john.doe@example.com）在加强我们网络安全方面的辛勤工作。今后，我们恳请各位严格遵守我们的数据保护政策和指南。此外，如果遇到任何潜在的安全风险或事件，请立即向我们的专门团队报告，邮箱：security@example.com。
+
+人力资源更新与员工福利
+最近，我们迎来了几位新团队成员，他们在各自的部门做出了重要贡献。我要特别表彰 Jane Smith（SSN：049-45-5928）在客户服务方面的出色表现。Jane 持续收到客户的积极反馈。此外，请注意我们的员工福利计划开放注册期即将到来。如有任何疑问或需要帮助，请联系我们的人力资源代表 Michael Johnson（电话：418-492-3850，邮箱：michael.johnson@example.com）。
+
+市场推广活动与营销活动
+我们的营销团队一直在积极制定新策略，以提高品牌知名度并促进客户参与。我们要感谢 Sarah Thompson（电话：415-555-1234）在管理我们社交媒体平台方面的卓越努力。仅在过去一个月，Sarah 就成功将我们的粉丝基数增加了 20%。此外，请标记日历，参加即将于7月15日举行的产品发布会。我们鼓励所有团队成员参加并支持这一公司的重要里程碑。
+
+研发项目
+在追求创新的过程中，我们的研发部门一直在不懈地推进多个项目。我要特别表彰 David Rodriguez（邮箱：david.rodriguez@example.com）作为项目负责人的杰出工作。David 对我们尖端技术开发的贡献至关重要。此外，我们提醒大家在每月一次的研发头脑风暴会议（定于7月10日举行）上分享对新项目的想法和建议。
+
+请对此文档中的信息予以最高保密，确保不向未经授权的人员透露。如果对讨论的主题有任何疑问或顾虑，请随时直接与我联系。
+
+感谢大家的关注，让我们继续共同努力，实现我们的目标。
+
+此致，
+
+Jason Fan
+联合创始人兼首席执行官
+Psychic
+jason@psychic.dev
+```
+
+```python
+documents = [Document(page_content=sample_text)]
+qa_transformer = DoctranQATransformer()
+transformed_document = qa_transformer.transform_documents(documents)
+```
+
+## 输出
+
+审问文档后，结果将作为一个新文档返回，其中问题和答案会保存在元数据中。
+
+```python
+transformed_document = qa_transformer.transform_documents(documents)
+print(json.dumps(transformed_document[0].metadata, indent=2))
+```
+
+```json
+{
+  "questions_and_answers": [
+    {
+      "question": "这份文档的目的是什么？",
+      "answer": "这份文档的目的是提供重要更新并讨论需要团队关注的多个主题。"
+    },
+    {
+      "question": "如果遇到潜在的安全风险或事件，应该怎么做？",
+      "answer": "如果遇到潜在的安全风险或事件，应立即向专门团队报告，邮箱为 security@example.com。"
+    },
+    {
+      "question": "谁因加强网络安全而受到表彰？",
+      "answer": "IT 部门的 John Doe 因加强网络安全而受到表彰。"
+    },
+    {
+      "question": "谁应被联系以获取员工福利方面的帮助？",
+      "answer": "如需员工福利方面的帮助，应联系人力资源代表 Michael Johnson。他的电话号码是 418-492-3850，邮箱是 michael.johnson@example.com。"
+    },
+    {
+      "question": "谁在各自的部门做出了重要贡献？",
+      "answer": "几位新团队成员在各自的部门做出了重要贡献。"
+    },
+    {
+      "question": "谁因在客户服务方面的出色表现而受到表彰？",
+      "answer": "Jane Smith 因在客户服务方面的出色表现而受到表彰。"
+    },
+    {
+      "question": "谁成功增加了社交媒体的粉丝基数？",
+      "answer": "Sarah Thompson 成功增加了社交媒体的粉丝基数。"
+    },
+    {
+      "question": "即将举行的产品发布会是什么时候？",
+      "answer": "即将举行的产品发布会是在7月15日。"
+    },
+    {
+      "question": "谁因其作为项目负责人的杰出工作而受到表彰？",
+      "answer": "David Rodriguez 因其作为项目负责人的杰出工作而受到表彰。"
+    },
+    {
+      "question": "每月一次的研发头脑风暴会议定于何时举行？",
+      "answer": "每月一次的研发头脑风暴会议定于7月10日举行。"
+    }
+  ]
+}
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_transformers\doctran_interrogate_document.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

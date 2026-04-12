@@ -1,0 +1,68 @@
+---
+title: INVALID_CONCURRENT_GRAPH_UPDATE
+---
+
+LangGraph 的 [`StateGraph`](https://langchain-ai.github.io/langgraph/reference/graphs/#langgraph.graph.state.StateGraph) 收到了来自多个节点对其状态的并发更新，而该状态属性不支持此类操作。
+
+这种情况可能发生在以下场景：你在图中使用了[扇出（fanout）](/oss/python/langgraph/use-graph-api#map-reduce-and-the-send-api)或其他并行执行逻辑，并且定义了类似这样的图：
+
+```python
+class State(TypedDict):
+    some_key: str  # [!code highlight]
+
+def node(state: State):
+    return {"some_key": "some_string_value"}
+
+def other_node(state: State):
+    return {"some_key": "some_string_value"}
+
+
+builder = StateGraph(State)
+builder.add_node(node)
+builder.add_node(other_node)
+builder.add_edge(START, "node")
+builder.add_edge(START, "other_node")
+graph = builder.compile()
+```
+
+
+
+
+如果上述图中的某个节点返回 `{ "some_key": "some_string_value" }`，这将用 `"some_string_value"` 覆盖 `"some_key"` 的状态值。
+然而，如果在单个步骤中（例如在扇出操作中）有多个节点返回了 `"some_key"` 的值，图将抛出此错误，因为无法确定如何更新内部状态。
+
+
+
+
+要解决此问题，你可以定义一个合并多个值的归约器（reducer）：
+
+```python
+import operator
+from typing import Annotated
+
+class State(TypedDict):
+    # operator.add 归约函数使其变为仅追加模式  # [!code highlight]
+    some_key: Annotated[list, operator.add]  # [!code highlight]
+```
+
+
+
+
+这将允许你定义逻辑，以处理从并行执行的多个节点返回的相同键。
+
+## 故障排除
+
+以下方法可能有助于解决此错误：
+
+* 如果你的图并行执行节点，请确保已为相关的状态键定义了归约器。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\errors\INVALID_CONCURRENT_GRAPH_UPDATE.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

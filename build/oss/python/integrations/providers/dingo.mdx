@@ -1,0 +1,43 @@
+---
+title: "DingoDB 集成"
+description: "使用 LangChain Python 与 DingoDB 集成。"
+---
+
+>[DingoDB](https://github.com/dingodb) 是一个分布式多模态向量数据库。它结合了数据湖和向量数据库的功能，允许存储任何类型的数据（key-value、PDF、音频、视频等），无论其大小如何。利用 DingoDB，您可以构建自己的“向量海洋”（继数据仓库和数据湖之后的下一代数据架构）。这使得通过单一 SQL 实时分析结构化和非结构化数据成为可能，且具有极低的延迟。
+
+## 安装和设置
+
+安装 Python SDK
+
+<CodeGroup>
+```bash pip
+pip install dingodb
+```
+
+```bash uv
+uv add dingodb
+```
+</CodeGroup>
+
+## 向量存储
+
+存在一个针对 DingoDB 索引的封装，允许您将其用作向量存储，无论是用于语义搜索还是示例选择。
+
+要导入此向量存储：
+
+```python
+from langchain_community.vectorstores import Dingo
+```
+
+有关 DingoDB 封装的更详细教程，请参阅 [此笔记本](/oss/python/integrations/vectorstores/dingo)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\dingo.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

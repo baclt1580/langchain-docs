@@ -1,0 +1,170 @@
+---
+title: 追踪 Semantic Kernel 应用
+sidebarTitle: Semantic Kernel
+---
+
+LangSmith 可以利用其内置的 OpenTelemetry 支持捕获由 [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/) 生成的追踪信息。本指南将向您展示如何自动捕获来自 Semantic Kernel 应用的追踪数据，并将其发送到 LangSmith 进行监控和分析。
+
+## 安装
+
+使用您偏好的包管理器安装所需的包：
+
+<CodeGroup>
+
+```bash pip
+pip install langsmith semantic-kernel opentelemetry-instrumentation-openai
+```
+
+```bash uv
+uv add langsmith semantic-kernel opentelemetry-instrumentation-openai
+```
+
+</CodeGroup>
+
+## 设置
+
+### 1. 配置环境变量
+
+设置您的 [API 密钥](/langsmith/create-account-api-key) 和项目名称：
+
+```bash
+export LANGSMITH_API_KEY=<您的_langsmith_api_key>
+export LANGSMITH_PROJECT=<您的项目名称>
+export OPENAI_API_KEY=<您的_openai_api_key>
+```
+
+### 2. 配置 OpenTelemetry 集成
+
+在您的 Semantic Kernel 应用中，配置 LangSmith OpenTelemetry 集成以及 OpenAI 检测器：
+
+```python
+from langsmith.integrations.otel import configure
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+
+# 配置 LangSmith 追踪
+configure(project_name="semantic-kernel-demo")
+
+# 检测 OpenAI 调用
+OpenAIInstrumentor().instrument()
+```
+
+<Note>
+您无需设置任何 OpenTelemetry 环境变量或手动配置导出器——`configure()` 会自动处理所有内容。
+</Note>
+
+### 3. 创建并运行您的 Semantic Kernel 应用
+
+配置完成后，您的 Semantic Kernel 应用将自动向 LangSmith 发送追踪数据：
+
+```python
+import asyncio
+from semantic_kernel import Kernel
+from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
+from semantic_kernel.prompt_template import InputVariable, PromptTemplateConfig
+from langsmith.integrations.otel import configure
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+
+# 配置 LangSmith 追踪
+configure(project_name="semantic-kernel-assistant")
+
+# 检测 OpenAI 调用
+OpenAIInstrumentor().instrument()
+
+# 配置 Semantic Kernel
+kernel = Kernel()
+kernel.add_service(OpenAIChatCompletion())
+
+# 创建提示模板
+code_analysis_prompt = """
+分析以下代码并提供见解：
+
+代码：{{$code}}
+
+请提供：
+1. 代码功能的简要总结
+2. 任何潜在的改进建议
+3. 代码质量评估
+"""
+
+prompt_template_config = PromptTemplateConfig(
+    template=code_analysis_prompt,
+    name="code_analyzer",
+    template_format="semantic-kernel",
+    input_variables=[
+        InputVariable(name="code", description="要分析的代码", is_required=True),
+    ],
+)
+
+# 将函数添加到内核
+code_analyzer = kernel.add_function(
+    function_name="analyzeCode",
+    plugin_name="codeAnalysisPlugin",
+    prompt_template_config=prompt_template_config,
+)
+
+async def main():
+    sample_code = """
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+    """
+
+    result = await kernel.invoke(code_analyzer, code=sample_code)
+    print("代码分析：")
+    print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## 高级用法
+
+### 自定义元数据和标签
+
+您可以通过设置跨度属性向追踪中添加自定义元数据：
+
+```python
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+
+async def analyze_with_metadata(code: str):
+    with tracer.start_as_current_span("semantic_kernel_workflow") as span:
+        span.set_attribute("langsmith.metadata.workflow_type", "code_analysis")
+        span.set_attribute("langsmith.metadata.user_id", "developer_123")
+        span.set_attribute("langsmith.span.tags", "semantic-kernel,code-analysis")
+
+        result = await kernel.invoke(code_analyzer, code=code)
+        return result
+```
+
+### 与其他检测器结合使用
+
+您可以将 Semantic Kernel 追踪与其他 OpenTelemetry 检测器结合使用：
+
+```python
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+# 初始化多个检测器
+OpenAIInstrumentor().instrument()
+HTTPXClientInstrumentor().instrument()
+```
+
+## 资源
+
+- [Semantic Kernel 文档](https://learn.microsoft.com/en-us/semantic-kernel/overview/)
+- [Semantic Kernel 可观测性指南](https://learn.microsoft.com/en-us/semantic-kernel/concepts/enterprise-readiness/observability/)
+- [LangSmith OpenTelemetry 指南](/langsmith/trace-with-opentelemetry)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\trace-with-semantic-kernel.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

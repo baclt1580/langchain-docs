@@ -1,0 +1,51 @@
+---
+title: "LocalAI 重排序器集成"
+description: "使用 LangChain Python 集成 LocalAI 重排序器文档转换器。"
+---
+
+<Info>
+**`langchain-localai` 是一个用于 LocalAI 的第三方集成包。它提供了在 LangChain 中使用 LocalAI 服务的简便方式。**
+
+源代码可在 [GitHub](https://github.com/mkhludnev/langchain-localai) 上获取。
+</Info>
+
+本笔记本展示了如何使用 [LocalAI 重排序器 API](https://localai.io/features/reranker/) 进行文档压缩和检索。
+
+让我们加载 `LocalAIRerank` 类。为了使用 `LocalAIRerank` 类，您需要在某处托管 LocalAI 服务并配置重排序器。请参阅 [localai.io/basics/getting_started/index.html](https://localai.io/basics/getting_started/index.html) 和 [localai.io/features/reranker/index.html](https://localai.io/features/reranker/index.html) 上的文档。
+
+```python
+pip install -U langchain-localai
+```
+
+```python
+import os
+from langchain_localai import LocalAIRerank
+from langchain_core.documents import Document
+
+# 将您的 LocalAI/OpenAI API 密钥设置为环境变量以确保安全。
+# 例如，在您的 shell 中：export OPENAI_API_KEY="your-key-here"
+reranker = LocalAIRerank(
+    openai_api_key=os.environ.get("OPENAI_API_KEY"),
+    model="bge-reranker-v2-m3",
+    openai_api_base="http://localhost:8080",
+)
+reranked_docs = reranker.compress_documents(
+    documents=[
+        Document(page_content="绿茶富含抗氧化剂，可能改善大脑功能。"),
+        Document(page_content="咖啡含有咖啡因，可以提高警觉性。"),
+        Document(page_content="红茶风味浓郁，含有多种多酚类物质。"),
+    ],
+    query="绿茶对健康有哪些益处？"
+)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_transformers\localai_rerank.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

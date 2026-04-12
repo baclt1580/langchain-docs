@@ -1,0 +1,43 @@
+---
+title: "Diffbot 集成"
+description: "使用 LangChain Python 与 Diffbot 进行集成。"
+---
+
+> [Diffbot](https://docs.diffbot.com/docs) 是一套基于机器学习的工具套件，可轻松地对网络数据进行结构化和集成。
+
+## 安装与设置
+
+[获取免费的 Diffbot API 令牌](https://app.diffbot.com/get-started/) 并 [遵循这些说明](https://docs.diffbot.com/reference/authentication) 来认证您的请求。
+
+## 文档加载器
+
+Diffbot 的 [Extract API](https://docs.diffbot.com/reference/extract-introduction) 是一项服务，用于对网页数据进行结构化和规范化。
+
+与传统网页抓取工具不同，`Diffbot Extract` 不需要任何规则即可读取页面上的内容。它使用计算机视觉模型将页面分类为 20 种可能类型之一，然后将原始 HTML 标记转换为 JSON。生成的结构化 JSON 遵循一致的 [基于类型的本体](https://docs.diffbot.com/docs/ontology)，这使得使用相同的模式从多个不同的 Web 源提取数据变得容易。
+
+查看 [使用示例](/oss/python/integrations/document_loaders/diffbot)。
+
+```python
+from langchain_community.document_loaders import DiffbotLoader
+```
+
+## 图谱
+
+Diffbot 的 [Natural Language Processing API](https://www.diffbot.com/products/natural-language/) 允许从非结构化文本数据中提取实体、关系和语义含义。
+
+查看 [使用示例](/oss/python/integrations/graphs/diffbot)。
+
+```python
+from langchain_experimental.graph_transformers.diffbot import DiffbotGraphTransformer
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\diffbot.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

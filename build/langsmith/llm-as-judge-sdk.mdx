@@ -1,0 +1,97 @@
+---
+title: 如何定义 LLM 作为评判者的评估器
+sidebarTitle: LLM 作为评判者
+---
+
+由于 LLM 应用通常生成对话式文本，且没有唯一正确答案，因此评估起来可能具有挑战性。
+
+本指南将展示如何使用 [LangSmith SDK](https://reference.langchain.com/python/langsmith/observability/sdk) 为[离线评估](/langsmith/evaluation-concepts#offline-evaluations)定义 [LLM 作为评判者的评估器](/langsmith/evaluation-concepts#llm-as-judge)。
+
+<Tip>
+如需快速开始，可使用[预构建评估器](/langsmith/prebuilt-evaluators)，其中提供了开箱即用的 LLM 作为评判者的评估器。
+</Tip>
+
+## 创建自定义的 LLM 作为评判者的评估器
+
+如需完全控制评估逻辑，可创建自定义的 LLM 作为评判者的评估器，并使用 LangSmith SDK（[Python](https://docs.smith.langchain.com/reference/python/reference) / [TypeScript](https://docs.smith.langchain.com/reference/js)）运行它。
+
+要求 `langsmith>=0.2.0`
+
+一个 LLM 作为评判者的评估器包含三个关键组件：
+
+1. **评估器函数**：接收示例输入和应用程序输出的函数，使用 LLM 对质量进行评分。该函数应返回布尔值、数字、字符串或包含评分信息的字典。
+1. **目标函数**：待评估的应用程序逻辑（使用 [`@traceable`][@traceable] 装饰器包装以实现可观测性）。
+1. **数据集和评估**：包含测试示例的数据集，以及 `evaluate()` 函数，该函数在每个示例上运行目标函数并应用评估器。
+
+### 示例
+
+```python
+from langsmith import evaluate, traceable, wrappers, Client
+from openai import OpenAI
+from pydantic import BaseModel
+
+# 包装 OpenAI 客户端以自动追踪所有 LLM 调用
+oai_client = wrappers.wrap_openai(OpenAI())
+
+# 1. 定义评估器函数
+# 此函数接收每个测试示例的输入和输出
+def valid_reasoning(inputs: dict, outputs: dict) -> bool:
+    """使用 LLM 判断推理过程与答案是否一致。"""
+    # 定义评估标准
+    instructions = """
+给定以下问题、答案和推理过程，判断该答案的推理过程在逻辑上是否有效，
+且与问题和答案保持一致。"""
+
+    # 使用结构化输出来获取布尔评分
+    class Response(BaseModel):
+        reasoning_is_valid: bool
+
+    # 使用实际输入和输出构建提示
+    msg = f"问题：{inputs['question']}\n答案：{outputs['answer']}\n推理过程：{outputs['reasoning']}"
+
+    # 调用 LLM 对输出进行评判
+    response = oai_client.beta.chat.completions.parse(
+        model="gpt-4o",
+        messages=[{"role": "system", "content": instructions}, {"role": "user", "content": msg}],
+        response_format=Response
+    )
+
+    # 返回布尔评分
+    return response.choices[0].message.parsed.reasoning_is_valid
+
+# 2. 定义目标函数（待评估的应用程序）
+# @traceable 装饰器将追踪日志记录到 LangSmith 以便调试
+@traceable
+def dummy_app(inputs: dict) -> dict:
+    return {"answer": "嗯，我不太确定", "reasoning": "我没理解这个问题"}
+
+# 3. 创建包含测试示例的数据集
+ls_client = Client()
+dataset = ls_client.create_dataset("重大问题")
+examples = [
+    {"inputs": {"question": "宇宙将如何终结"}},
+    {"inputs": {"question": "我们是否孤独"}},
+]
+ls_client.create_examples(dataset_id=dataset.id, examples=examples)
+
+# 4. 运行评估
+# 此操作在每个示例上运行 dummy_app 并应用 valid_reasoning 评估器
+results = evaluate(
+    dummy_app,              # 应用程序函数
+    data=dataset,           # 评估所用的数据集
+    evaluators=[valid_reasoning]  # 评估器函数列表
+)
+```
+
+有关如何编写自定义评估器的更多信息，请参阅[如何定义代码评估器（SDK）](/langsmith/code-evaluator-sdk)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\llm-as-judge-sdk.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

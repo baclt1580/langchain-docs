@@ -1,0 +1,110 @@
+---
+title: "文本分割器集成"
+sidebarTitle: "文本分割器"
+description: "使用 LangChain 集成文本分割器。"
+---
+
+<CodeGroup>
+    ```bash pip
+    pip install -U langchain-text-splitters
+    ```
+
+    ```bash uv
+    uv add langchain-text-splitters
+    ```
+</CodeGroup>
+
+
+
+
+**文本分割器**将大型文档拆分为更小的块，这些块可以单独检索，并适应模型上下文窗口的限制。
+
+有几种文档分割策略，每种都有其自身的优势。
+
+<Tip>
+    对于大多数用例，建议从 [`RecursiveCharacterTextSplitter`](/oss/python/integrations/splitters/recursive_text_splitter) 开始。它在保持上下文完整性和管理块大小之间提供了良好的平衡。这种默认策略开箱即用，通常效果很好，只有在需要针对特定应用微调性能时才应考虑调整。
+</Tip>
+
+## 基于文本结构
+
+文本自然地组织成层次化单元，如段落、句子和单词。我们可以利用这种固有结构来指导分割策略，创建保持自然语言流畅性、在分割内保持语义连贯性，并能适应不同文本粒度的分割。LangChain 的 `RecursiveCharacterTextSplitter` 实现了这一概念：
+
+- [`RecursiveCharacterTextSplitter`](/oss/python/integrations/splitters/recursive_text_splitter) 尝试保持较大单元（例如段落）的完整性。
+- 如果一个单元超过块大小，它会移动到下一级别（例如句子）。
+- 如有必要，此过程会一直持续到单词级别。
+
+使用示例：
+
+```python
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=0)
+texts = text_splitter.split_text(document)
+```
+
+
+
+**可用的文本分割器**：
+- [递归分割文本](/oss/python/integrations/splitters/recursive_text_splitter)
+
+## 基于长度
+
+一种直观的策略是根据文档长度进行分割。这种简单而有效的方法确保每个块不超过指定的大小限制。基于长度分割的主要优点：
+
+- 实现简单
+- 块大小一致
+- 易于适应不同的模型要求
+
+基于长度分割的类型：
+
+- 基于令牌：根据令牌数量分割文本，这在处理语言模型时很有用。
+- 基于字符：根据字符数量分割文本，对于不同类型的文本可能更一致。
+
+使用 LangChain 的 `CharacterTextSplitter` 进行基于令牌分割的示例实现：
+
+```python
+from langchain_text_splitters import CharacterTextSplitter
+
+text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
+    encoding_name="cl100k_base", chunk_size=100, chunk_overlap=0
+)
+texts = text_splitter.split_text(document)
+```
+
+
+
+**可用的文本分割器**：
+- [按令牌分割](/oss/python/integrations/splitters/split_by_token)
+- [按字符分割](/oss/python/integrations/splitters/character_text_splitter)
+
+## 基于文档结构
+
+某些文档具有固有结构，例如 HTML、Markdown 或 JSON 文件。在这些情况下，基于文档结构进行分割是有益的，因为它通常自然地分组语义相关的文本。基于结构分割的主要优点：
+
+- 保留文档的逻辑组织
+- 在每个块内保持上下文
+- 对于检索或摘要等下游任务可能更有效
+
+基于结构分割的示例：
+
+- Markdown：基于标题分割（例如 `#`、`##`、`###`）
+- HTML：使用标签分割
+- JSON：按对象或数组元素分割
+- 代码：按函数、类或逻辑块分割
+
+**可用的文本分割器**：
+- [分割 Markdown](/oss/python/integrations/splitters/markdown_header_metadata_splitter)
+- [分割 JSON](/oss/python/integrations/splitters/recursive_json_splitter)
+- [分割代码](/oss/python/integrations/splitters/code_splitter)
+- [分割 HTML](/oss/python/integrations/splitters/split_html)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\integrations\splitters\index.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

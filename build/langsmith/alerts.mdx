@@ -1,0 +1,357 @@
+---
+title: LangSmith 中的告警
+sidebarTitle: 告警
+---
+
+<Note>
+    **自托管版本要求**
+
+    使用告警功能需要 Helm chart 版本 **0.10.3** 或更高。
+</Note>
+
+## 概述
+
+在 LLM 应用中实现有效的可观测性，需要主动检测故障、性能下降和回归问题。LangSmith 的告警功能有助于识别关键问题，例如：
+
+- 模型提供商的 API 速率限制违规
+- 应用程序的延迟增加
+- 影响反映最终用户体验的反馈分数的应用程序变更
+- LLM 使用导致的意外成本激增
+
+LangSmith 中的告警是按项目（project）作用域的，需要为每个受监控的项目单独配置。
+
+## 配置告警
+
+### 步骤 1：导航至创建告警
+
+在 [UI](https://smith.langchain.com) 中，导航到您想要配置告警的追踪项目。点击页面右上角的 **告警** 图标，查看该项目的现有告警并设置新告警。
+
+### 步骤 2：选择指标类型
+
+LangSmith 提供基于以下指标的阈值告警：
+
+| 指标类型         | 描述                          | 使用场景                                                                                                                                                                                 |
+| ---------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **运行次数**     | 跟踪一段时间窗口内的运行总数。 | 监控流水线是否按预期量产生运行，并在意外下降时发出告警。 |
+| **成本**         | 跟踪一段时间窗口内运行的总成本 | 监控 LLM 支出，在成本超过预期阈值时发出告警。需要配置[成本追踪](/langsmith/cost-tracking)。 |
+| **错误**         | 跟踪状态为错误的运行。可基于总错误数或错误百分比（错误运行占所有运行的比例）发出告警。 | 监控应用程序中的故障，或在错误率超过可接受阈值时发出告警。 |
+| **反馈分数**     | 测量平均反馈分数              | 跟踪[最终用户的反馈](/langsmith/attach-user-feedback)或[在线评估结果](/langsmith/online-evaluations-llm-as-judge)，以在出现回归时发出告警。 |
+| **延迟**         | 测量平均运行执行时间          | 跟踪应用程序的延迟，以在出现峰值和性能瓶颈时发出告警。 |
+
+此外，对于**错误**和**延迟**指标，您可以定义过滤器来缩小触发告警的运行范围。例如，您可以创建一个错误告警过滤器，针对所有标记为 `support_agent` 且遇到 `RateLimitExceeded` 错误的 `llm` 运行。
+
+<div style={{ textAlign: 'center' }}>
+
+![告警指标](/langsmith/images/alerts-filter.png)
+
+</div>
+
+### 步骤 2：定义告警条件
+
+告警条件由以下几个部分组成：
+
+- **聚合方法**：平均值、百分比或计数
+- **比较运算符**：`>=`、`<=` 或超过阈值
+- **阈值**：触发告警的数值
+- **聚合窗口**：计算指标的时间段（当前可选择 5 分钟或 15 分钟）
+- **反馈键**（仅限反馈分数告警）：要监控的特定反馈指标
+
+<br />
+<div style={{ textAlign: 'center' }}>
+
+![告警条件配置](/langsmith/images/define-conditions.png)
+
+</div>
+
+**示例：** 上面显示的配置将在过去 5 分钟内错误运行超过 5% 时生成告警。
+
+您可以预览告警在历史时间窗口内的行为，以了解在选定阈值下（用红色表示）会有多少个数据点（以及哪些数据点）会触发告警。例如，为项目设置 60 秒的平均延迟阈值，可以让您可视化潜在的告警，如下图所示。
+
+<div style={{ textAlign: 'center' }}>
+
+![告警指标](/langsmith/images/alert-preview.png)
+
+</div>
+
+### 步骤 3：配置通知渠道
+
+<Tabs>
+  <Tab title="PagerDuty">
+    使用 PagerDuty 的 [Events API v2](https://developer.pagerduty.com/docs/events-api-v2-overview) 将 PagerDuty 配置为通知渠道。此集成允许关键的 LLM 应用程序问题触发 PagerDuty 事件，从而通过您已建立的事件管理工作流程实现快速响应。
+
+    **先决条件**
+
+    - 具有管理员访问权限的活跃 PagerDuty 账户
+    - PagerDuty 中适当的服务级别权限
+
+    如果使用 LangSmith 的自定义部署，请确保没有防火墙设置阻止来自 LangSmith 服务的出口流量。
+
+    #### 1. 在 PagerDuty 中创建服务
+
+    1. 登录您的 PagerDuty 账户
+    2. 导航到 **Services → Service Directory**
+    3. 点击 **+ New Service**
+    4. 填写以下字段：
+       - **Name**：提供描述性名称（例如，"LangSmith Monitoring"）
+       - **Description**：添加有关受监控应用程序的详细信息
+       - **Escalation Policy**：选择适当的团队升级策略
+       - **Integration Type**：选择 "Events API V2"
+    5. 点击 **Add Service** 以创建服务
+
+    #### 2. 获取集成密钥
+
+    创建服务后，获取集成密钥：
+
+    1. 在 **Service Directory** 中，找到并点击您新创建的服务
+    2. 选择 **Integrations** 选项卡
+    3. 找到 "Events API V2" 集成
+    4. 复制 **Integration Key**（一个 32 位的字母数字字符串）
+
+    ![PagerDuty 集成密钥位置](/langsmith/images/pager-duty.png)
+
+    #### 3. 使用 PagerDuty 配置 LangSmith 告警
+
+    <Info>
+    要在告警触发后一小时内再次收到同一告警，您必须在 PagerDuty 中解决由该告警创建的活跃事件。
+    </Info>
+
+    ![PagerDuty 设置](/langsmith/images/pagerduty-setup.png)
+
+    1. 在 LangSmith 告警设置的通知部分，选择 **PagerDuty**
+    2. 点击钥匙图标将集成密钥保存为工作区密钥，或选择现有的工作区密钥。作为最佳实践，我们建议将集成密钥保存为工作区密钥，而不是直接添加。这将允许您在同一个工作区的多个告警中重复使用同一密钥。
+    3. 配置其他通知选项：
+       - **Severity**：映射到 PagerDuty 事件优先级
+    4. 点击 **Send Test Alert** 发送测试告警
+    5. 验证 PagerDuty 是否触发了事件并包含相关的 LangSmith 告警信息
+
+    #### 故障排除
+
+    如果 PagerDuty 中没有创建事件：
+
+    - 验证集成密钥在 LangSmith 中是否正确输入
+    - 确保 PagerDuty 服务处于活动状态且未处于维护模式
+    - 检查您的 PagerDuty 账户是否启用了 Events API v2
+    - 如果某个告警触发器似乎在 PagerDuty 中缺失，请检查预期触发器是否发生在同一告警规则的前一个触发器的一小时内，以及前一个告警创建的事件是否仍处于打开状态。
+    - 如果您的 LangSmith 实例位于防火墙后，请检查网络连接
+
+    #### 其他资源
+
+    - [PagerDuty Events API v2 文档](https://developer.pagerduty.com/docs/events-api-v2/overview/)
+    - [PagerDuty 集成指南](https://support.pagerduty.com/docs/services-and-integrations)
+  </Tab>
+  <Tab title="Webhook">
+    Webhook 允许与自定义服务和第三方平台集成，在告警条件触发时发送 HTTP POST 请求。使用 Webhook 将告警数据转发到工单系统、聊天应用程序或自定义监控解决方案。
+
+    **先决条件**
+
+    - 一个可以接收 HTTP POST 请求的端点
+    - 接收服务所需的适当身份验证凭据（如果需要）
+
+    #### 1. 准备您的接收端点
+
+    在 LangSmith 中配置 Webhook 之前，请确保您的接收端点：
+
+    - 接受 HTTP POST 请求
+    - 可以处理 JSON 负载
+    - 可以从外部服务访问
+    - 具有适当的身份验证机制（如果需要）
+
+    如果使用 LangSmith 的自定义部署，请确保没有防火墙设置阻止来自 LangSmith 服务的出口流量。
+
+    #### 2. 配置 Webhook 参数
+
+    ![Webhook 设置](/langsmith/images/webhook-setup.png)
+
+    在告警的通知部分，使用以下参数完成 Webhook 配置：
+
+    **必填字段**
+
+    - **URL**：您的接收端点的完整 URL
+      - 示例：`https://api.example.com/incident-webhook`
+
+    **可选字段**
+
+    - **Headers**：随 Webhook 请求发送的 JSON 键值对
+      - 常见标头包括：
+        - `Authorization`：用于身份验证令牌
+        - `Content-Type`：通常设置为 `application/json`（默认）
+        - `X-Source`：用于标识来源为 LangSmith
+      - 如果没有标头，请使用 `{}`
+
+    - **Request Body Template**：自定义发送到您端点的 JSON 负载
+      - 默认：LangSmith 发送定义的负载以及附加到负载的以下额外键值对：
+        - `project_name`：触发告警的项目名称
+        - `alert_rule_id`：用于标识 LangSmith 告警的 UUID。这可以在 Webhook 服务中用作去重键。
+        - `alert_rule_name`：告警规则的名称。
+        - `alert_rule_type`：告警类型（截至 2025年4月1日，所有告警均为 `threshold` 类型）。
+        - `alert_rule_attribute`：与告警规则关联的属性 - `error_count`、`feedback_score`、`latency` 或 `cost`。
+        - `triggered_metric_value`：触发阈值时的指标值。
+        - `triggered_threshold`：触发告警的阈值。
+        - `timestamp`：触发告警的时间戳。
+
+    #### 3. 测试 Webhook
+
+    点击 **Send Test Alert** 发送 Webhook 通知，以确保通知按预期工作。
+
+    #### 故障排除
+
+    如果 Webhook 通知未送达：
+
+    - 验证 Webhook URL 是否正确且可访问
+    - 确保任何身份验证标头格式正确
+    - 检查您的接收端点是否接受 POST 请求
+    - 检查您端点的日志，查看是否收到但拒绝了请求
+    - 验证您的自定义负载模板是否为有效的 JSON 格式
+
+    #### 安全注意事项
+
+    - 为您的 Webhook 端点使用 HTTPS
+    - 为您的 Webhook 端点实施身份验证
+    - 考虑在标头中添加共享密钥以验证 Webhook 来源
+    - 在处理传入的 Webhook 请求之前验证它们
+
+    #### 将告警发送到 Slack
+
+    <Accordion title="通过 Webhook 配置 Slack 通知">
+      这是一个配置 LangSmith 告警以使用 [`chat.postMessage`](https://api.slack.com/methods/chat.postMessage) API 向 Slack 频道发送通知的示例。
+
+      **先决条件**
+
+      - 访问 Slack 工作区
+      - 用于设置告警的 LangSmith 项目
+      - 创建 Slack 应用程序的权限
+
+      **步骤 1：创建 Slack 应用**
+
+      1. 访问 [Slack API 应用程序页面](https://api.slack.com/apps)
+      2. 点击 **Create New App**
+      3. 选择 **From scratch**
+      4. 提供 **App Name**（例如，"LangSmith Alerts"）
+      5. 选择要安装该应用的工作区
+      6. 点击 **Create App**
+
+      **步骤 2：配置机器人权限**
+
+      1. 在 Slack 应用配置的左侧边栏中，点击 **OAuth & Permissions**
+      2. 向下滚动到 **Scopes** 下的 **Bot Token Scopes**，然后点击 **Add an OAuth Scope**
+      3. 添加以下范围：
+         - `chat:write`（以应用身份发送消息）
+         - `chat:write.public`（向应用不在的频道发送消息）
+         - `channels:read`（查看基本频道信息）
+
+      **步骤 3：将应用安装到您的工作区**
+
+      1. 向上滚动到 **OAuth & Permissions** 页面顶部
+      2. 点击 **Install to Workspace**
+      3. 查看权限并点击 **Allow**
+      4. 复制出现的 **Bot User OAuth Token**（以 `xoxb-` 开头）
+
+      **步骤 4：将机器人添加到 Slack 频道**
+
+      将机器人添加到您想要接收告警的特定频道。您可以通过在消息字段中提及它（例如 `@botname`）来将机器人添加到 Slack 频道。
+
+      您还需要频道 ID 来配置 LangSmith 中的 Webhook 告警。您可以通过打开频道详情 > About 来找到频道 ID。
+
+      **步骤 5：在 LangSmith 中配置 Webhook 告警**
+
+      1. 在 LangSmith 中，导航到您的项目
+      2. 选择 **Alerts → Create Alert**
+      3. 定义您的告警指标和条件
+      4. 在通知部分，选择 **Webhook**
+      5. 使用以下设置配置 Webhook：
+
+      **Webhook URL**
+
+      ```json
+      https://slack.com/api/chat.postMessage
+      ```
+
+      **Headers**
+      <Note>将 `xoxb-your-token-here` 替换为您的 Bot User OAuth Token</Note>
+
+      ```json
+      {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer xoxb-your-token-here"
+      }
+      ```
+
+      **Request Body Template**
+      <Note>必须填写从步骤 4 中找到的 `{channel_id}` 值。<br /><br />其余字段：`alert_name`、`project_name` 和 `project_url` 可选地为告警消息添加上下文。您可以在浏览器的地址栏中找到您的 `project_url`。复制直到但不包括任何查询参数的部分。</Note>
+
+      ```json
+      {
+        "channel": "{channel_id}",
+        "text": "{alert_name} triggered for {project_name}",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "🚨{alert_name} has been triggered"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "Please check the following link for more information:"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "<{project-url}|View in LangSmith>"
+            }
+          }
+        ]
+      }
+      ```
+
+      6. 点击 **Save** 以激活 Webhook 配置
+
+      **步骤 6：测试集成**
+
+      1. 在 LangSmith 告警配置中，点击 **Test Alert**
+      2. 检查您指定的 Slack 频道是否有测试通知
+      3. 验证消息是否包含预期的告警信息
+
+      **（可选）步骤 7：在请求体中链接到告警预览**
+
+      创建告警后，您可以选择在 Webhook 的请求体中链接到其预览。
+
+      ![告警预览面板](/langsmith/images/alert-preview-pane.png)
+
+      配置方法：
+
+      1. 保存您的告警
+      2. 在告警表中找到您保存的告警并点击它
+      3. 复制显示的 URL
+      4. 点击 "Edit Alert"
+      5. 将现有的项目 URL 替换为复制的告警预览 URL
+    </Accordion>
+
+    #### 其他资源
+
+    - [Slack chat.postMessage API 文档](https://api.slack.com/methods/chat.postMessage)
+    - [Slack Block Kit Builder](https://app.slack.com/block-kit-builder/)
+  </Tab>
+</Tabs>
+
+## 最佳实践
+
+- 根据应用程序的关键性调整灵敏度
+- 从较宽的阈值开始，然后根据观察到的模式进行细化
+- 确保告警路由到达适当的待命人员
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\alerts.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

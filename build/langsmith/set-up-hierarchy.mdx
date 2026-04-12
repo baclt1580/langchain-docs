@@ -1,0 +1,125 @@
+---
+title: 设置层级结构
+sidebarTitle: 设置层级结构
+---
+
+本页介绍如何设置和管理 LangSmith 的[_组织_](/langsmith/administration-overview#organizations)和[_工作空间_](/langsmith/administration-overview#workspaces)：
+
+- [设置组织](#设置组织)：为团队协作创建和管理组织，包括用户管理和角色分配。
+- [设置工作空间](#设置工作空间)：设置和配置工作空间以组织 LangSmith 资源，管理工作空间成员，并为团队协作配置设置。
+- [设置应用](#设置应用)：在工作空间内设置应用以进一步组织 LangSmith 资源，并利用 ABAC 权限管理。
+
+<Check>
+在阅读本设置页面之前，参考[LangSmith 资源层级结构概述](/langsmith/administration-overview)可能会有所帮助。
+</Check>
+
+## 设置组织
+
+<Note>
+如果您希望通过编程方式管理组织和工作空间，请参考[使用 API 管理组织](/langsmith/manage-organization-by-api)。
+</Note>
+
+### 创建组织
+
+当您首次登录 [UI](https://smith.langchain.com) 时，LangSmith 会自动为您创建一个个人组织。如果您希望与他人协作，可以创建一个单独的组织并邀请您的团队成员加入。
+
+1. 点击左下角的个人资料图标，打开**组织**抽屉。
+1. 在菜单顶部选择组织资料下拉菜单。
+1. 点击 **+ 创建组织**。
+
+共享组织在使用前需要绑定信用卡。您需要[设置账单](/langsmith/billing#set-up-billing-for-your-account)才能继续。
+
+### 管理和导航工作空间
+
+一旦您订阅了允许组织内多用户的[计划](/langsmith/pricing-plans)，就可以设置[工作空间](/langsmith/administration-overview#workspaces)以更有效地协作，并在不同用户组之间隔离 LangSmith 资源。要在工作空间之间导航并访问每个工作空间内的资源（追踪项目、标注队列等），请在 [LangSmith UI](https://smith.langchain.com) 的左下角选择器中选择所需的工作空间。
+
+### 管理用户
+
+在[设置页面](https://smith.langchain.com/settings)的**成员和角色**选项卡中管理共享组织的成员资格。在这里您可以：
+
+- 邀请新用户加入您的组织，选择工作空间成员资格以及（如果启用了 [RBAC](/langsmith/rbac)）工作空间角色。
+- 编辑用户的组织角色。
+- 从组织中移除用户。
+
+[企业计划](/langsmith/pricing-plans)上的组织可以在**角色**选项卡中设置自定义工作空间角色。更多详情，请参考[访问控制设置指南](/langsmith/user-management)。
+
+#### 组织角色
+
+组织范围的角色用于确定对组织设置的访问权限。所选角色也会影响工作空间成员资格：
+
+- **组织管理员**授予管理所有组织配置、用户、账单和工作空间的完全访问权限。任何组织管理员对组织中的所有工作空间都拥有 `Admin` 访问权限。
+- **组织用户**可以读取组织信息，但无法在组织级别执行任何写入操作。您可以将组织用户添加到一部分工作空间中，并按常规分配工作空间角色（如果启用了 [RBAC](/langsmith/rbac)），这些角色指定了工作空间级别的权限。
+
+<Info>
+[组织用户](/langsmith/rbac#organization-user)和[组织查看者](/langsmith/rbac#organization-viewer)角色仅在[Plus 和 Enterprise 计划](https://langchain.com/pricing)的组织中可用。在开发者组织（单工作空间）中，默认情况下所有用户都被分配为[组织管理员](/langsmith/rbac#organization-admin)角色。自定义组织范围的角色不可用。
+</Info>
+
+有关每个角色关联的完整权限列表，请参考[管理概述](/langsmith/administration-overview#organization-roles)页面。
+
+## 设置工作空间
+
+当您首次登录时，LangSmith 会在您的个人组织中创建一个默认的[工作空间](/langsmith/administration-overview#workspaces)。您可以使用工作空间来分隔不同团队或业务单元之间的资源，从而在它们之间建立清晰的信任边界。在每个工作空间内，[基于角色的访问控制 (RBAC)](/langsmith/rbac) 管理权限和访问级别，确保用户仅能访问其角色所需的资源和设置。大多数 LangSmith 活动都在工作空间的上下文中进行，每个工作空间都有自己的设置和访问控制。
+
+有关为您的团队选择合适的工作空间组织模型（每个团队单工作空间、每个工作空间多团队或每个团队多工作空间）的指导，请参考[工作负载隔离](/langsmith/workload-isolation)。
+
+### 创建工作空间
+
+要创建新的工作空间，请导航到共享组织的[**设置**页面](https://smith.langchain.com/settings)的**工作空间**选项卡，然后点击**添加工作空间**。
+
+创建工作空间后，您可以通过在**设置**页面上选择该工作空间来管理其成员和其他配置。
+
+<Note>
+不同计划对组织中可使用的工作空间数量有不同的限制。更多信息，请参考[定价页面](https://www.langchain.com/pricing-langsmith)。
+</Note>
+
+### 管理用户
+
+<Info>
+只有[工作空间管理员](/langsmith/rbac#workspace-admin)可以管理工作空间成员资格，并且如果启用了 RBAC，可以更改用户的工作空间角色。
+</Info>
+
+对于已经是组织成员的用户，工作空间管理员可以在[**工作空间设置**页面](https://smith.langchain.com/settings/workspaces)的**工作空间成员**选项卡中将他们添加到工作空间。用户也可以在受邀加入组织时直接受邀加入一个或多个工作空间。
+
+### 配置工作空间设置
+
+工作空间配置位于[**工作空间设置**页面](https://smith.langchain.com/settings/workspaces)的选项卡中。选择要配置的工作空间，然后选择所需的配置子选项卡。
+配置选项包括：
+
+- **工作空间成员**
+- **API 密钥**
+- **密钥**
+- **反馈配置**
+- **模型**
+- **规则**
+- **共享 URL**
+
+### 删除工作空间
+
+<Warning>
+删除工作空间将永久删除该工作空间及其所有关联数据。此操作无法撤销。
+</Warning>
+
+您可以通过 [LangSmith UI](https://smith.langchain.com) 或 [API](https://api.smith.langchain.com/redoc?#tag/workspaces/operation/delete_workspace_api_v1_workspaces__workspace_id__delete) 删除工作空间。您必须是[工作空间管理员](/langsmith/rbac#workspace-admin)才能删除工作空间。
+
+在 LangSmith UI 中：
+
+1. 导航到**设置**。
+1. 选择要删除的工作空间。
+1. 点击屏幕右上角的删除图标 <Icon icon="trash" iconType="solid"/>。
+
+## 设置应用
+
+您可以在工作空间内创建应用，以进一步组织资源，例如追踪项目和数据集。一个工作空间可以有零个或多个应用。
+
+您可以通过在 LangSmith UI 主页选择**所有应用**来查看工作空间内的所有资源。您可以通过在**设置**页面的**资源标签**下将资源添加到 `Application` 标签，将资源标记到多个应用。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\set-up-hierarchy.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

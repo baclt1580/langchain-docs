@@ -1,0 +1,359 @@
+---
+title: 流式传输
+description: 从智能体运行中流式获取实时更新
+---
+
+import StreamingReasoningTokensPy from '/snippets/code-samples/streaming-reasoning-tokens-py.mdx';
+import StreamingReasoningTokensJs from '/snippets/code-samples/streaming-reasoning-tokens-js.mdx';
+
+LangChain 实现了一个流式系统，用于展示实时更新。
+
+流式传输对于增强基于大语言模型（LLM）构建的应用程序的响应性至关重要。通过逐步显示输出，甚至在完整响应准备好之前，流式传输显著改善了用户体验（UX），特别是在处理 LLM 的延迟时。
+
+## 概述
+
+LangChain 的流式系统允许您将智能体运行的实时反馈展示到您的应用程序中。
+
+使用 LangChain 流式传输可以实现：
+
+* <Icon icon="brain" size={16} /> [**流式传输智能体进度**](#agent-progress)—在每次智能体步骤后获取状态更新。
+* <Icon icon="binary" size={16} /> [**流式传输 LLM 令牌**](#llm-tokens)—流式传输正在生成的语言模型令牌。
+* <Icon icon="bulb" size={16} /> [**流式传输思考/推理令牌**](#streaming-thinking-/-reasoning-tokens)—展示正在生成的模型推理过程。
+* <Icon icon="table" size={16} /> [**流式传输自定义更新**](#custom-updates)—发射用户定义的信号（例如，`"Fetched 10/100 records"`）。
+* <Icon icon="stack-push" size={16} /> [**流式传输多种模式**](#stream-multiple-modes)—从 `updates`（智能体进度）、`messages`（LLM 令牌 + 元数据）或 `custom`（任意用户数据）中选择。
+
+请参阅下面的 [常见模式](#common-patterns) 部分以获取更多端到端示例。
+
+## 支持的流模式
+
+
+
+将以下一个或多个流模式作为列表传递给 [`stream`](https://reference.langchain.com/javascript/classes/_langchain_langgraph.index.CompiledStateGraph.html#stream) 方法：
+
+
+| 模式       | 描述                                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------- |
+| `updates`  | 在每个智能体步骤后流式传输状态更新。如果同一步骤中有多个更新（例如，运行了多个节点），这些更新将分别流式传输。 |
+| `messages` | 流式传输来自任何调用 LLM 的图节点的 `(token, metadata)` 元组。 |
+| `custom`   | 使用流写入器从您的图节点内部流式传输自定义数据。 |
+
+## 智能体进度
+
+
+
+要流式传输智能体进度，请使用 [`stream`](https://reference.langchain.com/javascript/classes/_langchain_langgraph.index.CompiledStateGraph.html#stream) 方法并设置 `streamMode: "updates"`。这会在每个智能体步骤后发射一个事件。
+
+
+例如，如果您有一个调用一次工具的代理，您应该看到以下更新：
+
+* **LLM 节点**：带有工具调用请求的 [`AIMessage`](https://reference.langchain.com/javascript/langchain-core/messages/AIMessage)
+* **工具节点**：带有执行结果的 [`ToolMessage`](https://reference.langchain.com/javascript/langchain-core/messages/ToolMessage)
+* **LLM 节点**：最终 AI 响应
+
+
+
+```typescript
+import z from "zod";
+import { createAgent, tool } from "langchain";
+
+const getWeather = tool(
+    async ({ city }) => {
+        return `The weather in ${city} is always sunny!`;
+    },
+    {
+        name: "get_weather",
+        description: "Get weather for a given city.",
+        schema: z.object({
+        city: z.string(),
+        }),
+    }
+);
+
+const agent = createAgent({
+    model: "gpt-5-nano",
+    tools: [getWeather],
+});
+
+for await (const chunk of await agent.stream(
+    { messages: [{ role: "user", content: "what is the weather in sf" }] },
+    { streamMode: "updates" }
+)) {
+    const [step, content] = Object.entries(chunk)[0];
+    console.log(`step: ${step}`);
+    console.log(`content: ${JSON.stringify(content, null, 2)}`);
+}
+/**
+ * step: model
+ * content: {
+ *   "messages": [
+ *     {
+ *       "kwargs": {
+ *         // ...
+ *         "tool_calls": [
+ *           {
+ *             "name": "get_weather",
+ *             "args": {
+ *               "city": "San Francisco"
+ *             },
+ *             "type": "tool_call",
+ *             "id": "call_0qLS2Jp3MCmaKJ5MAYtr4jJd"
+ *           }
+ *         ],
+ *         // ...
+ *       }
+ *     }
+ *   ]
+ * }
+ * step: tools
+ * content: {
+ *   "messages": [
+ *     {
+ *       "kwargs": {
+ *         "content": "The weather in San Francisco is always sunny!",
+ *         "name": "get_weather",
+ *         // ...
+ *       }
+ *     }
+ *   ]
+ * }
+ * step: model
+ * content: {
+ *   "messages": [
+ *     {
+ *       "kwargs": {
+ *         "content": "The latest update says: The weather in San Francisco is always sunny!\n\nIf you'd like real-time details (current temperature, humidity, wind, and today's forecast), I can pull the latest data for you. Want me to fetch that?",
+ *         // ...
+ *       }
+ *     }
+ *   ]
+ * }
+ */
+```
+
+
+## LLM 令牌
+
+
+
+要流式传输由 LLM 产生的令牌，请使用 `streamMode: "messages"`：
+
+```typescript
+import z from "zod";
+import { createAgent, tool } from "langchain";
+
+const getWeather = tool(
+    async ({ city }) => {
+        return `The weather in ${city} is always sunny!`;
+    },
+    {
+        name: "get_weather",
+        description: "Get weather for a given city.",
+        schema: z.object({
+        city: z.string(),
+        }),
+    }
+);
+
+const agent = createAgent({
+    model: "gpt-4.1-mini",
+    tools: [getWeather],
+});
+
+for await (const [token, metadata] of await agent.stream(
+    { messages: [{ role: "user", content: "what is the weather in sf" }] },
+    { streamMode: "messages" }
+)) {
+    console.log(`node: ${metadata.langgraph_node}`);
+    console.log(`content: ${JSON.stringify(token.contentBlocks, null, 2)}`);
+}
+```
+
+
+## 自定义更新
+
+
+
+要流式传输工具执行时的更新，您可以使用配置中的 `writer` 参数。
+
+```typescript
+import z from "zod";
+import { tool, createAgent } from "langchain";
+import { LangGraphRunnableConfig } from "@langchain/langgraph";
+
+const getWeather = tool(
+    async (input, config: LangGraphRunnableConfig) => {
+        // Stream any arbitrary data
+        config.writer?.(`Looking up data for city: ${input.city}`);
+        // ... fetch city data
+        config.writer?.(`Acquired data for city: ${input.city}`);
+        return `It's always sunny in ${input.city}!`;
+    },
+    {
+        name: "get_weather",
+        description: "Get weather for a given city.",
+        schema: z.object({
+        city: z.string().describe("The city to get weather for."),
+        }),
+    }
+);
+
+const agent = createAgent({
+    model: "gpt-4.1-mini",
+    tools: [getWeather],
+});
+
+for await (const chunk of await agent.stream(
+    { messages: [{ role: "user", content: "what is the weather in sf" }] },
+    { streamMode: "custom" }
+)) {
+    console.log(chunk);
+}
+```
+
+```shell title="Output"
+Looking up data for city: San Francisco
+Acquired data for city: San Francisco
+```
+
+<Note>
+    如果您将 `writer` 参数添加到工具中，您将无法在没有提供 writer 函数的情况下在 LangGraph 执行上下文之外调用该工具。
+</Note>
+
+
+## 流式传输多种模式
+
+
+
+您可以通过传递流模式数组来指定多个流模式：`streamMode: ["updates", "messages", "custom"]`。
+
+流式传输的输出将是 `[mode, chunk]` 元组，其中 `mode` 是流模式的名称，`chunk` 是该模式流式传输的数据。
+
+```typescript
+import z from "zod";
+import { tool, createAgent } from "langchain";
+import { LangGraphRunnableConfig } from "@langchain/langgraph";
+
+const getWeather = tool(
+    async (input, config: LangGraphRunnableConfig) => {
+        // Stream any arbitrary data
+        config.writer?.(`Looking up data for city: ${input.city}`);
+        // ... fetch city data
+        config.writer?.(`Acquired data for city: ${input.city}`);
+        return `It's always sunny in ${input.city}!`;
+    },
+    {
+        name: "get_weather",
+        description: "Get weather for a given city.",
+        schema: z.object({
+        city: z.string().describe("The city to get weather for."),
+        }),
+    }
+);
+
+const agent = createAgent({
+    model: "gpt-4.1-mini",
+    tools: [getWeather],
+});
+
+for await (const [streamMode, chunk] of await agent.stream(
+    { messages: [{ role: "user", content: "what is the weather in sf" }] },
+    { streamMode: ["updates", "messages", "custom"] }
+)) {
+    console.log(`${streamMode}: ${JSON.stringify(chunk, null, 2)}`);
+}
+```
+
+
+## 常见模式
+
+以下是展示流式传输常见用例的示例。
+
+### 流式传输思考/推理令牌
+
+某些模型在生成最终答案之前会进行内部推理。您可以通过过滤 [标准内容块](/oss/javascript/langchain/messages#standard-content-blocks) 的 `type` 为 `"reasoning"` 来流式传输这些正在生成的思考/推理令牌。
+
+<Note>
+    必须在模型上启用推理输出。
+
+    请参阅 [推理部分](/oss/javascript/langchain/models#reasoning) 和您的 [提供商的集成页面](/oss/javascript/integrations/providers/overview) 以获取配置详情。
+
+    要快速检查模型的推理支持情况，请查看 [models.dev](https://models.dev)。
+</Note>
+
+
+
+要从智能体流式传输思考令牌，请使用 `streamMode: "messages"` 并过滤推理内容块。当模型支持时，使用具有扩展思考功能的模型实例（例如 `ChatAnthropic`）：
+
+<StreamingReasoningTokensJs />
+
+```shell title="Output"
+[thinking] The user is asking about the weather in San Francisco. I have a tool
+[thinking]  available to get this information. Let me call the get_weather tool
+[thinking]  with "San Francisco" as the city parameter.
+The weather in San Francisco is: It's always sunny in San Francisco!
+```
+
+
+
+无论模型提供商如何，其工作原理相同—LangChain 将特定于提供商的格式（Anthropic `thinking` 块、OpenAI `reasoning` 摘要等）通过 [`content_blocks`](/oss/javascript/langchain/messages#standard-content-blocks) 属性标准化为标准的 `"reasoning"` 内容块类型。
+
+要从聊天模型直接流式传输推理令牌（不使用智能体），请参阅 [与聊天模型流式传输](/oss/javascript/langchain/models#reasoning)。
+
+
+
+## 禁用流式传输
+
+在某些应用程序中，您可能需要禁用给定模型的单个令牌的流式传输。这在以下情况下很有用：
+
+- 与 [多智能体](/oss/javascript/langchain/multi-agent) 系统一起工作以控制哪些智能体流式传输其输出
+- 混合支持流式传输和不支持流式传输的模型
+- 部署到 [LangSmith](/langsmith/home) 并希望防止某些模型输出流式传输到客户端
+
+
+
+初始化模型时设置 `streaming: false`。
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+
+const model = new ChatOpenAI({
+  model: "gpt-4.1",
+  streaming: false,  // [!code highlight]
+});
+```
+
+
+<Tip>
+部署到 LangSmith 时，对任何您不希望流式传输到客户端的模型设置 `streaming=False`。这是在部署前在您的图代码中配置的。
+</Tip>
+
+
+
+<Note>
+并非所有聊天模型集成都支持 `streaming` 参数。如果您的模型不支持它，请使用 `disableStreaming: true`。此参数通过基类在所有聊天模型上可用。
+</Note>
+
+
+有关更多详细信息，请参阅 [LangGraph 流式指南](/oss/javascript/langgraph/streaming#disable-streaming-for-specific-chat-models)。
+
+
+
+## 相关资源
+
+- [前端流式传输](/oss/javascript/langchain/streaming/frontend)—使用 `useStream` 构建 React UI 以实现实时智能体交互
+- [与聊天模型流式传输](/oss/javascript/langchain/models#stream)—直接从聊天模型流式传输令牌，无需使用智能体或图
+- [与聊天模型推理](/oss/javascript/langchain/models#reasoning)—配置和访问聊天模型的推理输出
+- [标准内容块](/oss/javascript/langchain/messages#standard-content-blocks)—了解用于推理、文本和其他内容类型的标准化内容块格式
+- [人机回环流式传输](/oss/javascript/langchain/human-in-the-loop#streaming-with-human-in-the-loop)—在处理人类审查的中断时流式传输智能体进度
+- [LangGraph 流式传输](/oss/javascript/langgraph/streaming)—高级流式传输选项，包括 `values`、`debug` 模式和子图流式传输
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\streaming.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

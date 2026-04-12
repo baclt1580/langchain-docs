@@ -1,0 +1,33 @@
+---
+title: "FakeEmbeddings 集成"
+description: "使用 LangChain Python 集成 FakeEmbeddings 嵌入模型。"
+---
+
+LangChain 还提供了一个假的嵌入类。您可以使用它来测试您的流水线。
+
+```python
+from langchain_community.embeddings import FakeEmbeddings
+```
+
+```python
+embeddings = FakeEmbeddings(size=1352)
+```
+
+```python
+query_result = embeddings.embed_query("foo")
+```
+
+```python
+doc_results = embeddings.embed_documents(["foo"])
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\fake.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,54 @@
+---
+title: "Stack Exchange 集成"
+description: "使用 LangChain Python 与 Stack Exchange 进行集成。"
+---
+
+>[Stack Exchange](https://en.wikipedia.org/wiki/Stack_Exchange) 是一个涵盖多个领域主题的问答（Q&A）网站网络，每个站点覆盖特定主题，问题和回答以及用户都遵循声誉奖励机制。
+
+本页介绍如何在 LangChain 中使用 `Stack Exchange API`。
+
+## 安装与配置
+- 使用以下方式安装依赖项
+<CodeGroup>
+```bash pip
+pip install stackapi
+```
+
+```bash uv
+uv add stackapi
+```
+</CodeGroup>
+
+## 包装器
+
+### 实用工具
+
+存在一个封装此 API 的 StackExchangeAPIWrapper 实用工具。要导入此实用工具：
+
+```python
+from langchain_community.utilities import StackExchangeAPIWrapper
+```
+
+有关此包装器的更详细教程，请参阅 [此笔记本](/oss/python/integrations/tools/stackexchange)。
+
+### 工具
+
+您也可以轻松地将此包装器加载为工具（以便与 Agent 一起使用）。
+您可以这样操作：
+```python
+from langchain_community.agent_toolkits.load_tools import load_tools
+tools = load_tools(["stackexchange"])
+```
+
+有关工具的更多信息，请参阅 [工具](/oss/python/integrations/tools)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\stackexchange.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

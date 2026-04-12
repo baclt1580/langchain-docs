@@ -1,0 +1,539 @@
+---
+title: "Composio 集成"
+description: 通过 Composio 的统一 API 平台为 AI 智能体访问 500+ 工具和集成，支持 OAuth 处理、事件驱动工作流和多用户支持。
+---
+
+[Composio](https://composio.dev) 是一个集成平台，提供对 500+ 工具的访问，涵盖 GitHub、Slack、Notion 等流行应用。它使 AI 智能体能够通过统一的 API 与外部服务交互，处理身份验证、权限和事件驱动的工作流。
+
+## 概述
+
+### 集成详情
+
+| 类别 | 包 | 可序列化 | [Python 支持](/oss/javascript/integrations/tools/composio) | 版本 |
+|:---|:---|:---:|:---:|:---:|
+| Composio | [@composio/langchain](https://www.npmjs.com/package/@composio/langchain) | ❌ | ✅ | ![npm 版本](https://img.shields.io/npm/v/@composio/langchain?style=flat-square&label=%20) |
+
+### 工具特性
+
+- **500+ 工具访问**：为 GitHub、Slack、Gmail、Jira、Notion 等提供预构建集成
+- **身份验证管理**：处理 OAuth 流程、API 密钥和身份验证状态
+- **事件驱动工作流**：基于外部事件（新的 Slack 消息、GitHub 问题等）触发智能体
+- **细粒度权限**：按用户控制工具访问和数据暴露
+- **自定义工具支持**：添加专有 API 和内部工具
+
+## 设置
+
+该集成位于 `@composio/langchain` 包中。
+
+```bash
+npm install @composio/langchain @composio/core
+```
+
+或使用其他包管理器：
+
+```bash
+yarn add @composio/langchain @composio/core
+# 或
+pnpm add @composio/langchain @composio/core
+```
+
+### 凭证
+
+你需要一个 Composio API 密钥。在 [composio.dev](https://composio.dev) 免费注册以获取你的 API 密钥。
+
+```typescript 设置 API 密钥
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+// 设置你的 Composio API 密钥
+process.env.COMPOSIO_API_KEY = 'your_api_key_here';
+```
+
+同时设置 [LangSmith](/langsmith/home) 用于追踪也很有帮助：
+
+```typescript 启用追踪
+// process.env.LANGSMITH_API_KEY = 'your_langsmith_key';
+// process.env.LANGSMITH_TRACING = 'true';
+```
+
+## 实例化
+
+使用 LangChain 提供程序初始化 Composio，并从特定的工具包中获取工具。每个工具包代表一个服务（例如 GitHub、Slack），包含多个工具（你可以执行的操作）。
+
+```typescript 初始化 Composio
+import { Composio } from '@composio/core';
+import { LangchainProvider } from '@composio/langchain';
+
+// 使用 LangChain 提供程序初始化 Composio
+const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY,
+    provider: new LangchainProvider(),
+});
+
+// 从特定工具包获取工具
+const tools = await composio.tools.get('default', 'GITHUB');
+
+console.log(`从 GitHub 工具包加载了 ${tools.length} 个工具`);
+```
+
+### 可用工具包
+
+Composio 为各种服务提供工具包：
+
+**生产力**：GitHub、Slack、Gmail、Jira、Notion、Asana、Trello、ClickUp
+**通信**：Discord、Telegram、WhatsApp、Microsoft Teams
+**开发**：GitLab、Bitbucket、Linear、Sentry
+**数据与分析**：Google Sheets、Airtable、HubSpot、Salesforce
+**以及 100+ 更多...**
+
+## 调用
+
+### 从多个工具包获取工具
+
+你可以从多个服务加载工具：
+
+```typescript
+// 从多个工具包获取工具
+const tools = await composio.tools.get('default', ['GITHUB', 'SLACK', 'GMAIL']);
+```
+
+### 获取特定工具
+
+你可以加载特定工具，而不是整个工具包：
+
+```typescript
+// 按名称获取特定工具
+const tools = await composio.tools.get('default', {
+    tools: ['GITHUB_CREATE_ISSUE', 'SLACK_SEND_MESSAGE']
+});
+```
+
+### 用户特定工具
+
+Composio 支持具有用户特定身份验证的多用户场景：
+
+```typescript
+// 为特定用户获取工具
+// 此用户必须先验证其账户
+const tools = await composio.tools.get('user_123', 'GITHUB');
+```
+
+## 在智能体中使用
+
+这是一个使用 Composio 工具与 LangGraph 智能体交互以与 HackerNews 交互的完整示例：
+
+```typescript
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import { ToolNode } from '@langchain/langgraph/prebuilt';
+import { StateGraph, MessagesAnnotation } from '@langchain/langgraph';
+import { Composio } from '@composio/core';
+import { LangchainProvider } from '@composio/langchain';
+
+// 初始化 Composio
+const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY,
+    provider: new LangchainProvider(),
+});
+
+// 获取工具
+console.log('🔄 正在获取工具...');
+const tools = await composio.tools.get('default', 'HACKERNEWS_GET_USER');
+
+// 定义智能体要使用的工具
+const toolNode = new ToolNode(tools);
+
+// 创建一个模型并授予其工具访问权限
+const model = new ChatOpenAI({
+    model: 'gpt-5',
+}).bindTools(tools);
+
+// 定义决定是否继续的函数
+function shouldContinue({ messages }: typeof MessagesAnnotation.State) {
+    const lastMessage = messages[messages.length - 1] as AIMessage;
+
+    // 如果 LLM 进行工具调用，则路由到 "tools" 节点
+    if (lastMessage.tool_calls?.length) {
+        return 'tools';
+    }
+
+    // 否则，我们停止（回复用户）
+    return '__end__';
+}
+
+// 定义调用模型的函数
+async function callModel(state: typeof MessagesAnnotation.State) {
+    console.log('🔄 正在调用模型...');
+    const response = await model.invoke(state.messages);
+    return { messages: [response] };
+}
+
+// 定义一个新图
+const workflow = new StateGraph(MessagesAnnotation)
+    .addNode('agent', callModel)
+    .addEdge('__start__', 'agent')
+    .addNode('tools', toolNode)
+    .addEdge('tools', 'agent')
+    .addConditionalEdges('agent', shouldContinue);
+
+// 编译图
+const app = workflow.compile();
+
+// 使用智能体
+const finalState = await app.invoke({
+    messages: [new HumanMessage('在 HackerNews 上查找用户 `pg` 的详细信息')]
+});
+
+console.log('✅ 从模型收到消息');
+console.log(finalState.messages[finalState.messages.length - 1].content);
+
+// 继续对话
+const nextState = await app.invoke({
+    messages: [...finalState.messages, new HumanMessage('那 haxzie 呢')]
+});
+
+console.log('✅ 从模型收到消息');
+console.log(nextState.messages[nextState.messages.length - 1].content);
+```
+
+### 使用 GitHub 工具包
+
+这是一个为 GitHub 仓库加星的示例：
+
+```typescript
+import { ChatOpenAI } from '@langchain/openai';
+import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { Composio } from '@composio/core';
+import { LangchainProvider } from '@composio/langchain';
+
+// 初始化 Composio
+const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY,
+    provider: new LangchainProvider(),
+});
+
+// 获取 GitHub 工具
+const tools = await composio.tools.get('default', 'GITHUB');
+
+// 创建模型
+const model = new ChatOpenAI({
+    model: 'gpt-5',
+});
+
+// 创建智能体
+const agent = createReactAgent({
+    llm: model,
+    tools: tools,
+});
+
+// 执行任务
+const result = await agent.invoke({
+    messages: [
+        {
+            role: 'user',
+            content: '在 GitHub 上为仓库 composiohq/composio 加星'
+        }
+    ]
+});
+
+console.log(result.messages[result.messages.length - 1].content);
+```
+
+## 身份验证设置
+
+在使用需要身份验证的工具之前，用户需要连接其账户：
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY
+});
+
+// 获取用户的身份验证 URL
+const authConnection = await composio.integrations.create({
+    userId: 'user_123',
+    integration: 'github'
+});
+
+console.log(`在此处验证：${authConnection.redirectUrl}`);
+
+// 身份验证后，用户的连接账户将可用
+// 并且工具将使用其凭证工作
+```
+
+## 多用户场景
+
+对于具有多个用户的应用程序：
+
+```typescript
+// 每个用户验证自己的账户
+const toolsUser1 = await composio.tools.get('user_1', 'GITHUB');
+const toolsUser2 = await composio.tools.get('user_2', 'GITHUB');
+
+// 工具将使用相应用户的凭证
+// 用户 1 的智能体将在用户 1 的 GitHub 账户上操作
+const agent1 = createAgent(model, toolsUser1);
+
+// 用户 2 的智能体将在用户 2 的 GitHub 账户上操作
+const agent2 = createAgent(model, toolsUser2);
+```
+
+## 事件驱动工作流
+
+Composio 支持基于外部事件触发智能体。当连接的应用中发生事件时（如新的 GitHub 提交或 Slack 消息），触发器会自动将结构化负载发送到你的应用程序。
+
+### 创建触发器
+
+首先，为你想要监控的事件创建一个触发器：
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your_api_key' });
+const userId = 'user_123';
+
+// 检查触发器需要什么配置
+const triggerType = await composio.triggers.getType('GITHUB_COMMIT_EVENT');
+console.log(triggerType.config);
+
+// 使用所需配置创建触发器
+const trigger = await composio.triggers.create(
+    userId,
+    'GITHUB_COMMIT_EVENT',
+    {
+        triggerConfig: {
+            owner: 'composiohq',
+            repo: 'composio'
+        }
+    }
+);
+
+console.log(`触发器已创建：${trigger.triggerId}`);
+```
+
+### 订阅触发器（开发）
+
+对于本地开发和原型设计，你可以直接订阅触发器：
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your_api_key' });
+
+// 订阅触发器事件
+composio.triggers.subscribe(
+    (data) => {
+        console.log(`检测到新提交：`, data);
+        // 使用你的智能体处理事件
+        // ... 使用任务调用你的智能体
+    },
+    {
+        triggerId: 'your_trigger_id',
+        // 你也可以按以下条件过滤：
+        // userId: 'user@acme.com',
+        // toolkits: ['github', 'slack'],
+        // triggerSlug: ["GITHUB_COMMIT_EVENT"],
+        // authConfigId: "ac_1234567890"
+    }
+);
+
+// 注意：对于生产环境，请使用 webhook
+```
+
+### 类型安全的触发器处理
+
+为了更好的类型安全，定义负载类型：
+
+```typescript
+import { TriggerEvent } from '@composio/core';
+
+// 定义类型安全的负载
+export type GitHubStarAddedEventPayload = {
+    action: 'created';
+    repository_id: number;
+    repository_name: string;
+    repository_url: string;
+    starred_at: string;
+    starred_by: string;
+};
+
+// 类型安全的处理器
+function handleGitHubStarAddedEvent(event: TriggerEvent<GitHubStarAddedEventPayload>) {
+    console.log(`⭐ ${event.data.repository_name} 被 ${event.data.starred_by} 加星`);
+}
+```
+
+### Webhook（生产环境）
+
+对于生产环境，在 [Composio 仪表板](https://platform.composio.dev/settings/events) 中配置 webhook：
+
+```typescript
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+        const payload = req.body;
+
+        console.log('收到触发器事件：', payload);
+
+        // 使用你的智能体处理事件
+        if (payload.triggerSlug === 'GITHUB_COMMIT_EVENT') {
+            const commitData = payload.payload;
+            // ... 使用 commitData 调用你的智能体
+        }
+
+        res.status(200).json({ status: 'success' });
+    } catch (error) {
+        console.error('处理 webhook 时出错：', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+```
+
+更多详情，请参阅 [Composio 触发器文档](https://docs.composio.dev/docs/using-triggers)
+
+## 高级功能
+
+### 自定义工具
+
+Composio 允许你创建可与内置工具一起使用的自定义工具。有两种类型：
+
+#### 独立工具
+
+不需要身份验证的简单工具：
+
+```typescript
+import { Composio } from '@composio/core';
+import { z } from 'zod';
+
+const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY
+});
+
+const tool = await composio.tools.createCustomTool({
+    slug: 'CALCULATE_SQUARE',
+    name: '计算平方',
+    description: '计算一个数字的平方',
+    inputParams: z.object({
+        number: z.number().describe('要计算平方的数字'),
+    }),
+    execute: async input => {
+        const { number } = input;
+        return {
+            data: { result: number * number },
+            error: null,
+            successful: true,
+        };
+    },
+});
+
+// 与你的智能体一起使用
+const allTools = [...tools, tool];
+```
+
+#### 基于工具包的工具
+
+需要身份验证并可以使用工具包凭证的工具：
+
+```typescript
+import { Composio } from '@composio/core';
+import { z } from 'zod';
+
+const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY
+});
+
+const tool = await composio.tools.createCustomTool({
+    slug: 'GITHUB_STAR_COMPOSIOHQ_REPOSITORY',
+    name: 'Github 为 composiohq 仓库加星',
+    toolkitSlug: 'github',
+    description: '为 `composiohq` 用户的任何指定仓库加星',
+    inputParams: z.object({
+        repository: z.string().describe('要加星的仓库'),
+        page: z.number().optional().describe('分页页码'),
+        customHeader: z.string().optional().describe('自定义头部'),
+    }),
+    execute: async (input, connectionConfig, executeToolRequest) => {
+        // 此方法向相关 API 发出经过身份验证的请求
+        // Composio 会自动注入 baseURL
+        const result = await executeToolRequest({
+            endpoint: `/user/starred/composiohq/${input.repository}`,
+            method: 'PUT',
+            body: {},
+            // 添加自定义头部或查询参数
+            parameters: [
+                // 添加查询参数
+                {
+                    name: 'page',
+                    value: input.page?.toString() || '1',
+                    in: 'query',
+                },
+                // 添加自定义头部
+                {
+                    name: 'x-custom-header',
+                    value: input.customHeader || 'default-value',
+                    in: 'header',
+                },
+            ],
+        });
+        return result;
+    },
+});
+```
+
+执行自定义工具：
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY
+});
+
+const result = await composio.tools.execute('TOOL_SLUG', {
+    arguments: {
+        // 工具输入参数
+    },
+    userId: 'user-id',
+    connectedAccountId: 'optional-account-id', // 基于工具包的工具需要
+});
+```
+
+更多详情，请参阅 [Composio 自定义工具文档](https://docs.composio.dev/docs/custom-tools)
+
+### 细粒度权限
+
+控制工具可以执行的操作：
+
+```typescript
+// 获取具有特定权限的工具
+const tools = await composio.tools.get('default', 'GITHUB', {
+    // 限制为只读操作
+    permissions: ['read']
+});
+```
+
+---
+
+## API 参考
+
+有关所有 Composio 功能和配置的详细文档，请访问：
+- [Composio 文档](https://docs.composio.dev)
+- [LangChain 提供程序指南](https://docs.composio.dev/providers/langchain)
+- [可用工具和操作](https://docs.composio.dev/toolkits/introduction)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\composio.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

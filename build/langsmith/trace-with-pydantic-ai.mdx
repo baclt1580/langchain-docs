@@ -1,0 +1,116 @@
+---
+title: 追踪 PydanticAI 应用
+sidebarTitle: PydanticAI
+---
+
+LangSmith 可以通过其内置的 OpenTelemetry 工具捕获 PydanticAI 生成的追踪信息。本指南将向您展示如何自动捕获来自 PydanticAI 智能体的追踪数据，并将其发送到 LangSmith 进行监控和分析。
+
+## 安装
+
+安装所需的软件包：
+
+<CodeGroup>
+
+```bash pip
+pip install langsmith pydantic-ai opentelemetry-exporter-otlp
+```
+
+```bash uv
+uv add langsmith pydantic-ai opentelemetry-exporter-otlp
+```
+
+</CodeGroup>
+
+<Info>
+需要 LangSmith Python SDK 版本 `langsmith>=0.4.26` 以获得最佳的 OpenTelemetry 支持。
+</Info>
+
+## 设置
+
+### 1. 配置环境变量
+
+设置您的 [API 密钥](/langsmith/create-account-api-key) 和项目名称：
+
+```bash
+export LANGSMITH_API_KEY=<your_langsmith_api_key>
+export LANGSMITH_PROJECT=<your_project_name>
+export OPENAI_API_KEY=<your_openai_api_key>
+```
+
+### 2. 配置 OpenTelemetry 集成
+
+在您的 PydanticAI 应用中，配置 LangSmith 的 OpenTelemetry 集成：
+
+```python
+from langsmith.integrations.otel import configure
+from pydantic_ai import Agent
+
+# 配置 LangSmith 追踪
+configure(project_name="pydantic-ai-demo")
+
+# 为所有 PydanticAI 智能体启用工具
+Agent.instrument_all()
+```
+
+<Note>
+您无需手动设置任何 OpenTelemetry 环境变量或配置导出器——`configure()` 会自动处理所有配置。
+</Note>
+
+### 3. 创建并运行您的 PydanticAI 智能体
+
+配置完成后，您的 PydanticAI 智能体将自动向 LangSmith 发送追踪数据：
+
+```python
+from langsmith.integrations.otel import configure
+from pydantic_ai import Agent
+
+# 配置 LangSmith 追踪
+configure(project_name="pydantic-ai-demo")
+
+# 为所有 PydanticAI 智能体启用工具
+Agent.instrument_all()
+
+# 创建并运行一个智能体
+agent = Agent('openai:gpt-4.1')
+result = agent.run_sync('What is the capital of France?')
+print(result.output)
+#> Paris
+```
+
+## 高级用法
+
+### 自定义元数据和标签
+
+您可以使用 OpenTelemetry 跨度属性向追踪数据添加自定义元数据：
+
+```python
+from opentelemetry import trace
+from pydantic_ai import Agent
+from langsmith.integrations.otel import configure
+
+configure(project_name="pydantic-ai-metadata")
+Agent.instrument_all()
+
+tracer = trace.get_tracer(__name__)
+
+agent = Agent('openai:gpt-4.1')
+
+with tracer.start_as_current_span("pydantic_ai_workflow") as span:
+    span.set_attribute("langsmith.metadata.user_id", "user_123")
+    span.set_attribute("langsmith.metadata.workflow_type", "question_answering")
+    span.set_attribute("langsmith.span.tags", "pydantic-ai,production")
+
+    result = agent.run_sync('Explain quantum computing in simple terms')
+    print(result.output)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\trace-with-pydantic-ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

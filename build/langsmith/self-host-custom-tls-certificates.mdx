@@ -1,0 +1,86 @@
+---
+title: 配置自定义 TLS 证书
+sidebarTitle: 配置自定义 TLS 证书
+---
+
+使用本指南在 LangSmith 中配置 TLS。首先，挂载内部证书颁发机构（CA），以便您的部署在系统范围内信任正确的根证书，用于数据库或外部服务调用。然后，您可以配置[Playground](/langsmith/prompt-engineering-concepts#playground)特定的 mTLS，以便与支持的模型提供商进行安全通信。
+
+本页内容涵盖：
+
+- [挂载内部证书颁发机构](#mount-internal-cas-for-tls)（CA）到系统范围，以启用数据库连接和 Playground 模型调用的 TLS
+- 使用 Playground 特定的 TLS 设置，为支持的模型提供商提供客户端证书/密钥以进行 mTLS
+
+## 挂载内部 CA 以启用 TLS
+
+<Note>
+必须使用 Helm chart 版本 0.11.9 或更高版本，才能使用以下配置挂载内部 CA。
+</Note>
+
+使用此方法使内部/公共 CA 在 LangSmith 系统范围内受信任（用于 Playground 模型调用和[数据库/外部服务连接](/langsmith/self-hosted#storage-services)）。
+
+1. 创建一个包含数据库和外部服务 TLS 所需的所有 CA 的文件。如果您的部署直接与 `beacon.langchain.com` 通信而不使用代理，请确保包含一个公共受信任的 CA。所有证书应在此文件中连接，中间用空行分隔。
+    ```
+    -----BEGIN CERTIFICATE-----
+    <PUBLIC_CA>
+    -----END CERTIFICATE-----
+
+    -----BEGIN CERTIFICATE-----
+    <INTERNAL_CA>
+    -----END CERTIFICATE-----
+
+    ...
+    ```
+2. 创建一个 Kubernetes 密钥，其中包含此文件内容的键。
+    ```bash
+    kubectl create secret generic <SECRET_NAME> --from-file=<SECRET_KEY>=<CA_BUNDLE_FILE_PATH> -n <NAMESPACE>
+    ```
+3. 如果为数据库和其他外部服务的 TLS 使用自定义 CA，请向 LangSmith helm chart 提供以下值：
+    ```yaml Helm
+    config:
+      customCa:
+        secretName: <SECRET_NAME> # 第 2 步中创建的密钥的名称。
+        secretKey: <SECRET_KEY> # 密钥中包含 CA 包的键。
+
+    clickhouse:
+      external:
+        tls: true # 仅在需要 Clickhouse 的 TLS 时启用。
+    postgres:
+      external:
+        customTls: true # 仅在需要 Postgres 的 TLS 时启用。
+    ```
+4. 确保使用支持 TLS 的连接字符串：
+    - <b>Postgres</b>：在末尾添加 `?sslmode=verify-full&sslrootcert=system`。
+    - <b>Redis</b>：使用 `rediss://` 作为前缀，而不是 `redis://`。
+
+## 为模型提供商使用自定义 TLS 证书
+
+<Note>
+此功能目前仅适用于以下模型提供商：
+
+* Azure OpenAI
+* OpenAI
+* 自定义（我们的自定义模型服务器）。有关更多信息，请参阅[自定义模型服务器文档](/langsmith/custom-endpoint)。
+
+这些 TLS 设置适用于所选模型提供商的所有调用（包括在线评估）。当提供商需要双向 TLS（客户端证书/密钥）或必须为提供商调用覆盖特定 CA 的信任时使用它们。它们是对上述配置的内部 CA 包的补充。
+</Note>
+
+您可以使用自定义 TLS 证书连接到 Playground 中的模型提供商。如果您使用自签名证书、自定义证书颁发机构的证书或双向 TLS 身份验证，这将非常有用。
+
+要使用自定义 TLS 证书，请设置以下环境变量。有关如何配置应用程序设置的更多信息，请参阅[自托管概述](/langsmith/self-hosted)。
+
+* [可选] `LANGSMITH_PLAYGROUND_TLS_KEY`：PEM 格式的私钥。这必须是文件路径（用于挂载的卷）。通常仅在双向 TLS 身份验证时需要。
+* [可选] `LANGSMITH_PLAYGROUND_TLS_CERT`：PEM 格式的证书。这必须是文件路径（用于挂载的卷）。通常仅在双向 TLS 身份验证时需要。
+* [可选] `LANGSMITH_PLAYGROUND_TLS_CA`：自定义证书颁发机构（CA）证书，PEM 格式。这必须是文件路径（用于挂载的卷）。仅在使用的 helm 版本低于 `0.11.9` 时使用此选项挂载 CA；否则，请使用上面的[挂载内部 CA 以启用 TLS](/langsmith/self-host-custom-tls-certificates#mount-internal-cas-for-tls)部分。
+
+设置这些环境变量后，进入 Playground 的**设置**页面，选择需要自定义 TLS 证书的**提供商**。照常设置您的模型提供商配置，连接模型提供商时将使用自定义 TLS 证书。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\self-host-custom-tls-certificates.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

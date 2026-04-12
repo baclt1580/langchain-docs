@@ -1,0 +1,102 @@
+---
+title: "使用优化和量化嵌入器集成嵌入文档"
+description: "使用 LangChain Python 集成基于优化和量化嵌入器的文档嵌入模型。"
+---
+
+使用量化嵌入器嵌入所有文档。
+
+这些嵌入器基于优化模型，通过结合 [optimum-intel](https://github.com/huggingface/optimum-intel.git) 和 [IPEX](https://github.com/intel/intel-extension-for-pytorch) 创建。
+
+示例文本基于 [SBERT](https://www.sbert.net/docs/pretrained_cross-encoders.html)。
+
+```python
+from langchain_community.embeddings import QuantizedBiEncoderEmbeddings
+
+model_name = "Intel/bge-small-en-v1.5-rag-int8-static"
+encode_kwargs = {"normalize_embeddings": True}  # set True to compute cosine similarity
+
+model = QuantizedBiEncoderEmbeddings(
+    model_name=model_name,
+    encode_kwargs=encode_kwargs,
+    query_instruction="Represent this sentence for searching relevant passages: ",
+)
+```
+
+```text
+loading configuration file inc_config.json from cache at
+INCConfig {
+  "distillation": {},
+  "neural_compressor_version": "2.4.1",
+  "optimum_version": "1.16.2",
+  "pruning": {},
+  "quantization": {
+    "dataset_num_samples": 50,
+    "is_static": true
+  },
+  "save_onnx_model": false,
+  "torch_version": "2.2.0",
+  "transformers_version": "4.37.2"
+}
+
+Using `INCModel` to load a TorchScript model will be deprecated in v1.15.0, to load your model please use `IPEXModel` instead.
+```
+
+让我们提出一个问题，并与 2 个文档进行比较。第一个包含问题的答案，而第二个则不包含。
+
+我们可以检查哪一个更适合我们的查询。
+
+```python
+question = "How many people live in Berlin?"
+```
+
+```python
+documents = [
+    "Berlin had a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers.",
+    "Berlin is well known for its museums.",
+]
+```
+
+```python
+doc_vecs = model.embed_documents(documents)
+```
+
+```text
+Batches: 100%|██████████| 1/1 [00:00<00:00,  4.18it/s]
+```
+
+```python
+query_vec = model.embed_query(question)
+```
+
+```python
+import torch
+```
+
+```python
+doc_vecs_torch = torch.tensor(doc_vecs)
+```
+
+```python
+query_vec_torch = torch.tensor(query_vec)
+```
+
+```python
+query_vec_torch @ doc_vecs_torch.T
+```
+
+```text
+tensor([0.7980, 0.6529])
+```
+
+我们可以看到确实第一个排名更高。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\optimum_intel.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,72 @@
+---
+title: "Browserbase 集成"
+description: "使用 LangChain Python 集成 Browserbase 文档加载器。"
+---
+
+[Browserbase](https://browserbase.com) 是一个开发者平台，用于可靠地运行、管理和监控无头浏览器。
+
+通过以下功能为您的 AI 数据检索提供支持：
+
+- [无服务器基础设施](https://docs.browserbase.com/under-the-hood) 提供可靠的浏览器，从复杂的用户界面中提取数据
+- [隐身模式](https://docs.browserbase.com/features/stealth-mode) 包含指纹识别策略和自动验证码解决功能
+- [会话调试器](https://docs.browserbase.com/features/sessions) 通过网络时间轴和日志检查您的浏览器会话
+- [实时调试](https://docs.browserbase.com/guides/session-debug-connection/browser-remote-control) 快速调试您的自动化流程
+
+## 安装与设置
+
+- 从 [browserbase.com](https://browserbase.com) 获取 API 密钥和项目 ID，并设置到环境变量中（`BROWSERBASE_API_KEY`、`BROWSERBASE_PROJECT_ID`）。
+- 安装 [Browserbase SDK](http://github.com/browserbase/python-sdk)：
+
+```python
+pip install browserbase
+```
+
+## 加载文档
+
+您可以使用 `BrowserbaseLoader` 将网页加载到 LangChain 中。可选地，您可以设置 `text_content` 参数以将页面转换为纯文本表示。
+
+```python
+import os
+
+from langchain_community.document_loaders import BrowserbaseLoader
+
+load_dotenv()
+
+BROWSERBASE_API_KEY = os.getenv("BROWSERBASE_API_KEY")
+BROWSERBASE_PROJECT_ID = os.getenv("BROWSERBASE_PROJECT_ID")
+```
+
+```python
+loader = BrowserbaseLoader(
+    api_key=BROWSERBASE_API_KEY,
+    project_id=BROWSERBASE_PROJECT_ID,
+    urls=[
+        "https://example.com",
+    ],
+    # 文本模式
+    text_content=False,
+)
+
+docs = loader.load()
+print(docs[0].page_content[:61])
+```
+
+### 加载器选项
+
+- `urls` 必需。要获取的 URL 列表。
+- `text_content` 仅检索文本内容。默认为 `False`。
+- `api_key` Browserbase API 密钥。默认为 `BROWSERBASE_API_KEY` 环境变量。
+- `project_id` Browserbase 项目 ID。默认为 `BROWSERBASE_PROJECT_ID` 环境变量。
+- `session_id` 可选。提供现有的会话 ID。
+- `proxy` 可选。启用/禁用代理。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\browserbase.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

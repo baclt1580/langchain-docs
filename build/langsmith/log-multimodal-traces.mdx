@@ -1,0 +1,76 @@
+---
+title: 记录多模态追踪
+sidebarTitle: 记录多模态追踪
+---
+
+LangSmith 支持在追踪中记录和渲染图像。目前该功能支持多模态 LLM 运行。
+
+要记录图像，请分别在 Python 或 TypeScript 中使用 `wrap_openai`/`wrapOpenAI`，并在输入中传入图像 URL 或 base64 编码的图像。
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+from langsmith.wrappers import wrap_openai
+client = wrap_openai(OpenAI())
+response = client.chat.completions.create(
+    model="gpt-4-turbo",
+    messages=[
+      {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "这张图片里有什么？"},
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+            },
+          },
+        ],
+      }
+    ],
+)
+print(response.choices[0])
+```
+
+```typescript TypeScript
+import OpenAI from "openai";
+import { wrapOpenAI } from "langsmith/wrappers";
+// 包装 OpenAI 客户端以自动记录追踪
+const wrappedClient = wrapOpenAI(new OpenAI());
+const response = await wrappedClient.chat.completions.create({
+  model: "gpt-4-turbo",
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "这张图片里有什么？" },
+        {
+          type: "image_url",
+          image_url: {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+          },
+        },
+      ],
+    },
+  ],
+});
+console.log(response.choices[0]);
+```
+
+</CodeGroup>
+
+图像将在 LangSmith 用户界面中作为追踪的一部分进行渲染。
+
+![多模态](/langsmith/images/multimodal.png)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\log-multimodal-traces.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

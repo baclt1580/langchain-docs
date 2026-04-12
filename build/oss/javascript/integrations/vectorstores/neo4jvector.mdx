@@ -1,0 +1,280 @@
+---
+title: "Neo4j 向量索引集成"
+description: "使用 LangChain JavaScript 与 Neo4j 向量索引向量存储集成。"
+---
+
+Neo4j 是一个开源图数据库，内置支持向量相似性搜索。
+它支持：
+
+- 近似最近邻搜索
+- 欧几里得相似度和余弦相似度
+- 结合向量搜索和关键词搜索的混合搜索
+
+## 设置
+
+要使用 Neo4j 向量索引，你需要安装 `neo4j-driver` 包：
+
+```bash npm
+npm install neo4j-driver
+```
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+### 使用 `docker-compose` 设置 `Neo4j` 自托管实例
+
+`Neo4j` 提供了一个预构建的 Docker 镜像，可用于快速设置自托管的 Neo4j 数据库实例。
+创建一个名为 `docker-compose.yml` 的文件：
+
+```yml docker-compose.yml
+services:
+  database:
+    image: neo4j
+    ports:
+      - 7687:7687
+      - 7474:7474
+    environment:
+      - NEO4J_AUTH=neo4j/pleaseletmein
+```
+
+然后在同一目录下运行 `docker compose up` 以启动容器。
+
+你可以在 Neo4j [网站](https://neo4j.com/docs/operations-manual/current/installation/)上找到更多关于如何设置 `Neo4j` 的信息。
+
+## 用法
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Neo4jVectorStore } from "@langchain/community/vectorstores/neo4j_vector";
+
+// Neo4j 连接和其他相关设置的配置对象
+const config = {
+  url: "bolt://localhost:7687", // Neo4j 实例的 URL
+  username: "neo4j", // Neo4j 认证的用户名
+  password: "pleaseletmein", // Neo4j 认证的密码
+  indexName: "vector", // 向量索引的名称
+  keywordIndexName: "keyword", // 如果使用混合搜索，关键词索引的名称
+  searchType: "vector" as const, // 搜索类型（例如，向量、混合）
+  nodeLabel: "Chunk", // 图中节点的标签
+  textNodeProperty: "text", // 包含文本的节点属性
+  embeddingNodeProperty: "embedding", // 包含嵌入向量的节点属性
+};
+
+const documents = [
+  { pageContent: "what's this", metadata: { a: 2 } },
+  { pageContent: "Cat drinks milk", metadata: { a: 1 } },
+];
+
+const neo4jVectorIndex = await Neo4jVectorStore.fromDocuments(
+  documents,
+  new OpenAIEmbeddings(),
+  config
+);
+
+const results = await neo4jVectorIndex.similaritySearch("water", 1);
+
+console.log(results);
+
+/*
+  [ Document { pageContent: 'Cat drinks milk', metadata: { a: 1 } } ]
+*/
+
+await neo4jVectorIndex.close();
+```
+
+### 使用 retrievalQuery 参数自定义响应
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Neo4jVectorStore } from "@langchain/community/vectorstores/neo4j_vector";
+
+/*
+ * retrievalQuery 是一个可自定义的 Cypher 查询片段，用于在 Neo4jVectorStore 类中定义如何从 Neo4j 数据库检索和呈现搜索结果。
+ * 它允许开发者指定相似性搜索后返回数据的格式和结构。
+ * `retrievalQuery` 的必需列：
+ *
+ * 1. text:
+ *    - 描述：表示节点的文本内容。
+ *    - 类型：字符串
+ *
+ * 2. score:
+ *    - 描述：表示节点相对于搜索查询的相似性分数。分数越高表示匹配度越高。
+ *    - 类型：浮点数（范围在 0 到 1 之间，1 表示完全匹配）
+ *
+ * 3. metadata:
+ *    - 描述：包含节点的其他属性和信息。可以包括节点任何其他可能与应用程序相关的属性。
+ *    - 类型：对象（键值对）
+ *    - 示例：{ "id": "12345", "category": "Books", "author": "John Doe" }
+ *
+ * 注意：虽然你可以自定义 `retrievalQuery` 以获取额外的列或执行转换，但绝不能省略必需列。
+ * 这些列的名称（`text`、`score` 和 `metadata`）应保持一致。重命名它们可能导致错误或意外行为。
+ */
+
+// Neo4j 连接和其他相关设置的配置对象
+const config = {
+  url: "bolt://localhost:7687", // Neo4j 实例的 URL
+  username: "neo4j", // Neo4j 认证的用户名
+  password: "pleaseletmein", // Neo4j 认证的密码
+  retrievalQuery: `
+    RETURN node.text AS text, score, {a: node.a * 2} AS metadata
+  `,
+};
+
+const documents = [
+  { pageContent: "what's this", metadata: { a: 2 } },
+  { pageContent: "Cat drinks milk", metadata: { a: 1 } },
+];
+
+const neo4jVectorIndex = await Neo4jVectorStore.fromDocuments(
+  documents,
+  new OpenAIEmbeddings(),
+  config
+);
+
+const results = await neo4jVectorIndex.similaritySearch("water", 1);
+
+console.log(results);
+
+/*
+  [ Document { pageContent: 'Cat drinks milk', metadata: { a: 2 } } ]
+*/
+
+await neo4jVectorIndex.close();
+```
+
+### 从现有图实例化 Neo4jVectorStore
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Neo4jVectorStore } from "@langchain/community/vectorstores/neo4j_vector";
+
+/**
+ * `fromExistingGraph` 方法：
+ *
+ * 描述：
+ * 此方法使用 Neo4j 数据库中现有的图来初始化一个 `Neo4jVectorStore` 实例。
+ * 它设计用于处理已有文本属性但可能没有嵌入向量的节点。
+ * 该方法将为缺少嵌入向量的节点计算并存储嵌入向量。
+ *
+ * 注意：
+ * 当你有一个包含文本数据的预存图，并且希望在不改变原始数据结构的情况下通过向量嵌入增强其相似性搜索能力时，此方法特别有用。
+ */
+
+// Neo4j 连接和其他相关设置的配置对象
+const config = {
+  url: "bolt://localhost:7687", // Neo4j 实例的 URL
+  username: "neo4j", // Neo4j 认证的用户名
+  password: "pleaseletmein", // Neo4j 认证的密码
+  indexName: "wikipedia",
+  nodeLabel: "Wikipedia",
+  textNodeProperties: ["title", "description"],
+  embeddingNodeProperty: "embedding",
+  searchType: "hybrid" as const,
+};
+
+// 使用此方法前，你应已有一个已填充数据的 Neo4j 数据库
+const neo4jVectorIndex = await Neo4jVectorStore.fromExistingGraph(
+  new OpenAIEmbeddings(),
+  config
+);
+
+await neo4jVectorIndex.close();
+```
+
+### 元数据过滤
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Neo4jVectorStore } from "@langchain/community/vectorstores/neo4j_vector";
+
+/**
+ * 带元数据过滤的 `similaritySearch` 方法：
+ *
+ * 描述：
+ * 此方法在 Neo4j 向量索引中实现高级相似性搜索，同时利用文本嵌入和元数据属性。
+ * 第三个参数 `filter` 允许指定基于元数据的条件，在执行相似性搜索之前预过滤节点。
+ * 这种方法通过允许用户基于复杂的元数据标准以及文本相似性进行查询，提高了搜索精度。
+ * 元数据过滤还支持以下运算符：
+ *
+ *  $eq: 等于
+ *  $ne: 不等于
+ *  $lt: 小于
+ *  $lte: 小于或等于
+ *  $gt: 大于
+ *  $gte: 大于或等于
+ *  $in: 在值列表中
+ *  $nin: 不在值列表中
+ *  $between: 在两个值之间
+ *  $like: 文本包含值
+ *  $ilike: 小写文本包含值
+ *
+ * 过滤器支持一系列查询操作，如相等检查、范围查询和复合条件（使用逻辑运算符如 $and、$or）。
+ * 这使得它高度适应各种用例，需要基于内容和上下文信息详细且特定地检索文档。
+ *
+ * 注意：
+ * 有效使用此方法需要一个结构良好的 Neo4j 数据库，其中节点同时包含文本和元数据属性。
+ * 在文本分析与详细元数据查询的集成至关重要的场景中，此方法特别有用，例如内容推荐系统、详细的档案搜索或任何上下文相关性是关键的应用。
+ */
+
+// Neo4j 连接和其他相关设置的配置对象
+const config = {
+  url: "bolt://localhost:7687", // Neo4j 实例的 URL
+  username: "neo4j", // Neo4j 认证的用户名
+  password: "pleaseletmein", // Neo4j 认证的密码
+  indexName: "vector", // 向量索引的名称
+  keywordIndexName: "keyword", // 如果使用混合搜索，关键词索引的名称
+  searchType: "vector" as const, // 搜索类型（例如，向量、混合）
+  nodeLabel: "Chunk", // 图中节点的标签
+  textNodeProperty: "text", // 包含文本的节点属性
+  embeddingNodeProperty: "embedding", // 包含嵌入向量的节点属性
+};
+
+const documents = [
+  { pageContent: "what's this", metadata: { a: 2 } },
+  { pageContent: "Cat drinks milk", metadata: { a: 1 } },
+];
+
+const neo4jVectorIndex = await Neo4jVectorStore.fromDocuments(
+  documents,
+  new OpenAIEmbeddings(),
+  config
+);
+
+const filter = { a: { $eq: 1 } };
+const results = await neo4jVectorIndex.similaritySearch("water", 1, { filter });
+
+console.log(results);
+
+/*
+  [ Document { pageContent: 'Cat drinks milk', metadata: { a: 1 } } ]
+*/
+
+await neo4jVectorIndex.close();
+```
+
+# 免责声明 ⚠️
+
+_安全提示_：请确保数据库连接使用的凭据权限范围尽可能小，仅包含必要的权限。
+否则可能导致数据损坏或丢失，因为调用代码可能会尝试执行删除、数据突变（如果被适当触发）或读取敏感数据（如果数据库中存在此类数据）。
+防范此类负面结果的最佳方法是（根据情况）限制授予此工具使用的凭据的权限。
+例如，为数据库创建只读用户是确保调用代码无法突变或删除数据的好方法。
+
+## 相关
+
+- 向量存储[概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储[操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\neo4jvector.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

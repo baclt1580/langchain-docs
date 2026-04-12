@@ -1,0 +1,58 @@
+---
+title: "VDMS 集成"
+description: "使用 LangChain Python 与 VDMS 进行集成。"
+---
+
+> [VDMS](https://github.com/IntelLabs/vdms/blob/master/README.md) 是一种存储解决方案，旨在通过以图形式存储视觉元数据来搜索相关视觉数据，并实现对视觉数据的机器友好增强，从而高效访问大型“视觉”数据，达到云规模。
+
+## 安装和设置
+
+### 安装客户端
+
+<CodeGroup>
+```bash pip
+pip install langchain-vdms
+```
+
+```bash uv
+uv add langchain-vdms
+```
+</CodeGroup>
+
+### 安装数据库
+
+有两种方式可以开始使用 VDMS：
+
+1. 通过 Docker 在本地机器上安装 VDMS
+    ```bash
+        docker run -d -p 55555:55555 intellabs/vdms:latest
+    ```
+
+2. 直接在本地机器上安装 VDMS。请查看 [安装说明](https://github.com/IntelLabs/vdms/blob/master/INSTALL.md)。
+
+## 向量存储
+
+要导入此向量存储：
+
+```python
+from langchain_vdms import VDMS
+from langchain_vdms.vectorstores import VDMS
+```
+要导入 VDMS 客户端连接器：
+
+```python
+from langchain_vdms.vectorstores import VDMS_Client
+```
+
+有关 VDMS 包装器的更详细教程，请参阅 [VDMS](/oss/python/integrations/vectorstores/vdms)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\vdms.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

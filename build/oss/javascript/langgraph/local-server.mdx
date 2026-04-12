@@ -1,0 +1,215 @@
+---
+title: 运行本地服务器
+sidebarTitle: 本地服务器
+---
+
+
+
+本指南将向你展示如何在本地运行 LangGraph 应用程序。
+
+## 前提条件
+
+开始之前，请确保你已具备以下条件：
+
+* 一个 [LangSmith](https://smith.langchain.com/settings) 的 API 密钥 - 可免费注册
+
+## 1. 安装 LangGraph CLI
+
+
+
+```shell
+npm install --save-dev @langchain/langgraph-cli
+```
+
+
+## 2. 创建 LangGraph 应用
+
+
+
+使用 [`new-langgraph-project-js` 模板](https://github.com/langchain-ai/new-langgraphjs-project) 创建一个新应用。此模板演示了一个单节点应用程序，你可以使用自己的逻辑进行扩展。
+
+```shell
+npm create langgraph
+```
+
+<Accordion title="将 LangGraph 添加到现有项目">
+如果你有一个包含 LangGraph 智能体的现有项目，可以使用 `config` 命令自动生成 `langgraph.json` 配置文件：
+
+```shell
+npm create langgraph config
+```
+
+此命令会扫描你的项目以查找 LangGraph 智能体（例如 `createAgent()`、`StateGraph.compile()` 或 `workflow.compile()` 模式），并生成一个包含所有已导出智能体的配置文件。
+
+示例输出：
+
+```json
+{
+  "node_version": "24",
+  "graphs": {
+    "agent": "./src/agent.ts:agent",
+    "searchAgent": "./src/search.ts:searchAgent"
+  },
+  "env": ".env"
+}
+```
+
+<Tip>
+只有**已导出**的智能体才会包含在配置中。如果某个智能体未导出，命令会发出警告，以便你添加 `export` 关键字。
+</Tip>
+</Accordion>
+
+
+## 3. 安装依赖项
+
+在你的新 LangGraph 应用根目录下，以 `edit` 模式安装依赖项，以便服务器使用你的本地更改：
+
+
+
+```shell
+cd path/to/your/app
+npm install
+```
+
+
+## 4. 创建 `.env` 文件
+
+你会在新 LangGraph 应用的根目录下找到一个 `.env.example` 文件。在新 LangGraph 应用的根目录下创建一个 `.env` 文件，并将 `.env.example` 文件的内容复制到其中，填写必要的 API 密钥：
+
+```bash
+LANGSMITH_API_KEY=lsv2...
+```
+
+## 5. 启动智能体服务器
+
+在本地启动 LangGraph API 服务器：
+
+
+
+```shell
+npx @langchain/langgraph-cli dev
+```
+
+
+示例输出：
+
+```
+INFO:langgraph_api.cli:
+
+        欢迎使用
+
+╦  ┌─┐┌┐┌┌─┐╔═╗┬─┐┌─┐┌─┐┬ ┬
+║  ├─┤││││ ┬║ ╦├┬┘├─┤├─┘├─┤
+╩═╝┴ ┴┘└┘└─┘╚═╝┴└─┴ ┴┴  ┴ ┴
+
+- 🚀 API: http://127.0.0.1:2024
+- 🎨 Studio UI: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+- 📚 API 文档: http://127.0.0.1:2024/docs
+
+此内存服务器专为开发和测试设计。
+生产环境使用，请使用 LangSmith 部署。
+```
+
+`langgraph dev` 命令以内存模式启动智能体服务器。此模式适用于开发和测试目的。生产环境使用，请部署具有持久存储后端访问权限的智能体服务器。更多信息，请参阅 [平台设置概述](/langsmith/platform-setup)。
+
+## 6. 在 Studio 中测试你的应用
+
+[Studio](/langsmith/studio) 是一个专门的用户界面，你可以连接到 LangGraph API 服务器，以可视化、交互和本地调试你的应用程序。通过访问 `langgraph dev` 命令输出中提供的 URL，在 Studio 中测试你的图：
+
+```
+>    - LangGraph Studio Web UI: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+```
+
+对于在自定义主机/端口上运行的智能体服务器，请更新 URL 中的 `baseUrl` 查询参数。例如，如果你的服务器运行在 `http://myhost:3000`：
+
+```
+https://smith.langchain.com/studio/?baseUrl=http://myhost:3000
+```
+
+<Accordion title="Safari 兼容性">
+    由于 Safari 在连接到 localhost 服务器时存在限制，请使用 `--tunnel` 标志与你的命令一起创建安全隧道：
+
+    ```shell
+    langgraph dev --tunnel
+    ```
+</Accordion>
+
+## 7. 测试 API
+
+
+
+<Tabs>
+    <Tab title="Javascript SDK">
+    1. 安装 LangGraph JS SDK：
+        ```shell
+        npm install @langchain/langgraph-sdk
+        ```
+    2. 向助手发送消息（无线程运行）：
+      ```js
+      import { Client } from "@langchain/langgraph-sdk";
+
+      // 仅当调用 langgraph dev 时更改了默认端口，才需要设置 apiUrl
+      const client = new Client({ apiUrl: "http://localhost:2024"});
+
+      const streamResponse = client.runs.stream(
+        null, // 无线程运行
+        "agent", // 助手 ID
+        {
+          input: {
+            "messages": [
+              { "role": "user", "content": "什么是 LangGraph？"}
+            ]
+          },
+          streamMode: "messages-tuple",
+        }
+      );
+
+      for await (const chunk of streamResponse) {
+        console.log(`接收到类型为 ${chunk.event} 的新事件...`);
+        console.log(JSON.stringify(chunk.data));
+        console.log("\n\n");
+      }
+      ```
+    </Tab>
+    <Tab title="Rest API">
+    ```bash
+    curl -s --request POST \
+        --url "http://localhost:2024/runs/stream" \
+        --header 'Content-Type: application/json' \
+        --data "{
+            \"assistant_id\": \"agent\",
+            \"input\": {
+                \"messages\": [
+                    {
+                        \"role\": \"human\",
+                        \"content\": \"什么是 LangGraph？\"
+                    }
+                ]
+            },
+            \"stream_mode\": \"messages-tuple\"
+        }"
+    ```
+    </Tab>
+</Tabs>
+
+
+## 后续步骤
+
+现在你已经在本地运行了一个 LangGraph 应用，通过探索部署和高级功能来进一步深入：
+
+* [部署快速入门](/langsmith/deployment-quickstart)：使用 LangSmith 部署你的 LangGraph 应用。
+* [LangSmith](/langsmith/home)：了解 LangSmith 的基础概念。
+
+
+* [SDK 参考](https://reference.langchain.com/javascript/modules/_langchain_langgraph-sdk.html)：探索 SDK API 参考。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\local-server.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

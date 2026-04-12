@@ -1,0 +1,186 @@
+---
+title: "SurrealDBVectorStore 集成"
+description: "使用 LangChain Python 与 SurrealDBVectorStore 集成。"
+---
+
+> [SurrealDB](https://surrealdb.com) 是一个专为 AI 系统构建的统一多模型数据库。它将结构化和非结构化数据（包括向量搜索、图遍历、关系查询、全文搜索、文档存储和时间序列数据）组合到一个单一的 ACID 兼容引擎中，规模从 3 MB 的边缘二进制文件扩展到云端的 PB 级集群。通过消除对多个专用存储的需求，SurrealDB 简化了架构，降低了延迟，并确保 AI 工作负载的一致性。
+>
+> **为什么 SurrealDB 对生成式 AI 系统很重要**
+>
+> - **存储和内存的一个引擎：** 在单个系统中结合持久化存储和快速、适合代理的内存，提供代理所需的所有数据，并消除同步多个系统的需求。
+> - **代理的一次跳转内存：** 在单个查询中运行向量搜索、图遍历、语义连接和事务写入，为 LLM 代理提供快速、一致的内存访问，而无需拼接关系、图和向量数据库。
+> - **原位推理和实时更新：** SurrealDB 使代理能够在数据旁边运行推理并接收毫秒级新鲜更新，这对实时推理和协作至关重要。
+> - **版本化、持久的上下文：** SurrealDB 支持时间旅行查询和版本记录，让代理可以审计或“重放”过去状态以实现一致、可解释的推理。
+> - **即插即用代理内存：** 将 AI 内存作为原生概念暴露，使其易于用作 AI 框架的现成后端。
+
+本笔记本介绍如何开始使用 SurrealDB 向量存储。
+
+## 设置
+
+您可以在本地运行 SurrealDB 或开始使用 [免费 SurrealDB 云账户](https://surrealdb.com/docs/cloud/getting-started)。
+
+对于本地，有两个选项：
+
+1. [安装 SurrealDB](https://surrealdb.com/docs/surrealdb/installation) 和 [运行 SurrealDB](https://surrealdb.com/docs/surrealdb/installation/running)。以内存模式运行：
+
+    ```bash
+    surreal start -u root -p root
+    ```
+
+2. [使用 Docker 运行](https://surrealdb.com/docs/surrealdb/installation/running/docker)。
+
+    ```bash
+    docker run --rm --pull always -p 8000:8000 surrealdb/surrealdb:latest start
+    ```
+
+## 安装依赖
+
+安装 `langchain-surrealdb` 和 `surrealdb` python 包。
+
+```shell
+# -- Using pip
+pip install -U langchain-surrealdb surrealdb
+# -- Using poetry
+poetry add langchain-surrealdb surrealdb
+# -- Using uv
+uv add langchain-surrealdb surrealdb
+```
+
+要运行此笔记本，我们只需要安装此示例所需的额外依赖项：
+
+```python
+!poetry add --quiet --group docs langchain-ollama langchain-surrealdb
+```
+
+## 初始化
+
+```python
+from langchain_ollama import OllamaEmbeddings
+from langchain_surrealdb.vectorstores import SurrealDBVectorStore
+from surrealdb import Surreal
+
+conn = Surreal("ws://localhost:8000/rpc")
+conn.signin({"username": "root", "password": "root"})
+conn.use("langchain", "demo")
+vector_store = SurrealDBVectorStore(OllamaEmbeddings(model="llama3.2"), conn)
+```
+
+## 管理向量存储
+
+### 向向量存储添加项
+
+```python
+from langchain_core.documents import Document
+
+_url = "https://surrealdb.com"
+d1 = Document(page_content="foo", metadata={"source": _url})
+d2 = Document(page_content="SurrealDB", metadata={"source": _url})
+d3 = Document(page_content="bar", metadata={"source": _url})
+d4 = Document(page_content="this is surreal", metadata={"source": _url})
+
+vector_store.add_documents(documents=[d1, d2, d3, d4], ids=["1", "2", "3", "4"])
+```
+
+```python
+['1', '2', '3', '4']
+```
+
+### 更新向量存储中的项
+
+```python
+updated_document = Document(
+    page_content="zar", metadata={"source": "https://example.com"}
+)
+
+vector_store.add_documents(documents=[updated_document], ids=["3"])
+```
+
+```python
+['3']
+```
+
+### 从向量存储删除项
+
+```python
+vector_store.delete(ids=["3"])
+```
+
+## 查询向量存储
+
+一旦您的向量存储已创建并添加了相关文档，您很可能希望在运行链或代理期间对其进行查询。
+
+### 直接查询
+
+执行简单的相似度搜索可以如下所示：
+
+```python
+results = vector_store.similarity_search(
+    query="surreal", k=1, custom_filter={"source": "https://surrealdb.com"}
+)
+for doc in results:
+    print(f"{doc.page_content} [{doc.metadata}]")
+```
+
+```text
+this is surreal [{'source': 'https://surrealdb.com'}]
+```
+
+如果您想执行相似度搜索并接收相应的分数，可以运行：
+
+```python
+results = vector_store.similarity_search_with_score(
+    query="thud", k=1, custom_filter={"source": "https://surrealdb.com"}
+)
+for doc, score in results:
+    print(f"[similarity={score:.0%}] {doc.page_content}")
+```
+
+```text
+[similarity=57%] this is surreal
+```
+
+### 转换为检索器进行查询
+
+您也可以将向量存储转换为检索器，以便在链中更轻松地使用。
+
+```python
+retriever = vector_store.as_retriever(
+    search_type="mmr", search_kwargs={"k": 1, "lambda_mult": 0.5}
+)
+retriever.invoke("surreal")
+```
+
+```text
+[Document(id='4', metadata={'source': 'https://surrealdb.com'}, page_content='this is surreal')]
+```
+
+## 用于检索增强生成的用法
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [如何使用 RAG 进行问答](https://python.langchain.com/docs/how_to/#qa-with-rag)
+- [检索概念文档](https://python.langchain.com/docs/concepts/retrieval/)
+
+---
+
+## API 参考
+
+有关所有 `SurrealDBVectorStore` 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/vector-stores)
+
+## 下一步
+
+- 查看 [基本示例](https://github.com/surrealdb/langchain-surrealdb/tree/main/examples/basic)。使用 Dockerfile 尝试一下！
+- 查看 [图示例](https://github.com/surrealdb/langchain-surrealdb/tree/main/examples/graph)
+- 尝试 [Jupyter 笔记本](https://github.com/langchain-ai/langchain/blob/v0.3/docs/docs/integrations/vectorstores/surrealdb.ipynb)
+- [Awesome SurrealDB](https://github.com/surrealdb/awesome-surreal)，一份精选的 SurrealDB 资源、工具、实用程序和应用程序列表
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\surrealdb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

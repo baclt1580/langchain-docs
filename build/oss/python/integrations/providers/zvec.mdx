@@ -1,0 +1,53 @@
+---
+title: Zvec
+---
+
+> [Zvec](https://zvec.org/en/) 是一个开源的进程内向量数据库——轻量级、闪电般快速，并设计为可直接嵌入应用程序。基于 Proxima（阿里巴巴经过实战检验的向量搜索引擎）构建，它提供生产级、低延迟、可扩展的相似性搜索，且设置极简
+
+本文档展示了如何在 LangChain 生态系统中利用 Zvec。特别是，它演示了如何安装 Zvec，以及如何将其作为 LangChain 中的 VectorStore 插件使用。
+
+## 安装与设置
+
+安装 Python SDK：
+
+<CodeGroup>
+```bash pip
+pip install zvec
+```
+
+```bash uv
+uv add zvec
+```
+</CodeGroup>
+
+
+## 嵌入模型
+
+```python
+from langchain_community.embeddings import DashScopeEmbeddings
+```
+
+请参阅 [使用示例](/oss/python/integrations/vectorstores/zvec)。
+
+## 向量存储
+
+一个 Zvec 集合被封装为熟悉的 VectorStore，以便在 LangChain 中原生使用，这使得它能够轻松用于各种场景，例如语义搜索或示例选择。
+
+您可以通过以下方式导入向量存储：
+
+```python
+from langchain_community.vectorstores import Zvec
+```
+
+有关 Zvec 包装器的详细教程，请参阅 [此笔记本](/oss/python/integrations/vectorstores/zvec)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\zvec.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

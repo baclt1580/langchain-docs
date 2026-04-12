@@ -1,0 +1,26 @@
+---
+title: 数据集预构建 JSON 模式类型
+sidebarTitle: 数据集预构建 JSON 模式类型
+---
+
+LangSmith 建议您为数据集模式的输入和输出设置模式，以确保数据一致性，并确保您的示例格式适合下游处理，例如运行评估。
+
+为了更好地支持 LLM 工作流，LangSmith 提供了几种不同的预定义预构建类型。这些模式由 LangSmith API 公开托管，您可以使用 [JSON 模式引用](https://json-schema.org/understanding-json-schema/structuring#dollarref) 在数据集模式中定义它们。可用的模式如下表所示：
+
+| 类型    | JSON 模式引用链接                                                                                                       | 用途                                                                                                                     |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 消息    | [https://api.smith.langchain.com/public/schemas/v1/message.json](https://api.smith.langchain.com/public/schemas/v1/message.json) | 表示发送给聊天模型的消息，遵循 OpenAI 标准格式。                                           |
+| 工具    | [https://api.smith.langchain.com/public/schemas/v1/tooldef.json](https://api.smith.langchain.com/public/schemas/v1/tooldef.json) | 聊天模型可用于函数调用的工具定义，采用 OpenAI 的 JSON 模式启发式函数格式定义。 |
+
+LangSmith 允许您定义一系列转换，从您的跟踪记录中收集上述预构建类型并将其添加到数据集中。有关可用转换的更多信息，请参阅我们的 [参考文档](/langsmith/dataset-transformations)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\dataset-json-types.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

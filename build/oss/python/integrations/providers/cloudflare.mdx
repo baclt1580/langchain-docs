@@ -1,0 +1,44 @@
+---
+title: "Cloudflare 集成"
+description: "使用 LangChain Python 与 Cloudflare 集成。"
+---
+
+>[Cloudflare, Inc. (维基百科)](https://en.wikipedia.org/wiki/Cloudflare) 是一家提供内容分发网络服务、云网络安全、DDoS 缓解以及 ICANN 认证域名注册服务的美国公司。
+
+>[Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) 允许您通过 REST API 从您的代码中在 `Cloudflare` 网络上运行机器学习模型。
+
+
+## 聊天模型
+
+请参阅 [安装说明和使用示例](/oss/python/integrations/chat/cloudflare_workersai)。
+
+```python
+from langchain_cloudflare import ChatCloudflareWorkersAI
+```
+
+## 嵌入
+
+请参阅 [安装说明和使用示例](/oss/python/integrations/embeddings/cloudflare_workersai)。
+
+```python
+from langchain_cloudflare import CloudflareWorkersAIEmbeddings
+```
+
+## 大语言模型
+
+请参阅 [安装说明和使用示例](/oss/python/integrations/llms/cloudflare_workersai)。
+
+```python
+from langchain_community.llms.cloudflare_workersai import CloudflareWorkersAI
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\cloudflare.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,42 @@
+---
+title: "SurrealDB 集成"
+description: "使用 LangChain Python 与 SurrealDB 集成。"
+---
+
+[SurrealDB](https://surrealdb.com) 是一款专为 AI 系统打造的统一多模型数据库。它将结构化与非结构化数据（包括向量搜索、图遍历、关系查询、全文搜索、文档存储和时间序列数据）整合到单个符合 ACID 规范的引擎中，规模可从 3 MB 的边缘二进制文件扩展到云端的 PB 级集群。通过消除对多个专用存储的需求，SurrealDB 简化了架构，降低了延迟，并确保 AI 工作负载的一致性。
+
+**为什么 SurrealDB 对生成式 AI 系统至关重要**
+- **存储和内存的统一引擎：** 在单个系统中结合持久化存储和快速、适合代理的内存，提供代理所需的所有数据，并消除同步多个系统的需求。
+- **代理的单跳内存：** 在单个查询中运行向量搜索、图遍历、语义连接和事务写入，为 LLM 代理提供快速、一致的内存访问，而无需拼接关系、图和向量数据库。
+- **就地推理和实时更新：** SurrealDB 使代理能够在数据旁运行推理并接收毫秒级新鲜更新，这对实时推理和协作至关重要。
+- **版本化、持久的上下文：** SurrealDB 支持时间旅行查询和版本记录，允许代理审计或“重放”过去状态，以实现一致且可解释的推理。
+- **即插即用代理内存：** 将 AI 内存作为原生概念暴露出来，使得轻松将 SurrealDB 用作 AI 框架的即插即用后端。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install langchain-surrealdb
+```
+
+```bash uv
+uv add langchain-surrealdb
+```
+</CodeGroup>
+
+## 向量存储
+
+[此笔记本](/oss/python/integrations/vectorstores/surrealdb) 介绍了如何开始使用 SurrealDB 向量存储。
+
+在仓库中找到更多 [示例](https://github.com/surrealdb/langchain-surrealdb/blob/main/README.md#simple-example)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\surrealdb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

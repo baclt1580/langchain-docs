@@ -1,0 +1,144 @@
+---
+title: "UnstructuredMarkdownLoader 集成"
+description: "使用 LangChain Python 集成 UnstructuredMarkdownLoader 文档加载器。"
+---
+
+本指南提供了快速入门 `UnstructuredMarkdownLoader` [文档加载器](/oss/python/integrations/document_loaders) 的概览。有关 `UnstructuredMarkdownLoader` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/markdown/UnstructuredMarkdownLoader)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/document_loaders/file_loaders/unstructured/) |
+| :--- | :--- | :---: | :---: | :---: |
+| [`UnstructuredMarkdownLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/markdown/UnstructuredMarkdownLoader) | [`langchain_community`](https://reference.langchain.com/python/langchain-community) | ❌ | ❌ | ✅ |
+
+### 加载器特性
+
+| 来源 | 文档惰性加载 | 原生异步支持 |
+| :---: | :---: | :---: |
+| `UnstructuredMarkdownLoader` | ✅ | ❌ |
+
+## 设置
+
+要使用 UnstructuredMarkdownLoader 文档加载器，您需要安装 `langchain-community` 集成包和 `unstructured` Python 包。
+
+### 凭证
+
+使用此加载器无需凭证。
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+安装 **langchain_community** 和 **unstructured**
+
+```python
+pip install -qU langchain_community unstructured
+```
+
+## 初始化
+
+现在我们可以实例化模型对象并加载文档。
+
+您可以在两种模式之一中运行加载器："single" 和 "elements"。如果使用 "single" 模式，文档将作为单个 [`Document`](https://reference.langchain.com/python/langchain-core/documents/base/Document) 对象返回。如果使用 "elements" 模式，unstructured 库会将文档拆分为诸如 `Title` 和 `NarrativeText` 等元素。您可以在模式后传入额外的 `unstructured` 参数以应用不同的 `unstructured` 设置。
+
+```python
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+
+loader = UnstructuredMarkdownLoader(
+    "./example_data/example.md",
+    mode="single",
+    strategy="fast",
+)
+```
+
+## 加载
+
+```python
+docs = loader.load()
+docs[0]
+```
+
+```text
+Document(metadata={'source': './example_data/example.md'}, page_content='示例 Markdown 文档\n\n简介\n\n欢迎阅读此示例 Markdown 文档。Markdown 是一种轻量级标记语言，用于格式化文本。它广泛用于文档、自述文件等。\n\n特性\n\n标题\n\nMarkdown 支持多级标题：\n\n一级标题：# 一级标题\n\n二级标题：## 二级标题\n\n三级标题：### 三级标题\n\n列表\n\n无序列表\n\n项目 1\n\n项目 2\n\n子项目 2.1\n\n子项目 2.2\n\n有序列表\n\n第一项\n\n第二项\n\n第三项\n\n链接\n\nOpenAI 是一个 AI 研究组织。\n\n图片\n\n这是一个示例图片：\n\n代码\n\n行内代码\n\n使用 `code` 表示行内代码片段。\n\n代码块\n\n\`\`\`python def greet(name): return f"Hello, {name}!"\n\nprint(greet("World")) \`\`\`')
+```
+
+```python
+print(docs[0].metadata)
+```
+
+```python
+{'source': './example_data/example.md'}
+```
+
+## 惰性加载
+
+```python
+page = []
+for doc in loader.lazy_load():
+    page.append(doc)
+    if len(page) >= 10:
+        # 执行一些分页操作，例如
+        # index.upsert(page)
+
+        page = []
+page[0]
+```
+
+```text
+Document(metadata={'source': './example_data/example.md', 'link_texts': ['OpenAI'], 'link_urls': ['https://www.openai.com'], 'last_modified': '2024-08-14T15:04:18', 'languages': ['eng'], 'parent_id': 'de1f74bf226224377ab4d8b54f215bb9', 'filetype': 'text/markdown', 'file_directory': './example_data', 'filename': 'example.md', 'category': 'NarrativeText', 'element_id': '898a542a261f7dc65e0072d1e847d535'}, page_content='OpenAI 是一个 AI 研究组织。')
+```
+
+## 加载元素
+
+在此示例中，我们将以 `elements` 模式加载，这将返回 Markdown 文档中不同元素的列表：
+
+```python
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+
+loader = UnstructuredMarkdownLoader(
+    "./example_data/example.md",
+    mode="elements",
+    strategy="fast",
+)
+
+docs = loader.load()
+len(docs)
+```
+
+```text
+29
+```
+
+如您所见，从 `example.md` 文件中提取了 29 个元素。第一个元素是文档的标题，符合预期：
+
+```python
+docs[0].page_content
+```
+
+```text
+'示例 Markdown 文档'
+```
+
+---
+
+## API 参考
+
+有关 `UnstructuredMarkdownLoader` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/markdown/UnstructuredMarkdownLoader)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\unstructured_markdown.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

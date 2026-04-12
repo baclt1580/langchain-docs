@@ -1,0 +1,191 @@
+---
+title: 核心功能
+description: Fleet 的核心特性
+---
+
+LangSmith Fleet 核心功能是构成您智能体基础的核心特性。它们包括工具、通道、记忆、子智能体和审批机制。
+
+## 智能体身份
+
+智能体身份控制着智能体在与应用程序和服务交互时使用谁的[凭据](/langsmith/fleet/setup)。
+
+更多信息请参阅[智能体身份](/langsmith/fleet/agent-identity)。
+
+## 通道
+
+<Anchor id="triggers" />
+
+通道定义了您的智能体何时开始运行。您可以将智能体连接到外部工具或基于时间的计划，使其能够自动响应消息、电子邮件或周期性事件。
+
+设置说明和支持的通道类型请参阅[通道](/langsmith/fleet/channels)。
+
+## 自定义模型
+
+Fleet 支持自定义模型。您可以连接任何支持 **OpenAI 聊天补全规范** 或 **Anthropic 聊天规范** 的 LLM API。
+
+常见用例包括：
+
+- **LLM 代理**：通过 LiteLLM、Portkey 或您自己的代理等服务路由请求。
+- **自托管模型**：连接到您自己基础设施上运行的模型。
+- **替代提供商**：使用任何具有兼容 API 的提供商。
+
+要添加自定义模型：
+
+1.  在 [LangSmith UI](https://smith.langchain.com) 中，导航到您要编辑的智能体。
+1.  点击右上角的 <Icon icon="settings" /> 设置图标。
+1.  在 **模型** 部分，选择 **+ 添加自定义模型**。
+1.  输入模型 ID、显示名称、基础 URL 以及 API 密钥名称和值。
+1.  点击 **保存**。
+
+<Note>
+  自定义模型必须可通过公共 API 端点访问。LangSmith 无法连接到托管在私有网络、VPN 后或未暴露到互联网的机器上的模型。
+</Note>
+
+## 人工介入
+
+保持对重要决策的控制。您可以设置您的智能体在执行某些操作前暂停并请求您的批准。这确保了您的智能体能自动处理大多数任务，同时您保留监督权。
+
+### 设置审批步骤
+
+<Steps>
+  <Step title="选择一个工具">
+    在设置智能体时，选择您希望在运行前审查的工具或操作。
+  </Step>
+  <Step title="开启审批">
+    找到该工具的审批选项并将其打开。
+  </Step>
+  <Step title="智能体等待您">
+    当您的智能体执行到该步骤时，它将暂停并等待您的批准，然后才会继续。
+  </Step>
+</Steps>
+
+### 智能体暂停时您可以做什么
+
+当您的智能体停下来请求批准时，您有三个选项：
+
+<CardGroup cols={3}>
+  <Card title="接受" icon="check">
+    给予绿灯，让您的智能体按计划继续执行。
+  </Card>
+  <Card title="编辑" icon="edit">
+    在允许智能体继续之前，修改其消息或参数。
+  </Card>
+  <Card title="发送反馈" icon="message">
+    分享反馈以帮助您的智能体学习和改进。
+  </Card>
+</CardGroup>
+
+## 指令
+
+指令是定义智能体行为、个性和能力的系统提示。它们指导智能体如何解释请求、使用其工具以及响应用户。
+
+要编辑指令：
+
+1.  在 [LangSmith UI](https://smith.langchain.com) 中，导航到您要编辑的智能体。
+1.  点击右上角的 <Icon icon="pencil" /> **编辑**。
+1.  在 **指令** 面板中，点击 <Icon icon="pencil" /> **编辑**。
+1.  编辑指令。
+1.  点击 **完成**，然后点击 **保存更改**。
+
+<Tip>
+您也可以通过直接在聊天中提示智能体来更新指令。例如："更新你的指令，要求始终以项目符号列表形式回复。"
+</Tip>
+
+## 记忆与更新
+
+智能体会记住先前对话中的重要信息，并可以自我更新以更好地工作。
+
+- **记忆**：智能体通过将文件写入 **记忆文件夹**（使用 `write_file` 和 `edit_file` 工具调用）来持久化过去交互中的相关细节。这使它们能在未来的对话中做出更好的决策。
+- **自我更新**：智能体可以添加新工具、移除不需要的工具或调整其指令以改进工作方式。
+- **保持不变的内容**：智能体无法更改其名称、描述或启动它们的通道。
+
+<Note>
+默认情况下，智能体在保存到记忆文件夹之前需要获得批准。您可以在智能体设置中禁用此功能。对于在自动计划上运行的智能体（例如[计划任务](/langsmith/fleet/channels#add-a-schedule)），请禁用批准要求，以便智能体无需人工干预即可持久化信息。操作说明请参阅[更新记忆](/langsmith/fleet/manage-agent-settings#update-memory)。
+</Note>
+
+更多信息请参阅[我们如何构建 Agent Builder 的记忆系统](https://www.langchain.com/conceptual-guides/how-we-built-agent-builders-memory)。
+
+## 技能
+
+技能是一种捆绑能力的方式，并在上下文并非普遍相关的情况下提供更具体的信息。
+
+使用技能可以帮助：
+
+-   通过仅提供与当前任务相关的上下文来节省令牌使用量。
+-   防止智能体在系统提示中拥有过多上下文，这可能导致幻觉和不正确的响应。
+
+更多信息请参阅[技能](/langsmith/fleet/skills)。
+
+## 子智能体
+
+通过将大任务分解为更小、更专业的助手来构建复杂的智能体。将子智能体视为一个专家团队——每个子智能体处理工作的特定部分，同时与您的主智能体协同工作。
+
+这种方法使构建复杂系统变得更加容易。与其让一个智能体尝试做所有事情，不如让每个专家助手在其任务部分表现出色。
+
+以下是一些您可能使用子智能体的方式：
+
+-   拆分为子任务：让一个智能体获取数据，另一个智能体进行总结，第三个智能体格式化结果。
+-   专用工具：根据不同的需求，为不同的智能体提供不同的工具访问权限。
+-   独立工作：让子智能体独立工作，然后将结果带回主智能体。
+
+## 会话线程
+
+会话线程是您与智能体之间的对话。每个线程包含消息、智能体响应以及智能体采取的任何操作。
+
+要查看会话线程，请在 [LangSmith UI](https://smith.langchain.com) 中导航到您的智能体。收件箱显示该智能体的所有会话线程。点击一个会话线程以查看对话。
+
+### 已读和未读状态
+
+会话线程的标记方式取决于智能体是否使用通道：
+
+-   **聊天智能体（无通道）**：响应将会话线程标记为**未读**。查看会话线程会将其标记为已读。
+-   **基于通道的智能体**：响应默认将会话线程保持为**已读**。
+
+您可以随时手动将会话线程标记为已读或未读。
+
+## 工具
+
+工具让您的智能体能够与您的应用程序和服务交互。您的智能体可以发送电子邮件、创建日历事件、发布消息、搜索网络等等。从 Gmail、Slack、Google Calendar、GitHub 等众多内置工具中进行选择。
+
+无论智能体是如何触发的，工具都能工作。例如，您可以在 Fleet 聊天界面中启动一个任务，并让智能体在完成后向您发送一条 [Slack 消息](/langsmith/fleet/slack-app#add-slack-tools)。
+
+更多信息请参阅[工具集成](/langsmith/fleet/tools)。
+
+## 追踪
+
+追踪是您的智能体从输入到输出所采取的一系列步骤。您可以使用 [LangSmith](/langsmith/home) 来可视化这些执行步骤。
+
+要查看智能体的所有追踪：
+
+1.  在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体的收件箱。
+1.  在智能体名称旁边，点击 **查看智能体追踪** 图标。
+
+要查看特定会话线程的追踪：
+
+1.  在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体的收件箱。
+1.  右键单击您要追踪的会话线程，然后选择 **查看追踪**。
+
+更多信息请参阅 [LangSmith 可观测性](/langsmith/observability)。
+
+<Note>
+Fleet 会追踪所有智能体运行并将其存储在 LangSmith 中。LLM 提供商不会保留您的数据。在 LangSmith Cloud 上，追踪数据默认存储 14 天。
+</Note>
+
+## 后续步骤
+
+-   [设置您的工作区](/langsmith/fleet/setup)
+-   [连接应用程序和服务](/langsmith/fleet/tools)
+-   [为工具使用远程服务器](/langsmith/fleet/remote-mcp-servers)
+-   [在工作区智能体和私有智能体之间选择](/langsmith/fleet/manage-agent-settings)
+-   [从您的应用程序调用智能体](/langsmith/fleet/code)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\essentials.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

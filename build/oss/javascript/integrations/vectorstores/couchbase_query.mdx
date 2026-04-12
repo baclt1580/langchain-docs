@@ -1,0 +1,393 @@
+---
+title: "Couchbase 查询集成"
+description: "使用 LangChain JavaScript 与 Couchbase 查询向量存储集成。"
+---
+
+`CouchbaseQueryVectorStore` 是 Couchbase 中向量搜索的首选实现。它使用 [查询服务](https://docs.couchbase.com/server/current/learn/services-and-indexes/services/query-service.html) (SQL++) 和 [索引服务](https://docs.couchbase.com/server/current/learn/services-and-indexes/services/index-service.html) 进行向量相似性搜索，而不是搜索服务。这为使用带有向量函数的 SQL++ 查询进行向量操作提供了一种更强大、更直接的方法。
+
+有关 Couchbase 向量搜索功能的更多信息，请参阅官方文档：[选择正确的向量索引](https://docs.couchbase.com/server/current/vector-index/use-vector-indexes.html)。
+
+<Warning>
+    此功能仅在 [Couchbase 8.0](https://docs.couchbase.com/server/8.0/introduction/whats-new.html) 及以上版本中可用。
+</Warning>
+
+## 与 `CouchbaseSearchVectorStore` 的主要区别
+
+(原 `CouchbaseVectorStore`)
+
+- **查询和索引服务**：使用 Couchbase 的查询服务及 SQL++，而非搜索服务
+- **无需索引**：基本操作不需要预先配置的搜索索引
+- **SQL++ 语法**：支持 WHERE 子句和 SQL++ 查询语法进行过滤
+- **向量函数**：使用 `APPROX_VECTOR_DISTANCE` 函数进行相似性计算
+- **距离策略**：支持多种距离策略（点积、余弦、欧几里得、欧几里得平方）
+
+## 安装
+
+```bash npm
+npm install couchbase @langchain/openai @langchain/community @langchain/core
+```
+
+## 创建 Couchbase 连接对象
+
+我们创建一个到 Couchbase 集群的连接，然后将集群对象传递给向量存储。这里，我们使用用户名和密码进行连接。
+您也可以使用任何其他支持的方法连接到您的集群。
+
+有关连接到 Couchbase 集群的更多信息，请查看 [Node SDK 文档](https://docs.couchbase.com/nodejs-sdk/current/hello-world/start-using-sdk.html#connect)。
+
+```typescript
+import { Cluster } from "couchbase";
+
+const connectionString = "couchbase://localhost";
+const dbUsername = "Administrator"; // 对查询的存储桶具有读取权限的有效数据库用户
+const dbPassword = "Password"; // 数据库用户的密码
+
+const couchbaseClient = await Cluster.connect(connectionString, {
+  username: dbUsername,
+  password: dbPassword,
+  configProfile: "wanDevelopment",
+});
+```
+
+## 基本设置
+
+```typescript
+import { CouchbaseQueryVectorStore, DistanceStrategy } from "@langchain/community/vectorstores/couchbase_query";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Cluster } from "couchbase";
+
+// 连接到 Couchbase
+const cluster = await Cluster.connect("couchbase://localhost", {
+  username: "Administrator",
+  password: "password",
+});
+
+// 初始化嵌入模型
+const embeddings = new OpenAIEmbeddings();
+
+// 配置向量存储
+const vectorStore = await CouchbaseQueryVectorStore.initialize(embeddings, {
+  cluster,
+  bucketName: "my-bucket",
+  scopeName: "my-scope",
+  collectionName: "my-collection",
+  textKey: "text", // 可选，默认为 "text"
+  embeddingKey: "embedding", // 可选，默认为 "embedding"
+  distanceStrategy: DistanceStrategy.COSINE, // 可选，默认为 DOT
+});
+```
+
+## 创建向量索引
+
+查询向量存储支持创建向量索引以提高搜索性能。有两种类型的索引可用：
+
+### 超大规模索引
+一种专门的向量索引，利用 Couchbase 的向量索引能力优化向量操作：
+
+```typescript
+import { IndexType } from "@langchain/community/vectorstores/couchbase_query";
+
+await vectorStore.createIndex({
+  indexType: IndexType.HYPERSCALE,
+  indexDescription: "IVF,SQ8",
+  indexName: "my_vector_index", // 可选
+  vectorDimension: 1536, // 可选，从嵌入向量自动检测
+  distanceMetric: DistanceStrategy.COSINE, // 可选，使用存储的默认值
+  fields: ["text", "metadata"], // 可选，默认为文本字段
+  whereClause: "type = 'document'", // 可选过滤器
+  indexScanNprobes: 10, // 可选调优参数
+  indexTrainlist: 1000, // 可选调优参数
+});
+```
+
+**生成的 SQL++：**
+```sql
+CREATE VECTOR INDEX `my_vector_index` ON `bucket`.`scope`.`collection`
+(`embedding` VECTOR) INCLUDE (`text`, `metadata`)
+WHERE type = 'document' USING GSI WITH {'dimension': 1536, 'similarity': 'cosine', 'description': 'IVF,SQ8'}
+```
+
+### 复合索引
+一种通用 GSI 索引，将向量字段与标量字段一起包含：
+
+```typescript
+await vectorStore.createIndex({
+  indexType: IndexType.COMPOSITE,
+  indexDescription: "IVF1024,SQ8",
+  indexName: "my_composite_index",
+  vectorDimension: 1536,
+  fields: ["text", "metadata.category"],
+  whereClause: "created_date > '2023-01-01'",
+  indexScanNprobes: 3,
+  indexTrainlist: 10000,
+});
+```
+
+**生成的 SQL++：**
+```sql
+CREATE INDEX `my_composite_index` ON `bucket`.`scope`.`collection`
+(`text`, `metadata.category`, `embedding` VECTOR)
+WHERE created_date > '2023-01-01' USING GSI
+WITH {'dimension': 1536, 'similarity': 'dot', 'description': 'IVF1024,SQ8', 'scan_nprobes': 3, 'trainlist': 10000}
+```
+
+### 主要区别
+
+| 方面 | 超大规模索引 | 复合索引 |
+|------|-------------|-----------------|
+| **SQL++ 语法** | `CREATE VECTOR INDEX` | `CREATE INDEX` |
+| **向量字段** | `(field VECTOR)` 带 `INCLUDE` 子句 | `(field1, field2, vector_field VECTOR)` |
+| **向量参数** | 支持所有向量参数 | 支持所有向量参数 |
+| **优化** | 专为向量操作优化 | 支持向量的通用 GSI |
+| **使用场景** | 纯向量相似性搜索 | 混合向量和标量查询 |
+| **性能** | 针对向量距离计算优化 | 适用于混合查询 |
+| **调优参数** | 支持 `indexScanNprobes`、`indexTrainlist` | 支持 `indexScanNprobes`、`indexTrainlist` |
+| **限制** | 仅一个向量字段，使用 INCLUDE 包含其他字段 | 多个索引键中包含一个向量字段 |
+
+## 基本向量搜索示例
+
+以下示例展示了如何使用 Couchbase 查询向量搜索并执行相似性搜索。
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import {
+  CouchbaseQueryVectorStore,
+  DistanceStrategy,
+} from "@langchain/community/vectorstores/couchbase_query";
+import { Cluster } from "couchbase";
+import { Document } from "@langchain/core/documents";
+
+const connectionString = process.env.COUCHBASE_DB_CONN_STR ?? "couchbase://localhost";
+const databaseUsername = process.env.COUCHBASE_DB_USERNAME ?? "Administrator";
+const databasePassword = process.env.COUCHBASE_DB_PASSWORD ?? "Password";
+
+const couchbaseClient = await Cluster.connect(connectionString, {
+  username: databaseUsername,
+  password: databasePassword,
+  configProfile: "wanDevelopment",
+});
+
+// 使用 OpenAIEmbeddings 需要 OpenAI API 密钥
+const embeddings = new OpenAIEmbeddings({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const vectorStore = await CouchbaseQueryVectorStore.initialize(embeddings, {
+  cluster: couchbaseClient,
+  bucketName: "testing",
+  scopeName: "_default",
+  collectionName: "_default",
+  textKey: "text",
+  embeddingKey: "embedding",
+  distanceStrategy: DistanceStrategy.COSINE,
+});
+
+// 添加文档
+const documents = [
+  new Document({
+    pageContent: "Couchbase 是一个 NoSQL 数据库",
+    metadata: { category: "database", type: "document" }
+  }),
+  new Document({
+    pageContent: "向量搜索支持语义相似性",
+    metadata: { category: "ai", type: "document" }
+  })
+];
+
+await vectorStore.addDocuments(documents);
+
+// 执行相似性搜索
+const query = "什么是 NoSQL 数据库？";
+const results = await vectorStore.similaritySearch(query, 4);
+console.log("搜索结果:", results[0]);
+
+// 带分数的搜索
+const resultsWithScores = await vectorStore.similaritySearchWithScore(query, 4);
+console.log("文档:", resultsWithScores[0][0]);
+console.log("分数:", resultsWithScores[0][1]);
+```
+
+## 搜索文档
+
+### 基本相似性搜索
+
+```typescript
+// 基本相似性搜索
+const results = await vectorStore.similaritySearch(
+  "什么是 NoSQL 数据库？",
+  4
+);
+```
+
+### 带过滤器的搜索
+
+```typescript
+// 带过滤器的搜索
+const filteredResults = await vectorStore.similaritySearch(
+  "数据库技术",
+  4,
+  {
+    where: "metadata.category = 'database'",
+    fields: ["text", "metadata.category"]
+  }
+);
+```
+
+### 带分数的搜索
+
+```typescript
+// 带分数的搜索
+const resultsWithScores = await vectorStore.similaritySearchWithScore(
+  "向量搜索能力",
+  4
+);
+```
+
+### 复杂过滤
+
+```typescript
+const results = await vectorStore.similaritySearch(
+  "搜索查询",
+  10,
+  {
+    where: "metadata.category IN ['tech', 'science'] AND metadata.rating >= 4",
+    fields: ["content", "metadata.title", "metadata.rating"]
+  }
+);
+```
+
+## 配置选项
+
+### 距离策略
+
+- `DistanceStrategy.DOT` - [点积](https://docs.couchbase.com/server/current/vector-index/vectors-and-indexes-overview.html#dot) (默认)
+- `DistanceStrategy.COSINE` - [余弦相似性](https://docs.couchbase.com/server/current/vector-index/vectors-and-indexes-overview.html#cosine)
+- `DistanceStrategy.EUCLIDEAN` - [欧几里得距离](https://docs.couchbase.com/server/current/vector-index/vectors-and-indexes-overview.html#euclidean) (也称为 L2)
+- `DistanceStrategy.EUCLIDEAN_SQUARED` - [欧几里得平方距离](https://docs.couchbase.com/server/current/vector-index/vectors-and-indexes-overview.html#euclidean-squared) (也称为 L2 平方)
+
+### 索引类型
+
+- `IndexType.HYPERSCALE` - 专门的向量索引，用于获得最佳向量搜索性能
+- `IndexType.COMPOSITE` - 通用索引，可包含向量和标量字段
+
+## 高级用法
+
+### 自定义向量字段
+
+```typescript
+const vectorStore = await CouchbaseQueryVectorStore.initialize(embeddings, {
+  cluster,
+  bucketName: "my-bucket",
+  scopeName: "my-scope",
+  collectionName: "my-collection",
+  textKey: "content",
+  embeddingKey: "vector_embedding",
+  distanceStrategy: DistanceStrategy.EUCLIDEAN,
+});
+```
+
+### 从文本创建
+
+```typescript
+const texts = [
+  "Couchbase 是一个 NoSQL 数据库",
+  "向量搜索支持语义相似性"
+];
+
+const metadatas = [
+  { category: "database" },
+  { category: "ai" }
+];
+
+const vectorStore = await CouchbaseQueryVectorStore.fromTexts(
+  texts,
+  metadatas,
+  embeddings,
+  {
+    cluster,
+    bucketName: "my-bucket",
+    scopeName: "my-scope",
+    collectionName: "my-collection"
+  }
+);
+```
+
+### 删除文档
+
+```typescript
+const documentIds = ["doc1", "doc2", "doc3"];
+await vectorStore.delete({ ids: documentIds });
+```
+
+## 性能考虑
+
+1. **创建索引**：使用 `createIndex()` 创建适当的向量索引以获得更好的性能
+2. **选择索引类型**：
+   - 使用**超大规模索引**处理纯向量搜索工作负载，主要执行相似性搜索
+   - 使用**复合索引**处理混合查询，将向量相似性与标量字段过滤结合
+3. **调优参数**：根据数据大小和性能要求调整 `indexScanNprobes` 和 `indexTrainlist`
+4. **尽早过滤**：使用 WHERE 子句在向量计算前减少搜索空间
+
+## 错误处理
+
+```typescript
+try {
+  await vectorStore.createIndex({
+    indexType: IndexType.HYPERSCALE,
+    indexDescription: "IVF,SQ8",
+  });
+} catch (error) {
+  console.error("索引创建失败:", error.message);
+}
+```
+
+### 常见错误
+
+#### 训练数据不足
+如果看到与训练数据不足相关的错误，您可能需要：
+- 增加 `indexTrainlist` 参数（默认建议：每个质心约 50 个向量）
+- 确保集合中有足够多带有向量嵌入的文档
+- 对于向量数 < 100 万的集合，使用 `number_of_vectors / 1000` 作为质心数
+- 对于更大的集合，使用 `sqrt(number_of_vectors)` 作为质心数
+
+## 与 `CouchbaseSearchVectorStore` 的比较
+
+| 特性 | `CouchbaseQueryVectorStore` | `CouchbaseSearchVectorStore` |
+|------|---------------------------|----------------------|
+| 服务 | 查询 (SQL++) | 搜索 (FTS) |
+| 索引要求 | 可选（用于性能） | 必需 |
+| 查询语言 | SQL++ WHERE 子句 | 搜索查询语法 |
+| 向量函数 | APPROX_VECTOR_DISTANCE | VectorQuery API |
+| 设置复杂度 | 较低 | 较高 |
+| 性能 | 使用索引时良好 | 针对搜索优化 |
+
+## 常见问题
+
+### 在使用 `CouchbaseQueryVectorStore` 之前需要创建索引吗？
+
+不需要，与基于搜索的 `CouchbaseSearchVectorStore` 不同，基于查询的实现可以在没有预先创建索引的情况下工作。但是，创建适当的向量索引（超大规模或复合）将显著提高查询性能。
+
+### 何时应该使用超大规模索引与复合索引？
+
+- 当您主要执行向量相似性搜索，对其他字段过滤最少时，使用**超大规模索引**
+- 当您经常在同一查询中将向量相似性与标量字段过滤结合时，使用**复合索引**
+- 了解更多关于如何[选择正确的向量索引](https://docs.couchbase.com/server/current/vector-index/use-vector-indexes.html)
+
+### 我可以在同一数据上同时使用 `CouchbaseQueryVectorStore` 和 `CouchbaseSearchVectorStore` 吗？
+
+可以，两者都可以在同一文档结构上工作。但是，它们使用不同的服务（搜索 vs 查询）并且有不同的索引要求。
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储[操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\couchbase_query.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

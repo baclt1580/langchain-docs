@@ -1,0 +1,48 @@
+---
+title: "集成 Permit"
+description: "使用 LangChain Python 与 Permit 进行集成。"
+---
+
+[Permit.io](https://permit.io/) 提供细粒度的访问控制和策略执行。借助 LangChain，您可以集成 Permit 检查，以确保只有授权用户才能访问或检索您 LLM 应用中的数据。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install langchain-permit
+pip install permit
+```
+
+```bash uv
+uv add langchain-permit
+uv add permit
+```
+</CodeGroup>
+
+为您的 Permit PDP 和凭据设置环境变量：
+
+```python
+export PERMIT_API_KEY="your_permit_api_key"
+export PERMIT_PDP_URL="http://localhost:7766"   # or your real PDP endpoint
+```
+
+请确保您的 PDP 正在运行并已配置。有关策略设置，请参阅 [Permit 文档](https://docs.permit.io/sdk/python/quickstart-python/#2-setup-your-pdp-policy-decision-point-container)。
+
+## 工具
+
+有关可用工具的详细信息，请参阅 [Permit 工具文档](/oss/python/integrations/tools/permit)。
+
+## 检索器
+
+有关可用检索器的详细信息，请参阅 [Permit 检索器文档](/oss/python/integrations/retrievers/permit)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\permit.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

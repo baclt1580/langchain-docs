@@ -1,0 +1,138 @@
+---
+title: Azure DocumentDB
+description: Azure DocumentDB 向量存储集成
+---
+
+> [Azure DocumentDB](https://learn.microsoft.com/azure/documentdb/) 可轻松创建具备完整原生 MongoDB 支持的数据库。您可以将 MongoDB 经验应用于此服务，并通过将应用程序指向连接字符串，继续使用您喜爱的 MongoDB 驱动程序、SDK 和工具。利用 Azure DocumentDB 中的向量搜索功能，可无缝集成基于 AI 的应用程序与存储在 Azure DocumentDB 中的数据。
+
+Azure DocumentDB 为开发人员提供完全托管的、兼容 MongoDB 的数据库服务，用于通过熟悉的架构构建现代应用程序。
+
+了解如何利用 Azure DocumentDB 的向量搜索功能，请访问[此页面](https://learn.microsoft.com/azure/documentdb/vector-search)。如果您没有 Azure 账户，可以[创建免费账户](https://azure.microsoft.com/free/)开始使用。
+
+## 设置
+
+首先需要安装 [`@langchain/azure-cosmosdb`](https://www.npmjs.com/package/@langchain/azure-cosmosdb) 包：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/azure-cosmosdb @langchain/core
+```
+
+您还需要运行一个 Azure DocumentDB 实例。您可以按照[此指南](https://learn.microsoft.com/azure/documentdb/quickstart-portal)在 Azure 门户上免费部署一个版本。
+
+一旦您的实例运行起来，请确保您拥有连接字符串和管理密钥。您可以在 Azure 门户中，实例的“连接字符串”部分找到它们。然后需要设置以下环境变量：
+
+```bash .env vars
+AZURE_DOCUMENTDB_CONNECTION_STRING=
+```
+
+## 示例
+
+以下示例演示了如何将文件中的文档索引到 Azure DocumentDB 中，运行向量搜索查询，最后使用链基于检索到的文档以自然语言回答问题。
+
+```typescript
+import {
+  AzureDocumentDBVectorStore,
+  AzureDocumentDBSimilarityType,
+} from "@langchain/azure-cosmosdb";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import { createStuffDocumentsChain } from "@langchain/classic/chains/combine_documents";
+import { createRetrievalChain } from "@langchain/classic/chains/retrieval";
+import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+
+// 从文件加载文档
+const loader = new TextLoader("./state_of_the_union.txt");
+const rawDocuments = await loader.load();
+const splitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 1000,
+  chunkOverlap: 0,
+});
+const documents = await splitter.splitDocuments(rawDocuments);
+
+// 创建 Azure DocumentDB 向量存储
+const store = await AzureDocumentDBVectorStore.fromDocuments(
+  documents,
+  new OpenAIEmbeddings(),
+  {
+    databaseName: "langchain",
+    collectionName: "documents",
+    indexOptions: {
+      numLists: 100,
+      dimensions: 1536,
+      similarity: AzureDocumentDBSimilarityType.COS,
+    },
+  }
+);
+
+// 执行相似性搜索
+const resultDocuments = await store.similaritySearch(
+  "总统对 Ketanji Brown Jackson 说了什么？"
+);
+
+console.log("相似性搜索结果：");
+console.log(resultDocuments[0].pageContent);
+/*
+  今晚。我呼吁参议院：通过《自由投票法案》。通过《约翰·刘易斯投票权法案》。同时，通过《披露法案》，让美国人知道谁在资助我们的选举。
+
+  今晚，我想向一位毕生致力于服务这个国家的人致敬：斯蒂芬·布雷耶大法官——一位陆军退伍军人、宪法学者、即将退休的美国最高法院大法官。布雷耶大法官，感谢您的服务。
+
+  总统最严肃的宪法职责之一是提名某人担任美国最高法院大法官。
+
+  我在四天前做到了这一点，当时我提名了联邦上诉法院法官 Ketanji Brown Jackson。她是我们国家顶尖的法律人才之一，将继续布雷耶大法官的卓越传统。
+*/
+
+// 将存储作为链的一部分使用
+const model = new ChatOpenAI({ model: "gpt-3.5-turbo-1106" });
+const questionAnsweringPrompt = ChatPromptTemplate.fromMessages([
+  [
+    "system",
+    "根据以下上下文回答用户的问题：\n\n{context}",
+  ],
+  ["human", "{input}"],
+]);
+
+const combineDocsChain = await createStuffDocumentsChain({
+  llm: model,
+  prompt: questionAnsweringPrompt,
+});
+
+const chain = await createRetrievalChain({
+  retriever: store.asRetriever(),
+  combineDocsChain,
+});
+
+const res = await chain.invoke({
+  input: "总统在价格方面的首要任务是什么？",
+});
+
+console.log("链式响应：");
+console.log(res.answer);
+/*
+  总统的首要任务是控制价格。
+*/
+
+// 清理
+await store.delete();
+
+await store.close();
+```
+
+## 相关链接
+
+- 向量存储[集成概览](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\azure_documentdb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

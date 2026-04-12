@@ -1,0 +1,99 @@
+---
+title: "百度集成"
+description: "使用 LangChain Python 与百度集成。"
+---
+
+本页面涵盖所有 LangChain 与百度产品的集成，例如 PaddleOCR。
+
+## PaddleOCR
+
+`langchain-paddleocr` 包实现了 PaddleOCR 功能的集成。[PaddleOCR](https://www.paddleocr.com) 是百度开发的一款功能强大且轻量级的 OCR 工具包，它将图像和 PDF 与 LLM 连接起来。它支持超过 100 种语言，并将文档内容转换为结构化、AI 就绪的数据。
+
+### 文档加载器
+
+<Columns cols={1}>
+    <Card title="PaddleOCRVLLoader" href="/oss/python/integrations/document_loaders/paddleocr_vl" cta="开始使用" icon="i-cursor" arrow>
+        提供 PaddleOCR 的大模型文档解析能力。
+    </Card>
+</Columns>
+
+## 百度智能云
+
+### 安装和设置
+
+注册并从 [百度智能云文心工坊](https://cloud.baidu.com/product/wenxinworkshop) 获取 `Qianfan` `AK` 和 `SK` 密钥。
+
+### 大语言模型
+
+#### 百度千帆
+
+查看 [使用示例](/oss/python/integrations/llms/baidu_qianfan_endpoint)。
+
+```python
+from langchain_community.llms import QianfanLLMEndpoint
+```
+
+### 聊天模型
+
+#### 千帆聊天端点
+
+查看 [使用示例](/oss/python/integrations/chat/baidu_qianfan_endpoint)。
+查看另一个 [使用示例](/oss/python/integrations/chat/ernie)。
+
+```python
+from langchain_community.chat_models import QianfanChatEndpoint
+```
+
+### 嵌入模型
+
+#### 百度千帆
+
+查看 [使用示例](/oss/python/integrations/embeddings/baidu_qianfan_endpoint)。
+查看另一个 [使用示例](/oss/python/integrations/embeddings/ernie)。
+
+```python
+from langchain_community.embeddings import QianfanEmbeddingsEndpoint
+```
+
+### 文档加载器
+
+#### 百度 BOS 目录加载器
+
+```python
+from langchain_community.document_loaders.baiducloud_bos_directory import BaiduBOSDirectoryLoader
+```
+
+#### 百度 BOS 文件加载器
+
+```python
+from langchain_community.document_loaders.baiducloud_bos_file import BaiduBOSFileLoader
+```
+
+### 向量存储
+
+#### 百度云 ElasticSearch 向量搜索
+
+查看 [使用示例](/oss/python/integrations/vectorstores/baiducloud_vector_search)。
+
+```python
+from langchain_community.vectorstores import BESVectorStore
+```
+
+#### 百度 VectorDB
+
+查看 [使用示例](/oss/python/integrations/vectorstores/baiduvectordb)。
+
+```python
+from langchain_community.vectorstores import BaiduVectorDB
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\baidu.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

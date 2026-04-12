@@ -1,0 +1,311 @@
+---
+title: "源代码集成"
+description: "使用 LangChain Python 与源代码文档加载器集成。"
+---
+
+本笔记本介绍了如何使用语言解析的特殊方法加载源代码文件：代码中的每个顶层函数和类都会被加载到单独的文档中。在已加载的函数和类之外，剩余的顶层代码将被加载到另一个独立的文档中。
+
+这种方法有可能提高 QA 模型在源代码上的准确性。
+
+支持代码解析的语言包括：
+
+- C (*)
+- C++ (*)
+- C# (*)
+- COBOL
+- Elixir
+- Go (*)
+- Java (*)
+- JavaScript（需要包 `esprima`）
+- Kotlin (*)
+- Lua (*)
+- Perl (*)
+- Python
+- Ruby (*)
+- Rust (*)
+- Scala (*)
+- TypeScript (*)
+
+标记 (*) 的项目需要安装 `tree_sitter` 和 `tree_sitter_languages` 包。
+使用 `tree_sitter` 添加对其他语言的支持是直接的，尽管目前这需要修改 LangChain。
+
+用于解析的语言可以配置，同时可以设置激活基于语法拆分所需的最小行数。
+
+如果未明确指定语言，`LanguageParser` 会根据文件扩展名（如果存在）进行推断。
+
+```python
+pip install -qU esprima esprima tree_sitter tree_sitter_languages
+```
+
+```python
+import warnings
+
+warnings.filterwarnings("ignore")
+from pprint import pprint
+
+from langchain_community.document_loaders.generic import GenericLoader
+from langchain_community.document_loaders.parsers import LanguageParser
+from langchain_text_splitters import Language
+```
+
+```python
+loader = GenericLoader.from_filesystem(
+    "./example_data/source_code",
+    glob="*",
+    suffixes=[".py", ".js"],
+    parser=LanguageParser(),
+)
+docs = loader.load()
+```
+
+```python
+len(docs)
+```
+
+```text
+6
+```
+
+```python
+for document in docs:
+    pprint(document.metadata)
+```
+
+```text
+{'content_type': 'functions_classes',
+ 'language': <Language.PYTHON: 'python'>,
+ 'source': 'example_data/source_code/example.py'}
+{'content_type': 'functions_classes',
+ 'language': <Language.PYTHON: 'python'>,
+ 'source': 'example_data/source_code/example.py'}
+{'content_type': 'simplified_code',
+ 'language': <Language.PYTHON: 'python'>,
+ 'source': 'example_data/source_code/example.py'}
+{'content_type': 'functions_classes',
+ 'language': <Language.JS: 'js'>,
+ 'source': 'example_data/source_code/example.js'}
+{'content_type': 'functions_classes',
+ 'language': <Language.JS: 'js'>,
+ 'source': 'example_data/source_code/example.js'}
+{'content_type': 'simplified_code',
+ 'language': <Language.JS: 'js'>,
+ 'source': 'example_data/source_code/example.js'}
+```
+
+```python
+print("\n\n--8<--\n\n".join([document.page_content for document in docs]))
+```
+
+```javascript
+class MyClass:
+    def __init__(self, name):
+        self.name = name
+
+    def greet(self):
+        print(f"Hello, {self.name}!")
+
+--8<--
+
+def main():
+    name = input("Enter your name: ")
+    obj = MyClass(name)
+    obj.greet()
+
+--8<--
+
+# Code for: class MyClass:
+
+
+# Code for: def main():
+
+
+if __name__ == "__main__":
+    main()
+
+--8<--
+
+class MyClass {
+  constructor(name) {
+    this.name = name;
+  }
+
+  greet() {
+    console.log(`Hello, ${this.name}!`);
+  }
+}
+
+--8<--
+
+function main() {
+  const name = prompt("Enter your name:");
+  const obj = new MyClass(name);
+  obj.greet();
+}
+
+--8<--
+
+// Code for: class MyClass {
+
+// Code for: function main() {
+
+main();
+```
+
+对于小文件，可以禁用解析器。
+
+参数 `parser_threshold` 表示源代码文件必须达到的最小行数，才会使用解析器进行分段。
+
+```python
+loader = GenericLoader.from_filesystem(
+    "./example_data/source_code",
+    glob="*",
+    suffixes=[".py"],
+    parser=LanguageParser(language=Language.PYTHON, parser_threshold=1000),
+)
+docs = loader.load()
+```
+
+```python
+len(docs)
+```
+
+```text
+1
+```
+
+```python
+print(docs[0].page_content)
+```
+
+```text
+class MyClass:
+    def __init__(self, name):
+        self.name = name
+
+    def greet(self):
+        print(f"Hello, {self.name}!")
+
+
+def main():
+    name = input("Enter your name: ")
+    obj = MyClass(name)
+    obj.greet()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+## 拆分
+
+对于那些过大的函数、类或脚本，可能需要进行额外的拆分。
+
+```python
+loader = GenericLoader.from_filesystem(
+    "./example_data/source_code",
+    glob="*",
+    suffixes=[".js"],
+    parser=LanguageParser(language=Language.JS),
+)
+docs = loader.load()
+```
+
+```python
+from langchain_text_splitters import (
+    Language,
+    RecursiveCharacterTextSplitter,
+)
+```
+
+```python
+js_splitter = RecursiveCharacterTextSplitter.from_language(
+    language=Language.JS, chunk_size=60, chunk_overlap=0
+)
+```
+
+```python
+result = js_splitter.split_documents(docs)
+```
+
+```python
+len(result)
+```
+
+```text
+7
+```
+
+```python
+print("\n\n--8<--\n\n".join([document.page_content for document in result]))
+```
+
+```javascript
+class MyClass {
+  constructor(name) {
+    this.name = name;
+
+--8<--
+
+}
+
+--8<--
+
+greet() {
+    console.log(`Hello, ${this.name}!`);
+  }
+}
+
+--8<--
+
+function main() {
+  const name = prompt("Enter your name:");
+
+--8<--
+
+const obj = new MyClass(name);
+  obj.greet();
+}
+
+--8<--
+
+// Code for: class MyClass {
+
+// Code for: function main() {
+
+--8<--
+
+main();
+```
+
+## 使用 Tree-Sitter 模板添加语言
+
+使用 Tree-Sitter 模板扩展语言支持涉及几个关键步骤：
+
+1. **创建新的语言文件**：
+    - 首先在指定目录（langchain/libs/community/langchain_community/document_loaders/parsers/language）中创建一个新文件。
+    - 基于现有语言文件（如 **`cpp.py`**）的结构和解析逻辑来建模此文件。
+    - 您还需要在 langchain 目录（langchain/libs/langchain/langchain/document_loaders/parsers/language）中创建一个文件。
+2. **解析语言细节**：
+    - 模仿 **`cpp.py`** 文件中使用的结构，并根据您要加入的语言进行调整。
+    - 主要的修改涉及调整块查询数组，以适应您要解析语言的语法和结构。
+3. **测试语言解析器**：
+    - 为了进行彻底验证，请为新语言生成一个特定的测试文件。在指定目录（langchain/libs/community/tests/unit_tests/document_loaders/parsers/language）中创建 **`test_language.py`**。
+    - 遵循 **`test_cpp.py`** 的示例，为新语言中的解析元素建立基础测试。
+4. **集成到解析器和文本拆分器中**：
+    - 在 **`language_parser.py`** 文件中加入您的新语言。确保更新 LANGUAGE_EXTENSIONS 和 LANGUAGE_SEGMENTERS，以及 LanguageParser 的文档字符串，以识别和处理添加的语言。
+    - 同时，请确认您的语言已包含在 **`text_splitter.py`** 的 Language 类中，以便正确解析。
+
+通过遵循这些步骤，并确保全面的测试和集成，您将成功使用 Tree-Sitter 模板扩展语言支持。
+
+祝您好运！
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\source_code.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

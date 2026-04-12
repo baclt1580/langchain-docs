@@ -1,0 +1,48 @@
+---
+title: "Psychic 集成"
+description: "使用 LangChain Python 与 Psychic 集成。"
+---
+
+<Warning>
+此服务已不再维护，可能无法正常工作。请谨慎使用。
+</Warning>
+
+>[Psychic](https://www.psychic.dev/) 是一个平台，用于通过 OAuth 集成 SaaS 工具（如 `Notion`、`Zendesk`、
+> `Confluence` 和 `Google Drive`）并通过 OAuth 将这些应用程序中的文档同步到您的 SQL 或向量
+> 数据库。您可以将其视为非结构化数据的 Plaid。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install psychicapi
+```
+
+```bash uv
+uv add psychicapi
+```
+</CodeGroup>
+
+Psychic 设置很简单——您导入 `react` 库并使用从 [Psychic 仪表板](https://dashboard.psychic.dev/) 获取的 `Sidekick API` 密钥对其进行配置。连接应用程序后，您可以从仪表板查看这些连接，并使用服务器端库检索数据。
+
+1. 在 [仪表板](https://dashboard.psychic.dev/) 中创建账户。
+2. 使用 [react 库](https://docs.psychic.dev/sidekick-link) 将 Psychic 链接模态框添加到您的前端 React 应用中。您将使用它来连接 SaaS 应用。
+3. 创建连接后，您可以按照 [示例笔记本](/oss/python/integrations/document_loaders/psychic) 使用 `PsychicLoader`
+
+
+## 与其他文档加载器的优势对比
+
+1.	**通用 API：** 无需为每个 SaaS 应用构建 OAuth 流程并学习其 API，只需集成一次 Psychic，并利用我们的通用 API 检索数据。
+2.	**数据同步：** 客户 SaaS 应用中的数据可能会很快过时。使用 Psychic，您可以配置 Webhook 以按每日或实时方式保持文档更新。
+3.	**简化的 OAuth：** Psychic 端到端处理 OAuth，因此您无需花费时间为每个集成创建 OAuth 客户端、保持访问令牌新鲜以及处理 OAuth 重定向逻辑。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\psychic.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

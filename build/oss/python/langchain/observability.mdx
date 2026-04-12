@@ -1,0 +1,80 @@
+---
+title: LangSmith 可观测性
+sidebarTitle: 可观测性
+---
+
+import ObservabilityPy from '/snippets/oss/observability-py.mdx';
+import ObservabilityJs from '/snippets/oss/observability-js.mdx';
+
+在使用 LangChain 构建和运行智能体时，你需要了解其行为：它们调用了哪些[工具](/oss/python/langchain/tools)、生成了什么提示以及如何做出决策。使用 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 构建的 LangChain 智能体自动支持通过 [LangSmith](/langsmith/home) 进行追踪。LangSmith 是一个用于捕获、调试、评估和监控 LLM 应用行为的平台。
+
+
+
+
+[_追踪记录_](/langsmith/observability-concepts#traces) 记录了智能体执行的每一步，从初始用户输入到最终响应，包括所有工具调用、模型交互和决策点。这些执行数据有助于你调试问题、评估不同输入下的性能，并监控生产环境中的使用模式。
+
+本指南将向你展示如何为 LangChain 智能体启用追踪，并使用 LangSmith 分析其执行过程。
+
+## 前提条件
+
+开始之前，请确保满足以下条件：
+
+- **LangSmith 账户**：在 [smith.langchain.com](https://smith.langchain.com) 注册（免费）或登录。
+- **LangSmith API 密钥**：请按照[创建 API 密钥](/langsmith/create-account-api-key#create-an-api-key)指南操作。
+
+## 启用追踪
+
+所有 LangChain 智能体都自动支持 LangSmith 追踪。要启用它，请设置以下环境变量：
+
+```bash
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=<你的-api-key>
+```
+
+## 快速开始
+
+无需额外代码即可将追踪记录到 LangSmith。只需像往常一样运行你的智能体代码：
+
+```python
+from langchain.agents import create_agent
+
+
+def send_email(to: str, subject: str, body: str):
+    """向收件人发送电子邮件。"""
+    # ... 邮件发送逻辑
+    return f"邮件已发送至 {to}"
+
+def search_web(query: str):
+    """在网络上搜索信息。"""
+    # ... 网络搜索逻辑
+    return f"搜索结果：{query}"
+
+agent = create_agent(
+    model="gpt-4.1",
+    tools=[send_email, search_web],
+    system_prompt="你是一个可以发送电子邮件和搜索网络的助手。"
+)
+
+# 运行智能体 - 所有步骤将自动被追踪
+response = agent.invoke({
+    "messages": [{"role": "user", "content": "搜索最新的 AI 新闻，并将摘要发送至 john@example.com"}]
+})
+```
+
+
+
+
+默认情况下，追踪记录将记录到名为 `default` 的项目中。要配置自定义项目名称，请参阅[记录到项目](/langsmith/log-traces-to-project)。
+
+<ObservabilityPy />
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\observability.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

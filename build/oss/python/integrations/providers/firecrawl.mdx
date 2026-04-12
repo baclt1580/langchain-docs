@@ -1,0 +1,42 @@
+---
+title: "FireCrawl 集成"
+description: "使用 LangChain Python 与 FireCrawl 进行集成。"
+---
+
+>[FireCrawl](https://firecrawl.dev/?ref=langchain) 爬取并转换任何网站为适合 LLM 的数据。
+> 它会爬取所有可访问的子页面，并提供干净的 markdown
+> 以及每个页面的元数据。无需站点地图。
+
+
+## 安装和设置
+
+安装 Python SDK：
+
+<CodeGroup>
+```bash pip
+pip install firecrawl-py==0.0.20
+```
+
+```bash uv
+uv add "firecrawl-py==0.0.20"
+```
+</CodeGroup>
+
+## 文档加载器
+
+查看 [使用示例](/oss/python/integrations/document_loaders/firecrawl)。
+
+```python
+from langchain_community.document_loaders import FireCrawlLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\firecrawl.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

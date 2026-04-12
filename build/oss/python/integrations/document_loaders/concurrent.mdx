@@ -1,0 +1,41 @@
+---
+title: "并发加载器集成"
+description: "使用 LangChain Python 与并发加载器文档加载器进行集成。"
+---
+
+工作方式与通用加载器类似，但采用并发处理，适合希望优化工作流程的用户。
+
+```python
+from langchain_community.document_loaders import ConcurrentLoader
+```
+
+```python
+loader = ConcurrentLoader.from_filesystem("example_data/", glob="**/*.txt")
+```
+
+```python
+files = loader.load()
+```
+
+```python
+len(files)
+```
+
+```text
+2
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\concurrent.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

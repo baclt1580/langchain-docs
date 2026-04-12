@@ -1,0 +1,172 @@
+---
+title: "Prisma 集成"
+description: "使用 LangChain JavaScript 与 Prisma 向量存储进行集成。"
+---
+
+为了在 PostgreSQL 数据库中增强现有模型的向量搜索能力，LangChain 支持将 [Prisma](https://www.prisma.io/) 与 PostgreSQL 及 [`pgvector`](https://github.com/pgvector/pgvector) Postgres 扩展结合使用。
+
+## 设置
+
+### 使用 Supabase 设置数据库实例
+
+参考 [Prisma 与 Supabase 集成指南](https://supabase.com/docs/guides/integrations/prisma) 来使用 Supabase 和 Prisma 设置一个新的数据库实例。
+
+### 安装 prisma
+
+```bash npm
+npm install prisma
+```
+
+### 使用 `docker-compose` 设置 `pgvector` 自托管实例
+
+`pgvector` 提供了一个预构建的 Docker 镜像，可用于快速设置自托管的 Postgres 实例。
+
+```yaml
+services:
+  db:
+    image: ankane/pgvector
+    ports:
+      - 5432:5432
+    volumes:
+      - db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=
+      - POSTGRES_USER=
+      - POSTGRES_DB=
+
+volumes:
+  db:
+```
+
+### 创建新模型
+
+假设您尚未创建模型，请创建一个带有 `vector` 字段的新模型，其类型为 `Unsupported("vector")`：
+
+```prisma
+model Document {
+  id      String                 @id @default(cuid())
+  content String
+  vector  Unsupported("vector")?
+}
+```
+
+之后，使用 `--create-only` 创建新的迁移，以避免直接运行迁移。
+
+```bash npm
+npx prisma migrate dev --create-only
+```
+
+如果尚未启用 `pgvector` 扩展，请在新建的迁移中添加以下行以启用它：
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+随后运行迁移：
+
+```bash npm
+npx prisma migrate dev
+```
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+<Warning>
+**表名和列名（在 `tableName`、`vectorColumnName`、`columns` 和 `filter` 等字段中）会直接传入 SQL 查询，而未经参数化处理。**
+
+这些字段必须事先进行清理，以避免 SQL 注入攻击。
+</Warning>
+
+```typescript
+import { PrismaVectorStore } from "@langchain/community/vectorstores/prisma";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { PrismaClient, Prisma, Document } from "@prisma/client";
+
+export const run = async () => {
+  const db = new PrismaClient();
+
+  // 使用 `withModel` 方法为 `metadata` 字段获取正确的类型提示：
+  const vectorStore = PrismaVectorStore.withModel<Document>(db).create(
+    new OpenAIEmbeddings(),
+    {
+      prisma: Prisma,
+      tableName: "Document",
+      vectorColumnName: "vector",
+      columns: {
+        id: PrismaVectorStore.IdColumn,
+        content: PrismaVectorStore.ContentColumn,
+      },
+    }
+  );
+
+  const texts = ["Hello world", "Bye bye", "What's this?"];
+  await vectorStore.addModels(
+    await db.$transaction(
+      texts.map((content) => db.document.create({ data: { content } }))
+    )
+  );
+
+  const resultOne = await vectorStore.similaritySearch("Hello world", 1);
+  console.log(resultOne);
+
+  // 创建带有默认过滤器的实例
+  const vectorStore2 = PrismaVectorStore.withModel<Document>(db).create(
+    new OpenAIEmbeddings(),
+    {
+      prisma: Prisma,
+      tableName: "Document",
+      vectorColumnName: "vector",
+      columns: {
+        id: PrismaVectorStore.IdColumn,
+        content: PrismaVectorStore.ContentColumn,
+      },
+      filter: {
+        content: {
+          equals: "default",
+        },
+      },
+    }
+  );
+
+  await vectorStore2.addModels(
+    await db.$transaction(
+      texts.map((content) => db.document.create({ data: { content } }))
+    )
+  );
+
+  // 使用默认过滤器，即 {"content": "default"}
+  const resultTwo = await vectorStore.similaritySearch("Hello world", 1);
+  console.log(resultTwo);
+};
+```
+
+以下 SQL 运算符可用作过滤器：`equals`、`in`、`isNull`、`isNotNull`、`like`、`lt`、`lte`、`gt`、`gte`、`not`。
+
+以上示例使用了以下模型：
+
+<SchemaPrisma />
+
+如果不需要，可以移除 `namespace`。
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储[操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\prisma.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

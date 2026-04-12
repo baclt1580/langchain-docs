@@ -1,0 +1,93 @@
+---
+title: "USearch 集成"
+description: "使用 LangChain Python 与 USearch 向量存储进行集成。"
+---
+
+>[USearch](https://unum-cloud.github.io/usearch/) 是一个更小、更快的单文件向量搜索引擎
+
+>USearch 的基础功能与 FAISS 相同，如果您曾经研究过近似最近邻搜索，其接口应该看起来很熟悉。FAISS 是高性能向量搜索引擎的广泛认可标准。USearch 和 FAISS 都采用相同的 HNSW 算法，但它们在设计原则上存在显著差异。USearch 紧凑且广泛兼容，同时不牺牲性能，主要关注用户定义的指标和更少的依赖项。
+
+```python
+pip install -qU  usearch langchain-community
+```
+
+我们要使用 [`OpenAIEmbeddings`](https://reference.langchain.com/python/langchain-openai/embeddings/base/OpenAIEmbeddings)，因此需要获取 OpenAI API 密钥。
+
+```python
+import getpass
+import os
+
+if "OPENAI_API_KEY" not in os.environ:
+    os.environ["OPENAI_API_KEY"] = getpass.getpass("OpenAI API Key:")
+```
+
+```python
+from langchain_community.document_loaders import TextLoader
+from langchain_community.vectorstores import USearch
+from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import CharacterTextSplitter
+```
+
+```python
+from langchain_community.document_loaders import TextLoader
+
+loader = TextLoader("../../../extras/modules/state_of_the_union.txt")
+documents = loader.load()
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+
+embeddings = OpenAIEmbeddings()
+```
+
+```python
+db = USearch.from_documents(docs, embeddings)
+
+query = "What did the president say about Ketanji Brown Jackson"
+docs = db.similarity_search(query)
+```
+
+```python
+print(docs[0].page_content)
+```
+
+```text
+Tonight. I call on the Senate to: Pass the Freedom to Vote Act. Pass the John Lewis Voting Rights Act. And while you’re at it, pass the Disclose Act so Americans can know who is funding our elections.
+
+Tonight, I’d like to honor someone who has dedicated his life to serve this country: Justice Stephen Breyer—an Army veteran, Constitutional scholar, and retiring Justice of the United States Supreme Court. Justice Breyer, thank you for your service.
+
+One of the most serious constitutional responsibilities a President has is nominating someone to serve on the United States Supreme Court.
+
+And I did that 4 days ago, when I nominated Circuit Court of Appeals Judge Ketanji Brown Jackson. One of our nation’s top legal minds, who will continue Justice Breyer’s legacy of excellence.
+```
+
+## 带分数的相似度搜索
+
+`similarity_search_with_score` 方法允许您不仅返回文档，还返回查询到它们的距离分数。返回的距离分数是 L2 距离。因此，分数越低越好。
+
+```python
+docs_and_scores = db.similarity_search_with_score(query)
+```
+
+```python
+docs_and_scores[0]
+```
+
+```text
+(Document(page_content='Tonight. I call on the Senate to: Pass the Freedom to Vote Act. Pass the John Lewis Voting Rights Act. And while you’re at it, pass the Disclose Act so Americans can know who is funding our elections. \n\nTonight, I’d like to honor someone who has dedicated his life to serve this country: Justice Stephen Breyer—an Army veteran, Constitutional scholar, and retiring Justice of the United States Supreme Court. Justice Breyer, thank you for your service. \n\nOne of the most serious constitutional responsibilities a President has is nominating someone to serve on the United States Supreme Court. \n\nAnd I did that 4 days ago, when I nominated Circuit Court of Appeals Judge Ketanji Brown Jackson. One of our nation’s top legal minds, who will continue Justice Breyer’s legacy of excellence.', metadata={'source': '../../../extras/modules/state_of_the_union.txt'}),
+ 0.1845687)
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\usearch.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

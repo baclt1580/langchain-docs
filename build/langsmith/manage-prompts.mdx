@@ -1,0 +1,185 @@
+---
+title: 管理提示词
+sidebarTitle: 管理提示词
+description: 在 LangSmith 中管理提示词版本、环境和访问控制。
+---
+
+LangSmith 提供了多种工具来帮助您有效管理您的[_提示词_](/langsmith/prompt-engineering-concepts)。本页介绍以下功能：
+
+- [环境](#环境)，用于通过**暂存**和**生产**环境推进提交。
+- [提交标签](#提交标签)，用于版本控制和环境管理。
+- [提示词所有者](#提示词所有者)，用于控制谁可以推进提交和删除提示词。
+- [Webhook 触发器](#在提示词提交时触发-webhook)，用于在提示词更新时自动化工作流。
+- [公共提示词中心](#公共提示词中心)，用于发现和使用社区创建的提示词。
+
+## 提示词详情页
+
+从[**提示词**表格](/langsmith/create-a-prompt#查看您的提示词)中选择一个提示词以打开其详情页，该页面采用双窗格布局：左侧显示提交历史和环境，右侧显示提交详情。
+
+您可以通过切换右上角的**差异**来比较提交与其先前版本。
+
+## 环境
+
+环境代表命名的部署目标，即**暂存**和**生产**环境，您可以将其分配给特定的提交。它们让您可以跟踪每个环境中哪个版本的提示词处于活动状态，并在环境之间推进提交。
+
+环境由保留的[提交标签](#提交标签)（`staging` 和 `production`）定义，这些标签通过升级 UI 管理，而不是通过自由形式的标签选择器管理。
+
+### 推进提交
+
+推进提交会将其分配给一个环境。您可以将任何提交推进到暂存或生产环境。
+
+要推进提交：
+
+1. 将鼠标悬停在左侧窗格中的某个提交上以显示**推进**，或点击页面右上角的**推进**。从下拉菜单中选择**暂存**或**生产**。
+2. 将打开一个部署模态框，显示当前分配给该环境并将被替换的提交。
+3. 确认推进。环境指针会立即更新。
+
+<Note>
+将提交推进到生产环境不会将其从暂存环境中移除。如果一个提交在暂存环境中，您将其推进到生产环境，它仍会保留在暂存环境中。
+</Note>
+
+### 回滚环境
+
+每个环境都维护一个有序的历史记录，记录哪些提交在何时被分配给它。要回滚到先前的提交：
+
+1. 在左侧窗格中，找到您想要回滚的环境。
+2. 点击该环境的回滚图标。
+3. 从显示的**回滚历史**中，选择您想要回滚到的提交。环境指针将更新到该提交。
+
+## 提交标签
+
+[_提交标签_](/langsmith/prompt-engineering-concepts#标签)是引用您提示词版本历史中特定[_提交_](/langsmith/prompt-engineering-concepts#提交)的标签。它们帮助您标记重要版本，并控制在不同环境中运行哪个版本。通过在代码中引用标签而不是提交 ID，您可以更新正在使用的版本而无需修改代码本身。
+
+每个标签恰好引用一个提交，但您可以重新分配标签以指向不同的提交。
+
+<Note>
+**保留标签：** `staging` 和 `production` 标签是为环境管理保留的，不会在自由形式的标签选择器中启用。使用[推进流程](#推进提交)将提交分配给这些环境。
+</Note>
+
+<Note>
+**请勿与资源标签混淆**：提交标签特定于提示词版本控制，并引用提示词历史中的单个提交。[资源标签](/langsmith/set-up-resource-tags)是用于组织工作空间资源（如项目、数据集和提示词）的键值对。虽然两者都可以使用类似的命名约定（如 `prod` 或 `staging`），但提交标签控制**哪个版本**的提示词运行，而资源标签帮助您**组织和筛选**工作空间中的资源。
+</Note>
+
+### 创建标签
+
+要创建标签，请在提示词详情页的左侧窗格中选择您想要标记的提交。点击右侧窗格右上角的**标签**。在下拉菜单中，点击**提交标签**并输入名称。
+
+### 移动标签
+
+要将标签指向不同的提交，请在提示词详情页的左侧窗格中选择目标提交。点击右侧窗格右上角的**标签**。在下拉菜单中，选择您想要移动的标签。这将自动更新标签以指向新的提交。
+
+### 删除标签
+
+要删除标签，请点击右侧窗格右上角的**标签**。（选择哪个提交无关紧要）。在下拉菜单中，点击您想要删除的标签旁边的删除图标。这将完全删除该标签，它将不再与任何提交关联。
+
+### 在代码中使用标签
+
+标签提供了一种稳定的方式来在代码中引用特定版本的提示词。您可以直接引用标签，而不是使用提交哈希，这样可以在不更改代码的情况下更新引用。
+
+以下是在 Python 中通过标签拉取提示词的示例：
+
+```python
+prompt = client.pull_prompt("joke-generator:production")
+# 如果 production 标签指向提交 a1b2c3d4，这等同于：
+prompt = client.pull_prompt("joke-generator:a1b2c3d4")
+```
+
+有关如何在代码中使用提示词的更多信息，请参阅[以编程方式管理提示词](/langsmith/manage-prompts-programmatically)。
+
+## 提示词所有者
+
+提示词所有者功能让您可以精细控制谁可以标记提交和删除特定提示词。这对于生产推进流程非常有用，您可以通过分配或移动标签来限制哪些团队成员可以将提交推进到环境。
+
+### 访问模式
+
+每个提示词有两种访问模式，可在[UI](https://smith.langchain.com)中的**访问与权限**下配置：
+
+- **工作空间授权用户**（默认）：任何拥有 [`prompts:tag`](/langsmith/organization-workspace-operations#prompts) 权限的工作空间用户都可以创建、更新和删除标签，以及删除提示词。
+- **仅所有者**：只有被添加为提示词所有者的用户才能创建或更新提交标签、将提交推进到环境以及删除提示词。
+
+LangSmith 会自动将提示词创建者添加为所有者。
+
+### 配置访问与权限
+
+1. 在 LangSmith UI 中打开提示词。
+2. 点击右上角的 <Icon icon="dots-vertical"/> **更多**图标，选择**访问与权限**。
+3. 选择**仅所有者**模式。
+4. 在所有者组中添加或移除用户。
+
+<Warning>
+如果您保存了将自己从所有者中移除的更改，您将失去管理所有者或将提示词切换回工作空间授权用户模式的能力。只有另一位所有者才能恢复您的访问权限。
+</Warning>
+
+当**仅所有者**模式处于活动状态时，只有所有者可以禁用它或添加/移除其他所有者。
+
+## 在提示词提交时触发 Webhook
+
+您可以配置一个 Webhook，以便在提示词提交时触发。
+
+一些常见的用例包括：
+
+* 在提示词更新时触发 CI/CD 流水线。
+* 将提示词与 GitHub 仓库同步。
+* 通知团队成员关于提示词的修改。
+
+### 配置 Webhook
+
+导航到左侧边栏中的**提示词**部分或从应用程序主页进入。在右上角，点击 `+ Webhook` 按钮。
+
+添加 Webhook URL 和任何必需的请求头。
+
+<Note>
+每个工作空间只能配置一个 Webhook。如果您想为每个工作空间配置多个 Webhook，或为每个提示词设置不同的 Webhook，请在 [LangChain 论坛](https://forum.langchain.com/)中告诉我们。
+</Note>
+
+要测试您的 Webhook，请点击**发送测试通知**按钮。这将向您提供的 Webhook URL 发送一个包含示例负载的测试通知。
+
+示例负载是一个包含以下字段的 JSON 对象：
+
+- `prompt_id`：已提交提示词的 ID。
+- `prompt_name`：已提交提示词的名称。
+- `commit_hash`：提示词的提交哈希。
+- `created_at`：提交日期。
+- `created_by`：提交作者。
+- `manifest`：提示词的清单。
+
+### 触发 Webhook
+
+提交到提示词以触发您配置的 Webhook。
+
+#### 使用 Playground
+
+如果您在 Playground 中执行此操作，系统将提示您取消选择您希望避免触发的 Webhook。
+
+![提交 Playground](/langsmith/images/commit-playground.png)
+
+#### 使用 API
+
+如果您通过 API 提交，可以通过将 `skip_webhooks` 参数设置为 `true` 或设置为要忽略的 Webhook ID 数组来指定跳过触发 Webhook。有关更多信息，请参阅 [API 文档](https://api.smith.langchain.com/redoc#tag/commits/operation/create_commit_api_v1_commits__owner___repo__post)。
+
+## 公共提示词中心
+
+LangSmith 的公共提示词中心是一个由 LangChain 社区创建的提示词集合，您可以参考使用。
+
+<Note>
+请注意，提示词由用户生成且未经验证。LangChain 不审查或认可公共提示词，使用风险自负。使用提示词中心需遵守我们的[服务条款](https://www.langchain.com/terms-of-service)。
+</Note>
+
+导航到左侧边栏的**提示词**部分，点击**浏览 LangChain Hub 中的所有公共提示词**。
+
+在这里，您将找到 LangChain Hub 中所有公开列出的提示词。您可以按名称、句柄、用例、描述或模型搜索提示词。您可以将提示词分叉到您的个人组织，查看提示词详情，并在 Playground 中运行提示词。您可以使用 SDK [将任何公共提示词拉取到您的代码中](/langsmith/manage-prompts-programmatically)。
+
+要查看与您工作空间关联的提示词，请导航到侧边栏中的**提示词**。
+
+![提示词标签页](/langsmith/images/prompts-tab.png)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\manage-prompts.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

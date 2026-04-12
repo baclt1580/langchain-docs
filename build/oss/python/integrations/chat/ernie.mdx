@@ -1,0 +1,72 @@
+---
+title: "ErnieBotChat 集成"
+description: "使用 LangChain Python 集成 ErnieBotChat 聊天模型。"
+---
+
+[ERNIE-Bot](https://cloud.baidu.com/doc/WENXINWORKSHOP/s/jlil56u11) 是百度开发的大型语言模型，覆盖了海量的中文数据。
+本文档将介绍如何开始使用 ErnieBot 聊天模型。
+
+**弃用警告**
+
+我们建议用户从 `langchain_community.chat_models.ErnieBotChat` 切换到 `langchain_community.chat_models.QianfanChatEndpoint`。
+
+`QianfanChatEndpoint` 的文档位于 [ERNIE 文档](/oss/python/integrations/chat/baidu_qianfan_endpoint/)。
+
+我们推荐用户使用 `QianfanChatEndpoint` 的原因有 4 点：
+
+1. `QianfanChatEndpoint` 支持千帆平台中更多的 LLM 模型。
+2. `QianfanChatEndpoint` 支持流式输出模式。
+3. `QianfanChatEndpoint` 支持函数调用功能。
+4. `ErnieBotChat` 已停止维护并已被弃用。
+
+迁移时的一些提示：
+
+- 将 `ernie_client_id` 改为 `qianfan_ak`，同时将 `ernie_client_secret` 改为 `qianfan_sk`。
+- 安装 `qianfan` 包，例如 `pip install qianfan`。
+- 将 `ErnieBotChat` 改为 `QianfanChatEndpoint`。
+
+```python
+from langchain_community.chat_models.baidu_qianfan_endpoint import QianfanChatEndpoint
+
+chat = QianfanChatEndpoint(
+    qianfan_ak="your qianfan ak",
+    qianfan_sk="your qianfan sk",
+)
+```
+
+## 使用方法
+
+```python
+from langchain_community.chat_models import ErnieBotChat
+from langchain.messages import HumanMessage
+
+chat = ErnieBotChat(
+    ernie_client_id="YOUR_CLIENT_ID", ernie_client_secret="YOUR_CLIENT_SECRET"
+)
+```
+
+或者您可以在环境变量中设置 `client_id` 和 `client_secret`
+
+```bash
+export ERNIE_CLIENT_ID=YOUR_CLIENT_ID
+export ERNIE_CLIENT_SECRET=YOUR_CLIENT_SECRET
+```
+
+```python
+chat([HumanMessage(content="hello there, who are you?")])
+```
+
+```text
+AIMessage(content='Hello, I am an artificial intelligence language model. My purpose is to help users answer questions or provide information. What can I do for you?', additional_kwargs={}, example=False)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\ernie.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

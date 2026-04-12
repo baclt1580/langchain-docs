@@ -1,0 +1,47 @@
+---
+title: "Minimax 集成"
+description: "使用 LangChain Python 与 Minimax 集成。"
+---
+
+>[Minimax](https://api.minimax.chat) 是一家中国初创企业，提供自然语言处理模型
+> 面向公司和个人。
+
+## 安装和设置
+获取 [Minimax API 密钥](https://api.minimax.chat/user-center/basic-information/interface-key) 并将其设置为环境变量（`MINIMAX_API_KEY`）
+获取 [Minimax 群组 ID](https://api.minimax.chat/user-center/basic-information) 并将其设置为环境变量（`MINIMAX_GROUP_ID`）
+
+
+## 大语言模型
+
+存在一个 Minimax 大语言模型封装，您可以通过以下方式访问
+查看 [使用示例](/oss/python/integrations/llms/minimax)。
+
+```python
+from langchain_community.llms import Minimax
+```
+
+## 聊天模型
+
+查看 [使用示例](/oss/python/integrations/chat/minimax)
+
+```python
+from langchain_community.chat_models import MiniMaxChat
+```
+
+## 文本嵌入模型
+
+存在一个 Minimax 嵌入模型，您可以通过以下方式访问
+```python
+from langchain_community.embeddings import MiniMaxEmbeddings
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\minimax.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

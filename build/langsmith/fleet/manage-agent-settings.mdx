@@ -1,0 +1,119 @@
+---
+title: 管理智能体设置
+sidebarTitle: 设置
+description: 在 Fleet 中管理您的智能体。
+---
+
+本页说明如何在 LangSmith Fleet 中管理智能体的设置。
+
+## 更改模型
+
+要更改智能体的模型：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体收件箱。
+1. 在智能体名称旁边，点击 <Icon icon="pencil" /> **编辑智能体** 图标。
+1. 在右上角，点击 <Icon icon="settings" /> **设置** 图标。
+1. 选择您想要使用的 **模型**。
+1. 输入该模型的 API 密钥。
+
+有关如何添加自定义模型的信息，请参阅 [自定义模型](/langsmith/fleet/essentials#custom-models)。
+
+## 重新连接工具集成
+
+要将工具集成重新连接到智能体：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体收件箱。
+1. 在智能体名称旁边，点击 <Icon icon="pencil" /> **编辑智能体** 图标。
+1. 在右上角，点击 <Icon icon="settings" /> **设置** 图标。
+1. 在 **已连接的集成** 部分，点击您想要重新连接的工具旁边的 **连接** 按钮。
+
+## 下载智能体文件
+
+要下载智能体的文件，请点击智能体右上角的 <Icon icon="settings" /> **设置** 图标，然后选择 **下载 ZIP**。这将把智能体配置导出为 ZIP 文件。
+
+## 更改智能体的访问权限
+
+智能体可以仅对创建者私有，也可以在 LangSmith 工作区内共享。
+
+| 功能 | 私有智能体 | [工作区智能体](#工作区范围智能体详情) |
+| --- | --- | --- |
+| **所有权和访问权限** | 仅对创建者可见 | 同一 LangSmith 工作区内的任何人都可见 |
+| **OAuth 身份验证** | OAuth 凭据范围限定于创建者 | OAuth 凭据范围限定于每个用户；克隆工作区智能体的新用户必须使用所选工具重新进行身份验证 |
+| **密钥** | 使用工作区范围的 LangSmith 密钥 | 使用工作区范围的 LangSmith 密钥（与私有智能体相同） |
+
+要更改智能体的可见性，请点击智能体右上角的 <Icon icon="lock" /> **可见性设置** 图标，然后选择 **仅我** 或 **工作区**。
+
+### 工作区范围智能体详情
+
+虽然工作区范围的智能体是共享的，但某些详情是公开的，而其他则是私有的：
+
+- **对话线程始终是用户范围的**，因此，即使智能体是工作区范围的，在该智能体内创建的聊天历史记录也始终是私有的，并且只能由创建它们的特定用户访问。
+- **系统提示、所选工具和子智能体在工作区范围的智能体上是公开的。** 用户将无法修改原始工作区范围智能体上的这些字段，但克隆智能体后可以进行更改。
+- **工作区范围智能体上的通道类型是公开的**（例如，Slack 消息接收），但与通道的特定连接（例如，Slack 频道或 Gmail 地址）则不共享。这样，用户在克隆智能体时知道要使用什么通道，但无法获得对原始用户已建立的任何连接的未授权访问。
+
+## 更新记忆
+
+您的智能体可以记住先前对话中的信息，并利用这些信息在未来的对话中做出更好的决策。智能体通过使用 `write_file` 和 `edit_file` 工具调用将文件写入 **记忆文件夹** 来持久化记忆。
+
+默认情况下，您的智能体在保存到记忆文件夹之前需要获得批准。启用此设置后，智能体会暂停并等待您在 Fleet UI 中接受、编辑或拒绝每次记忆更新，然后再继续。
+
+<Tip>
+如果您的智能体在[计划任务](/langsmith/fleet/channels#add-a-schedule)或其他自动化计划上运行，请禁用记忆批准要求。否则，智能体将在每次涉及记忆更新的计划运行时暂停，并无限期地等待手动批准。
+</Tip>
+
+要禁用记忆批准要求：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体收件箱。
+1. 在智能体名称旁边，点击 <Icon icon="pencil" /> **编辑智能体** 图标。
+1. 在右上角，点击 <Icon icon="settings" /> **设置** 图标。
+1. 在 **记忆** 部分，将 **更新记忆需要批准** 切换为关闭。
+
+## 以编程方式使用智能体
+
+您可以使用 [LangGraph SDK](/langsmith/reference) 通过代码连接到您的智能体。要查看以编程方式调用智能体所需的代码片段：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体收件箱。
+1. 在智能体名称旁边，点击 <Icon icon="pencil" /> **编辑智能体** 图标。
+1. 在右上角，点击 <Icon icon="settings" /> **设置** 图标。
+1. 点击 **查看代码片段** 按钮。
+1. 复制为您的智能体预填充的代码片段。
+
+更多信息，请参阅 [从代码调用智能体](/langsmith/fleet/code)。
+
+## 暂停智能体
+
+要暂停智能体，请暂停其通道：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体收件箱。
+1. 在智能体名称旁边，点击 <Icon icon="pencil" /> **编辑智能体** 图标。
+1. 在图形视图中，点击 **通道** 框中的 **暂停** 按钮。
+1. 点击 **保存更改**。
+
+<Tip>
+要恢复，请点击 **通道** 框中的 **恢复通道** 按钮。
+</Tip>
+
+## 删除智能体
+
+要永久删除智能体：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您的智能体收件箱。
+1. 在智能体名称旁边，点击 <Icon icon="pencil" /> **编辑智能体** 图标。
+1. 在右上角，点击 <Icon icon="settings" /> **设置** 图标。
+1. 点击 **删除智能体** 按钮。
+1. 要确认删除，请点击 **删除** 按钮。
+
+<Warning>
+此操作无法撤销。它将永久删除智能体、所有链接到该智能体的对话线程，并取消链接任何已连接的通道。
+</Warning>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\manage-agent-settings.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

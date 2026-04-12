@@ -1,0 +1,670 @@
+---
+title: 自定义 Deep Agents
+sidebarTitle: 自定义
+description: 了解如何使用系统提示、工具、子代理等自定义 Deep Agents
+---
+
+import ChatModelTabsDaPy from '/snippets/chat-model-tabs-da.mdx';
+import ChatModelTabsDaJs from '/snippets/chat-model-tabs-da-js.mdx';
+import HitlBasicConfigPy from '/snippets/hitl-basic-config-py.mdx';
+import HitlBasicConfigJs from '/snippets/hitl-basic-config-js.mdx';
+import SkillsUsageTabsPy from '/snippets/skills-usage-tabs-py.mdx';
+import SkillsUsageTabsJs from '/snippets/skills-usage-tabs-js.mdx';
+import BackendStatePy from '/snippets/backend-state-py.mdx';
+import BackendStateJs from '/snippets/backend-state-js.mdx';
+import BackendFilesystemPy from '/snippets/backend-filesystem-py.mdx';
+import BackendFilesystemJs from '/snippets/backend-filesystem-js.mdx';
+import BackendLocalShellPy from '/snippets/backend-local-shell-py.mdx';
+import BackendLocalShellJs from '/snippets/backend-local-shell-js.mdx';
+import BackendStorePy from '/snippets/backend-store-py.mdx';
+import BackendStoreJs from '/snippets/backend-store-js.mdx';
+import BackendCompositePy from '/snippets/backend-composite-py.mdx';
+import BackendCompositeJs from '/snippets/backend-composite-js.mdx';
+import SubagentBasicPy from '/snippets/subagent-basic-py.mdx';
+import SubagentBasicJs from '/snippets/subagent-basic-js.mdx';
+import SandboxBasicPy from '/snippets/deepagents-sandbox-basic-py.mdx';
+import SandboxBasicJs from '/snippets/deepagents-sandbox-basic-js.mdx';
+
+
+
+`createDeepAgent` 具有以下配置选项：
+
+
+- [模型](#model)
+- [工具](#tools)
+- [系统提示](#system-prompt)
+- [中间件](#middleware)
+- [子代理](#subagents)
+- [后端（虚拟文件系统）](#backends)
+- [人机回环](#human-in-the-loop)
+- [技能](#skills)
+- [记忆](#memory)
+
+
+
+```typescript
+const agent = createDeepAgent({
+  name?: string,
+  model?: BaseLanguageModel | string,
+  tools?: TTools | StructuredTool[],
+  systemPrompt?: string | SystemMessage,
+});
+```
+
+有关更多信息，请参阅 [Customizing Deep Agents](https://reference.langchain.com/javascript/modules/deepagents.html#customizing-deep-agents)。
+
+
+### 连接弹性
+
+LangChain 聊天模型会自动重试失败的 API 请求，并采用指数退避策略。默认情况下，模型会针对网络错误、速率限制（429）和服务器错误（5xx）**最多重试 6 次**。像 401（未授权）或 404 这样的客户端错误不会重试。
+
+
+您可以在创建模型时调整 `maxRetries` 参数，以便根据您的环境调整此行为：
+
+
+
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+import { createDeepAgent } from "deepagents";
+
+const agent = createDeepAgent({
+    model: new ChatAnthropic({
+        model: "claude-sonnet-4-6",
+        maxRetries: 10, // 增加以应对不可靠的网络（默认值：6）
+        timeout: 120_000, // 增加超时时间以应对慢速连接
+    }),
+});
+```
+
+
+
+<Tip>对于在不可靠网络上运行的长时间运行代理任务，建议将 `max_retries` 增加到 10–15，并将其与 [检查点器](/oss/javascript/langgraph/persistence) 配对，以便在故障之间保留进度。</Tip>
+
+## 模型
+
+默认情况下，`deepagents` 使用 [`claude-sonnet-4-6`](https://platform.claude.com/docs/en/about-claude/models/overview)。您可以通过传递任何支持的 <Tooltip tip="遵循 `provider:model` 格式的字符串（例如 openai:gpt-5）" cta="查看映射" href="https://reference.langchain.com/python/langchain/models/#langchain.chat_models.init_chat_model(model)">模型标识符字符串</Tooltip> 或 [LangChain 模型对象](/oss/javascript/integrations/chat) 来自定义模型。
+
+<Tip>
+    使用 `provider:model` 格式（例如 `openai:gpt-5`）可以快速切换模型。
+</Tip>
+
+
+
+<ChatModelTabsDaJs />
+
+
+## 工具
+
+除了用于规划、文件管理和子代理生成的 [内置工具](/oss/javascript/deepagents/overview#core-capabilities) 之外，您还可以提供自定义工具：
+
+
+
+```typescript
+import { tool } from "langchain";
+import { TavilySearch } from "@langchain/tavily";
+import { createDeepAgent } from "deepagents";
+import { z } from "zod";
+
+const internetSearch = tool(
+  async ({
+    query,
+    maxResults = 5,
+    topic = "general",
+    includeRawContent = false,
+  }: {
+    query: string;
+    maxResults?: number;
+    topic?: "general" | "news" | "finance";
+    includeRawContent?: boolean;
+  }) => {
+    const tavilySearch = new TavilySearch({
+      maxResults,
+      tavilyApiKey: process.env.TAVILY_API_KEY,
+      includeRawContent,
+      topic,
+    });
+    return await tavilySearch._call({ query });
+  },
+  {
+    name: "internet_search",
+    description: "运行网络搜索",
+    schema: z.object({
+      query: z.string().describe("搜索查询"),
+      maxResults: z.number().optional().default(5),
+      topic: z
+        .enum(["general", "news", "finance"])
+        .optional()
+        .default("general"),
+      includeRawContent: z.boolean().optional().default(false),
+    }),
+  },
+);
+
+const agent = createDeepAgent({
+  tools: [internetSearch],
+});
+```
+
+
+## 系统提示
+
+Deep Agents 自带内置系统提示。默认系统提示包含使用内置规划工具、文件系统工具和子代理的详细指令。
+当中间件添加特殊工具（如文件系统工具）时，它们会被附加到系统提示中。
+
+每个深度代理还应包含针对其特定用例的自定义系统提示：
+
+
+
+```typescript
+import { createDeepAgent } from "deepagents";
+
+const researchInstructions =
+  "你是一名专家研究员。" +
+  "你的工作是进行彻底的研究，然后" +
+  "撰写一份精美的报告。";
+
+const agent = createDeepAgent({
+  systemPrompt: researchInstructions,
+});
+```
+
+
+## 中间件
+
+默认情况下，Deep Agents 可以访问以下 [中间件](/oss/javascript/langchain/middleware/overview)：
+
+- [`TodoListMiddleware`](https://reference.langchain.com/javascript/langchain/index/todoListMiddleware)：跟踪和管理待办事项列表，以组织代理任务和作业
+- [`FilesystemMiddleware`](https://reference.langchain.com/javascript/deepagents/middleware/createFilesystemMiddleware)：处理文件系统操作，如读取、写入和导航目录
+- [`SubAgentMiddleware`](https://reference.langchain.com/javascript/deepagents/middleware/createSubAgentMiddleware)：生成和协调子代理，以便将任务委托给专用代理
+- [`SummarizationMiddleware`](https://reference.langchain.com/javascript/langchain/index/summarizationMiddleware)：压缩消息历史记录，以便在对话变长时保持在上下文限制内
+- [`AnthropicPromptCachingMiddleware`](https://reference.langchain.com/javascript/langchain/index/anthropicPromptCachingMiddleware)：在使用 Anthropic 模型时自动减少冗余令牌处理
+- [`PatchToolCallsMiddleware`](https://reference.langchain.com/javascript/deepagents/middleware/createPatchToolCallsMiddleware)：当工具调用在收到结果之前被中断或取消时，自动修复消息历史记录
+
+如果您正在使用记忆、技能或人机回环，还包括以下中间件：
+
+- [`MemoryMiddleware`](https://reference.langchain.com/javascript/deepagents/middleware/createMemoryMiddleware)：当提供 `memory` 参数时，跨会话持久化和检索对话上下文
+- [`SkillsMiddleware`](https://reference.langchain.com/javascript/deepagents/middleware/createSkillsMiddleware)：当提供 `skills` 参数时启用自定义技能
+- `HumanInTheLoopMiddleware`：当提供 `interruptOn` 参数时，在指定点暂停以获取人类批准或输入
+
+### 预构建中间件
+
+LangChain 暴露了其他预构建中间件，让您能够添加各种功能，如重试、降级或 PII 检测。有关更多信息，请参阅 [预构建中间件](/oss/javascript/langchain/middleware/built-in)。
+
+
+
+`deepagents` 包也暴露了 [createSummarizationMiddleware](https://reference.langchain.com/javascript/deepagents/middleware/createSummarizationMiddleware) 用于相同的工作流程。有关更多详细信息，请参阅 [Harness 中的摘要](/oss/javascript/deepagents/harness#summarization)。
+
+
+
+### 自定义中间件
+
+您可以提供额外的中间件来扩展功能、添加工具或实现自定义钩子：
+
+
+
+```typescript
+import { tool, createMiddleware } from "langchain";
+import { createDeepAgent } from "deepagents";
+import * as z from "zod";
+
+const getWeather = tool(
+  ({ city }: { city: string }) => {
+    return `The weather in ${city} is sunny.`;
+  },
+  {
+    name: "get_weather",
+    description: "Get the weather in a city.",
+    schema: z.object({
+      city: z.string(),
+    }),
+  }
+);
+
+let callCount = 0;
+
+const logToolCallsMiddleware = createMiddleware({
+  name: "LogToolCallsMiddleware",
+  wrapToolCall: async (request, handler) => {
+    // 拦截并记录每次工具调用 - 演示横切关注点
+    callCount += 1;
+    const toolName = request.toolCall.name;
+
+    console.log(`[中间件] 工具调用 #${callCount}: ${toolName}`);
+    console.log(
+      `[中间件] 参数：${JSON.stringify(request.toolCall.args)}`
+    );
+
+    // 执行工具调用
+    const result = await handler(request);
+
+    // 记录结果
+    console.log(`[中间件] 工具调用 #${callCount} 完成`);
+
+    return result;
+  },
+});
+
+const agent = await createDeepAgent({
+  model: "claude-sonnet-4-20250514",
+  tools: [getWeather] as any,
+  middleware: [logToolCallsMiddleware] as any,
+});
+```
+
+
+<Warning>
+**初始化后不要修改属性**
+
+如果您需要在钩子调用之间跟踪值（例如计数器或累积数据），请使用图状态。
+图状态按设计是针对线程范围的，因此更新在并发下是安全的。
+
+**这样做：**
+
+
+
+```typescript
+const customMiddleware = createMiddleware({
+  name: "CustomMiddleware",
+  beforeAgent: async (state) => {
+    return { x: (state.x ?? 0) + 1 }; // 更新图状态而不是直接修改
+  },
+});
+```
+
+
+**不要这样做：**
+
+
+
+```typescript
+let x = 1;
+
+const customMiddleware = createMiddleware({
+  name: "CustomMiddleware",
+  beforeAgent: async () => {
+    x += 1; // 修改会导致竞态条件
+  },
+});
+```
+
+
+
+就地修改，例如在 `beforeAgent` 中修改 `state.x`、在 `beforeAgent` 中修改共享变量或在钩子中更改其他共享值，可能会导致细微的错误和竞态条件，因为许多操作是并发运行的（子代理、并行工具和不同线程上的并行调用）。
+
+
+有关使用自定义属性扩展状态的完整详细信息，请参阅 [自定义中间件 - 自定义状态模式](/oss/javascript/langchain/middleware/custom#custom-state-schema)。
+如果您必须在自定义中间件中使用修改，请考虑当子代理、并行工具或并发代理调用同时运行时会发生什么。
+</Warning>
+
+## 子代理
+
+为了隔离详细工作并避免上下文膨胀，请使用子代理：
+
+
+
+<SubagentBasicJs />
+
+
+有关更多信息，请参阅 [子代理](/oss/javascript/deepagents/subagents)。
+
+{/* TODO(https://github.com/langchain-ai/docs/pull/2368/) ## 结构化响应格式 */}
+
+{/* ## 上下文 - 您可以在运行之间持久化代理状态以存储用户 ID 等信息。*/}
+
+## 后端
+
+深度代理工具可以使用虚拟文件系统来存储、访问和编辑文件。默认情况下，Deep Agents 使用 [`StateBackend`](https://reference.langchain.com/javascript/deepagents/backends/StateBackend)。
+
+如果您正在使用 [技能](#skills) 或 [记忆](#memory)，您必须在创建代理之前将预期的技能或记忆文件添加到后端。
+
+<Tabs>
+    <Tab title="StateBackend">
+        存储在 `langgraph` 状态中的临时文件系统后端。
+
+        此文件系统仅 _在一个线程内_ 持久存在。
+
+
+
+        <BackendStateJs />
+
+    </Tab>
+    <Tab title="FilesystemBackend">
+        本地机器的文件系统。
+
+        <Warning>
+            此后端授予代理直接的文件系统读写访问权限。
+            请谨慎使用，仅在合适的环境中使用。
+            有关更多信息，请参阅 [`FilesystemBackend`](/oss/javascript/deepagents/backends#filesystembackend-local-disk)。
+        </Warning>
+
+
+
+        <BackendFilesystemJs />
+
+    </Tab>
+    <Tab title="LocalShellBackend">
+        直接在主机上执行 Shell 的文件系统。提供文件系统工具以及用于运行命令的 `execute` 工具。
+
+        <Warning>
+            此后端授予代理直接的文件系统读写访问权限 **以及** 在您主机上的无限制 Shell 执行权限。
+            请极其谨慎使用，仅在合适的环境中使用。
+            有关更多信息，请参阅 [`LocalShellBackend`](/oss/javascript/deepagents/backends#localshellbackend-local-shell)。
+        </Warning>
+
+
+
+        <BackendLocalShellJs />
+
+    </Tab>
+    <Tab title="StoreBackend">
+        提供 _跨线程持久化_ 长期存储的文件系统。
+
+
+
+        <BackendStoreJs />
+
+
+        <Tip>
+            `namespace` 参数控制数据隔离。对于多用户部署，始终设置 [命名空间工厂](/oss/javascript/deepagents/backends#namespace-factories) 以按用户或租户隔离数据。
+        </Tip>
+    </Tab>
+    <Tab title="CompositeBackend">
+        一个灵活的后端，您可以在其中指定文件系统中的不同路由指向不同的后端。
+
+
+
+        <BackendCompositeJs />
+
+    </Tab>
+</Tabs>
+
+有关更多信息，请参阅 [后端](/oss/javascript/deepagents/backends)。
+
+### 沙箱
+
+沙箱是专门的 [后端](/oss/javascript/deepagents/backends)，它们在具有自己的文件系统和用于 Shell 命令的 `execute` 工具的隔离环境中运行代理代码。
+当您希望深度代理写入文件、安装依赖项和运行命令而不更改本地机器上的任何内容时，请使用沙箱后端。
+
+您可以通过在创建深度代理时将沙箱后端传递给 `backend` 来配置沙箱：
+
+
+
+<SandboxBasicJs />
+
+
+有关更多信息，请参阅 [沙箱](/oss/javascript/deepagents/sandboxes)。
+
+## 人机回环
+
+某些工具操作可能很敏感，需要执行前获得人类批准。
+您可以为每个工具配置批准：
+
+
+
+<HitlBasicConfigJs />
+
+
+您还可以为代理和子代理配置工具调用期间以及工具调用内部的中断。
+有关更多信息，请参阅 [人机回环](/oss/javascript/deepagents/human-in-the-loop)。
+
+## 技能
+
+您可以使用 [技能](/oss/javascript/deepagents/overview) 为您的深度代理提供新的能力和专业知识。
+虽然 [工具](/oss/javascript/deepagents/customization#tools) 通常涵盖低级功能，如原生文件系统操作或规划，但技能可以包含完成任务的详细指令、参考信息和其他资源，例如模板。
+这些文件仅在代理确定该技能对当前提示有用时才由代理加载。
+这种渐进式披露减少了代理在启动时必须考虑的令牌和上下文数量。
+
+有关示例技能，请参阅 [深度代理示例技能](https://github.com/langchain-ai/deepagentsjs/tree/main/examples/skills)。
+
+要将技能添加到您的深度代理，请将它们作为参数传递给 `create_deep_agent`：
+
+
+
+<SkillsUsageTabsJs />
+
+
+## 记忆
+
+使用 [`AGENTS.md` 文件](https://agents.md/) 为您的深度代理提供额外上下文。
+
+您可以在创建深度代理时将一个或多个文件路径传递给 `memory` 参数：
+
+
+
+<Tabs>
+  <Tab title="StateBackend">
+    ```typescript
+    import { createDeepAgent, type FileData } from "deepagents";
+    import { MemorySaver } from "@langchain/langgraph";
+
+    const AGENTS_MD_URL =
+      "https://raw.githubusercontent.com/langchain-ai/deepagents/refs/heads/main/examples/text-to-sql-agent/AGENTS.md";
+
+    async function fetchText(url: string): Promise<string> {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
+      }
+      return await res.text();
+    }
+
+    const agentsMd = await fetchText(AGENTS_MD_URL);
+    const checkpointer = new MemorySaver();
+
+    function createFileData(content: string): FileData {
+      const now = new Date().toISOString();
+      return {
+        content: content.split("\n"),
+        created_at: now,
+        modified_at: now,
+      };
+    }
+
+    const agent = await createDeepAgent({
+      memory: ["/AGENTS.md"],
+      checkpointer: checkpointer,
+    });
+
+    const result = await agent.invoke(
+      {
+        messages: [
+          {
+            role: "user",
+            content: "Please tell me what's in your memory files.",
+          },
+        ],
+        // 引导默认 StateBackend 的状态内文件系统（虚拟路径必须以 "/" 开头）。
+        files: { "/AGENTS.md": createFileData(agentsMd) },
+      },
+      { configurable: { thread_id: "12345" } }
+    );
+    ```
+  </Tab>
+  <Tab title="StoreBackend">
+```typescript
+    import { createDeepAgent, StoreBackend, type FileData } from "deepagents";
+    import {
+      InMemoryStore,
+      MemorySaver,
+      type BaseStore,
+    } from "@langchain/langgraph";
+
+    const AGENTS_MD_URL =
+      "https://raw.githubusercontent.com/langchain-ai/deepagents/refs/heads/main/examples/text-to-sql-agent/AGENTS.md";
+
+    async function fetchText(url: string): Promise<string> {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
+      }
+      return await res.text();
+    }
+
+    const agentsMd = await fetchText(AGENTS_MD_URL);
+
+    function createFileData(content: string): FileData {
+      const now = new Date().toISOString();
+      return {
+        content: content.split("\n"),
+        created_at: now,
+        modified_at: now,
+      };
+    }
+
+    const store = new InMemoryStore();
+    const fileData = createFileData(agentsMd);
+    await store.put(["filesystem"], "/AGENTS.md", fileData);
+
+    const checkpointer = new MemorySaver();
+
+    const backendFactory = (config: { state: unknown; store?: BaseStore }) => {
+      return new StoreBackend({
+        state: config.state,
+        store: config.store ?? store,
+      });
+    };
+
+    const agent = await createDeepAgent({
+      backend: backendFactory,
+      store: store,
+      checkpointer: checkpointer,
+      memory: ["/AGENTS.md"],
+    });
+
+    const result = await agent.invoke(
+      {
+        messages: [
+          {
+            role: "user",
+            content: "Please tell me what's in your memory files.",
+          },
+        ],
+      },
+      { configurable: { thread_id: "12345" } }
+    );
+    ```
+  </Tab>
+  <Tab title="Filesystem">
+    ```typescript
+    import { createDeepAgent, FilesystemBackend } from "deepagents";
+    import { MemorySaver } from "@langchain/langgraph";
+
+    // 检查点器对于人机回环是必需的
+    const checkpointer = new MemorySaver();
+
+    const agent = await createDeepAgent({
+      backend: (config) =>
+        new FilesystemBackend({ rootDir: "/Users/user/{project}" }),
+      memory: ["./AGENTS.md", "./.deepagents/AGENTS.md"],
+      interruptOn: {
+        read_file: true,
+        write_file: true,
+        delete_file: true,
+      },
+      checkpointer, // Required!
+    });
+    ```
+  </Tab>
+</Tabs>
+
+
+
+## 结构化输出
+
+Deep Agents 支持 [结构化输出](/oss/javascript/langchain/structured-output)。
+
+您可以通过将所需的结构化输出模式作为 `responseFormat` 参数传递给 `createDeepAgent()` 调用来设置它。
+当模型生成结构化数据时，它会被捕获、验证，并返回在代理状态的 'structuredResponse' 键中。
+
+```typescript
+import { tool } from "langchain";
+import { TavilySearch } from "@langchain/tavily";
+import { createDeepAgent } from "deepagents";
+import { z } from "zod";
+
+const internetSearch = tool(
+  async ({
+    query,
+    maxResults = 5,
+    topic = "general",
+    includeRawContent = false,
+  }: {
+    query: string;
+    maxResults?: number;
+    topic?: "general" | "news" | "finance";
+    includeRawContent?: boolean;
+  }) => {
+    const tavilySearch = new TavilySearch({
+      maxResults,
+      tavilyApiKey: process.env.TAVILY_API_KEY,
+      includeRawContent,
+      topic,
+    });
+    return await tavilySearch._call({ query });
+  },
+  {
+    name: "internet_search",
+    description: "Run a web search",
+    schema: z.object({
+      query: z.string().describe("The search query"),
+      maxResults: z.number().optional().default(5),
+      topic: z
+        .enum(["general", "news", "finance"])
+        .optional()
+        .default("general"),
+      includeRawContent: z.boolean().optional().default(false),
+    }),
+  }
+);
+
+const weatherReportSchema = z.object({
+  location: z.string().describe("The location for this weather report"),
+  temperature: z.number().describe("Current temperature in Celsius"),
+  condition: z
+    .string()
+    .describe("Current weather condition (e.g., sunny, cloudy, rainy)"),
+  humidity: z.number().describe("Humidity percentage"),
+  windSpeed: z.number().describe("Wind speed in km/h"),
+  forecast: z.string().describe("Brief forecast for the next 24 hours"),
+});
+
+const agent = await createDeepAgent({
+  responseFormat: weatherReportSchema,
+  tools: [internetSearch],
+});
+
+const result = await agent.invoke({
+  messages: [
+    {
+      role: "user",
+      content: "What's the weather like in San Francisco?",
+    },
+  ],
+});
+
+console.log(result.structuredResponse);
+// {
+//   location: 'San Francisco, California',
+//   temperature: 18.3,
+//   condition: 'Sunny',
+//   humidity: 48,
+//   windSpeed: 7.6,
+//   forecast: 'Clear skies with temperatures remaining mild. High of 18°C (64°F) during the day, dropping to around 11°C (52°F) at night.'
+// }
+```
+
+
+
+有关更多信息和示例，请参阅 [响应格式](/oss/javascript/langchain/structured-output#response-format)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\customization.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

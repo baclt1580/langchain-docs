@@ -1,0 +1,70 @@
+---
+title: "维基百科集成"
+description: "使用 LangChain Python 与维基百科文档加载器集成。"
+---
+
+>[维基百科](https://wikipedia.org/) 是一个多语言的免费在线百科全书，由一群被称为维基人的志愿者通过开放协作和维护，使用基于维基的编辑系统 MediaWiki。`维基百科` 是历史上规模最大、阅读量最高的参考工具。
+
+本笔记本展示了如何将来自 `wikipedia.org` 的维基页面加载为我们下游使用的文档格式。
+
+## 安装
+
+首先，你需要安装 `langchain_community` 和 `wikipedia` 包。
+
+```python
+pip install -qU langchain_community wikipedia
+```
+
+## 参数
+
+`WikipediaLoader` 具有以下参数：
+
+- `query`：用于在维基百科中查找文档的自由文本
+- `lang`（可选）：默认="en"。用于在维基百科的特定语言部分进行搜索
+- `load_max_docs`（可选）：默认=100。用于限制下载的文档数量。下载全部 100 个文档需要时间，因此实验时请使用较小的数字。目前有 300 个文档的硬性限制。
+- `load_all_available_meta`（可选）：默认=False。默认情况下，仅下载最重要的字段：`title` 和 `summary`。如果为 `True`，则将下载所有可用字段。
+- `doc_content_chars_max`（可选）：默认=4000。文档内容的最大字符数。
+
+## 示例
+
+```python
+from langchain_community.document_loaders import WikipediaLoader
+```
+
+```python
+docs = WikipediaLoader(query="HUNTER X HUNTER", load_max_docs=2).load()
+len(docs)
+```
+
+```text
+2
+```
+
+```python
+docs[0].metadata  # 第一个文档的元数据
+```
+
+```text
+{'title': 'Hunter × Hunter',
+ 'summary': 'Hunter × Hunter (发音为 "hunter hunter") 是由富坚义博创作和绘制的日本漫画系列。自 1998 年 3 月起在集英社的少年漫画杂志《周刊少年Jump》连载，尽管自 2006 年以来漫画经常长时间休刊。截至 2022 年 11 月，其章节已收录于 37 卷单行本中。故事聚焦于一个名叫小杰·富力士的男孩，他发现自幼离开自己的父亲实际上是一位世界知名的猎人——一种专门从事奇幻活动的持照专业人士，例如寻找稀有或未知的动物物种、寻宝、勘察未开发的飞地，或追捕不法分子。小杰踏上了成为猎人并最终找到父亲的旅程。一路上，他遇到了各种其他猎人并接触到了超自然现象。\n《猎人》被日本动画改编为 62 集的电视动画系列，由古桥一浩执导，于 1999 年 10 月至 2001 年 3 月在富士电视台播出。随后，日本动画制作了三部总计 30 集的原创视频动画（OVA），于 2002 年至 2004 年在日本发行。由 Madhouse 制作的第二部电视动画系列于 2011 年 10 月至 2014 年 9 月在日本电视台播出，总计 148 集，并于 2013 年发布了两部动画剧场版。还有众多基于《猎人》的音频专辑、视频游戏、音乐剧和其他媒体。\n该漫画自 2005 年 4 月起由 Viz Media 在北美授权英文发行。两部电视动画系列也由 Viz Media 授权，第一部系列于 2009 年在 Funimation Channel 播出，第二部系列于 2016 年 4 月至 2019 年 6 月在 Adult Swim 的 Toonami 节目区块播出。\n《猎人》在评论和商业上取得了巨大成功，并成为有史以来最畅销的漫画系列之一，截至 2022 年 7 月，发行量已超过 8400 万册。',
+ 'source': 'https://en.wikipedia.org/wiki/Hunter_%C3%97_Hunter'}
+```
+
+```python
+docs[0].page_content[:400]  # 页面内容的一部分
+```
+
+```text
+'Hunter × Hunter (发音为 "hunter hunter") 是由富坚义博创作和绘制的日本漫画系列。自 1998 年 3 月起在集英社的少年漫画杂志《周刊少年Jump》连载，尽管自 2006 年以来漫画经常长时间休刊。截至 2022 年 11 月，其章节已收录于 37 卷单行本中。故事聚焦于一个名叫小杰·富力士的男孩，他发现自幼离开自己的父亲实际上是一位世界知名的猎人——一种专门从事奇幻活动的持照专业人士，例如寻找稀有或未知的动物物种、寻宝、勘察未开发的飞地，或追捕不法分子。小杰踏上了成为猎人并最终找到父亲的旅程。一路上，他遇到了各种其他猎人并接触到了超自然现象。'
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\wikipedia.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

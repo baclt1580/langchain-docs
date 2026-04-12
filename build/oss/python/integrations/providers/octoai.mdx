@@ -1,0 +1,49 @@
+---
+title: "OctoAI 集成"
+description: "使用 LangChain Python 与 OctoAI 集成。"
+---
+
+>[OctoAI](https://docs.octoai.cloud/docs) 提供高效计算的便捷访问
+> 并允许用户将选择的 AI 模型集成到应用程序中。
+> The `OctoAI` compute service helps you run, tune, and scale AI applications easily.
+
+
+## 安装和设置
+
+- 安装 `openai` Python 包：
+  ```bash
+  pip install openai
+  ```
+- 在 `OctoAI` 注册并从 [您的 OctoAI 账户页面](https://octoai.cloud/settings) 获取 API Token。
+
+
+## 聊天模型
+
+查看 [使用示例](/oss/python/integrations/chat/octoai)。
+
+```python
+from langchain_community.chat_models import ChatOctoAI
+```
+## 大语言模型
+
+查看 [使用示例](/oss/python/integrations/llms/octoai)。
+
+```python
+from langchain_community.llms.octoai_endpoint import OctoAIEndpoint
+```
+## 嵌入模型
+
+```python
+from langchain_community.embeddings.octoai_embeddings import OctoAIEmbeddings
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\octoai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

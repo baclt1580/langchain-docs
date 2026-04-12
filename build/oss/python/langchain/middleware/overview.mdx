@@ -1,0 +1,78 @@
+---
+title: 概述
+description: 在每一步控制和自定义智能体执行流程
+---
+
+中间件提供了一种更精细控制智能体内部行为的方式。中间件适用于以下场景：
+
+- 通过日志记录、分析和调试来追踪智能体行为。
+- 转换提示、[工具选择](/oss/python/langchain/middleware/built-in#llm-tool-selector)和输出格式。
+- 添加[重试机制](/oss/python/langchain/middleware/built-in#tool-retry)、[回退策略](/oss/python/langchain/middleware/built-in#model-fallback)和提前终止逻辑。
+- 应用[速率限制](/oss/python/langchain/middleware/built-in#model-call-limit)、防护栏和[PII检测](/oss/python/langchain/middleware/built-in#pii-detection)。
+
+通过将中间件传递给 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 来添加：
+
+```python
+from langchain.agents import create_agent
+from langchain.agents.middleware import SummarizationMiddleware, HumanInTheLoopMiddleware
+
+agent = create_agent(
+    model="gpt-4.1",
+    tools=[...],
+    middleware=[
+        SummarizationMiddleware(...),
+        HumanInTheLoopMiddleware(...)
+    ],
+)
+```
+
+
+
+
+## 智能体循环
+
+核心智能体循环包括调用模型、让其选择要执行的工具，并在其不再调用工具时结束：
+
+<img
+    src="/oss/images/core_agent_loop.png"
+    alt="核心智能体循环示意图"
+    style={{height: "200px", width: "auto", justifyContent: "center"}}
+    className="rounded-lg block mx-auto"
+/>
+
+中间件在每个步骤前后暴露了钩子函数：
+
+<img
+    src="/oss/images/middleware_final.png"
+    alt="中间件流程示意图"
+    style={{height: "300px", width: "auto", justifyContent: "center"}}
+    className="rounded-lg mx-auto"
+/>
+
+## 更多资源
+
+<CardGroup cols={2}>
+    <Card title="内置中间件" icon="box" href="/oss/python/langchain/middleware/built-in">
+        探索常见用例的内置中间件。
+    </Card>
+    <Card title="自定义中间件" icon="code" href="/oss/python/langchain/middleware/custom">
+        使用钩子和装饰器构建自定义中间件。
+    </Card>
+    <Card title="中间件 API 参考" icon="book" href="https://reference.langchain.com/python/langchain/middleware/">
+        完整的中间件 API 参考。
+    </Card>
+    <Card title="测试智能体" icon="scale" href="/oss/python/langchain/test/">
+        使用 LangSmith 测试您的智能体。
+    </Card>
+</CardGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\middleware\overview.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

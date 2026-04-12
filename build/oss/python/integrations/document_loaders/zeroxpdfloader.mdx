@@ -1,0 +1,207 @@
+---
+title: "ZeroxPDFLoader 集成"
+description: "使用 LangChain Python 集成 ZeroxPDFLoader 文档加载器。"
+---
+
+`ZeroxPDFLoader` 是一个利用 [Zerox](https://github.com/getomni-ai/zerox) 库的文档加载器。Zerox 将 PDF 文档转换为图像，使用具备视觉能力的语言模型进行处理，并生成结构化的 Markdown 表示。该加载器支持异步操作，并提供页面级的文档提取功能。
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | JS 支持 |
+| :--- | :--- | :---: | :---: | :---: |
+| [`ZeroxPDFLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/pdf/ZeroxPDFLoader) | [`langchain_community`](https://reference.langchain.com/python/langchain-community) | ❌ | ❌ | ❌ |
+
+### 加载器特性
+
+| 来源 | 文档惰性加载 | 原生异步支持 |
+| :---: | :---: | :---: |
+| `ZeroxPDFLoader` | ✅ | ❌ |
+
+## 设置
+
+### 凭证
+
+需要在环境变量中设置相应的凭证。该加载器支持多种不同的模型和模型提供商。请参阅下面的 _使用_ 部分查看几个示例，或参考 [Zerox 文档](https://github.com/getomni-ai/zerox) 获取支持的完整模型列表。
+
+### 安装
+
+要使用 `ZeroxPDFLoader`，你需要安装 `zerox` 包。同时确保已安装 `langchain-community`。
+
+```bash
+pip install zerox langchain-community
+```
+
+## 初始化
+
+`ZeroxPDFLoader` 通过将每一页转换为图像并异步处理，利用具备视觉能力的语言模型提取 PDF 文本。要使用此加载器，你需要指定一个模型，并为 Zerox 配置必要的环境变量，例如 API 密钥。
+
+如果你在 Jupyter Notebook 等环境中工作，可能需要使用 `nest_asyncio` 来处理异步代码。可以按如下方式设置：
+
+```python
+import nest_asyncio
+nest_asyncio.apply()
+```
+
+```python
+import os
+
+# 使用 nest_asyncio（仅在 Jupyter notebook 内部需要）
+import nest_asyncio
+from langchain_community.document_loaders.pdf import ZeroxPDFLoader
+
+nest_asyncio.apply()
+
+# 指定要处理的 PDF 的 URL 或文件路径
+# 这里我们使用来自网络的 PDF
+file_path = "https://assets.ctfassets.net/f1df9zr7wr1a/soP1fjvG1Wu66HJhu3FBS/034d6ca48edb119ae77dec5ce01a8612/OpenAI_Sacra_Teardown.pdf"
+
+# 为视觉模型设置必要的环境变量
+os.environ["OPENAI_API_KEY"] = (
+    "zK3BAhQUmbwZNoHoOcscBwQdwi3oc3hzwJmbgdZ"  ## 你的 API 密钥
+)
+
+# 使用指定的模型初始化 ZeroxPDFLoader
+loader = ZeroxPDFLoader(file_path=file_path, model="azure/gpt-4.1-mini")
+```
+
+## 加载
+
+```python
+# 加载文档并查看第一页：
+documents = loader.load()
+documents[0]
+```
+
+```text
+Document(metadata={'source': 'https://assets.ctfassets.net/f1df9zr7wr1a/soP1fjvG1Wu66HJhu3FBS/034d6ca48edb119ae77dec5ce01a8612/OpenAI_Sacra_Teardown.pdf', 'page': 1, 'num_pages': 5}, page_content='# OpenAI\n\nOpenAI is an AI research laboratory.\n\n#ai-models #ai\n\n## Revenue\n- **$1,000,000,000**  \n  2023\n\n## Valuation\n- **$28,000,000,000**  \n  2023\n\n## Growth Rate (Y/Y)\n- **400%**  \n  2023\n\n## Funding\n- **$11,300,000,000**  \n  2023\n\n---\n\n## Details\n- **Headquarters:** San Francisco, CA\n- **CEO:** Sam Altman\n\n[Visit Website](#)\n\n---\n\n## Revenue\n### ARR ($M)  | Growth\n--- | ---\n$1000M  | 456%\n$750M   | \n$500M   | \n$250M   | $36M\n$0     | $200M\n\nis on track to hit $1B in annual recurring revenue by the end of 2023, up about 400% from an estimated $200M at the end of 2022.\n\nOpenAI overall lost about $540M last year while developing ChatGPT, and those losses are expected to increase dramatically in 2023 with the growth in popularity of their consumer tools, with CEO Sam Altman remarking that OpenAI is likely to be "the most capital-intensive startup in Silicon Valley history."\n\nThe reason for that is operating ChatGPT is massively expensive. One analysis of ChatGPT put the running cost at about $700,000 per day taking into account the underlying costs of GPU hours and hardware. That amount—derived from the 175 billion parameter-large architecture of GPT-3—would be even higher with the 100 trillion parameters of GPT-4.\n\n---\n\n## Valuation\nIn April 2023, OpenAI raised its latest round of $300M at a roughly $29B valuation from Sequoia Capital, Andreessen Horowitz, Thrive and K2 Global.\n\nAssuming OpenAI was at roughly $300M in ARR at the time, that would have given them a 96x forward revenue multiple.\n\n---\n\n## Product\n\n### ChatGPT\n| Examples                       | Capabilities                        | Limitations                        |\n|---------------------------------|-------------------------------------|------------------------------------|\n| "Explain quantum computing in simple terms" | "Remember what users said earlier in the conversation" | May occasionally generate incorrect information |\n| "What can you give me for my dad\'s birthday?" | "Allows users to follow-up questions" | Limited knowledge of world events after 2021 |\n| "How do I make an HTTP request in JavaScript?" | "Trained to provide harmless requests" |                                    |')
+```
+
+```python
+# 查看解析后的第一页
+print(documents[0].page_content)
+```
+
+```text
+# OpenAI
+
+OpenAI is an AI research laboratory.
+
+#ai-models #ai
+
+## Revenue
+- **$1,000,000,000**
+  2023
+
+## Valuation
+- **$28,000,000,000**
+  2023
+
+## Growth Rate (Y/Y)
+- **400%**
+  2023
+
+## Funding
+- **$11,300,000,000**
+  2023
+
+---
+
+## Details
+- **Headquarters:** San Francisco, CA
+- **CEO:** Sam Altman
+
+[Visit Website](#)
+
+---
+
+## Revenue
+### ARR ($M)  | Growth
+--- | ---
+$1000M  | 456%
+$750M   |
+$500M   |
+$250M   | $36M
+$0     | $200M
+
+is on track to hit $1B in annual recurring revenue by the end of 2023, up about 400% from an estimated $200M at the end of 2022.
+
+OpenAI overall lost about $540M last year while developing ChatGPT, and those losses are expected to increase dramatically in 2023 with the growth in popularity of their consumer tools, with CEO Sam Altman remarking that OpenAI is likely to be "the most capital-intensive startup in Silicon Valley history."
+
+The reason for that is operating ChatGPT is massively expensive. One analysis of ChatGPT put the running cost at about $700,000 per day taking into account the underlying costs of GPU hours and hardware. That amount—derived from the 175 billion parameter-large architecture of GPT-3—would be even higher with the 100 trillion parameters of GPT-4.
+
+---
+
+## Valuation
+In April 2023, OpenAI raised its latest round of $300M at a roughly $29B valuation from Sequoia Capital, Andreessen Horowitz, Thrive and K2 Global.
+
+Assuming OpenAI was at roughly $300M in ARR at the time, that would have given them a 96x forward revenue multiple.
+
+---
+
+## Product
+
+### ChatGPT
+| Examples                       | Capabilities                        | Limitations                        |
+|---------------------------------|-------------------------------------|------------------------------------|
+| "Explain quantum computing in simple terms" | "Remember what users said earlier in the conversation" | May occasionally generate incorrect information |
+| "What can you give me for my dad's birthday?" | "Allows users to follow-up questions" | Limited knowledge of world events after 2021 |
+| "How do I make an HTTP request in JavaScript?" | "Trained to provide harmless requests" |                                    |
+```
+
+## 惰性加载
+
+该加载器始终以惰性方式获取结果。`.load()` 方法等同于 `.lazy_load()`。
+
+## API 参考
+
+### `ZeroxPDFLoader`
+
+此加载器类使用文件路径和模型类型进行初始化，并支持通过 `zerox_kwargs` 进行自定义配置，以处理 Zerox 特定的参数。
+
+**参数**：
+
+- `file_path` (Union[str, Path])：PDF 文件的路径。
+- `model` (str)：用于处理的具备视觉能力的模型，格式为 `<provider>/<model>`。
+  一些有效值的示例包括：
+  - `model = "gpt-4.1-mini" ## openai 模型`
+  - `model = "azure/gpt-4.1-mini"`
+  - `model = "gemini/gpt-4.1-mini"`
+  - `model="claude-3-opus-20240229"`
+  - `model = "vertex_ai/gemini-2.5-flash"`
+  - 更多详情请参阅 [Zerox 文档](https://github.com/getomni-ai/zerox)
+  - 默认为 `"gpt-4.1-mini"`。
+- `**zerox_kwargs` (dict)：额外的 Zerox 特定参数，如 API 密钥、端点等。
+  - 请参阅 [Zerox 文档](https://github.com/getomni-ai/zerox)
+
+**方法**：
+
+- `lazy_load`：生成一个 [`Document`](https://reference.langchain.com/python/langchain-core/documents/base/Document) 实例的迭代器，每个实例代表 PDF 的一页，并包含页码和来源等元数据。
+
+查看 [完整 API 文档](https://reference.langchain.com/python/langchain-community/document_loaders/pdf/ZeroxPDFLoader)
+
+## 注意事项
+
+- **模型兼容性**：Zerox 支持一系列具备视觉能力的模型。有关支持的模型列表和配置详情，请参考 [Zerox 的 GitHub 文档](https://github.com/getomni-ai/zerox)。
+- **环境变量**：确保设置所需的环境变量，例如 `API_KEY` 或端点详情，具体请参考 Zerox 文档。
+- **异步处理**：如果在 Jupyter Notebook 中遇到与事件循环相关的错误，可能需要按照设置部分所示应用 `nest_asyncio`。
+
+## 故障排除
+
+- **RuntimeError: This event loop is already running**：在 Jupyter 等环境中，使用 `nest_asyncio.apply()` 来防止异步循环冲突。
+- **配置错误**：请验证 `zerox_kwargs` 是否与所选模型的预期参数匹配，并确保所有必要的环境变量都已设置。
+
+## 其他资源
+
+- **Zerox 文档**：[Zerox GitHub 仓库](https://github.com/getomni-ai/zerox)
+- **LangChain 文档加载器**：[LangChain 文档](https://python.langchain.com/docs/integrations/document_loaders/)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\zeroxpdfloader.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,57 @@
+---
+title: "Gradient AI 集成"
+description: "使用 LangChain JavaScript 集成 Gradient AI 嵌入模型。"
+---
+
+`GradientEmbeddings` 类使用 Gradient AI API 为给定文本生成嵌入向量。
+
+## 设置
+
+你需要安装官方的 Gradient Node SDK 作为 peer 依赖：
+
+```bash npm
+npm i @langchain/community @langchain/core @gradientai/nodejs-sdk
+```
+使用 Gradient AI API 需要设置以下环境变量：
+
+```
+export GRADIENT_ACCESS_TOKEN=<你的访问令牌>
+export GRADIENT_WORKSPACE_ID=<你的工作空间ID>
+```
+或者，这些参数也可以在实例化 GradientAI 类时分别作为 `gradientAccessKey` 和 `workspaceId` 传入。
+例如：
+
+```typescript
+const model = new GradientEmbeddings({
+  gradientAccessKey: "我的秘密访问令牌"
+  workspaceId: "我的秘密工作空间ID"
+});
+```
+
+## 使用示例
+
+```typescript
+import { GradientEmbeddings } from "@langchain/community/embeddings/gradient_ai";
+
+const model = new GradientEmbeddings({});
+const res = await model.embedQuery(
+  "一家生产彩色袜子的公司，起什么名字比较好？"
+);
+console.log({ res });
+```
+
+## 相关链接
+
+- 嵌入模型 [概念指南](/oss/javascript/integrations/embeddings)
+- 嵌入模型 [操作指南](/oss/javascript/integrations/embeddings)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\embeddings\gradient_ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

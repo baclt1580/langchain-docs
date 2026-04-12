@@ -1,0 +1,94 @@
+---
+title: "Azure Cosmos DB NoSQL 语义集成"
+description: "使用 LangChain JavaScript 与 Azure Cosmos DB NoSQL 语义缓存进行集成。"
+---
+
+> 语义缓存功能支持与 Azure Cosmos DB for NoSQL 集成，使用户能够基于用户输入与先前缓存结果之间的语义相似性来检索缓存响应。它利用了 [AzureCosmosDBNoSQLVectorStore](/oss/javascript/integrations/vectorstores/azure_cosmosdb_nosql)，该组件存储缓存提示的向量嵌入。这些嵌入支持基于相似性的搜索，使系统能够检索相关的缓存结果。
+
+如果您没有 Azure 账户，可以[创建一个免费账户](https://azure.microsoft.com/free/)开始使用。
+
+## 设置
+
+首先需要安装 [`@langchain/azure-cosmosdb`](https://www.npmjs.com/package/@langchain/azure-cosmosdb) 包：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/azure-cosmosdb @langchain/core
+```
+
+您还需要运行一个 Azure Cosmos DB for NoSQL 实例。您可以按照[此指南](https://learn.microsoft.com/azure/cosmos-db/nosql/quickstart-portal)在 Azure 门户上免费部署一个版本。
+
+实例运行后，请确保您拥有连接字符串。如果使用托管身份，则需要端点。您可以在 Azure 门户中实例的“设置 / 密钥”部分找到它们。
+
+<Info>
+**使用 Azure 托管身份和基于角色的访问控制时，必须确保数据库和容器已预先创建。RBAC 不提供创建数据库和容器的权限。您可以在 [Azure Cosmos DB 文档](https://learn.microsoft.com/azure/cosmos-db/how-to-setup-rbac#permission-model) 中获取有关权限模型的更多信息。**
+
+</Info>
+
+## 使用示例
+
+```typescript
+import {
+  AzureCosmosDBNoSQLConfig,
+  AzureCosmosDBNoSQLSemanticCache,
+} from "@langchain/azure-cosmosdb";
+import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+
+const embeddings = new OpenAIEmbeddings();
+const config: AzureCosmosDBNoSQLConfig = {
+  databaseName: "<DATABASE_NAME>",
+  containerName: "<CONTAINER_NAME>",
+  // 使用端点通过托管身份初始化客户端
+  connectionString: "<CONNECTION_STRING>",
+};
+
+/**
+ * 设置基于向量距离返回缓存结果的相似度分数阈值。
+ * 仅当相似度分数达到或超过此阈值时，才返回缓存输出；
+ * 否则，将生成新结果。默认值为 0.6，可通过构造函数调整，
+ * 以适应不同的距离函数和用例。
+ * (参见：https://aka.ms/CosmosVectorSearch)。
+ */
+
+const similarityScoreThreshold = 0.5;
+const cache = new AzureCosmosDBNoSQLSemanticCache(
+  embeddings,
+  config,
+  similarityScoreThreshold
+);
+
+const model = new ChatOpenAI({ model: "gpt-4.1-mini", cache });
+
+// 调用模型执行操作
+const response1 = await model.invoke("Do something random!");
+console.log(response1);
+/*
+  AIMessage {
+    content: "Sure! I'll generate a random number for you: 37",
+    additional_kwargs: {}
+  }
+*/
+
+const response2 = await model.invoke("Do something random!");
+console.log(response2);
+/*
+  AIMessage {
+    content: "Sure! I'll generate a random number for you: 37",
+    additional_kwargs: {}
+  }
+*/
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\llm_caching\azure_cosmosdb_nosql.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

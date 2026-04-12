@@ -1,0 +1,82 @@
+---
+title: "Cerebriumai 集成"
+description: "使用 LangChain Python 与 Cerebriumai LLM 进行集成。"
+---
+
+`Cerebrium` 是 AWS Sagemaker 的替代方案。它还提供了对 [多种 LLM 模型](https://docs.cerebrium.ai/cerebrium/prebuilt-models/deployment) 的 API 访问。
+
+本笔记本介绍如何使用 LangChain 与 [CerebriumAI](https://docs.cerebrium.ai/introduction) 配合。
+
+## 安装 cerebrium
+
+使用 `CerebriumAI` API 需要 `cerebrium` 包。使用 `pip3 install cerebrium` 安装 `cerebrium`。
+
+```python
+# Install the package
+!pip3 install cerebrium
+```
+
+## 导入
+
+```python
+import os
+
+from langchain_classic.chains import LLMChain
+from langchain_community.llms import CerebriumAI
+from langchain_core.prompts import PromptTemplate
+```
+
+## 设置环境变量 API 密钥
+
+请确保从 [CerebriumAI 仪表板](https://dashboard.cerebrium.ai/login) 获取您的 API 密钥。您将获得 1 小时的免费无服务器 GPU 计算资源来测试不同的模型。
+
+```python
+os.environ["CEREBRIUMAI_API_KEY"] = "YOUR_KEY_HERE"
+```
+
+## 创建 CerebriumAI 实例
+
+您可以指定不同的参数，例如模型端点 URL、最大长度、温度等。您必须提供一个端点 URL。
+
+```python
+llm = CerebriumAI(endpoint_url="YOUR ENDPOINT URL HERE")
+```
+
+## 创建提示模板
+
+我们将为问答创建一个提示模板。
+
+```python
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+prompt = PromptTemplate.from_template(template)
+```
+
+## 初始化 LLMChain
+
+```python
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+```
+
+## 运行 LLMChain
+
+提供一个问题并运行 LLMChain。
+
+```python
+question = "What NFL team won the Super Bowl in the year Justin Beiber was born?"
+
+llm_chain.run(question)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\cerebriumai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

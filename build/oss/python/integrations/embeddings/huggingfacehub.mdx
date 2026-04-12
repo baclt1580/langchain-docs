@@ -1,0 +1,96 @@
+---
+title: "Hugging Face 集成"
+sidebarTitle: HuggingFaceEmbeddings
+description: "使用 LangChain Python 与 Hugging Face 嵌入模型集成。"
+---
+
+## 本地嵌入
+
+你可以使用 `HuggingFaceEmbeddings` 类在本地生成嵌入。这利用了 `sentence_transformers` 库来下载模型权重，并直接在本地机器上运行。
+
+让我们加载 Hugging Face 嵌入类。
+
+```python
+pip install -qU  langchain langchain-huggingface sentence_transformers
+```
+
+```python
+from langchain_huggingface.embeddings import HuggingFaceEmbeddings
+```
+
+```python
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+```
+
+```python
+text = "This is a test document."
+```
+
+```python
+query_result = embeddings.embed_query(text)
+```
+
+```python
+query_result[:3]
+```
+
+```text
+[-0.04895168915390968, -0.03986193612217903, -0.021562768146395683]
+```
+
+```python
+doc_result = embeddings.embed_documents([text])
+```
+
+## Hugging Face 推理端点（无服务器 API）
+
+如果你不希望本地下载模型，可以通过 [推理端点](https://huggingface.co/docs/inference-endpoints/index) 访问嵌入模型，这允许我们在 Hugging Face 的可扩展无服务器基础设施上使用开源模型。
+
+确保已安装 huggingface_hub，它通常随 langchain-huggingface 一起提供。
+```python
+!pip install huggingface_hub
+```
+
+首先，我们需要从 [Hugging Face](https://huggingface.co/settings/tokens) 获取一个只读 API 密钥。
+
+```python
+import os
+from getpass import getpass
+
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = getpass()
+```
+
+现在我们可以使用 `HuggingFaceEndpointEmbeddings` 类通过 API 远程运行开源嵌入模型。
+
+```python
+from langchain_huggingface.embeddings import HuggingFaceEndpointEmbeddings
+```
+
+```python
+embeddings = HuggingFaceEndpointEmbeddings(
+    model="sentence-transformers/all-MiniLM-L6-v2"
+)
+```
+
+```python
+text = "This is a test document."
+```
+
+```python
+query_result = embeddings.embed_query(text)
+```
+
+```python
+query_result[:3]
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\huggingfacehub.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

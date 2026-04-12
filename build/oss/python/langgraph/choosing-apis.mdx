@@ -1,0 +1,364 @@
+---
+title: 在图 API 与函数式 API 之间选择
+sidebarTitle: 选择 API
+---
+
+LangGraph 提供了两种不同的 API 来构建智能体工作流：**图 API** 和 **函数式 API**。这两种 API 共享相同的底层运行时，可以在同一个应用程序中混合使用，但它们针对不同的用例和开发偏好而设计。
+
+本指南将帮助您根据具体需求理解何时使用每种 API。
+
+## 快速决策指南
+
+在以下情况下使用 **图 API**：
+- 用于调试和文档的**复杂工作流可视化**
+- 跨多个节点共享数据的**显式状态管理**
+- 具有多个决策点的**条件分支**
+- 需要后期合并的**并行执行路径**
+- 视觉呈现有助于理解的**团队协作**
+
+在以下情况下使用 **函数式 API**：
+- 对现有过程式代码进行**最小的代码改动**
+- 使用**标准控制流**（if/else、循环、函数调用）
+- **函数作用域的状态管理**，无需显式状态管理
+- 使用更少样板代码进行**快速原型设计**
+- 具有简单分支逻辑的**线性工作流**
+
+## 详细比较
+
+### 何时使用图 API
+
+[图 API](/oss/python/langgraph/graph-api) 采用声明式方法，您需要定义节点、边和共享状态来创建可视化的图结构。
+
+**1. 复杂的决策树和分支逻辑**
+
+当您的工作流具有多个依赖于各种条件的决策点时，图 API 使这些分支变得明确且易于可视化。
+
+```python
+# 图 API：决策路径清晰可视化
+from langgraph.graph import StateGraph
+from typing import TypedDict
+
+class AgentState(TypedDict):
+    messages: list
+    current_tool: str
+    retry_count: int
+
+def should_continue(state):
+    if state["retry_count"] > 3:
+        return "end"
+    elif state["current_tool"] == "search":
+        return "process_search"
+    else:
+        return "call_llm"
+
+workflow = StateGraph(AgentState)
+workflow.add_node("call_llm", call_llm_node)
+workflow.add_node("process_search", search_node)
+workflow.add_conditional_edges("call_llm", should_continue)
+```
+
+
+
+
+
+**2. 跨多个组件的状态管理**
+
+当您需要在工作流的不同部分之间共享和协调状态时，图 API 的显式状态管理非常有益。
+
+```python
+# 多个节点可以访问和修改共享状态
+class WorkflowState(TypedDict):
+    user_input: str
+    search_results: list
+    generated_response: str
+    validation_status: str
+
+def search_node(state):
+    # 访问共享状态
+    results = search(state["user_input"])
+    return {"search_results": results}
+
+def validation_node(state):
+    # 访问前一个节点的结果
+    is_valid = validate(state["generated_response"])
+    return {"validation_status": "valid" if is_valid else "invalid"}
+```
+
+
+
+
+
+**3. 带同步的并行处理**
+
+当您需要并行运行多个操作然后合并其结果时，图 API 可以自然地处理这种情况。
+
+```python
+# 多个数据源的并行处理
+workflow.add_node("fetch_news", fetch_news)
+workflow.add_node("fetch_weather", fetch_weather)
+workflow.add_node("fetch_stocks", fetch_stocks)
+workflow.add_node("combine_data", combine_all_data)
+
+# 所有获取操作并行运行
+workflow.add_edge(START, "fetch_news")
+workflow.add_edge(START, "fetch_weather")
+workflow.add_edge(START, "fetch_stocks")
+
+# 合并操作等待所有并行操作完成
+workflow.add_edge("fetch_news", "combine_data")
+workflow.add_edge("fetch_weather", "combine_data")
+workflow.add_edge("fetch_stocks", "combine_data")
+```
+
+
+
+
+
+**4. 团队开发和文档**
+
+图 API 的可视化特性使团队更容易理解、记录和维护复杂的工作流。
+
+```python
+# 关注点清晰分离 - 每个团队成员可以处理不同的节点
+workflow.add_node("data_ingestion", data_team_function)
+workflow.add_node("ml_processing", ml_team_function)
+workflow.add_node("business_logic", product_team_function)
+workflow.add_node("output_formatting", frontend_team_function)
+```
+
+
+
+
+
+### 何时使用函数式 API
+
+[函数式 API](/oss/python/langgraph/functional-api) 采用命令式方法，将 LangGraph 功能集成到标准的过程式代码中。
+
+**1. 现有的过程式代码**
+
+当您已有使用标准控制流的代码，并希望以最小的重构添加 LangGraph 功能时。
+
+```python
+# 函数式 API：对现有代码进行最小改动
+from langgraph.func import entrypoint, task
+
+@task
+def process_user_input(user_input: str) -> dict:
+    # 现有函数，改动最小
+    return {"processed": user_input.lower().strip()}
+
+@entrypoint(checkpointer=checkpointer)
+def workflow(user_input: str) -> str:
+    # 标准 Python 控制流
+    processed = process_user_input(user_input).result()
+
+    if "urgent" in processed["processed"]:
+        response = handle_urgent_request(processed).result()
+    else:
+        response = handle_normal_request(processed).result()
+
+    return response
+```
+
+
+
+
+
+**2. 具有简单逻辑的线性工作流**
+
+当您的工作流主要是顺序性的，具有简单的条件逻辑时。
+
+```python
+@entrypoint(checkpointer=checkpointer)
+def essay_workflow(topic: str) -> dict:
+    # 具有简单分支的线性流程
+    outline = create_outline(topic).result()
+
+    if len(outline["points"]) < 3:
+        outline = expand_outline(outline).result()
+
+    draft = write_draft(outline).result()
+
+    # 人工审核检查点
+    feedback = interrupt({"draft": draft, "action": "Please review"})
+
+    if feedback == "approve":
+        final_essay = draft
+    else:
+        final_essay = revise_essay(draft, feedback).result()
+
+    return {"essay": final_essay}
+```
+
+
+
+
+
+**3. 快速原型设计**
+
+当您希望快速测试想法，而无需定义状态模式和图形结构的开销时。
+
+```python
+@entrypoint(checkpointer=checkpointer)
+def quick_prototype(data: dict) -> dict:
+    # 快速迭代 - 无需状态模式
+    step1_result = process_step1(data).result()
+    step2_result = process_step2(step1_result).result()
+
+    return {"final_result": step2_result}
+```
+
+
+
+
+
+**4. 函数作用域的状态管理**
+
+当您的状态自然地限定在单个函数内，不需要广泛共享时。
+
+```python
+@task
+def analyze_document(document: str) -> dict:
+    # 函数内的本地状态管理
+    sections = extract_sections(document)
+    summaries = [summarize(section) for section in sections]
+    key_points = extract_key_points(summaries)
+
+    return {
+        "sections": len(sections),
+        "summaries": summaries,
+        "key_points": key_points
+    }
+
+@entrypoint(checkpointer=checkpointer)
+def document_processor(document: str) -> dict:
+    analysis = analyze_document(document).result()
+    # 状态在函数之间按需传递
+    return generate_report(analysis).result()
+```
+
+
+
+
+
+## 结合使用两种 API
+
+您可以在同一个应用程序中同时使用两种 API。这在系统的不同部分有不同需求时非常有用。
+
+```python
+from langgraph.graph import StateGraph
+from langgraph.func import entrypoint
+
+# 使用图 API 进行复杂的多智能体协调
+coordination_graph = StateGraph(CoordinationState)
+coordination_graph.add_node("orchestrator", orchestrator_node)
+coordination_graph.add_node("agent_a", agent_a_node)
+coordination_graph.add_node("agent_b", agent_b_node)
+
+# 使用函数式 API 进行简单的数据处理
+@entrypoint()
+def data_processor(raw_data: dict) -> dict:
+    cleaned = clean_data(raw_data).result()
+    transformed = transform_data(cleaned).result()
+    return transformed
+
+# 在图 API 中使用函数式 API 的结果
+def orchestrator_node(state):
+    processed_data = data_processor.invoke(state["raw_data"])
+    return {"processed_data": processed_data}
+```
+
+
+
+
+
+## API 之间的迁移
+
+### 从函数式 API 迁移到图 API
+
+当您的函数式工作流变得复杂时，可以迁移到图 API：
+
+```python
+# 之前：函数式 API
+@entrypoint(checkpointer=checkpointer)
+def complex_workflow(input_data: dict) -> dict:
+    step1 = process_step1(input_data).result()
+
+    if step1["needs_analysis"]:
+        analysis = analyze_data(step1).result()
+        if analysis["confidence"] > 0.8:
+            result = high_confidence_path(analysis).result()
+        else:
+            result = low_confidence_path(analysis).result()
+    else:
+        result = simple_path(step1).result()
+
+    return result
+
+# 之后：图 API
+class WorkflowState(TypedDict):
+    input_data: dict
+    step1_result: dict
+    analysis: dict
+    final_result: dict
+
+def should_analyze(state):
+    return "analyze" if state["step1_result"]["needs_analysis"] else "simple_path"
+
+def confidence_check(state):
+    return "high_confidence" if state["analysis"]["confidence"] > 0.8 else "low_confidence"
+
+workflow = StateGraph(WorkflowState)
+workflow.add_node("step1", process_step1_node)
+workflow.add_conditional_edges("step1", should_analyze)
+workflow.add_node("analyze", analyze_data_node)
+workflow.add_conditional_edges("analyze", confidence_check)
+# ... 添加剩余的节点和边
+```
+
+
+
+
+
+### 从图 API 迁移到函数式 API
+
+当您的图对于简单的线性过程变得过于复杂时：
+
+```python
+# 之前：过度设计的图 API
+class SimpleState(TypedDict):
+    input: str
+    step1: str
+    step2: str
+    result: str
+
+# 之后：简化的函数式 API
+@entrypoint(checkpointer=checkpointer)
+def simple_workflow(input_data: str) -> str:
+    step1 = process_step1(input_data).result()
+    step2 = process_step2(step1).result()
+    return finalize_result(step2).result()
+```
+
+
+
+
+
+## 总结
+
+当您需要对工作流结构、复杂分支、并行处理或团队协作优势进行显式控制时，选择 **图 API**。
+
+当您希望以最小的改动将 LangGraph 功能添加到现有代码中、拥有简单的线性工作流或需要快速原型设计能力时，选择 **函数式 API**。
+
+两种 API 都提供相同的核心 LangGraph 功能（持久化、流式传输、人在回路、记忆），但以不同的范式打包，以适应不同的开发风格和用例。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\choosing-apis.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

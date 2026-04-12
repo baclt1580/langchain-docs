@@ -1,0 +1,404 @@
+---
+title: 人机协同
+description: 了解如何为敏感工具操作配置人工审批
+---
+
+import HitlBasicConfigPy from '/snippets/hitl-basic-config-py.mdx';
+import HitlBasicConfigJs from '/snippets/hitl-basic-config-js.mdx';
+
+某些工具操作可能比较敏感，需要在执行前获得人工批准。Deep Agents 通过 LangGraph 的中断功能支持人机协同工作流。您可以使用 `interrupt_on` 参数来配置哪些工具需要审批。
+
+```mermaid
+graph LR
+    Agent[Agent] --> Check{Interrupt?}
+    Check --> |no| Execute[Execute]
+    Check --> |yes| Human{Human}
+
+    Human --> |approve| Execute
+    Human --> |edit| Execute
+    Human --> |reject| Cancel[Cancel]
+
+    Execute --> Agent
+    Cancel --> Agent
+
+    classDef trigger fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef process fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef decision fill:#FEF3C7,stroke:#F59E0B,stroke-width:2px,color:#78350F
+    classDef alert fill:#FEE2E2,stroke:#DC2626,stroke-width:2px,color:#7F1D1D
+
+    class Agent trigger
+    class Check,Human decision
+    class Execute process
+    class Cancel alert
+```
+
+## 基础配置
+
+`interrupt_on` 参数接受一个字典，将工具名称映射到中断配置。每个工具可以配置为：
+
+- **`True`**：启用中断，使用默认行为（允许批准、编辑、拒绝）
+- **`False`**：为此工具禁用中断
+- **`{"allowed_decisions": [...]}`**：自定义配置，指定允许的决策
+
+
+
+<HitlBasicConfigJs />
+
+
+## 决策类型
+
+`allowed_decisions` 列表控制在审查工具调用时人工可以采取的操作：
+
+- **`"approve"`**：使用代理提议的原始参数执行工具
+- **`"edit"`**：在执行前修改工具参数
+- **`"reject"`**：完全跳过执行此工具调用
+
+您可以为每个工具自定义可用的决策：
+
+
+
+```typescript
+const interruptOn = {
+  // 敏感操作：允许所有选项
+  delete_file: { allowedDecisions: ["approve", "edit", "reject"] },
+
+  // 中等风险：仅允许批准或拒绝
+  write_file: { allowedDecisions: ["approve", "reject"] },
+
+  // 必须批准（不允许拒绝）
+  critical_operation: { allowedDecisions: ["approve"] },
+};
+```
+
+
+## 处理中断
+
+当中断被触发时，代理会暂停执行并返回控制权。检查结果中是否有中断，并相应处理。
+
+
+
+```typescript
+import { v4 as uuidv4 } from "uuid";
+import { Command } from "@langchain/langgraph";
+
+// 创建包含 thread_id 的配置以持久化状态
+const config = { configurable: { thread_id: uuidv4() } };
+
+// 调用代理
+let result = await agent.invoke({
+  messages: [{ role: "user", content: "Delete the file temp.txt" }],
+}, config);
+
+// 检查执行是否被中断
+if (result.__interrupt__) {
+  // 提取中断信息
+  const interrupts = result.__interrupt__[0].value;
+  const actionRequests = interrupts.actionRequests;
+  const reviewConfigs = interrupts.reviewConfigs;
+
+  // 创建从工具名到审查配置的查找映射
+  const configMap = Object.fromEntries(
+    reviewConfigs.map((cfg) => [cfg.actionName, cfg])
+  );
+
+  // 向用户显示待处理的操作
+  for (const action of actionRequests) {
+    const reviewConfig = configMap[action.name];
+    console.log(`Tool: ${action.name}`);
+    console.log(`Arguments: ${JSON.stringify(action.args)}`);
+    console.log(`Allowed decisions: ${reviewConfig.allowedDecisions}`);
+  }
+
+  // 获取用户决策（每个 actionRequest 一个，按顺序）
+  const decisions = [
+    { type: "approve" }  // 用户批准了删除操作
+  ];
+
+  // 使用决策恢复执行
+  result = await agent.invoke(
+    new Command({ resume: { decisions } }),
+    config  // 必须使用相同的配置！
+  );
+}
+
+// 处理最终结果
+console.log(result.messages[result.messages.length - 1].content);
+```
+
+
+## 多个工具调用
+
+当代理调用多个需要批准的工具时，所有中断会批量处理在一个中断中。您必须按顺序为每个工具提供决策。
+
+
+
+```typescript
+const config = { configurable: { thread_id: uuidv4() } };
+
+let result = await agent.invoke({
+  messages: [{
+    role: "user",
+    content: "Delete temp.txt and send an email to admin@example.com"
+  }]
+}, config);
+
+if (result.__interrupt__) {
+  const interrupts = result.__interrupt__[0].value;
+  const actionRequests = interrupts.actionRequests;
+
+  // 两个工具需要批准
+  console.assert(actionRequests.length === 2);
+
+  // 按与 actionRequests 相同的顺序提供决策
+  const decisions = [
+    { type: "approve" },  // 第一个工具：delete_file
+    { type: "reject" }    # 第二个工具：send_email
+  ];
+
+  result = await agent.invoke(
+    new Command({ resume: { decisions } }),
+    config
+  );
+}
+```
+
+
+## 编辑工具参数
+
+当 `"edit"` 在允许的决策中时，您可以在执行前修改工具参数：
+
+
+
+```typescript
+if (result.__interrupt__) {
+  const interrupts = result.__interrupt__[0].value;
+  const actionRequest = interrupts.actionRequests[0];
+
+  // 来自代理的原始参数
+  console.log(actionRequest.args);  // { to: "everyone@company.com", ... }
+
+  // 用户决定编辑收件人
+  const decisions = [{
+    type: "edit",
+    editedAction: {
+      name: actionRequest.name,  // 必须包含工具名称
+      args: { to: "team@company.com", subject: "...", body: "..." }
+    }
+  }];
+
+  result = await agent.invoke(
+    new Command({ resume: { decisions } }),
+    config
+  );
+}
+```
+
+
+## 子代理中断
+
+使用子代理时，您可以在[工具调用时](#工具调用时的中断)和[工具调用内部](#工具调用内部的中断)使用中断。
+
+### 工具调用时的中断
+
+每个子代理可以有自己的 `interrupt_on` 配置，覆盖主代理的设置：
+
+
+
+```typescript
+const agent = createDeepAgent({
+  tools: [deleteFile, readFile],
+  interruptOn: {
+    delete_file: true,
+    read_file: false,
+  },
+  subagents: [{
+    name: "file-manager",
+    description: "Manages file operations",
+    systemPrompt: "You are a file management assistant.",
+    tools: [deleteFile, readFile],
+    interruptOn: {
+      // 覆盖：在此子代理中读取也需要批准
+      delete_file: true,
+      read_file: true,  // 与主代理不同！
+    }
+  }],
+  checkpointer
+});
+```
+
+
+当子代理触发中断时，处理方式相同——检查结果中的 `interrupts` 并使用 `Command` 恢复。
+
+### 工具调用内部的中断
+
+子代理工具可以直接调用 `interrupt()` 来暂停执行并等待批准：
+
+
+
+```typescript
+import { createAgent, tool } from "langchain";
+import { ChatOpenAI } from "@langchain/openai";
+import { HumanMessage } from "@langchain/core/messages";
+import { MemorySaver, Command, interrupt } from "@langchain/langgraph";
+import { createDeepAgent } from "deepagents";
+import { z } from "zod";
+
+const requestApproval = tool(
+  async ({ actionDescription }: { actionDescription: string }) => {
+    const approval = interrupt({
+      type: "approval_request",
+      action: actionDescription,
+      message: `Please approve or reject: ${actionDescription}`,
+    }) as { approved?: boolean; reason?: string };
+
+    if (approval.approved) {
+      return `Action '${actionDescription}' was APPROVED. Proceeding...`;
+    } else {
+      return `Action '${actionDescription}' was REJECTED. Reason: ${
+        approval.reason || "No reason provided"
+      }`;
+    }
+  },
+  {
+    name: "request_approval",
+    description: "Request human approval before proceeding with an action.",
+    schema: z.object({
+      actionDescription: z
+        .string()
+        .describe("The action that requires approval"),
+    }),
+  }
+);
+
+async function main() {
+  const checkpointer = new MemorySaver();
+  const model = new ChatOpenAI({
+    model: "gpt-4o-mini",
+    maxTokens: 4096,
+  });
+
+  const compiledSubagent = createAgent({
+    model: model,
+    tools: [requestApproval],
+    name: "approval-agent",
+  });
+
+  const parentAgent = await createDeepAgent({
+    checkpointer: checkpointer,
+    subagents: [
+      {
+        name: "approval-agent",
+        description: "An agent that can request approvals",
+        runnable: compiledSubagent as any,
+      },
+    ],
+  });
+
+  const threadId = "test_interrupt_directly";
+  const config = { configurable: { thread_id: threadId } };
+
+  console.log("Invoking agent - sub-agent will use request_approval tool...");
+
+  let result = await parentAgent.invoke(
+    {
+      messages: [
+        new HumanMessage({
+          content:
+            "Use the task tool to launch the approval-agent sub-agent. " +
+            "Tell it to use the request_approval tool to request approval for 'deploying to production'.",
+        }),
+      ],
+    },
+    config
+  );
+
+  if (result.__interrupt__) {
+    const interruptValue = result.__interrupt__[0].value as {
+      type?: string;
+      action?: string;
+      message?: string;
+    };
+    console.log("\nInterrupt received!");
+    console.log(`  Type: ${interruptValue.type}`);
+    console.log(`  Action: ${interruptValue.action}`);
+    console.log(`  Message: ${interruptValue.message}`);
+
+    console.log("\nResuming with Command(resume={'approved': true})...");
+    const result2 = await parentAgent.invoke(
+      new Command({ resume: { approved: true } }),
+      config
+    );
+
+    if (!result2.__interrupt__) {
+      console.log("\nExecution completed!");
+      // Find the tool response
+      const toolMsgs = result2.messages?.filter((m) => m.type === "tool") || [];
+      if (toolMsgs.length > 0) {
+        const lastToolMsg = toolMsgs[toolMsgs.length - 1];
+        console.log(`  Tool result: ${lastToolMsg.content}`);
+      }
+    } else {
+      console.log("\nAnother interrupt occurred");
+    }
+  } else {
+    console.log(
+      "\n  No interrupt - the model may not have called request_approval"
+    );
+  }
+}
+
+main().catch(console.error);
+```
+
+运行时，会产生以下输出：
+
+```typescript
+Invoking agent - sub-agent will use request_approval tool...
+
+Interrupt received!
+  Type: approval_request
+  Action: deploying to production
+  Message: Please approve or reject: deploying to production
+
+Resuming with Command(resume={'approved': true})...
+
+Execution completed!
+  Tool result: Approval for "deploying to production" has been granted. You can proceed with the deployment.
+```
+
+
+
+## 最佳实践
+
+### 始终使用检查点
+
+人机协同需要一个检查点来在中断和恢复之间持久化代理状态：
+
+
+
+### 使用相同的线程 ID
+
+恢复时，必须使用具有相同 `thread_id` 的相同配置：
+
+
+
+### 决策顺序与操作匹配
+
+决策列表的顺序必须与 `action_requests` 的顺序匹配：
+
+
+
+### 根据风险定制配置
+
+根据风险级别配置不同的工具：
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\human-in-the-loop.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

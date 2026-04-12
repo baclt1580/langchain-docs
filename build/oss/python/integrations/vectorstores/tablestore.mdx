@@ -1,0 +1,177 @@
+---
+title: "Tablestore 集成"
+description: "使用 LangChain Python 与 Tablestore 向量存储进行集成。"
+---
+
+[Tablestore](https://www.aliyun.com/product/ots) 是一项完全托管的 NoSQL 云数据库服务。
+
+Tablestore 支持存储海量结构和半结构化数据。
+
+本笔记本展示了如何使用与 `Tablestore` 向量数据库相关的功能。
+
+要使用 Tablestore，您必须创建一个实例。
+以下是 [创建实例的说明](https://help.aliyun.com/zh/tablestore/getting-started/manage-the-wide-column-model-in-the-tablestore-console)。
+
+## 设置
+
+```python
+pip install -qU  langchain-community tablestore
+```
+
+## 初始化
+
+```python
+import getpass
+import os
+
+os.environ["end_point"] = getpass.getpass("Tablestore end_point:")
+os.environ["instance_name"] = getpass.getpass("Tablestore instance_name:")
+os.environ["access_key_id"] = getpass.getpass("Tablestore access_key_id:")
+os.environ["access_key_secret"] = getpass.getpass("Tablestore access_key_secret:")
+```
+
+创建向量存储。
+
+```python
+import tablestore
+from langchain_community.embeddings import FakeEmbeddings
+from langchain_community.vectorstores import TablestoreVectorStore
+from langchain_core.documents import Document
+
+test_embedding_dimension_size = 4
+embeddings = FakeEmbeddings(size=test_embedding_dimension_size)
+
+store = TablestoreVectorStore(
+    embedding=embeddings,
+    endpoint=os.getenv("end_point"),
+    instance_name=os.getenv("instance_name"),
+    access_key_id=os.getenv("access_key_id"),
+    access_key_secret=os.getenv("access_key_secret"),
+    vector_dimension=test_embedding_dimension_size,
+    # metadata mapping is used to filter non-vector fields.
+    metadata_mappings=[
+        tablestore.FieldSchema(
+            "type", tablestore.FieldType.KEYWORD, index=True, enable_sort_and_agg=True
+        ),
+        tablestore.FieldSchema(
+            "time", tablestore.FieldType.LONG, index=True, enable_sort_and_agg=True
+        ),
+    ],
+)
+```
+
+## 管理向量存储
+
+创建表和索引。
+
+```python
+store.create_table_if_not_exist()
+store.create_search_index_if_not_exist()
+```
+
+添加文档。
+
+```python
+store.add_documents(
+    [
+        Document(
+            id="1", page_content="1 hello world", metadata={"type": "pc", "time": 2000}
+        ),
+        Document(
+            id="2", page_content="abc world", metadata={"type": "pc", "time": 2009}
+        ),
+        Document(
+            id="3", page_content="3 text world", metadata={"type": "sky", "time": 2010}
+        ),
+        Document(
+            id="4", page_content="hi world", metadata={"type": "sky", "time": 2030}
+        ),
+        Document(
+            id="5", page_content="hi world", metadata={"type": "sky", "time": 2030}
+        ),
+    ]
+)
+```
+
+```python
+['1', '2', '3', '4', '5']
+```
+
+删除文档。
+
+```python
+store.delete(["3"])
+```
+
+```text
+True
+```
+
+获取文档。
+
+## 查询向量存储
+
+```python
+store.get_by_ids(["1", "3", "5"])
+```
+
+```text
+[Document(id='1', metadata={'embedding': '[1.3296732307905934, 0.0037521341868022385, 0.9821875819319514, 2.5644103644492393]', 'time': 2000, 'type': 'pc'}, page_content='1 hello world'),
+ None,
+ Document(id='5', metadata={'embedding': '[1.4558082172139821, -1.6441137122167426, -0.13113098640337423, -1.889685473174525]', 'time': 2030, 'type': 'sky'}, page_content='hi world')]
+```
+
+相似度搜索。
+
+```python
+store.similarity_search(query="hello world", k=2)
+```
+
+```text
+[Document(id='1', metadata={'embedding': [1.3296732307905934, 0.0037521341868022385, 0.9821875819319514, 2.5644103644492393], 'time': 2000, 'type': 'pc'}, page_content='1 hello world'),
+ Document(id='4', metadata={'embedding': [-0.3310144199800685, 0.29250046478723635, -0.0646862290377582, -0.23664360156781225], 'time': 2030, 'type': 'sky'}, page_content='hi world')]
+```
+
+带过滤器的相似度搜索。
+
+```python
+store.similarity_search(
+    query="hello world",
+    k=10,
+    tablestore_filter_query=tablestore.BoolQuery(
+        must_queries=[tablestore.TermQuery(field_name="type", column_value="sky")],
+        should_queries=[tablestore.RangeQuery(field_name="time", range_from=2020)],
+        must_not_queries=[tablestore.TermQuery(field_name="type", column_value="pc")],
+    ),
+)
+```
+
+```text
+[Document(id='5', metadata={'embedding': [1.4558082172139821, -1.6441137122167426, -0.13113098640337423, -1.889685473174525], 'time': 2030, 'type': 'sky'}, page_content='hi world'),
+ Document(id='4', metadata={'embedding': [-0.3310144199800685, 0.29250046478723635, -0.0646862290377582, -0.23664360156781225], 'time': 2030, 'type': 'sky'}, page_content='hi world')]
+```
+
+## 检索增强生成 (RAG) 用法
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [使用 LangChain 构建 RAG 应用](/oss/python/langchain/rag)
+- [代理式 RAG](/oss/python/langgraph/agentic-rag)
+- [检索文档](/oss/python/langchain/retrieval)
+
+---
+
+## API 参考
+
+有关所有 `TablestoreVectorStore` 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/vector-stores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\tablestore.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

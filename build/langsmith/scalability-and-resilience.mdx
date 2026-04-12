@@ -1,0 +1,49 @@
+---
+title: 可扩展性与弹性
+sidebarTitle: 可扩展性与弹性
+---
+
+LangSmith 设计为可水平扩展以适应您的工作负载。服务的每个实例都是无状态的，不在内存中保留任何资源。该服务能够优雅地处理新增或移除实例的情况，包括硬性关闭场景。
+
+## 服务器可扩展性
+
+当您向服务添加更多实例时，只要在它们前面配置了适当的负载均衡机制，这些实例将共同分担 HTTP 负载。在大多数部署模式中，我们会自动为服务配置负载均衡器。在“无控制平面的自托管”模式下，您需要自行添加负载均衡器。由于实例是无状态的，任何负载均衡策略都适用，无需也不建议使用会话粘性。任何服务器实例都可以与任何队列实例通信（通过 Redis PubSub），这意味着取消或流式传输进行中的运行请求可以由任意实例处理。
+
+## 队列可扩展性
+
+当您向服务添加更多实例时，运行吞吐量将线性增加，因为每个实例都配置为处理一定数量的并发运行（默认为 10）。每个运行的每次尝试将由单个实例处理，通过 Postgres 的 MVCC 模型强制执行恰好一次语义（有关崩溃恢复的详细信息，请参阅下文）。由于瞬时数据库错误而失败的尝试最多重试 3 次。我们不使用长事务或锁，这使我们能够更高效地利用 Postgres 资源。
+
+## 弹性
+
+当运行由队列实例处理时，该队列工作器会在 Redis 中记录周期性的心跳时间戳。
+
+当收到优雅关闭请求（SIGINT）时，实例进入关闭模式，该模式会：
+
+* 停止接受新的 HTTP 请求
+* 给任何进行中的运行有限的秒数来完成（如果未完成，将被放回队列）
+* 阻止实例从队列中获取更多运行
+
+如果由于服务器崩溃或基础设施故障导致硬性关闭，任何进行中的运行将由内部清扫任务接管，该任务会查找超过其心跳窗口的进行中运行。清扫任务每 2 分钟运行一次，并将这些运行放回队列，供其他实例获取。
+
+## Postgres 弹性
+
+在我们管理 Postgres 数据库的部署模式中，我们定期备份并持续复制备用副本以实现自动故障转移。此 Postgres 配置仅在 [`生产` 部署类型](/langsmith/control-plane#deployment-types) 的 [云部署选项](/langsmith/cloud) 中可用。
+
+所有与 Postgres 的通信都实现了对可重试错误的重试机制。如果 Postgres 暂时不可用（例如在数据库重启期间），大部分/所有流量应能继续成功处理。Postgres 长时间故障将导致代理服务器不可用。
+
+## Redis 弹性
+
+所有需要持久存储的数据都存储在 Postgres 中，而非 Redis。Redis 仅用于临时元数据和实例间的通信。因此，我们对 Redis 没有持久性要求。
+
+所有与 Redis 的通信都实现了对可重试错误的重试机制。如果 Redis 暂时不可用（例如在数据库重启期间），大部分/所有流量应能继续成功处理。Redis 长时间故障将导致代理服务器不可用。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\scalability-and-resilience.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

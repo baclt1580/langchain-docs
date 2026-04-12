@@ -1,0 +1,314 @@
+---
+title: "ChatReka 集成"
+description: "使用 LangChain Python 与 ChatReka 聊天模型集成。"
+---
+
+本指南提供了快速入门 `ChatReka` [聊天模型](/oss/python/langchain/models) 的概览。
+
+Reka 提供多个聊天模型。您可以在 [Reka 文档](https://docs.reka.ai/available-models) 中找到关于其最新模型及其成本、上下文窗口和受支持输入类型的信息。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | JS 支持 | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| [ChatReka] | [`langchain_community`](https://reference.langchain.com/python/langchain-community) | ❌ | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain_community?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain_community?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/python/langchain/tools) | [结构化输出](/oss/python/langchain/structured-output) | [图像输入](/oss/python/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/python/langchain/streaming/) | 原生异步 | [令牌使用量](/oss/python/langchain/models#token-usage) | [对数概率](/oss/python/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+
+## 设置
+
+要访问 Reka 模型，您需要创建一个 Reka 开发者账户，获取 API 密钥，并通过 `pip install reka-api` 安装 `langchain_community` 集成包和 reka python 包。
+
+### 凭证
+
+前往 [platform.reka.ai/](https://platform.reka.ai/) 注册 Reka 并生成 API 密钥。完成后，设置 REKA_API_KEY 环境变量：
+
+### 安装
+
+LangChain ChatReka 集成位于 `langchain_community` 包中：
+
+```python
+pip install -qU langchain_community reka-api
+```
+
+## 实例化
+
+```python
+import getpass
+import os
+
+os.environ["REKA_API_KEY"] = getpass.getpass("输入您的 Reka API 密钥：")
+```
+
+可选：使用 LangSmith 追踪模型执行
+
+```python
+import getpass
+import os
+
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+```
+
+```python
+from langchain_community.chat_models import ChatReka
+
+model = ChatReka()
+```
+
+## 调用
+
+```python
+model.invoke("hi")
+```
+
+```text
+AIMessage(content=' 你好！今天我能为您提供什么帮助？如果您有问题、需要协助，或者只是想聊天，请随时告诉我。祝您有美好的一天！\n\n', additional_kwargs={}, response_metadata={}, id='run-61522ec2-0587-4fd5-a492-5b205fd8860c-0')
+```
+
+# 图像输入
+
+```python
+from langchain.messages import HumanMessage
+
+image_url = "https://v0.docs.reka.ai/_images/000000245576.jpg"
+
+message = HumanMessage(
+    content=[
+        {"type": "text", "text": "描述这张图片中的天气"},
+        {
+            "type": "image_url",
+            "image_url": {"url": image_url},
+        },
+    ],
+)
+response = model.invoke([message])
+print(response.content)
+```
+
+```text
+ 图片显示了一个室内环境，没有可见的窗户或自然光，也没有天气状况的指示。焦点是一只坐在电脑键盘上的猫，背景包括电脑显示器和各种办公用品。
+```
+
+# 多张图像作为输入
+
+```python
+message = HumanMessage(
+    content=[
+        {"type": "text", "text": "这两张图片有什么区别？"},
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "https://cdn.pixabay.com/photo/2019/07/23/13/51/shepherd-dog-4357790_1280.jpg"
+            },
+        },
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "https://cdn.pixabay.com/photo/2024/02/17/00/18/cat-8578562_1280.jpg"
+            },
+        },
+    ],
+)
+response = model.invoke([message])
+print(response.content)
+```
+
+```text
+ 第一张图片展示了两只德国牧羊犬，一只成年犬和一只幼犬，处于一个充满活力、郁郁葱葱的绿色环境中。成年犬嘴里叼着一根大树枝，奔跑在一片看似草地的区域，幼犬紧随其后。两只狗都展现出该品种典型的显著身体特征，如尖耳朵和浓密的毛发。
+
+第二张图片展示了一只具有引人注目的蓝眼睛的猫的特写，可能是西伯利亚猫或缅因猫等品种，处于自然的户外环境中。猫的毛色较浅，可能是白色和灰色的混合，表情比狗更内敛。背景模糊，表明焦点在猫的脸上。
+
+总的来说，区别在于主体（两只狗 vs. 一只猫）、环境（郁郁葱葱、充满活力的草地 vs. 更柔和的户外背景）以及所描绘的整体氛围和活动（活泼好动 vs. 宁静专注）。
+```
+
+## 链式调用
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate(
+    [
+        (
+            "system",
+            "您是一个将 {input_language} 翻译成 {output_language} 的助手。",
+        ),
+        ("human", "{input}"),
+    ]
+)
+
+chain = prompt | model
+chain.invoke(
+    {
+        "input_language": "英语",
+        "output_language": "德语",
+        "input": "我喜欢编程。",
+    }
+)
+```
+
+```text
+AIMessage(content=' Ich liebe Programmieren.\n\n', additional_kwargs={}, response_metadata={}, id='run-ffc4ace1-b73a-4fb3-ad0f-57e60a0f9b8d-0')
+```
+
+与 Tavily API 搜索结合使用
+
+# 工具使用与智能体创建
+
+## 定义工具
+
+我们首先需要创建要使用的工具。我们主要选择的工具是 Tavily——一个搜索引擎。LangChain 中有一个内置工具，可以方便地将 Tavily 搜索引擎用作工具。
+
+```python
+import getpass
+import os
+
+os.environ["TAVILY_API_KEY"] = getpass.getpass("输入您的 Tavily API 密钥：")
+```
+
+```python
+from langchain_community.tools.tavily_search import TavilySearchResults
+
+search = TavilySearchResults(max_results=2)
+search_results = search.invoke("旧金山的天气如何")
+print(search_results)
+# 如果需要，我们可以创建其他工具。
+# 一旦我们拥有了所有想要的工具，就可以将它们放入一个列表中，稍后引用。
+tools = [search]
+```
+
+```text
+[{'url': 'https://www.weatherapi.com/', 'content': "{'location': {'name': 'San Francisco', 'region': 'California', 'country': 'United States of America', 'lat': 37.775, 'lon': -122.4183, 'tz_id': 'America/Los_Angeles', 'localtime_epoch': 1730484342, 'localtime': '2024-11-01 11:05'}, 'current': {'last_updated_epoch': 1730484000, 'last_updated': '2024-11-01 11:00', 'temp_c': 11.1, 'temp_f': 52.0, 'is_day': 1, 'condition': {'text': 'Mist', 'icon': '//cdn.weatherapi.com/weather/64x64/day/143.png', 'code': 1030}, 'wind_mph': 2.9, 'wind_kph': 4.7, 'wind_degree': 247, 'wind_dir': 'WSW', 'pressure_mb': 1019.0, 'pressure_in': 30.08, 'precip_mm': 0.0, 'precip_in': 0.0, 'humidity': 100, 'cloud': 100, 'feelslike_c': 11.1, 'feelslike_f': 52.0, 'windchill_c': 10.3, 'windchill_f': 50.5, 'heatindex_c': 10.8, 'heatindex_f': 51.5, 'dewpoint_c': 10.4, 'dewpoint_f': 50.6, 'vis_km': 2.8, 'vis_miles': 1.0, 'uv': 3.0, 'gust_mph': 3.8, 'gust_kph': 6.1}}"}, {'url': 'https://weatherspark.com/h/m/557/2024/1/Historical-Weather-in-January-2024-in-San-Francisco-California-United-States', 'content': 'San Francisco Temperature History January 2024\nHourly Temperature in January 2024 in San Francisco\nCompare San Francisco to another city:\nCloud Cover in January 2024 in San Francisco\nDaily Precipitation in January 2024 in San Francisco\nObserved Weather in January 2024 in San Francisco\nHours of Daylight and Twilight in January 2024 in San Francisco\nSunrise & Sunset with Twilight in January 2024 in San Francisco\nSolar Elevation and Azimuth in January 2024 in San Francisco\nMoon Rise, Set & Phases in January 2024 in San Francisco\nHumidity Comfort Levels in January 2024 in San Francisco\nWind Speed in January 2024 in San Francisco\nHourly Wind Speed in January 2024 in San Francisco\nHourly Wind Direction in 2024 in San Francisco\nAtmospheric Pressure in January 2024 in San Francisco\nData Sources\n See all nearby weather stations\nLatest Report — 1:56 PM\nFri, Jan 12, 2024\xa0\xa0\xa0\xa04 min ago\xa0\xa0\xa0\xa0UTC 21:56\nCall Sign KSFO\nTemp.\n54.0°F\nPrecipitation\nNo Report\nWind\n8.1 mph\nCloud Cover\nMostly Cloudy\n14,000 ft\nRaw: KSFO 122156Z 08007KT 10SM FEW030 SCT050 BKN140 12/07 A3022 While having the tremendous advantages of temporal and spatial completeness, these reconstructions: (1) are based on computer models that may have model-based errors, (2) are coarsely sampled on a 50 km grid and are therefore unable to reconstruct the local variations of many microclimates, and (3) have particular difficulty with the weather in some coastal areas, especially small islands.\n We further caution that our travel scores are only as good as the data that underpin them, that weather conditions at any given location and time are unpredictable and variable, and that the definition of the scores reflects a particular set of preferences that may not agree with those of any particular reader.\n January 2024 Weather History in San Francisco California, United States\nThe data for this report comes from the San Francisco International Airport.'}]
+```
+
+现在我们可以看看如何启用此模型进行工具调用。为了启用此功能，我们使用 .bind_tools 让语言模型了解这些工具。
+
+```python
+model_with_tools = model.bind_tools(tools)
+```
+
+现在我们可以调用模型。首先用一个普通消息调用它，看看它如何响应。我们可以同时查看 content 字段和 tool_calls 字段。
+
+```python
+from langchain.messages import HumanMessage
+
+response = model_with_tools.invoke([HumanMessage(content="你好！")])
+
+print(f"ContentString: {response.content}")
+print(f"ToolCalls: {response.tool_calls}")
+```
+
+```text
+ContentString:  你好！今天我能为您提供什么帮助？如果您有疑问或需要特定主题的信息，请随时提问。只需输入您的搜索查询，我将尽力使用可用功能协助您。
+
+
+ToolCalls: []
+```
+
+现在，尝试用一些期望调用工具的输入来调用它。
+
+```python
+response = model_with_tools.invoke([HumanMessage(content="旧金山的天气如何？")])
+
+print(f"ContentString: {response.content}")
+print(f"ToolCalls: {response.tool_calls}")
+```
+
+```text
+ContentString:
+ToolCalls: [{'name': 'tavily_search_results_json', 'args': {'query': 'weather in SF'}, 'id': '2548c622-3553-42df-8220-39fde0632bdb', 'type': 'tool_call'}]
+```
+
+我们可以看到现在没有文本内容，但有一个工具调用！它希望我们调用 Tavily 搜索工具。
+
+这还不是实际调用该工具——它只是告诉我们去调用。为了真正调用它，我们需要创建我们的智能体。
+
+# 创建智能体
+
+现在我们已经定义了工具和 LLM，可以创建智能体了。我们将使用 LangGraph 来构建智能体。目前，我们使用高级接口来构建智能体，但 LangGraph 的好处在于，如果您想修改智能体逻辑，这个高级接口背后有一个低级别、高度可控的 API。
+
+现在，我们可以用 LLM 和工具初始化智能体。
+
+注意，我们传入的是 model，而不是 model_with_tools。这是因为 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 会在底层为我们调用 `.bind_tools`。
+
+```python
+from langchain.agents import create_agent
+
+
+agent_executor = create_agent(model, tools)
+```
+
+现在让我们在一个应该调用工具的示例上试试
+
+```python
+response = agent_executor.invoke({"messages": [HumanMessage(content="你好！")]})
+
+response["messages"]
+```
+
+```text
+[HumanMessage(content='你好！', additional_kwargs={}, response_metadata={}, id='0ab1f3c7-9079-42d4-8a8a-13af5f6c226b'),
+ AIMessage(content=' 你好！今天我能为您提供什么帮助？如果您有疑问或需要特定主题的信息，请随时提问。例如，您可以以“气候变化的最新消息”或“阿尔伯特·爱因斯坦传记”这样的搜索查询开始。\n\n', additional_kwargs={}, response_metadata={}, id='run-276d9dcd-13f3-481d-b562-8fe3962d9ba1-0')]
+```
+
+为了查看底层到底发生了什么（并确保它没有调用工具），我们可以查看 LangSmith 追踪：[smith.langchain.com/public/2372d9c5-855a-45ee-80f2-94b63493563d/r](https://smith.langchain.com/public/2372d9c5-855a-45ee-80f2-94b63493563d/r)
+
+```python
+response = agent_executor.invoke(
+    {"messages": [HumanMessage(content="旧金山的天气如何？")]}
+)
+response["messages"]
+```
+
+```json
+[HumanMessage(content='旧金山的天气如何？', additional_kwargs={}, response_metadata={}, id='af276c61-3df7-4241-8cb0-81d1f1477bb3'),
+ AIMessage(content='', additional_kwargs={'tool_calls': [{'id': '86da84b8-0d44-444f-8448-7f134f9afa41', 'type': 'function', 'function': {'name': 'tavily_search_results_json', 'arguments': '{"query": "weather in SF"}'}}]}, response_metadata={}, id='run-abe1b8e2-98a6-4f69-8f95-278ac8c141ff-0', tool_calls=[{'name': 'tavily_search_results_json', 'args': {'query': 'weather in SF'}, 'id': '86da84b8-0d44-444f-8448-7f134f9afa41', 'type': 'tool_call'}]),
+ ToolMessage(content='[{"url": "https://www.weatherapi.com/", "content": "{\'location\': {\'name\': \'San Francisco\', \'region\': \'California\', \'country\': \'United States of America\', \'lat\': 37.775, \'lon\': -122.4183, \'tz_id\': \'America/Los_Angeles\', \'localtime_epoch\': 1730483436, \'localtime\': \'2024-11-01 10:50\'}, \'current\': {\'last_updated_epoch\': 1730483100, \'last_updated\': \'2024-11-01 10:45\', \'temp_c\': 11.4, \'temp_f\': 52.5, \'is_day\': 1, \'condition\': {\'text\': \'Mist\', \'icon\': \'//cdn.weatherapi.com/weather/64x64/day/143.png\', \'code\': 1030}, \'wind_mph\': 2.2, \'wind_kph\': 3.6, \'wind_degree\': 237, \'wind_dir\': \'WSW\', \'pressure_mb\': 1019.0, \'pressure_in\': 30.08, \'precip_mm\': 0.0, \'precip_in\': 0.0, \'humidity\': 100, \'cloud\': 100, \'feelslike_c\': 11.8, \'feelslike_f\': 53.2, \'windchill_c\': 11.2, \'windchill_f\': 52.1, \'heatindex_c\': 11.7, \'heatindex_f\': 53.0, \'dewpoint_c\': 10.1, \'dewpoint_f\': 50.1, \'vis_km\': 2.8, \'vis_miles\': 1.0, \'uv\': 3.0, \'gust_mph\': 3.0, \'gust_kph': 4.9}}"}, {"url": "https://www.timeanddate.com/weather/@z-us-94134/ext", "content": "Forecasted weather conditions the coming 2 weeks for San Francisco. Sign in. News. News Home; Astronomy News; Time Zone News ... 01 pm: Mon Nov 11: 60 / 53 °F: Tstorms early. Broken clouds. 54 °F: 19 mph: ↑: 70%: 58%: 0.20\\" 0 (Low) 6:46 am: 5:00 pm * Updated Monday, October 28, 2024 2:24:10 pm San Francisco time - Weather by CustomWeather"}]', name='tavily_search_results_json', id='de8c8d78-ae24-4a8a-9c73-795c1e4fdd41', tool_call_id='86da84b8-0d44-444f-8448-7f134f9afa41', artifact={'query': 'weather in SF', 'follow_up_questions': None, 'answer': None, 'images': [], 'results': [{'title': 'Weather in San Francisco', 'url': 'https://www.weatherapi.com/', 'content': "{'location': {'name': 'San Francisco', 'region': 'California', 'country': 'United States of America', 'lat': 37.775, 'lon': -122.4183, 'tz_id': 'America/Los_Angeles', 'localtime_epoch': 1730483436, 'localtime': '2024-11-01 10:50'}, 'current': {'last_updated_epoch': 1730483100, 'last_updated': '2024-11-01 10:45', 'temp_c': 11.4, 'temp_f': 52.5, 'is_day': 1, 'condition': {'text': 'Mist', 'icon': '//cdn.weatherapi.com/weather/64x64/day/143.png', 'code': 1030}, 'wind_mph': 2.2, 'wind_kph': 3.6, 'wind_degree': 237, 'wind_dir': 'WSW', 'pressure_mb': 1019.0, 'pressure_in': 30.08, 'precip_mm': 0.0, 'precip_in': 0.0, 'humidity': 100, 'cloud': 100, 'feelslike_c': 11.8, 'feelslike_f': 53.2, 'windchill_c': 11.2, 'windchill_f': 52.1, 'heatindex_c': 11.7, 'heatindex_f': 53.0, 'dewpoint_c': 10.1, 'dewpoint_f': 50.1, 'vis_km': 2.8, 'vis_miles': 1.0, 'uv': 3.0, 'gust_mph': 3.0, 'gust_kph': 4.9}}", 'score': 0.9989501, 'raw_content': None}, {'title': 'San Francisco, USA 14 day weather forecast - timeanddate.com', 'url': 'https://www.timeanddate.com/weather/@z-us-94134/ext', 'content': 'Forecasted weather conditions the coming 2 weeks for San Francisco. Sign in. News. News Home; Astronomy News; Time Zone News ... 01 pm: Mon Nov 11: 60 / 53 °F: Tstorms early. Broken clouds. 54 °F: 19 mph: ↑: 70%: 58%: 0.20" 0 (Low) 6:46 am: 5:00 pm * Updated Monday, October 28, 2024 2:24:10 pm San Francisco time - Weather by CustomWeather', 'score': 0.9938309, 'raw_content': None}], 'response_time': 3.56}),
+ AIMessage(content=' 旧金山当前天气为有雾，温度为 11.4°C (52.5°F)。湿度为 100%，风向为 WSW，风速为 2.2 mph。未来几周的天气预报显示，天气将以多云和局部多云为主，并有雷暴的可能性。预计气温将在 53°F 至 60°F 之间。\n\n', additional_kwargs={}, response_metadata={}, id='run-de4207d6-e8e8-4382-ad16-4de0dcf0812a-0')]
+```
+
+我们可以查看 LangSmith 追踪，以确保它有效地调用了搜索工具。
+
+[smith.langchain.com/public/013ef704-654b-4447-8428-637b343d646e/r](https://smith.langchain.com/public/013ef704-654b-4447-8428-637b343d646e/r)
+
+我们已经看到如何使用 `invoke` 调用智能体以获取最终响应。如果智能体执行多个步骤，这可能需要一些时间。为了显示中间进度，我们可以在消息发生时流式返回它们。
+
+```python
+for chunk in agent_executor.stream(
+    {"messages": [HumanMessage(content="旧金山的天气如何？")]}
+):
+    print(chunk)
+    print("----")
+```
+
+```json
+{'agent': {'messages': [AIMessage(content='', additional_kwargs={'tool_calls': [{'id': '2457d3ea-f001-4b8c-a1ed-3dc3d1381639', 'type': 'function', 'function': {'name': 'tavily_search_results_json', 'arguments': '{"query": "weather in San Francisco"}'}}]}, response_metadata={}, id='run-0363deab-84d2-4319-bb1e-b55b47fe2274-0', tool_calls=[{'name': 'tavily_search_results_json', 'args': {'query': 'weather in San Francisco'}, 'id': '2457d3ea-f001-4b8c-a1ed-3dc3d1381639', 'type': 'tool_call'}])]}}
+----
+{'tools': {'messages': [ToolMessage(content='[{"url": "https://www.weatherapi.com/", "content": "{\'location\': {\'name\': \'San Francisco\', \'region\': \'California\', \'country\': \'United States of America\', \'lat\': 37.775, \'lon\': -122.4183, \'tz_id\': \'America/Los_Angeles\', \'localtime_epoch\': 1730483636, \'localtime\': \'2024-11-01 10:53\'}, \'current\': {\'last_updated_epoch\': 1730483100, \'last_updated\': \'2024-11-01 10:45\', \'temp_c\': 11.4, \'temp_f\': 52.5, \'is_day\': 1, \'condition\': {\'text\': \'Mist\', \'icon\': \'//cdn.weatherapi.com/weather/64x64/day/143.png\', \'code\': 1030}, \'wind_mph\': 2.2, \'wind_kph\': 3.6, \'wind_degree\': 237, \'wind_dir\': \'WSW\', \'pressure_mb\': 1019.0, \'pressure_in\': 30.08, \'precip_mm\': 0.0, \'precip_in\': 0.0, \'humidity\': 100, \'cloud\': 100, \'feelslike_c\': 11.8, \'feelslike_f\': 53.2, \'windchill_c\': 11.2, \'windchill_f\': 52.1, \'heatindex_c\': 11.7, \'heatindex_f\': 53.0, \'dewpoint_c\': 10.1, \'dewpoint_f\': 50.1, \'vis_km\': 2.8, \'vis_miles\': 1.0, \'uv\': 3.0, \'gust_mph\': 3.0, \'gust_kph\': 4.9}}"}, {"url": "https://weather.com/weather/monthly/l/69bedc6a5b6e977993fb3e5344e3c06d8bc36a1fb6754c3ddfb5310a3c6d6c87", "content": "Weather.com brings you the most accurate monthly weather forecast for San Francisco, CA with average/record and high/low temperatures, precipitation and more. ... 11. 66 ° 55 ° 12. 69 ° 60"}]', name='tavily_search_results_json', id='e675f99b-130f-4e98-8477-badd45938d9d', tool_call_id='2457d3ea-f001-4b8c-a1ed-3dc3d1381639', artifact={'query': 'weather in San Francisco', 'follow_up_questions': None, 'answer': None, 'images': [], 'results': [{'title': 'Weather in San Francisco', 'url': 'https://www.weatherapi.com/', 'content': "{'location': {'name': 'San Francisco', 'region': 'California', 'country': 'United States of America', 'lat': 37.775, 'lon': -122.4183, 'tz_id': 'America/Los_Angeles', 'localtime_epoch': 1730483636, 'localtime': '2024-11-01 10:53'}, 'current': {'last_updated_epoch': 1730483100, 'last_updated': '2024-11-01 10:45', 'temp_c': 11.4, 'temp_f': 52.5, 'is_day': 1, 'condition': {'text': 'Mist', 'icon': '//cdn.weatherapi.com/weather/64x64/day/143.png', 'code': 1030}, 'wind_mph': 2.2, 'wind_kph': 3.6, 'wind_degree': 237, 'wind_dir': 'WSW', 'pressure_mb': 1019.0, 'pressure_in': 30.08, 'precip_mm': 0.0, 'precip_in': 0.0, 'humidity': 100, 'cloud': 100, 'feelslike_c': 11.8, 'feelslike_f': 53.2, 'windchill_c': 11.2, 'windchill_f': 52.1, 'heatindex_c': 11.7, 'heatindex_f': 53.0, 'dewpoint_c': 10.1, 'dewpoint_f': 50.1, 'vis_km': 2.8, 'vis_miles': 1.0, 'uv': 3.0, 'gust_mph': 3.0, 'gust_kph': 4.9}}", 'score': 0.9968992, 'raw_content': None}, {'title': 'Monthly Weather Forecast for San Francisco, CA - weather.com', 'url': 'https://weather.com/weather/monthly/l/69bedc6a5b6e977993fb3e5344e3c06d8bc36a1fb6754c3ddfb5310a3c6d6c87', 'content': 'Weather.com brings you the most accurate monthly weather forecast for San Francisco, CA with average/record and high/low temperatures, precipitation and more. ... 11. 66 ° 55 ° 12. 69 ° 60', 'score': 0.97644573, 'raw_content': None}], 'response_time': 3.16})]}}
+----
+{'agent': {'messages': [AIMessage(content=' 旧金山当前天气为有雾，温度为 11.4°C (52.5°F)。风向为 WSW，风速为 2.2 mph (3.6 kph)。湿度为 100%，能见度为 2.8 km (1.0 英里)。月度预报显示平均气温在 55°F 至 66°F (13°C 至 19°C) 之间，预计会有一些降水。\n\n', additional_kwargs={}, response_metadata={}, id='run-99ccf444-d286-4244-a5a5-7b1b511153a6-0')]}}
+----
+```
+
+---
+
+## API 参考
+
+[docs.reka.ai/quick-start](https://docs.reka.ai/quick-start)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\reka.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

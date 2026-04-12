@@ -1,0 +1,173 @@
+---
+title: "Zep 云集成"
+description: "使用 LangChain JavaScript 与 Zep 云检索器集成。"
+---
+
+> [Zep](https://www.getzep.com) 是一款面向 AI 助手应用的长时记忆服务。
+> 通过 Zep，您可以让 AI 助手具备回忆过往对话的能力，无论对话发生在多久以前，
+> 同时还能减少幻觉、降低延迟和成本。
+
+本示例展示了如何在检索链中使用 Zep 检索器，从 Zep 开源记忆存储中检索文档。
+
+## 安装
+
+注册 [Zep Cloud](https://app.getzep.com/) 并创建一个项目。
+
+按照 [Zep Cloud Typescript SDK 安装指南](https://help.getzep.com/sdks) 安装并开始使用 Zep。
+
+您需要 Zep Cloud 项目 API 密钥才能使用 ZepCloudRetriever。更多信息请参阅 [Zep Cloud 文档](https://help.getzep.com/projects)。
+
+## 设置
+
+<Tip>
+通用安装 LangChain 包的说明请参见 [此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm i @getzep/zep-cloud @langchain/community @langchain/core
+```
+
+## 使用
+
+```typescript
+import { ZepCloudRetriever } from "@langchain/community/retrievers/zep_cloud";
+import { randomUUID } from "crypto";
+import { ZepClient, type Zep } from "@getzep/zep-cloud";
+
+function sleep(ms: number) {
+  // eslint-disable-next-line no-promise-executor-return
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const zepConfig = {
+  // 您的 Zep Cloud 项目 API 密钥 https://help.getzep.com/projects
+  apiKey: "<Zep Api Key>",
+  sessionId: `session_${randomUUID()}`,
+};
+
+console.log(`Zep 配置: ${JSON.stringify(zepConfig)}`);
+
+// 生成关于法国旅行的聊天消息
+const chatMessages = [
+  {
+    role: "AI",
+    message: "Bonjour! 今天我能如何协助您的旅行计划？",
+  },
+  { role: "User", message: "我正在计划去法国旅行。" },
+  {
+    role: "AI",
+    message: "听起来很令人兴奋！您计划访问哪些城市？",
+  },
+  { role: "User", message: "我考虑去巴黎和尼斯。" },
+  {
+    role: "AI",
+    message: "很棒的选择！您对任何特定活动感兴趣吗？",
+  },
+  { role: "User", message: "我很想去参观一些葡萄园。" },
+  {
+    role: "AI",
+    message:
+      "法国拥有世界上一些最好的葡萄园。我可以帮您找一些。",
+  },
+  { role: "User", message: "那太好了！" },
+  { role: "AI", message: "您更喜欢红葡萄酒还是白葡萄酒？" },
+  { role: "User", message: "我更喜欢红葡萄酒。" },
+  {
+    role: "AI",
+    message:
+      "完美！我会找一些以红葡萄酒闻名的葡萄园。",
+  },
+  { role: "User", message: "谢谢，那会非常有帮助。" },
+  {
+    role: "AI",
+    message:
+      "不客气！我还会为您查找一些法国葡萄酒礼仪。",
+  },
+  {
+    role: "User",
+    message: "听起来很棒。我迫不及待想开始我的旅行了！",
+  },
+  {
+    role: "AI",
+    message:
+      "我相信您会度过一段美妙的时光。关于您的旅行还有其他问题吗？",
+  },
+  { role: "User", message: "暂时没有，谢谢您的帮助！" },
+];
+
+const zepClient = new ZepClient({
+  apiKey: zepConfig.apiKey,
+});
+
+// 将聊天消息添加到记忆
+for (const chatMessage of chatMessages) {
+  let m: Zep.Message;
+  if (chatMessage.role === "AI") {
+    m = { role: "ai", roleType: "assistant", content: chatMessage.message };
+  } else {
+    m = { role: "human", roleType: "user", content: chatMessage.message };
+  }
+
+  await zepClient.memory.add(zepConfig.sessionId, { messages: [m] });
+}
+
+// 等待消息被总结、丰富、嵌入和索引。
+await sleep(10000);
+
+// 简单相似性搜索
+const query = "我可以在法国开红色的车吗？";
+const retriever = new ZepCloudRetriever({ ...zepConfig, topK: 3 });
+const docs = await retriever.invoke(query);
+console.log("简单相似性搜索");
+console.log(JSON.stringify(docs, null, 2));
+
+// MMR 重排序搜索
+const mmrRetriever = new ZepCloudRetriever({
+  ...zepConfig,
+  topK: 3,
+  searchType: "mmr",
+  mmrLambda: 0.5,
+});
+const mmrDocs = await mmrRetriever.invoke(query);
+console.log("MMR 重排序搜索");
+console.log(JSON.stringify(mmrDocs, null, 2));
+
+// 摘要搜索配合 MMR 重排序
+const mmrSummaryRetriever = new ZepCloudRetriever({
+  ...zepConfig,
+  topK: 3,
+  searchScope: "summary",
+  searchType: "mmr",
+  mmrLambda: 0.5,
+});
+const mmrSummaryDocs = await mmrSummaryRetriever.invoke(query);
+console.log("摘要搜索配合 MMR 重排序");
+console.log(JSON.stringify(mmrSummaryDocs, null, 2));
+
+// 过滤搜索
+const filteredRetriever = new ZepCloudRetriever({
+  ...zepConfig,
+  topK: 3,
+  filter: {
+    where: { jsonpath: '$[*] ? (@.foo == "bar")' },
+  },
+});
+const filteredDocs = await filteredRetriever.invoke(query);
+console.log("过滤搜索");
+console.log(JSON.stringify(filteredDocs, null, 2));
+```
+
+## 相关
+
+- [检索指南](/oss/javascript/langchain/retrieval)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\zep-cloud-retriever.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

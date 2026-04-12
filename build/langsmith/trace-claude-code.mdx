@@ -1,0 +1,209 @@
+---
+title: 追踪 Claude Code 应用
+sidebarTitle: Claude Code
+---
+
+本指南展示如何自动将 [Claude Code CLI](https://code.claude.com/docs/en/overview) 中的对话发送到 LangSmith。
+
+![](/langsmith/images/example-claude-code-plugin-trace.png)
+
+配置完成后，每个 Claude Code 项目都可以选择将追踪数据发送到 LangSmith。每条追踪记录包含用户消息、工具调用、压缩、子代理运行和助手响应。系统提示不包含在内，因为 Claude Code 不会在对话记录中返回它们。
+
+## 前提条件
+
+在设置追踪之前，请确保您已具备：
+
+- 已安装 [**Claude Code CLI**](https://code.claude.com/docs/en/overview)。
+- 拥有 [**LangSmith API 密钥**](https://smith.langchain.com/settings/apikeys)。
+- 已安装 [**Node.js**](https://nodejs.org/)。
+
+## 开始使用
+
+在 Claude Code 中运行：
+
+```bash
+/plugin marketplace add langchain-ai/langsmith-claude-code-plugins
+/plugin install langsmith-tracing@langsmith-claude-code-plugins
+/reload-plugins
+```
+
+要更新插件，请运行：
+
+```bash
+/plugin marketplace update langsmith-claude-code-plugins
+/reload-plugins
+```
+
+<Note> 如果您正在从之前推荐的通过手动创建停止钩子来追踪 Claude Code 的版本迁移，请参阅 [从手动停止钩子迁移](#migrating-from-the-manual-stop-hook)。</Note>
+
+### 设置环境变量
+
+**选项 1：项目级配置（推荐）**
+
+插件需要以下环境变量：
+
+- `TRACE_TO_LANGSMITH: "true"` - 为此项目启用追踪。移除或设置为 `false` 以禁用追踪。
+- `CC_LANGSMITH_API_KEY` - 您的 LangSmith API 密钥
+- `CC_LANGSMITH_PROJECT` - 追踪数据发送到的 LangSmith 项目名称
+- （可选）`CC_LANGSMITH_DEBUG: "true"` - 启用详细的调试日志记录。移除或设置为 `false` 以禁用调试日志记录。
+
+最简单的设置方法是创建或编辑 [Claude Code 的项目设置文件](https://code.claude.com/docs/en/settings#:~:text=Project%20settings%20are%20saved%20in%20your%20project%20directory%3A)。在您的项目目录中创建 `.claude/settings.local.json` 并填充如下内容：
+
+```json
+{
+  "env": {
+    "TRACE_TO_LANGSMITH": "true",
+    "CC_LANGSMITH_API_KEY": "<LangSmith API 密钥>",
+    "CC_LANGSMITH_PROJECT": "my-project"
+  }
+}
+```
+
+<Note> 或者，要为所有 Claude Code 会话启用向 LangSmith 发送追踪，您可以将上述 JSON 添加到您的 [全局 Claude Code settings.json](https://code.claude.com/docs/en/settings#:~:text=User%20settings%20are%20defined%20in%20~/.claude/settings.json%20and%20apply%20to%20all%20projects.) 文件中。</Note>
+
+**选项 2：Shell 环境变量**
+
+在您的 shell 中运行以下命令，或将它们添加到您的 shell 配置文件（`~/.zshrc`、`~/.bashrc` 或 `~/.bash_profile`）中：
+
+```bash
+export TRACE_TO_LANGSMITH="true"
+export CC_LANGSMITH_API_KEY="<LangSmith API 密钥>"
+export CC_LANGSMITH_PROJECT="my-project"
+```
+
+## 验证设置
+
+追踪记录将在 Claude Code 响应后完整地出现在 LangSmith 中。请注意，如果您在运行过程中中断，插件只会在您发送下一条消息或结束会话时刷新该次运行。
+
+在 LangSmith 中，您将看到：
+
+- 发送给 Claude Code 的每条消息都显示为一条追踪记录。
+- 同一 Claude Code 会话中的所有轮次都通过共享的 `thread_id` 进行分组，并可以在项目的 **Threads** 选项卡中查看。
+
+## 将追踪嵌套在现有运行下
+
+您还可以设置名为 `CC_LANGSMITH_PARENT_DOTTED_ORDER` 的环境变量，将所有 Claude Code 追踪记录作为现有 LangSmith 运行的子项嵌套。这在 Claude Code 作为更大追踪工作流的一部分被编程调用时非常有用。
+
+**Python**
+
+```python
+import subprocess
+from langsmith import traceable, get_current_run_tree
+
+
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = "<LangSmith API 密钥>"
+os.environ["LANGSMITH_PROJECT"] = "claude-code"
+
+@traceable
+def run_claude(prompt: str):
+    run_tree = get_current_run_tree()
+    subprocess.run(
+        ["claude", "-p", prompt],
+        env={
+            **os.environ,
+            "TRACE_TO_LANGSMITH": "true",
+            "CC_LANGSMITH_API_KEY": "<LangSmith API 密钥>",
+            "CC_LANGSMITH_PROJECT": "claude-code",
+            "CC_LANGSMITH_PARENT_DOTTED_ORDER": run_tree.dotted_order,
+        },
+    )
+```
+
+**TypeScript**
+
+```ts
+import { traceable, getCurrentRunTree } from "langsmith/traceable";
+import { execSync } from "node:child_process";
+
+process.env.LANGSMITH_TRACING = "true";
+process.env.LANGSMITH_API_KEY = "<LangSmith API 密钥>";
+process.env.LANGSMITH_PROJECT = "claude-code";
+
+const runClaude = traceable(
+  async (prompt: string) => {
+    const runTree = getCurrentRunTree();
+    const pluginDir = new URL(".", import.meta.url).pathname;
+    const res = execSync(`claude -p "${prompt}" --plugin-dir '${pluginDir}'`, {
+      env: {
+        ...process.env,
+        TRACE_TO_LANGSMITH: "true",
+        CC_LANGSMITH_API_KEY: "<LangSmith API 密钥>",
+        CC_LANGSMITH_PROJECT: "claude-code",
+        CC_LANGSMITH_PARENT_DOTTED_ORDER: runTree.dotted_order,
+      },
+    });
+    return res.toString();
+  },
+  { name: "run_claude" },
+);
+```
+
+生成的追踪层次结构如下所示：
+
+```
+您的外部运行 (chain)
+└── Claude Code 轮次 (chain)
+    ├── Claude (llm)
+    ├── Read (tool)
+    └── Claude (llm)
+```
+
+## 故障排除
+
+### LangSmith 中没有出现追踪记录
+
+1. **检查钩子是否正在运行**：
+   ```bash
+   tail -f ~/.claude/state/hook.log
+   ```
+   您应该在每次 Claude 响应后看到日志条目。
+
+2. **验证环境变量**：
+   - 检查您的项目 `.claude/settings.local.json` 中是否设置了 `TRACE_TO_LANGSMITH="true"`
+   - 验证您的个人访问令牌 (PAT) 是否正确（以 `lsv2_pt_` 开头）
+   - 确保项目名称在 LangSmith 中存在
+
+3. **启用调试模式** 以查看详细的 API 活动：
+   ```json
+   {
+     "env": {
+       "CC_LANGSMITH_DEBUG": "true"
+     }
+   }
+   ```
+   然后检查日志中的 API 调用和 HTTP 状态码。
+
+### 用户中断后子代理运行未出现
+目前，子代理仅在完成时被追踪。这意味着如果您在子代理运行过程中中断对话轮次，该子代理的子运行将不会被追踪。
+
+### 管理日志文件大小
+
+钩子将所有活动记录到 `~/.claude/state/hook.log`。启用调试模式后，此文件可能会变得很大：
+
+```bash
+# 查看日志文件大小
+ls -lh ~/.claude/state/hook.log
+
+# 如果需要，清除日志
+> ~/.claude/state/hook.log
+```
+
+## 从手动停止钩子迁移
+
+如果您之前使用旧版本的 LangSmith 追踪 Claude Code，您需要删除 `~/.claude/hooks/stop_hook.sh`，并从之前添加了该钩子的任何 `settings.local.json` 或 `settings.json` 文件中移除对钩子的引用，然后按照上面的 [插件安装说明](#getting-started) 操作。
+
+## 源代码
+
+该插件在 MIT 许可证下开源，可在 [此 GitHub 仓库](https://github.com/langchain-ai/langsmith-claude-code-plugins) 中找到。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\trace-claude-code.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

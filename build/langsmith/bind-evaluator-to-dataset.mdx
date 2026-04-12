@@ -1,0 +1,83 @@
+---
+title: 在实验上自动运行评估器
+sidebarTitle: 在实验上运行评估器
+---
+
+LangSmith 支持两种方式对通过 SDK 创建的实验进行评分：
+
+* **编程方式**，通过在代码中指定评估器（详见[如何评估 LLM 应用](/langsmith/evaluate-llm-application)）
+* 通过**在 UI 中将评估器绑定到数据集**。这将自动在任何新创建的实验上运行这些评估器，此外还会运行你通过 SDK 设置的任何评估器。这在迭代你的应用（目标函数）时非常有用，并且你希望为所有实验运行一套标准的评估器。
+
+## 在数据集上配置评估器
+
+1. 点击侧边栏中的 **Datasets and Experiments** 标签页。
+2. 选择你想要为其配置评估器的数据集。
+3. 点击 **+ Evaluator** 按钮，向数据集添加评估器。这将打开一个面板，你可以用来配置评估器。
+
+<Note>
+当你为数据集配置评估器时，它只会影响评估器配置之后创建的实验运行。它不会影响评估器配置之前创建的实验运行的评估。
+</Note>
+
+## LLM 作为评判者的评估器
+
+将评估器绑定到数据集的过程与在 Playground 中配置 LLM 作为评判者评估器的过程非常相似。查看[在 Playground 中配置 LLM 作为评判者评估器的说明](/langsmith/llm-as-judge?mode=ui)。
+
+## 自定义代码评估器
+
+将代码评估器绑定到数据集的过程与在线评估中配置代码评估器的过程非常相似。查看[配置代码评估器的说明](/langsmith/online-evaluations-code)。
+
+在线评估中配置代码评估器与将代码评估器绑定到数据集之间的唯一区别是，自定义代码评估器可以引用数据集 `Example` 中的输出。
+
+对于绑定到数据集的自定义代码评估器，评估器函数接受两个参数：
+
+* 一个 `Run`（[参考](/langsmith/run-data-format)）。这代表你实验中的新运行。例如，如果你通过 SDK 运行了一个实验，这将包含你正在测试的链或模型的输入/输出。
+* 一个 `Example`（[参考](/langsmith/example-data-format)）。这代表你正在测试的链或模型所使用的数据集中的参考示例。`Run` 和 `Example` 的 `inputs` 应该是相同的。如果你的 `Example` 有一个参考 `outputs`，那么你可以用它来与运行的输出进行比较以进行评分。
+
+下面的代码展示了一个简单的评估器函数示例，它检查输出是否与参考输出完全相等。
+
+<CodeGroup>
+
+```python Python
+import numpy as np
+
+def perform_eval(run, example):
+    # run 是一个 Run 对象
+    # example 是一个 Example 对象
+    output = run['outputs']['output']
+    ref_output = example['outputs']['outputs']
+    output_match = np.array_equal(output, ref_output)
+
+    return { "exact_match": output_match }
+```
+
+```javascript JavaScript
+function perform_eval(run, example) {
+    // run 是一个 Run 对象
+    // example 是一个 Example 对象
+    const output = run.outputs.output;
+    const refOutput = example.outputs.outputs;
+
+    // 对数组/对象进行深度相等性检查
+    const outputMatch = JSON.stringify(output) === JSON.stringify(refOutput);
+
+    return { "exact_match": outputMatch };
+}
+```
+
+</CodeGroup>
+
+## 后续步骤
+
+* 在[实验标签页](/langsmith/analyze-an-experiment)中分析你的实验结果
+* 在[比较视图](/langsmith/compare-experiment-results)中比较你的实验结果
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\bind-evaluator-to-dataset.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

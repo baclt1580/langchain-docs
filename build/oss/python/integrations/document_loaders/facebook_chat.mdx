@@ -1,0 +1,39 @@
+---
+title: "Facebook 集成"
+description: "使用 LangChain Python 与 Facebook 文档加载器集成。"
+---
+
+>[Messenger](https://en.wikipedia.org/wiki/Messenger_(software)) 是一款由 `Meta Platforms` 开发的美国专有即时通讯应用和平台。最初于 2008 年作为 `Facebook Chat` 开发，该公司在 2010 年对其消息服务进行了全面改进。
+
+本笔记本介绍了如何将 [Facebook 聊天记录](https://www.facebook.com/business/help/1646890868956360) 中的数据加载成可被 LangChain 摄取的格式。
+
+```python
+# pip install pandas
+```
+
+```python
+from langchain_community.document_loaders import FacebookChatLoader
+```
+
+```python
+loader = FacebookChatLoader("example_data/facebook_chat.json")
+```
+
+```python
+loader.load()
+```
+
+```python
+[Document(page_content='User 2 于 2023-02-05 03:46:11: 再见！\n\nUser 1 于 2023-02-05 03:43:55: 哦，没关系！再见\n\nUser 2 于 2023-02-05 03:24:37: 不，抱歉是我的错，蓝色的那个不卖\n\nUser 1 于 2023-02-05 03:05:40: 我以为你在卖蓝色的那个！\n\nUser 1 于 2023-02-05 03:05:09: 我对这个包不感兴趣。我感兴趣的是蓝色的那个！\n\nUser 2 于 2023-02-05 03:04:28: 这是 $129\n\nUser 2 于 2023-02-05 03:04:05: 网上至少 $100\n\nUser 1 于 2023-02-05 02:59:59: 你想要多少钱？\n\nUser 2 于 2023-02-04 22:17:56: 早上好！$50 太低了。\n\nUser 1 于 2023-02-04 14:17:02: 你好！我对你的包感兴趣。我出价 $50。如果你有兴趣请告诉我。谢谢！\n\n', metadata={'source': 'example_data/facebook_chat.json'})]
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\facebook_chat.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

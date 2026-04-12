@@ -1,0 +1,92 @@
+---
+title: "Epsilla 集成"
+description: "使用 LangChain Python 与 Epsilla 向量存储进行集成。"
+---
+
+>[Epsilla](https://www.epsilla.com) 是一个开源向量数据库，利用先进的并行图遍历技术进行向量索引。Epsilla 采用 GPL-3.0 许可。
+
+您需要安装 `langchain-community`，使用 `pip install -qU langchain-community` 来使用此集成
+
+本 Notebook 展示了如何使用与 `Epsilla` 向量数据库相关的功能。
+
+作为先决条件，您需要运行一个 Epsilla 向量数据库（例如，通过我们的 docker 镜像），并安装 `pyepsilla` 包。完整文档请查看 [文档](https://epsilla-inc.gitbook.io/epsilladb/quick-start)。
+
+```python
+!pip/pip3 install pyepsilla
+```
+
+我们要使用 [`OpenAIEmbeddings`](https://reference.langchain.com/python/langchain-openai/embeddings/base/OpenAIEmbeddings)，因此需要获取 OpenAI API 密钥。
+
+```python
+import getpass
+import os
+
+if "OPENAI_API_KEY" not in os.environ:
+    os.environ["OPENAI_API_KEY"] = getpass.getpass("OpenAI API Key:")
+```
+
+OpenAI API 密钥：········
+
+```python
+from langchain_community.vectorstores import Epsilla
+from langchain_openai import OpenAIEmbeddings
+```
+
+```python
+from langchain_community.document_loaders import TextLoader
+from langchain_text_splitters import CharacterTextSplitter
+
+loader = TextLoader("../../how_to/state_of_the_union.txt")
+documents = loader.load()
+
+documents = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0).split_documents(
+    documents
+)
+
+embeddings = OpenAIEmbeddings()
+```
+
+Epsilla 向量数据库默认以主机 "localhost" 和端口 "8888" 运行。我们使用了自定义的 db 路径、db 名称和集合名称，而不是默认值。
+
+```python
+from pyepsilla import vectordb
+
+client = vectordb.Client()
+vector_store = Epsilla.from_documents(
+    documents,
+    embeddings,
+    client,
+    db_path="/tmp/mypath",
+    db_name="MyDB",
+    collection_name="MyCollection",
+)
+```
+
+```python
+query = "What did the president say about Ketanji Brown Jackson"
+docs = vector_store.similarity_search(query)
+print(docs[0].page_content)
+```
+
+In state after state, new laws have been passed, not only to suppress the vote, but to subvert entire elections.
+
+We cannot let this happen.
+
+Tonight. I call on the Senate to: Pass the Freedom to Vote Act. Pass the John Lewis Voting Rights Act. And while you're at it, pass the Disclose Act so Americans can know who is funding our elections.
+
+Tonight, I'd like to honor someone who has dedicated his life to serve this country: Justice Stephen Breyer—an Army veteran, Constitutional scholar, and retiring Justice of the United States Supreme Court. Justice Breyer, thank you for your service.
+
+One of the most serious constitutional responsibilities a President has is nominating someone to serve on the United States Supreme Court.
+
+And I did that 4 days ago, when I nominated Circuit Court of Appeals Judge Ketanji Brown Jackson. One of our nation's top legal minds, who will continue Justice Breyer's legacy of excellence.
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\epsilla.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

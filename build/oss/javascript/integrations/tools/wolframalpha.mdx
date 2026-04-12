@@ -1,0 +1,40 @@
+---
+title: "Wolframalpha 集成"
+description: "使用 LangChain JavaScript 与 Wolframalpha 工具集成。"
+---
+
+WolframAlpha 工具可将您的智能体和链连接到 WolframAlpha 先进的计算智能引擎。
+
+## 设置
+
+您需要在 [WolframAlpha 开发者门户](https://developer.wolframalpha.com/) 创建一个应用并获取 `appid`。
+
+## 使用方法
+
+```typescript
+import { WolframAlphaTool } from "@langchain/community/tools/wolframalpha";
+
+const tool = new WolframAlphaTool({
+  appid: "YOUR_APP_ID",
+});
+
+const res = await tool.invoke("What is 2 * 2?");
+
+console.log(res);
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/javascript/langchain/tools)
+- 工具 [操作指南](/oss/javascript/langchain/tools)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\wolframalpha.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

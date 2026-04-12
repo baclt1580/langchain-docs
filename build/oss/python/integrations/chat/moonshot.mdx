@@ -1,0 +1,51 @@
+---
+title: "MoonshotChat 集成"
+description: "使用 LangChain Python 与 MoonshotChat 聊天模型进行集成。"
+---
+
+[Moonshot](https://platform.moonshot.cn/) 是一家为中国企业和个人提供大语言模型服务的初创公司。
+
+本示例将介绍如何使用 LangChain 与 Moonshot Inference 进行聊天交互。
+
+```python
+import os
+
+# 从以下地址生成您的 API 密钥：https://platform.moonshot.cn/console/api-keys
+os.environ["MOONSHOT_API_KEY"] = "MOONSHOT_API_KEY"
+```
+
+```python
+from langchain_community.chat_models.moonshot import MoonshotChat
+from langchain.messages import HumanMessage, SystemMessage
+```
+
+```python
+chat = MoonshotChat()
+# 或指定使用特定模型
+# 可用模型列表：https://platform.moonshot.cn/docs
+# chat = MoonshotChat(model="moonshot-v1-128k")
+```
+
+```python
+messages = [
+    SystemMessage(
+        content="你是一个将英语翻译成法语的助手。"
+    ),
+    HumanMessage(
+        content="将这句话从英语翻译成法语。I love programming."
+    ),
+]
+
+chat.invoke(messages)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\moonshot.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

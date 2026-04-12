@@ -1,0 +1,68 @@
+---
+title: "Taiga 集成"
+description: "使用 LangChain Python 与 Taiga 集成。"
+---
+
+> [Taiga](https://docs.taiga.io/) 是一个面向敏捷团队的开源项目管理平台，提供看板、Scrum 和问题跟踪等功能。
+
+## 安装和设置
+
+安装 `langchain-taiga` 包：
+
+<CodeGroup>
+```bash pip
+pip install langchain-taiga
+```
+
+```bash uv
+uv add langchain-taiga
+```
+</CodeGroup>
+
+您必须通过环境变量提供登录凭据，以便工具能够进行身份验证。
+
+```bash
+export TAIGA_URL="https://taiga.xyz.org/"
+export TAIGA_API_URL="https://taiga.xyz.org/"
+export TAIGA_USERNAME="username"
+export TAIGA_PASSWORD="pw"
+export OPENAI_API_KEY="OPENAI_API_KEY"
+```
+
+
+---
+
+## 工具
+
+查看 [使用示例](/oss/python/integrations/tools/taiga)
+
+---
+
+## 工具包
+
+`TaigaToolkit` 将多个与 Taiga 相关的工具组合到一个单一接口中。
+
+```python
+from langchain_taiga.toolkits import TaigaToolkit
+
+toolkit = TaigaToolkit()
+tools = toolkit.get_tools()
+
+```
+
+---
+
+## 未来集成
+
+请查阅 [Taiga 开发者文档](https://docs.taiga.io/) 以获取更多信息，并留意 [langchain_taiga GitHub 仓库](https://github.com/Shikenso-Analytics/langchain-taiga) 中的更新或高级使用示例。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\taiga.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

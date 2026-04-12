@@ -1,0 +1,70 @@
+---
+title: 核心功能概览
+sidebarTitle: 概览
+description: Agent Server 核心功能概览，包括流式传输、人在回路、MCP、A2A、分布式追踪、Webhook 和双重消息处理。
+---
+
+Agent Server 提供了一套用于构建和运营生产级智能体的能力。本节涵盖：
+
+<CardGroup cols={2}>
+
+<Card title="流式 API" icon="player-play" href="/langsmith/streaming">
+  使用 LangGraph SDK 实时流式传输您已部署智能体的输出。
+</Card>
+
+<Card title="人在回路" icon="user-check" href="/langsmith/add-human-in-the-loop">
+  暂停智能体执行，以便在继续之前审查、编辑或批准工具调用。
+</Card>
+
+<Card title="时间旅行" icon="clock" href="/langsmith/human-in-the-loop-time-travel">
+  从任何先前状态重放智能体运行，以进行调试或探索替代路径。
+</Card>
+
+<Card title="MCP 端点" icon="plug" href="/langsmith/server-mcp">
+  将您的智能体作为 MCP 工具公开，供任何符合 MCP 规范的客户端访问。
+</Card>
+
+<Card title="A2A 端点" icon="arrows-exchange" href="/langsmith/server-a2a">
+  使用 A2A 协议实现智能体间的通信。
+</Card>
+
+<Card title="分布式追踪" icon="git-merge" href="/langsmith/agent-server-distributed-tracing">
+  在从外部应用程序调用 Agent Server 时，跨服务统一追踪信息。
+</Card>
+
+<Card title="Webhook" icon="webhook" href="/langsmith/use-webhooks">
+  响应您已部署智能体的运行事件，触发外部系统。
+</Card>
+
+<Card title="双重消息处理" icon="messages" href="/langsmith/double-texting">
+  控制 Agent Server 在运行已在进行中时如何处理新消息。
+</Card>
+
+</CardGroup>
+
+
+
+### 持久化执行
+
+LangSmith Deployment 的核心是一个持久化执行引擎。您的智能体运行在具有自动检查点功能的管理任务队列上，因此任何运行都可以从确切的中断点重试、重放或恢复，而不是从头开始。
+
+由于执行是持久化的，智能体可以完成在无状态运行时中脆弱或不可能实现的事情：
+
+- **等待外部输入。** 智能体调用 [`interrupt()`](/langsmith/add-human-in-the-loop)，运行时会检查其状态、释放资源，并等待人工批准交易、审阅者编辑草稿或其他系统返回结果。当 [`Command(resume=...)`](/langsmith/add-human-in-the-loop) 在数小时或数天后到达时，执行会从停止的地方精确地继续。这是支撑[人在回路](/langsmith/add-human-in-the-loop)工作流和[时间旅行调试](/langsmith/human-in-the-loop-time-travel)的基础机制。
+- **在后台运行。** [后台运行](/langsmith/background-run) 无需阻塞调用者即可执行。运行时管理完整的生命周期（排队、执行、检查点、完成），而客户端可以继续处理其他任务。
+- **按计划运行。** [Cron 任务](/langsmith/cron-jobs) 按重复节奏触发智能体执行。例如每日摘要智能体、每周报告、定期数据同步。运行时按计划启动新的执行，并具有相同的持久性保证。
+- **处理并发输入。** 当用户在智能体运行中途发送新输入时（[双重消息处理](/langsmith/double-texting)），运行时可以将其排队、取消正在进行的运行，或者并行处理两者，而不会出现数据竞争或状态损坏。
+- **失败时重试。** 可配置的[重试策略](/oss/python/langgraph/use-graph-api#add-retry-policies) 控制退避、最大尝试次数以及每个节点上触发重试的异常类型。运行可以承受进程重启、基础设施故障以及执行过程中的代码修订。
+
+有关容器、进程和任务队列如何协同工作的详细信息，请参阅 [Agent Server：运行时架构](/langsmith/agent-server#runtime-architecture)。关于扩展和吞吐量调优，请参阅 [为扩展配置 Agent Server](/langsmith/agent-server-scale)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\core-capabilities.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

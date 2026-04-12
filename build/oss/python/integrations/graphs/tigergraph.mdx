@@ -1,0 +1,56 @@
+---
+title: "TigerGraph 集成"
+description: "使用 LangChain Python 与 TigerGraph 图进行集成。"
+---
+
+>[TigerGraph](https://www.tigergraph.com/tigergraph-db/) 是一个原生分布式且高性能的图数据库。
+> 以顶点和边的图格式存储数据能够建立丰富的关系，
+> 非常适合为 LLM 响应提供依据。
+
+这是一个关于 `TigerGraph` 和 `LangChain` 集成的优秀示例 [在此处查看](https://github.com/tigergraph/graph-ml-notebooks/blob/main/applications/large_language_models/TigerGraph_LangChain_Demo.ipynb)。
+
+## 安装与设置
+
+请遵循 [如何连接到 `TigerGraph` 数据库](https://docs.tigergraph.com/pytigergraph/current/getting-started/connection) 的说明。
+
+安装 Python SDK：
+
+<CodeGroup>
+```bash pip
+pip install pyTigerGraph
+```
+
+```bash uv
+uv add pyTigerGraph
+```
+</CodeGroup>
+
+## 示例
+
+要利用 `TigerGraph InquiryAI` 功能，您可以从 `langchain_community.graphs` 导入 `TigerGraph`。
+
+```python
+import pyTigerGraph as tg
+
+conn = tg.TigerGraphConnection(host="DATABASE_HOST_HERE", graphname="GRAPH_NAME_HERE", username="USERNAME_HERE", password="PASSWORD_HERE")
+
+### ==== CONFIGURE INQUIRYAI HOST ====
+conn.ai.configureInquiryAIHost("INQUIRYAI_HOST_HERE")
+
+from langchain_community.graphs import TigerGraph
+
+graph = TigerGraph(conn)
+result = graph.query("How many servers are there?")
+print(result)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\graphs\tigergraph.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

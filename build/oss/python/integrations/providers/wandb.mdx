@@ -1,0 +1,54 @@
+---
+title: "Weights & Biases 集成"
+description: "使用 LangChain Python 与 Weights & Biases 集成。"
+---
+
+>[Weights & Biases](https://wandb.ai/) 是提供 AI 开发者平台的厂商，用于训练和
+> 微调 AI 模型以及开发 AI 应用。
+
+`Weights & Biase` 产品可用于在训练期间记录指标和工件，
+并跟踪代码的执行情况。
+
+在 LangChain 中有几种主要方式使用 `Weights & Biases` 产品：
+- 使用 `wandb_tracing_enabled`
+- 使用 `Weave` 轻量级工具包
+- 使用 `WandbCallbackHandler`（已弃用）
+
+
+## wandb_tracing_enabled
+
+查看 [使用示例](/oss/python/integrations/providers/wandb_tracing)。
+
+参见 [W&B 文档](https://docs.wandb.ai/guides/integrations/langchain)。
+
+```python
+from langchain_community.callbacks import wandb_tracing_enabled
+```
+
+## Weave
+
+参见 [W&B 文档](https://weave-docs.wandb.ai/guides/integrations/langchain)。
+
+
+## WandbCallbackHandler
+
+**注意：** `WandbCallbackHandler` 正在被弃用，转而使用 `wandb_tracing_enabled`。
+
+查看 [使用示例](/oss/python/integrations/providers/wandb_tracking)。
+
+参见 [W&B 文档](https://docs.wandb.ai/guides/integrations/langchain)。
+
+```python
+from langchain_community.callbacks import WandbCallbackHandler
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\wandb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

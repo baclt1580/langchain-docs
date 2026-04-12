@@ -1,0 +1,68 @@
+---
+title: 如何在实验中重试失败的运行（仅限 Python）
+sidebarTitle: 重试失败的实验运行（Python）
+---
+
+
+在对大型[数据集](/langsmith/evaluation-concepts#datasets)运行[评估](/langsmith/evaluation-concepts#evaluation-lifecycle)时，可能会因速率限制、网络问题或其他瞬时错误导致一小部分示例失败。与其重新运行整个评估，不如在[实验](/langsmith/evaluation-concepts#experiment)中仅识别并重试失败的示例。
+
+本指南展示了一种在评估工作流中构建重试逻辑的方法，并仅重试失败的示例。您可以使用 `error_handling='ignore'` 参数来跳过记录出错的运行，然后在 Python 中自动识别不成功的示例并重新运行它们。
+
+
+## 步骤 1. 运行初始评估
+运行初始评估，忽略错误以防止出错的运行被记录：
+
+```python
+from langsmith import Client
+
+client = Client()
+
+# 运行初始评估，忽略错误
+# error_handling='ignore' 防止出错的运行被记录
+results = await client.aevaluate(
+    target,
+    data="dataset",
+    evaluators=[your_evaluators],
+    error_handling='ignore'
+)
+```
+
+## 步骤 2. 重试失败的示例并记录到同一实验
+
+获取所有不成功的示例：
+```python
+# 识别不成功的示例
+runs = client.list_runs(project_name=results.experiment_name)
+successful_example_ids = [r.reference_example_id for r in runs]
+unsuccessful_examples = (e for e in client.list_examples(dataset_name="dataset") if e.id not in successful_examples)
+```
+
+接下来，重新运行所有失败的示例并将它们记录到同一实验：
+```python
+# 仅重试失败的示例，并记录
+results_retry = await client.aevaluate(
+    target,
+    unsuccessful_examples,
+    evaluators=[your_evaluators],
+    experiment=results.experiment_name,
+    error_handling='ignore'
+)
+```
+
+## 相关主题
+* [运行评估](/langsmith/evaluate-llm-application)
+* [异步运行评估](/langsmith/evaluation-async)
+* [处理模型速率限制](/langsmith/rate-limiting)
+* [实验配置](/langsmith/experiment-configuration)
+* [评估现有实验](/langsmith/evaluate-existing-experiment)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\evaluate-with-retry.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

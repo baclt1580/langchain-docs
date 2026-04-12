@@ -1,0 +1,141 @@
+---
+title: "OracleDocLoader 集成"
+description: "使用 LangChain JavaScript 集成 OracleDocLoader 文档加载器。"
+---
+
+<Tip>
+**兼容性**：仅适用于 Node.js。
+</Tip>
+
+Oracle 数据库通过将非结构化内容的语义搜索与业务数据的关系查询结合在单一系统中，支持以文档为中心的人工智能工作流。这使得构建检索工作流（如 RAG）变得更加容易，无需将数据和向量分散在多个数据库中。
+
+> **为什么选择数据库内文档处理？**
+> 您可以将 Oracle 数据库的能力——安全性、事务处理、可扩展性和高可用性——应用于加载、分块和存储内容以供 AI 搜索和检索的同一管道中。
+
+如果您刚开始使用 Oracle 数据库，可以考虑探索[免费的 Oracle AI Database 26ai](https://www.oracle.com/database/free/#resources)，它提供了一种简单的设置方式。在使用数据库时，通常建议避免使用 `SYSTEM` 用户处理应用程序工作负载；相反，应创建一个具有最低所需权限的专用用户。有关用户管理的背景信息，请参阅官方 [Oracle 数据库指南](https://docs.oracle.com/en/database/oracle/oracle-database/26/dbseg/configuring-privilege-and-role-authorization.html#GUID-16473474-7F47-4E40-A592-01836E7D911C)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 兼容性 | 本地 | [Python 支持](https://python.langchain.com/docs/integrations/document_loaders/oracleai) |
+| :--- | :--- | :---: | :---: | :---: |
+| `OracleDocLoader` | [`@oracle/langchain-oracledb`](https://www.npmjs.com/package/@oracle/langchain-oracledb) | 仅 Node | ✅ | ✅ |
+| `OracleTextSplitter` | [`@oracle/langchain-oracledb`](https://www.npmjs.com/package/@oracle/langchain-oracledb) | 仅 Node | ✅ | ✅ |
+
+### 加载文档
+
+用户可以通过适当配置加载器参数，灵活地从 Oracle 数据库、文件系统或两者加载文档。有关这些参数的完整详细信息，请查阅 [Oracle AI 向量搜索指南](https://docs.oracle.com/en/database/oracle/oracle-database/23/arpls/dbms_vector_chain1.html#GUID-73397E89-92FB-48ED-94BB-1AD960C4EA1F)。
+
+使用 OracleDocLoader 的一个显著优势是它能够处理超过 150 种不同的文件格式，无需为不同类型的文档使用多个加载器。有关支持格式的完整列表，请参阅 [Oracle Text 支持的文档格式](https://docs.oracle.com/en/database/oracle/oracle-database/23/ccref/oracle-text-supported-document-formats.html)。
+
+## 设置
+
+要使用 OracleDocLoader，请安装 `@oracle/langchain-oracledb` 辅助工具（与 `@langchain/core` 一起），并确保满足 Oracle 数据库驱动程序的先决条件。有关 Oracle 数据库驱动程序的全面信息，请参阅[指南](https://node-oracledb.readthedocs.io/en/latest/)。
+
+### 凭据
+
+为拥有源数据的 Oracle 用户设置环境变量（或使用其他密钥管理器）。
+
+```bash
+export ORACLE_USER=testuser
+export ORACLE_PASSWORD=testuser
+export ORACLE_DSN="localhost:1521/free"
+```
+
+### 安装
+
+<CodeGroup>
+```bash npm
+npm install @oracle/langchain-oracledb @langchain/core
+```
+```bash yarn
+yarn add @oracle/langchain-oracledb @langchain/core
+```
+```bash pnpm
+pnpm add @oracle/langchain-oracledb @langchain/core
+```
+</CodeGroup>
+
+## 实例化
+
+```typescript
+import oracledb from "oracledb";
+import { OracleDocLoader } from "@oracle/langchain-oracledb";
+
+const connection = await oracledb.getConnection({
+  user: process.env.ORACLE_USER,
+  password: process.env.ORACLE_PASSWORD,
+  connectionString: process.env.ORACLE_DSN,
+});
+
+const loader = new OracleDocLoader(connection, {
+  owner: "TESTUSER",
+  tablename: "DEMO_TAB",
+  colname: "DATA",
+});
+
+// 记得在应用程序关闭时关闭连接（或连接池）。
+// await connection.close();
+```
+
+## 从 Oracle 数据库加载
+
+```typescript
+const docs = await loader.load();
+console.log(`已加载 ${docs.length} 个文档`);
+console.log(docs[0]?.pageContent.slice(0, 120));
+```
+
+## 从文件或目录加载
+
+切换加载器参数以摄取本地内容。`OracleDocLoader` 自动处理超过 150 种文件格式；完整列表请参见 [Oracle Text 支持的格式](https://www.oracle.com/pls/topic/lookup?ctx=dblatest&id=GUID-2EC9C942-0989-4FEE-909A-3575349AC706)。
+
+```typescript
+const fileLoader = new OracleDocLoader(connection, {
+  file: "/path/to/sample.pdf",
+});
+
+const directoryLoader = new OracleDocLoader(connection, {
+  dir: "/path/to/documents",
+});
+```
+
+## 分块文档
+
+文档的大小可能各不相同，从小型到非常大型。用户通常倾向于将文档分块成较小的部分，以便于生成嵌入向量。此分割过程提供了广泛的定制选项。有关这些参数的完整详细信息，请查阅 [Oracle AI 向量搜索指南](https://docs.oracle.com/en/database/oracle/oracle-database/23/arpls/dbms_vector_chain1.html#GUID-4E145629-7098-4C7C-804F-FC85D1F24240)。
+
+```typescript
+import { OracleTextSplitter } from "@oracle/langchain-oracledb";
+
+const splitter = new OracleTextSplitter(connection, {
+  split: "chars",
+  max: 500,
+  normalize: "all",
+});
+
+const chunks = await splitter.splitText(docs[0].pageContent);
+console.log(`生成了 ${chunks.length} 个块`);
+```
+
+## 后续步骤
+
+- 使用 [`OracleVS`](/oss/javascript/integrations/vectorstores/oracleai) 构建检索管道
+- 使用 [`OracleEmbeddings`](/oss/javascript/integrations/embeddings/oracleai) 生成嵌入向量
+
+---
+
+## API 参考
+
+有关 `OracleDocLoader` 和 `OracleTextSplitter` 所有功能和配置选项的详细文档，请前往 [Oracle LangChain Oracle DB 仓库](https://github.com/oracle/langchain-oracle/tree/main/libs/js/langchain-oracledb)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\file_loaders\oracleai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

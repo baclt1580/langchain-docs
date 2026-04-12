@@ -1,0 +1,59 @@
+---
+title: "文心（Ernie）集成"
+description: "使用 LangChain Python 集成文心（Ernie）嵌入模型。"
+---
+
+[文心嵌入模型-V1](https://cloud.baidu.com/doc/WENXINWORKSHOP/s/alj562vvu) 是基于 `百度文心` 大模型技术的文本表示模型，
+能够将文本转换为由数值表示的向量形式，适用于文本检索、信息推荐、知识挖掘等场景。
+
+**弃用警告**
+
+我们建议使用 `langchain_community.embeddings.ErnieEmbeddings` 的用户
+改用 `langchain_community.embeddings.QianfanEmbeddingsEndpoint`。
+
+你可以在 [百度千帆端点集成](/oss/python/integrations/embeddings/baidu_qianfan_endpoint/) 中找到 `QianfanEmbeddingsEndpoint` 的文档。
+
+我们推荐用户使用 `QianfanEmbeddingsEndpoint` 主要有两个原因：
+
+1. `QianfanEmbeddingsEndpoint` 支持千帆平台上更多的嵌入模型。
+2. `ErnieEmbeddings` 缺乏维护且已被弃用。
+
+迁移时的一些提示：
+
+```python
+from langchain_community.embeddings import QianfanEmbeddingsEndpoint
+
+embeddings = QianfanEmbeddingsEndpoint(
+    qianfan_ak="你的千帆 ak",
+    qianfan_sk="你的千帆 sk",
+)
+```
+
+## 使用方法
+
+```python
+from langchain_community.embeddings import ErnieEmbeddings
+```
+
+```python
+embeddings = ErnieEmbeddings()
+```
+
+```python
+query_result = embeddings.embed_query("foo")
+```
+
+```python
+doc_results = embeddings.embed_documents(["foo"])
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\ernie.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

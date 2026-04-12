@@ -1,0 +1,47 @@
+---
+title: "Open AI Whisper 音频集成"
+description: "使用 LangChain JavaScript 集成 Open AI Whisper 音频文档加载器。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+本文介绍如何使用 [Open AI Whisper](https://platform.openai.com/docs/guides/speech-to-text) API 从音频文件加载文档对象。
+
+## 环境设置
+
+要运行此加载器，您需要在 Open AI 上创建账户，并从 https://platform.openai.com/account 页面获取认证密钥。
+
+## 使用方法
+
+配置好认证密钥后，您可以使用加载器创建转录内容，并将其转换为文档。
+
+```typescript
+import { OpenAIWhisperAudio } from "@langchain/community/document_loaders/fs/openai_whisper_audio";
+
+const filePath = "./src/document_loaders/example_data/test.mp3";
+
+const loader = new OpenAIWhisperAudio(filePath, {
+  transcriptionCreateParams: {
+    language: "en",
+  },
+});
+
+const docs = await loader.load();
+
+console.log(docs);
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\file_loaders\openai_whisper_audio.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

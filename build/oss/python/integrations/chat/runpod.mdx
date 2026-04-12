@@ -1,0 +1,200 @@
+---
+title: "Runpod 集成"
+description: "使用 LangChain Python 与 Runpod 聊天模型集成。"
+---
+
+开始使用 Runpod 聊天模型。
+
+## 概述
+
+本指南介绍如何使用 LangChain 的 `ChatRunPod` 类与托管在 [RunPod Serverless](https://www.runpod.io/serverless-gpu) 上的聊天模型进行交互。
+
+## 设置
+
+1.  **安装包：**
+
+    ```bash
+    pip install -qU langchain-runpod
+    ```
+
+2.  **部署聊天模型端点：** 按照 [RunPod 提供商指南](/oss/python/integrations/providers/runpod#setup) 中的设置步骤，在 RunPod Serverless 上部署一个兼容的聊天模型端点，并获取其端点 ID。
+3.  **设置环境变量：** 确保已设置 `RUNPOD_API_KEY` 和 `RUNPOD_ENDPOINT_ID`（或特定的 `RUNPOD_CHAT_ENDPOINT_ID`）。
+
+```python
+import getpass
+import os
+
+# 确保环境变量已设置（或直接传递给 ChatRunPod）
+if "RUNPOD_API_KEY" not in os.environ:
+    os.environ["RUNPOD_API_KEY"] = getpass.getpass("输入你的 RunPod API 密钥：")
+
+if "RUNPOD_ENDPOINT_ID" not in os.environ:
+    os.environ["RUNPOD_ENDPOINT_ID"] = input(
+        "输入你的 RunPod 端点 ID（当 RUNPOD_CHAT_ENDPOINT_ID 未设置时使用）："
+    )
+
+# 可选：为聊天模型使用不同的端点 ID
+# if "RUNPOD_CHAT_ENDPOINT_ID" not in os.environ:
+#     os.environ["RUNPOD_CHAT_ENDPOINT_ID"] = input("输入你的 RunPod 聊天端点 ID（可选）：")
+
+chat_endpoint_id = os.environ.get(
+    "RUNPOD_CHAT_ENDPOINT_ID", os.environ.get("RUNPOD_ENDPOINT_ID")
+)
+if not chat_endpoint_id:
+    raise ValueError(
+        "未找到 RunPod 端点 ID。请设置 RUNPOD_ENDPOINT_ID 或 RUNPOD_CHAT_ENDPOINT_ID。"
+    )
+```
+
+## 实例化
+
+初始化 `ChatRunPod` 类。你可以通过 `model_kwargs` 传递模型特定参数，并配置轮询行为。
+
+```python
+from langchain_runpod import ChatRunPod
+
+chat = ChatRunPod(
+    runpod_endpoint_id=chat_endpoint_id,  # 指定正确的端点 ID
+    model_kwargs={
+        "max_new_tokens": 512,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        # 添加你的端点处理器支持的其他参数
+    },
+    # 可选：调整轮询设置
+    # poll_interval=0.2,
+    # max_polling_attempts=150
+)
+```
+
+## 调用
+
+使用标准的 LangChain `.invoke()` 和 `.ainvoke()` 方法来调用模型。也支持通过 `.stream()` 和 `.astream()` 进行流式传输（通过轮询 RunPod 的 `/stream` 端点模拟实现）。
+
+```python
+from langchain.messages import HumanMessage, SystemMessage
+
+messages = [
+    SystemMessage(content="你是一个有用的 AI 助手。"),
+    HumanMessage(content="RunPod Serverless API 的流程是什么？"),
+]
+
+# 调用（同步）
+try:
+    response = chat.invoke(messages)
+    print("--- 同步调用响应 ---")
+    print(response.content)
+except Exception as e:
+    print(
+        f"调用聊天模型时出错：{e}。请确保端点 ID/API 密钥正确且端点处于活动/兼容状态。"
+    )
+
+# 流式传输（同步，通过轮询 /stream 模拟）
+print("\n--- 同步流式响应 ---")
+try:
+    for chunk in chat.stream(messages):
+        print(chunk.content, end="", flush=True)
+    print()  # 换行
+except Exception as e:
+    print(
+        f"\n流式传输聊天模型时出错：{e}。请确保端点处理器支持流式输出格式。"
+    )
+
+### 异步用法
+
+# 异步调用
+try:
+    async_response = await chat.ainvoke(messages)
+    print("--- 异步调用响应 ---")
+    print(async_response.content)
+except Exception as e:
+    print(f"异步调用聊天模型时出错：{e}。")
+
+# 异步流式传输
+print("\n--- 异步流式响应 ---")
+try:
+    async for chunk in chat.astream(messages):
+        print(chunk.content, end="", flush=True)
+    print()  # 换行
+except Exception as e:
+    print(
+        f"\n异步流式传输聊天模型时出错：{e}。请确保端点处理器支持流式输出格式。\n"
+    )
+```
+
+## 链式调用
+
+该聊天模型与 LangChain 表达式语言 (LCEL) 链无缝集成。
+
+```python
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "你是一个有用的助手。"),
+        ("human", "{input}"),
+    ]
+)
+
+parser = StrOutputParser()
+
+chain = prompt | chat | parser
+
+try:
+    chain_response = chain.invoke(
+        {"input": "用简单的术语解释无服务器计算的概念。"}
+    )
+    print("--- 链式调用响应 ---")
+    print(chain_response)
+except Exception as e:
+    print(f"运行链时出错：{e}")
+
+
+# 异步链
+try:
+    async_chain_response = await chain.ainvoke(
+        {"input": "使用 RunPod 处理 AI/ML 工作负载有什么好处？"}
+    )
+    print("--- 异步链式调用响应 ---")
+    print(async_chain_response)
+except Exception as e:
+    print(f"运行异步链时出错：{e}")
+```
+
+## 模型功能（取决于端点）
+
+高级功能的可用性**高度依赖**于你的 RunPod 端点处理器的具体实现。`ChatRunPod` 集成提供了基本框架，但处理器必须支持底层功能。
+
+| 功能                                                         | 集成支持 | 取决于端点？ | 备注                                                                                                                                                                      |
+| :----------------------------------------------------------- | :------: | :----------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [工具调用](/oss/python/langchain/tools)                       | ❌       | ✅           | 需要处理器处理工具定义并返回工具调用（例如，OpenAI 格式）。集成需要解析逻辑。                                                                                             |
+| [结构化输出](/oss/python/langchain/structured-output)           | ❌       | ✅           | 需要处理器接受 `json_mode` 参数（或类似参数）并保证 JSON 输出。                                                                                                           |
+| 多模态（图像）                                               | ❌       | ✅           | 需要接受图像数据（例如，base64）的多模态处理器。集成不支持多模态消息。                                                                                                    |
+| 多模态（音频）                                               | ❌       | ✅           | 需要接受音频数据的处理器。集成不支持音频消息。                                                                                                                            |
+| 多模态（视频）                                               | ❌       | ✅           | 需要接受视频数据的处理器。集成不支持视频消息。                                                                                                                            |
+| 流式传输                                                     | ✅ (模拟) | ✅           | 轮询 `/stream`。需要处理器在状态响应的 `stream` 列表中填充令牌块（例如，`[{"output": "token"}]`）。未内置真正的低延迟流式传输。                                            |
+| 异步调用                                                     | ✅       | ✅           | 核心 `ainvoke`/`astream` 已实现。依赖于端点处理器的性能。                                                                                                                 |
+| 令牌计数                                                     | ❌       | ✅           | 需要处理器在最终响应中返回 `prompt_tokens`、`completion_tokens`。集成当前未解析此信息。                                                                                   |
+| 对数概率                                                     | ❌       | ✅           | 需要处理器返回对数概率。集成当前未解析此信息。                                                                                                                            |
+
+**关键要点：** 如果端点遵循基本的 RunPod API 约定，标准的聊天调用和模拟流式传输可以工作。高级功能需要特定的处理器实现，并可能需要扩展或自定义此集成包。
+
+---
+
+## API 参考
+
+有关 `ChatRunPod` 类、参数和方法的详细文档，请参阅源代码或生成的 API 参考（如果可用）。
+
+源代码链接：[https://github.com/runpod/langchain-runpod/blob/main/langchain_runpod/chat_models.py](https://github.com/runpod/langchain-runpod/blob/main/langchain_runpod/chat_models.py)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\runpod.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

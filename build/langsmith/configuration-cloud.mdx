@@ -1,0 +1,436 @@
+---
+title: 管理助手
+sidebarTitle: 管理助手
+---
+
+本页介绍如何创建、配置和管理[助手](/langsmith/assistants)。助手允许你通过配置（如模型选择、提示词和工具可用性）来定制[已部署](/langsmith/deployment)图的行为，而无需更改底层图代码。
+
+你可以使用[SDK](https://reference.langchain.com/python/langsmith/deployment/sdk/)或在[LangSmith UI](https://smith.langchain.com)中操作。
+
+## 理解助手配置
+
+助手存储_上下文_值，这些值在运行时定制图的行为。你在图代码中定义上下文模式，然后在通过 [`context` 参数](https://reference.langchain.com/python/langsmith/deployment/sdk/#langgraph_sdk.client.AssistantsClient.create) 创建助手时提供特定的上下文值。
+
+考虑以下 `call_model` 节点的示例，该节点从上下文中读取 `model_name`：
+
+<CodeGroup>
+```python Python
+class ContextSchema(TypedDict):
+    model_name: str
+
+builder = StateGraph(AgentState, context_schema=ContextSchema)
+
+def call_model(state, runtime: Runtime[ContextSchema]):
+    messages = state["messages"]
+    model = _get_model(runtime.context.get("model_name", "anthropic"))
+    response = model.invoke(messages)
+    return {"messages": [response]}
+```
+
+```javascript JavaScript
+import { Annotation } from "@langchain/langgraph";
+
+const ContextSchema = Annotation.Root({
+    model_name: Annotation<string>,
+    system_prompt: Annotation<string>,
+});
+
+const builder = new StateGraph(AgentState, ContextSchema)
+
+function callModel(state: State, runtime: Runtime[ContextSchema]) {
+  const messages = state.messages;
+  const model = _getModel(runtime.context.model_name ?? "anthropic");
+  const response = model.invoke(messages);
+  return { messages: [response] };
+}
+```
+</CodeGroup>
+
+创建助手时，你为这些配置字段提供具体的值。助手存储此配置，并在图运行时应用它。
+
+有关 [LangGraph](/oss/python/langgraph/overview) 中配置的更多信息，请参阅[运行时上下文文档](/oss/python/langgraph/graph-api#runtime-context)。
+
+**为你的工作流选择 SDK 或 UI：**
+
+<Tabs>
+    <Tab title="SDK">
+
+## 创建助手
+
+使用 [AssistantsClient.create](https://reference.langchain.com/python/langsmith/deployment/sdk/#langgraph_sdk.client.AssistantsClient.create) 方法创建新助手。此方法需要：
+- **图 ID**：此助手将使用的已部署图的名称（例如 `"agent"`）。
+- **上下文**：与图的上下文模式匹配的配置值。
+- **名称**：助手的描述性名称。
+
+以下示例创建一个将 `model_name` 设置为 `openai` 的助手：
+
+<CodeGroup>
+```python Python
+from langgraph_sdk import get_client
+
+# 使用你的部署 URL 初始化客户端
+client = get_client(url=<DEPLOYMENT_URL>)
+
+# 为 "agent" 图创建助手
+# 第一个参数是图 ID（也称为图名称）
+openai_assistant = await client.assistants.create(
+    "agent",  # 已部署图的图 ID
+    context={"model_name": "openai"},
+    name="Open AI Assistant"
+)
+
+print(openai_assistant)
+# 输出包括唯一标识此助手的 assistant_id（UUID）
+```
+
+```javascript JavaScript
+import { Client } from "@langchain/langgraph-sdk";
+
+// 使用你的部署 URL 初始化客户端
+const client = new Client({ apiUrl: <DEPLOYMENT_URL> });
+
+// 为 "agent" 图创建助手
+const openAIAssistant = await client.assistants.create({
+    graphId: 'agent',  // 已部署图的图 ID
+    name: "Open AI Assistant",
+    context: { "model_name": "openai" },
+});
+
+console.log(openAIAssistant);
+// 输出包括唯一标识此助手的 assistant_id（UUID）
+```
+
+```bash cURL
+curl --request POST \
+    --url <DEPLOYMENT_URL>/assistants \
+    --header 'Content-Type: application/json' \
+    --data '{"graph_id":"agent", "context":{"model_name":"openai"}, "name": "Open AI Assistant"}'
+```
+</CodeGroup>
+
+**响应：**
+
+API 返回一个助手对象，包含：
+- `assistant_id`：唯一标识此助手的 UUID
+- `graph_id`：此助手配置的图
+- `context`：你提供的配置值
+- `name`、`metadata`、时间戳和其他字段
+
+```json
+{
+  "assistant_id": "62e209ca-9154-432a-b9e9-2d75c7a9219b",
+  "graph_id": "agent",
+  "name": "Open AI Assistant",
+  "context": {
+    "model_name": "openai"
+  },
+  "metadata": {},
+  "created_at": "2024-08-31T03:09:10.230718+00:00",
+  "updated_at": "2024-08-31T03:09:10.230718+00:00"
+}
+```
+
+`assistant_id`（一个类似 `"62e209ca-9154-432a-b9e9-2d75c7a9219b"` 的 UUID）唯一标识此助手配置。运行图时，你将使用此 ID 来指定应用哪个配置。
+
+<Note>
+**图 ID 与助手 ID**
+
+创建助手时，你指定一个**图 ID**（图名称，如 `"agent"`）。这将返回一个**助手 ID**（UUID，如 `"62e209ca..."`）。运行图时，你可以使用任意一个：
+- **图 ID**（例如 `"agent"`）：使用该图的默认助手
+- **助手 ID**（UUID）：使用特定的助手配置
+
+示例请参见[使用助手](#使用助手)。
+</Note>
+
+## 使用助手
+
+要使用助手，请在创建运行时传递其 `assistant_id`。以下示例使用我们上面创建的助手：
+
+<CodeGroup>
+```python Python
+# 为对话创建一个线程
+thread = await client.threads.create()
+
+# 准备输入
+input = {"messages": [{"role": "user", "content": "who made you?"}]}
+
+# 使用助手的配置运行图
+# 将 assistant_id（UUID）作为第二个参数传递
+async for event in client.runs.stream(
+    thread["thread_id"],
+    openai_assistant["assistant_id"],  # 助手 ID（UUID）
+    input=input,
+    stream_mode="updates",
+):
+    print(f"Receiving event of type: {event.event}")
+    print(event.data)
+    print("\n\n")
+```
+
+```javascript JavaScript
+// 为对话创建一个线程
+const thread = await client.threads.create();
+
+// 准备输入
+const input = { "messages": [{ "role": "user", "content": "who made you?" }] };
+
+// 使用助手的配置运行图
+// 将 assistant_id（UUID）作为第二个参数传递
+const streamResponse = client.runs.stream(
+  thread["thread_id"],
+  openAIAssistant["assistant_id"],  # 助手 ID（UUID）
+  {
+    input,
+    streamMode: "updates"
+  }
+);
+
+for await (const event of streamResponse) {
+  console.log(`Receiving event of type: ${event.event}`);
+  console.log(event.data);
+  console.log("\n\n");
+}
+```
+
+```bash cURL
+# 首先，创建一个线程
+thread_id=$(curl --request POST \
+    --url <DEPLOYMENT_URL>/threads \
+    --header 'Content-Type: application/json' \
+    --data '{}' | jq -r '.thread_id')
+
+# 使用助手 ID（UUID）运行图
+curl --request POST \
+    --url "<DEPLOYMENT_URL>/threads/${thread_id}/runs/stream" \
+    --header 'Content-Type: application/json' \
+    --data '{
+        "assistant_id": "<ASSISTANT_ID>",
+        "input": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "who made you?"
+                }
+            ]
+        },
+        "stream_mode": ["updates"]
+    }' | \
+    sed 's/\r$//' | \
+    awk '
+    /^event:/ {
+        if (data_content != "") {
+            print data_content "\n"
+        }
+        sub(/^event: /, "Receiving event of type: ", $0)
+        printf "%s...\n", $0
+        data_content = ""
+    }
+    /^data:/ {
+        sub(/^data: /, "", $0)
+        data_content = $0
+    }
+    END {
+        if (data_content != "") {
+            print data_content "\n\n"
+        }
+    }
+'
+```
+</CodeGroup>
+
+**响应：**
+
+流在图形执行时返回事件，并应用你的助手配置：
+
+```
+Receiving event of type: metadata
+{'run_id': '1ef6746e-5893-67b1-978a-0f1cd4060e16'}
+
+Receiving event of type: updates
+{'agent': {'messages': [{'content': 'I was created by OpenAI...', ...}]}}
+```
+
+<Note>
+**使用图 ID 与助手 ID**
+
+运行图时，你可以传递**图 ID**或**助手 ID**：
+
+```python
+# 选项 1：使用图 ID 获取默认助手
+client.runs.stream(thread_id, "agent", input=input)
+
+# 选项 2：使用助手 ID（UUID）获取特定配置
+client.runs.stream(thread_id, "62e209ca-9154-432a-b9e9-2d75c7a9219b", input=input)
+```
+</Note>
+
+## 为助手创建新版本
+
+使用 [AssistantsClient.update](https://reference.langchain.com/python/langsmith/deployment/sdk/#langgraph_sdk.client.AssistantsClient.update) 方法创建助手的新版本。
+
+<Warning>
+**更新需要完整配置**
+
+更新时必须提供**完整**配置。更新端点从头开始创建新版本，不会与先前版本合并。请包含你想要保留的所有配置字段。
+</Warning>
+
+例如，要向助手添加系统提示：
+
+<CodeGroup>
+```python Python
+# 使用新配置更新助手
+# 重要：包含所有配置字段，而不仅仅是你正在更改的字段
+openai_assistant_v2 = await client.assistants.update(
+    openai_assistant["assistant_id"],  # 助手 ID（UUID）
+    context={
+          "model_name": "openai",  # 必须包含现有字段
+          "system_prompt": "You are a mindful assistant!",  # 新字段
+    },
+)
+
+# 这将创建版本 2 并将其设置为活动版本
+# 未来使用此 assistant_id 的运行将使用版本 2
+```
+
+```javascript JavaScript
+// 使用新配置更新助手
+// 重要：包含所有配置字段，而不仅仅是你正在更改的字段
+const openaiAssistantV2 = await client.assistants.update(
+    openAIAssistant["assistant_id"],  # 助手 ID（UUID）
+    {
+        context: {
+            model_name: 'openai',  # 必须包含现有字段
+            system_prompt: 'You are a mindful assistant!',  # 新字段
+        },
+    },
+);
+
+// 这将创建版本 2 并将其设置为活动版本
+// 未来使用此 assistant_id 的运行将使用版本 2
+```
+
+```bash cURL
+curl --request PATCH \
+--url <DEPLOYMENT_URL>/assistants/<ASSISTANT_ID> \
+--header 'Content-Type: application/json' \
+--data '{
+"context": {"model_name": "openai", "system_prompt": "You are a mindful assistant!"}
+}'
+```
+</CodeGroup>
+
+更新会创建一个新版本并自动将其设置为活动版本。所有未来使用此助手 ID 的运行都将使用新配置。
+
+## 使用先前的助手版本
+
+使用 `setLatest` 方法更改哪个版本是活动的：
+
+<CodeGroup>
+```python Python
+# 回滚到助手的版本 1
+await client.assistants.set_latest(
+    openai_assistant['assistant_id'],  # 助手 ID（UUID）
+    1  # 版本号
+)
+
+# 所有未来使用此 assistant_id 的运行现在将使用版本 1
+```
+
+```javascript JavaScript
+// 回滚到助手的版本 1
+await client.assistants.setLatest(
+    openaiAssistant['assistant_id'],  # 助手 ID（UUID）
+    1  # 版本号
+);
+
+// 所有未来使用此 assistant_id 的运行现在将使用版本 1
+```
+
+```bash cURL
+curl --request POST \
+--url <DEPLOYMENT_URL>/assistants/<ASSISTANT_ID>/latest \
+--header 'Content-Type: application/json' \
+--data '{
+"version": 1
+}'
+```
+</CodeGroup>
+
+更改活动版本后，所有使用此助手 ID 的运行都将使用指定版本的配置。
+
+</Tab>
+<Tab title="UI">
+
+## 创建助手
+
+你可以从 [LangSmith UI](https://smith.langchain.com) 创建助手：
+
+1. 导航到你的部署并选择 **Assistants** 标签页。
+1. 点击 **+ New assistant**。
+1. 在打开的表格中：
+   - 选择此助手对应的图。
+   - 提供名称和描述。
+   - 使用该图的配置模式配置助手。
+1. 点击 **Create assistant**。
+
+这将带你到 [Studio](/langsmith/studio)，你可以在那里测试助手。返回 **Assistants** 标签页，在表格中查看你新创建的助手。
+
+## 使用助手
+
+要在 LangSmith UI 中使用助手：
+
+1. 导航到你的部署并选择 **Assistants** 标签页。
+1. 找到你想要使用的助手。
+1. 点击该助手的 **Studio**。
+
+这将打开 [Studio](/langsmith/studio) 并加载选定的助手。当你提交输入（在 **Graph** 或 **Chat** 模式下）时，助手的配置将应用于运行。
+
+## 为助手创建新版本
+
+要从 UI 更新助手并创建新版本，你可以使用 Assistants 标签页或 Studio。任一方法都会创建一个新版本并将其设置为活动版本：
+
+<Tabs>
+<Tab title="Assistants 标签页">
+1. 导航到你的部署并选择 **Assistants** 标签页。
+1. 找到你想要编辑的助手。
+1. 点击 **Edit**。
+1. 修改助手的名称、描述或配置。
+1. 保存更改。
+</Tab>
+
+<Tab title="Studio">
+1. 打开该助手的 Studio。
+1. 点击 **Manage Assistants**。
+1. 编辑助手的配置。
+1. 保存更改。
+</Tab>
+</Tabs>
+
+## 使用先前的助手版本
+
+要从 Studio 将先前版本设置为活动版本：
+
+1. 打开该助手的 Studio。
+2. 点击 **Manage Assistants**。
+3. 找到助手并选择你想要使用的版本。
+4. 切换该版本的 **Active** 开关。
+
+这将更新助手，使所有未来运行都使用选定的版本。
+
+<Warning>
+删除助手将删除其**所有**版本。目前无法删除单个版本。要跳过某个版本，只需将其他版本设置为活动版本即可。
+</Warning>
+
+</Tab>
+</Tabs>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\configuration-cloud.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

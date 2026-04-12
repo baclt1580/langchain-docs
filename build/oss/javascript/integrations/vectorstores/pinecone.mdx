@@ -1,0 +1,224 @@
+---
+title: "PineconeStore 集成"
+description: "使用 LangChain JavaScript 集成 PineconeStore。"
+---
+
+[Pinecone](https://www.pinecone.io/) 是一个向量数据库，为全球顶尖公司的 AI 应用提供支持。
+
+本指南提供了快速入门 Pinecone [向量存储](/oss/javascript/integrations/vectorstores) 的概览。有关 `PineconeStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-pinecone/PineconeStore)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [Python 支持](https://python.langchain.com/docs/integrations/vectorstores/pinecone/) | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`PineconeStore`](https://reference.langchain.com/javascript/langchain-pinecone/PineconeStore) | [`@langchain/pinecone`](https://npmjs.com/@langchain/pinecone) | ✅ |  ![NPM - 版本](https://img.shields.io/npm/v/@langchain/pinecone?style=flat-square&label=%20&) |
+
+## 设置
+
+要使用 Pinecone 向量存储，你需要创建一个 Pinecone 账户、初始化一个索引，并安装 `@langchain/pinecone` 集成包。你还需要安装 [官方 Pinecone SDK](https://www.npmjs.com/package/@pinecone-database/pinecone) 来初始化一个客户端，以便传递给 `PineconeStore` 实例。
+
+本指南还将使用 [OpenAI 嵌入](/oss/javascript/integrations/embeddings/openai)，这需要你安装 `@langchain/openai` 集成包。你也可以根据需要选择使用 [其他支持的嵌入模型](/oss/javascript/integrations/embeddings)。
+
+<CodeGroup>
+```bash npm
+npm install @langchain/pinecone @langchain/openai @langchain/core @pinecone-database/pinecone@5
+```
+```bash yarn
+yarn add @langchain/pinecone @langchain/openai @langchain/core @pinecone-database/pinecone@5
+```
+```bash pnpm
+pnpm add @langchain/pinecone @langchain/openai @langchain/core @pinecone-database/pinecone@5
+```
+</CodeGroup>
+
+### 凭证
+
+注册一个 [Pinecone](https://www.pinecone.io/) 账户并创建一个索引。确保维度与你想要使用的嵌入模型匹配（OpenAI 的 `text-embedding-3-small` 默认维度为 1536）。完成这些后，设置 `PINECONE_INDEX`、`PINECONE_API_KEY` 和（可选）`PINECONE_ENVIRONMENT` 环境变量：
+
+```typescript
+process.env.PINECONE_API_KEY = "你的-pinecone-api-key";
+process.env.PINECONE_INDEX = "你的-pinecone-index";
+
+// 可选
+process.env.PINECONE_ENVIRONMENT = "你的-pinecone-environment";
+```
+
+如果你在本指南中使用 OpenAI 嵌入，还需要设置你的 OpenAI 密钥：
+
+```typescript
+process.env.OPENAI_API_KEY = "你的_API_KEY";
+```
+
+如果你想获取模型调用的自动追踪，也可以设置你的 [LangSmith](/langsmith/home) API 密钥，取消下面的注释即可：
+
+```typescript
+// process.env.LANGSMITH_TRACING="true"
+// process.env.LANGSMITH_API_KEY="你的-api-key"
+```
+
+## 实例化
+
+```typescript
+import { PineconeStore } from "@langchain/pinecone";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+import { Pinecone as PineconeClient } from "@pinecone-database/pinecone";
+
+const embeddings = new OpenAIEmbeddings({
+  model: "text-embedding-3-small",
+});
+
+const pinecone = new PineconeClient();
+// 将自动读取 PINECONE_API_KEY 和 PINECONE_ENVIRONMENT 环境变量
+const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX!);
+
+const vectorStore = await PineconeStore.fromExistingIndex(
+  embeddings,
+  {
+    pineconeIndex,
+    // 允许同时进行的最大批处理请求数。每批包含 1000 个向量。
+    maxConcurrency: 5,
+    // 你也可以在这里传递命名空间
+    // namespace: "foo",
+  }
+);
+```
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```typescript
+import type { Document } from "@langchain/core/documents";
+
+const document1: Document = {
+  pageContent: "细胞的动力源是线粒体",
+  metadata: { source: "https://example.com" }
+};
+
+const document2: Document = {
+  pageContent: "建筑物由砖块构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document3: Document = {
+  pageContent: "线粒体由脂质构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document4: Document = {
+  pageContent: "2024 年奥运会在巴黎举行",
+  metadata: { source: "https://example.com" }
+}
+
+const documents = [document1, document2, document3, document4];
+
+await vectorStore.addDocuments(documents, { ids: ["1", "2", "3", "4"] });
+```
+
+```python
+[ '1', '2', '3', '4' ]
+```
+
+**注意：** 添加文档后，需要短暂延迟才能进行查询。
+
+### 从向量存储删除项目
+
+```typescript
+await vectorStore.delete({ ids: ["4"] });
+```
+
+## 查询向量存储
+
+一旦你的向量存储创建完成并添加了相关文档，你很可能会在运行链或代理时查询它。
+
+### 直接查询
+
+执行简单的相似性搜索可以按如下方式进行：
+
+```typescript
+// 可选过滤器
+const filter = { source: "https://example.com" };
+
+const similaritySearchResults = await vectorStore.similaritySearch("生物学", 2, filter);
+
+for (const doc of similaritySearchResults) {
+  console.log(`* ${doc.pageContent} [${JSON.stringify(doc.metadata, null)}]`);
+}
+```
+
+```text
+* 细胞的动力源是线粒体 [{"source":"https://example.com"}]
+* 线粒体由脂质构成 [{"source":"https://example.com"}]
+```
+
+如果你想执行相似性搜索并获取相应的分数，可以运行：
+
+```typescript
+const similaritySearchWithScoreResults = await vectorStore.similaritySearchWithScore("生物学", 2, filter)
+
+for (const [doc, score] of similaritySearchWithScoreResults) {
+  console.log(`* [相似度=${score.toFixed(3)}] ${doc.pageContent} [${JSON.stringify(doc.metadata)}]`);
+}
+```
+
+```text
+* [相似度=0.165] 细胞的动力源是线粒体 [{"source":"https://example.com"}]
+* [相似度=0.148] 线粒体由脂质构成 [{"source":"https://example.com"}]
+```
+
+### 转换为检索器进行查询
+
+你也可以将向量存储转换为 [检索器](/oss/javascript/langchain/retrieval)，以便在链中更轻松地使用。
+
+```typescript
+const retriever = vectorStore.asRetriever({
+  // 可选过滤器
+  filter: filter,
+  k: 2,
+});
+
+await retriever.invoke("生物学");
+```
+
+```javascript
+[
+  Document {
+    pageContent: '细胞的动力源是线粒体',
+    metadata: { source: 'https://example.com' },
+    id: undefined
+  },
+  Document {
+    pageContent: '线粒体由脂质构成',
+    metadata: { source: 'https://example.com' },
+    id: undefined
+  }
+]
+```
+
+### 用于检索增强生成
+
+有关如何使用此向量存储进行检索增强生成（RAG）的指南，请参阅以下部分：
+
+- [使用 LangChain 构建 RAG 应用](/oss/javascript/langchain/rag)。
+- [代理式 RAG](/oss/javascript/langgraph/agentic-rag)
+- [检索文档](/oss/javascript/langchain/retrieval)
+
+---
+
+## API 参考
+
+有关 `PineconeStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-pinecone/PineconeStore)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\pinecone.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

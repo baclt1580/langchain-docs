@@ -1,0 +1,37 @@
+---
+title: "DuckDB 集成"
+description: "使用 LangChain Python 与 DuckDB 集成。"
+---
+
+> [DuckDB](https://duckdb.org/) 是一个进程内 SQL OLAP 数据库管理系统。
+
+## 安装和设置
+
+首先，你需要安装 `duckdb` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install duckdb
+```
+
+```bash uv
+uv add duckdb
+```
+</CodeGroup>
+
+## 文档加载器
+
+```python
+from langchain_community.document_loaders import DuckDBLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\duckdb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

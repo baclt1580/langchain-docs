@@ -1,0 +1,118 @@
+---
+title: "ChatAnthropicVertex 集成"
+description: "使用 LangChain Python 集成 ChatAnthropicVertex 聊天模型。"
+---
+
+<Warning>
+    **Claude 3 Haiku 弃用说明：** 自 2026 年 8 月 23 日起，Anthropic 将终止对 Claude 3 Haiku 的支持。请迁移至已在 Vertex AI 上正式发布的 Claude Haiku 4.5 (`claude-haiku-4-5@20251001`)。详情请参阅 [Anthropic 的模型弃用政策](https://docs.anthropic.com/en/docs/resources/model-deprecations)。
+</Warning>
+
+> [Anthropic Claude](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude) 模型在 Vertex AI 上提供完全托管且无服务器的 API 服务。要使用 Vertex AI 上的 Claude 模型，请直接向 Vertex AI API 端点发送请求。由于 Anthropic Claude 模型使用托管 API，因此无需配置或管理基础设施。
+
+注意：Vertex 上的 Anthropic 模型通过 `ChatAnthropicVertex` 类实现为聊天模型。
+
+```python
+!pip install -U langchain-google-vertexai anthropic[vertex]
+```
+
+```python
+from langchain.messages import (
+    AIMessage,
+    AIMessageChunk,
+    HumanMessage,
+    SystemMessage,
+)
+from langchain_core.outputs import LLMResult
+from langchain_google_vertexai.model_garden import ChatAnthropicVertex
+```
+
+<Note>
+    请指定正确的 [Claude 模型版本](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude#claude-opus)。尽可能使用包含日期后缀的模型标识符（例如 `claude-haiku-4-5@20251001`）。
+</Note>
+
+```python
+# TODO：将以下内容替换为你的项目 ID 和区域
+project = "<project_id>"
+location = "<region>"
+
+# 初始化模型
+model = ChatAnthropicVertex(
+    model_name="claude-haiku-4-5@20251001",
+    project=project,
+    location=location,
+)
+```
+
+```python
+# 为模型准备输入数据
+raw_context = (
+    "我的名字是 Peter。你是我的个人助手。我最喜欢的电影是《指环王》和《霍比特人》。"
+)
+question = (
+    "你好，今晚能为我推荐一部好看的电影吗？"
+)
+context = SystemMessage(content=raw_context)
+message = HumanMessage(content=question)
+```
+
+```python
+# 调用模型
+response = model.invoke([context, message])
+print(response.content)
+```
+
+```text
+既然你最喜欢的电影是《指环王》和《霍比特人》三部曲，我推荐你观看一些具有类似风格的史诗奇幻电影：
+
+1. 《纳尼亚传奇》系列 - 这些电影改编自 C.S. 刘易斯广受欢迎的奇幻小说，融合了冒险、魔法和令人难忘的角色。
+
+2. 《星尘》 - 这部 2007 年的奇幻电影改编自尼尔·盖曼的小说，演员阵容出色，基调迷人而富有奇思妙想。
+
+3. 《黄金罗盘》 - 菲利普·普尔曼《黑暗物质》系列的首部电影改编，视觉效果惊艳，故事引人入胜。
+
+4. 《潘神的迷宫》 - 吉尔莫·德尔·托罗的黑暗童话杰作，以西班牙内战为背景。
+
+5. 《公主新娘》 - 一部经典的奇幻冒险电影，融合了幽默、浪漫和令人难忘的角色。
+
+如果你对其中任何一部感兴趣，或者想要其他推荐，请告诉我！我很乐意提供更个性化的建议。
+```
+
+```python
+# 你也可以在调用方法中初始化或覆盖模型名称
+response = model.invoke([context, message], model_name="claude-sonnet-4-6")
+print(response.content)
+```
+
+```text
+当然，我很乐意为你推荐一部电影！既然你提到《指环王》和《霍比特人》是你最喜欢的电影，我推荐一些你可能喜欢的其他史诗奇幻/冒险电影：
+
+1. 《公主新娘》（1987） - 一部经典的童话故事，融合了冒险、浪漫和大量机智幽默。演员阵容强大，台词令人难忘。
+
+2. 《风云际会》（1988） - 乔治·卢卡斯制作的奇幻电影，讲述了精灵、矮人和棕精灵踏上史诗冒险的故事。基调与《指环王》电影相似。
+
+3. 《星尘》（2007） - 一部被低估的奇幻冒险片，改编自尼尔·盖曼的小说，讲述了一个年轻人进入魔法王国寻找陨落之星的故事。演员阵容和视觉效果都很出色。
+
+4. 《纳尼亚传奇》系列 - 《狮子、女巫和魔衣橱》最为知名，但其他纳尼亚电影也是非常出色的奇幻史诗。
+
+5. 《黄金罗盘》（2007） - 《黑暗物质》三部曲的第一部，设定在一个拥有装甲北极熊和真理探测仪的平行宇宙。
+
+如果你想要其他推荐，或者有特定的电影风格偏好，请告诉我！我旨在推荐与《指环王》类似的娱乐性奇幻/冒险电影。
+```
+
+```python
+# 使用流式响应
+sync_response = model.stream([context, message], model_name="claude-haiku-4-5@20251001")
+for chunk in sync_response:
+    print(chunk.content)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\google_anthropic_vertex.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

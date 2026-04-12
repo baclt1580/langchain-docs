@@ -1,0 +1,146 @@
+---
+title: "Nia 工具包集成"
+description: "使用 LangChain JavaScript 与 Nia 搜索和索引 API 集成。"
+---
+
+[Nia](https://trynia.ai) 是一个搜索和索引 API，能够持续从文档、研究论文、数据集、代码库等来源提供上下文信息，确保智能体永不依赖过时数据。它具备可扩展性，成本降低 5 倍，且稳定可靠。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [Python 支持](/oss/javascript/integrations/tools/nia) | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`NiaToolkit`](https://github.com/nozomio-labs/nia-langchain) | [`@nozomioai/langchain-nia`](https://www.npmjs.com/package/@nozomioai/langchain-nia) | ✅ | ![NPM - 版本](https://img.shields.io/npm/v/@nozomioai/langchain-nia?style=flat-square&label=%20&) |
+
+## 设置
+
+集成位于 `@nozomioai/langchain-nia` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @nozomioai/langchain-nia @langchain/core
+```
+```bash yarn
+yarn add @nozomioai/langchain-nia @langchain/core
+```
+```bash pnpm
+pnpm add @nozomioai/langchain-nia @langchain/core
+```
+</CodeGroup>
+
+### 凭证
+
+在 [trynia.ai](https://trynia.ai) 注册以获取 API 密钥。
+
+```typescript
+process.env.NIA_API_KEY = "nk_...";
+```
+
+同时建议（非必需）设置 [LangSmith](https://smith.langchain.com/) 以获得最佳的观测能力：
+
+```typescript
+process.env.LANGSMITH_TRACING = "true";
+process.env.LANGSMITH_API_KEY = "your-api-key";
+```
+
+## 实例化
+
+### 使用工具包
+
+```typescript
+import { NiaToolkit } from "@nozomioai/langchain-nia";
+
+const toolkit = new NiaToolkit({
+  includeSearch: true,        // 5 个搜索工具
+  includeSources: true,       // 7 个源管理工具
+  includeGithub: true,        // 4 个 GitHub 工具
+  includeContexts: true,      // 2 个上下文/记忆工具
+  includeDependencies: true,  // 2 个依赖工具
+});
+
+const tools = toolkit.getTools(); // 共 20 个工具
+```
+
+### 使用独立工具
+
+```typescript
+import { NiaSearch } from "@nozomioai/langchain-nia";
+
+const tool = new NiaSearch();
+```
+
+## 调用
+
+### 跨索引源搜索
+
+```typescript
+import { NiaSearch } from "@nozomioai/langchain-nia";
+
+const tool = new NiaSearch();
+const result = await tool.invoke({ query: "如何使用 React hooks" });
+```
+
+### 搜索网络
+
+```typescript
+import { NiaWebSearch } from "@nozomioai/langchain-nia";
+
+const tool = new NiaWebSearch();
+const result = await tool.invoke({ query: "最新 Node.js 版本", numResults: 5 });
+```
+
+### 在智能体中使用
+
+```typescript
+import { NiaToolkit } from "@nozomioai/langchain-nia";
+import { ChatOpenAI } from "@langchain/openai";
+
+const toolkit = new NiaToolkit({ includeSearch: true });
+const tools = toolkit.getTools();
+
+const llm = new ChatOpenAI({ model: "gpt-4o" });
+const llmWithTools = llm.bindTools(tools);
+
+const result = await llmWithTools.invoke("搜索 React hooks 最佳实践");
+```
+
+## 可用工具
+
+| 工具 | 描述 |
+|------|-------------|
+| `NiaSearch` | 跨索引仓库、文档和数据源的语义搜索 |
+| `NiaWebSearch` | 支持类别筛选和日期范围的网络搜索 |
+| `NiaDeepResearch` | 多步骤综合研究 |
+| `NiaUniversalSearch` | 同时搜索所有源 |
+| `NiaAdvisor` | 根据索引文档分析代码 |
+| `NiaIndex` | 索引新源（仓库、文档、论文、数据集） |
+| `NiaSourceList` | 列出索引源并支持筛选 |
+| `NiaSourceSubscribe` | 订阅预索引的公共源 |
+| `NiaSourceSync` | 重新同步源以获取最新更改 |
+| `NiaRead` | 从索引源读取文件/页面 |
+| `NiaGrep` | 在索引源内进行正则表达式搜索 |
+| `NiaExplore` | 浏览索引源的文件树 |
+| `NiaGitHubSearch` | 在 GitHub 仓库中搜索代码 |
+| `NiaGitHubRead` | 从 GitHub 仓库读取文件 |
+| `NiaGitHubGlob` | 查找匹配 glob 模式的文件 |
+| `NiaGitHubTree` | 浏览仓库文件树 |
+| `NiaContextSave` | 保存上下文以供跨智能体共享 |
+| `NiaContextSearch` | 对已保存上下文进行语义搜索 |
+| `NiaDependencySubscribe` | 自动订阅项目依赖的文档 |
+| `NiaDependencyAnalyze` | 从清单预览可索引的依赖项 |
+
+## API 参考
+
+详细文档请参阅 [langchain-nia GitHub 仓库](https://github.com/nozomio-labs/nia-langchain)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\nia.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

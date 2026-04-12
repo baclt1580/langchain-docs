@@ -1,0 +1,392 @@
+---
+title: "OpenVINO 重排序器集成"
+description: "使用 LangChain Python 集成 OpenVINO 重排序器文档转换器。"
+---
+
+[OpenVINO™](https://github.com/openvinotoolkit/openvino) 是一个用于优化和部署 AI 推理的开源工具包。OpenVINO™ Runtime 支持多种硬件[设备](https://github.com/openvinotoolkit/openvino?tab=readme-ov-file#supported-hardware-matrix)，包括 x86 和 ARM CPU，以及 Intel GPU。它可以帮助提升计算机视觉、自动语音识别、自然语言处理和其他常见任务中的深度学习性能。
+
+Hugging Face 的重排序模型可以通过 `OpenVINOReranker` 类得到 OpenVINO 的支持。如果您有 Intel GPU，可以指定 `model_kwargs={"device": "GPU"}` 在其上运行推理。
+
+```python
+pip install -U-strategy eager "optimum[openvino,nncf]" --quiet
+pip install -qU  faiss-cpu
+```
+
+```python
+# 用于打印文档的辅助函数
+
+
+def pretty_print_docs(docs):
+    print(
+        f"\n{'-' * 100}\n".join(
+            [
+                f"文档 {i + 1}:\n\n{d.page_content}\n元数据: {d.metadata}"
+                for i, d in enumerate(docs)
+            ]
+        )
+    )
+```
+
+## 设置基础向量存储检索器
+
+让我们从初始化一个简单的向量存储检索器并存储 2023 年国情咨文演讲（分块）开始。我们可以将检索器设置为检索大量（20 个）文档。
+
+```python
+from langchain_community.document_loaders import TextLoader
+from langchain_community.embeddings import OpenVINOEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+documents = TextLoader(
+    "../../how_to/state_of_the_union.txt",
+).load()
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+texts = text_splitter.split_documents(documents)
+for idx, text in enumerate(texts):
+    text.metadata["id"] = idx
+
+embedding = OpenVINOEmbeddings(
+    model_name_or_path="sentence-transformers/all-mpnet-base-v2"
+)
+retriever = FAISS.from_documents(texts, embedding).as_retriever(search_kwargs={"k": 20})
+
+query = "总统对 Ketanji Brown Jackson 说了什么"
+docs = retriever.invoke(query)
+pretty_print_docs(docs)
+```
+
+```text
+/home/ethan/intel/langchain_test/lib/python3.10/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+```
+```text
+INFO:nncf:NNCF 初始化成功。检测到支持的框架：torch, onnx, openvino
+```
+```text
+未指定框架。使用 pt 导出模型。
+使用导出变体 default。可用变体有：
+    - default: 默认的 ONNX 变体。
+使用框架 PyTorch: 2.2.1+cu121
+/home/ethan/intel/langchain_test/lib/python3.10/site-packages/transformers/modeling_utils.py:4193: FutureWarning: `_is_quantized_training_enabled` 将在 transformers 4.39.0 中弃用。请改用 `model.hf_quantizer.is_trainable`
+  warnings.warn(
+正在将模型编译到 CPU ...
+```
+```text
+文档 1:
+
+总统最严肃的宪法职责之一是提名某人担任美国最高法院大法官。
+
+我在 4 天前做到了这一点，当时我提名了联邦巡回上诉法院法官 Ketanji Brown Jackson。她是我们国家顶尖的法律人才之一，将延续布雷耶大法官的卓越传统。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 73}
+----------------------------------------------------------------------------------------------------
+文档 2:
+
+Danielle 说 Heath 战斗到了最后一刻。
+
+他不知道如何停止战斗，她也不知道。
+
+在痛苦中，她找到了要求我们做得更好的目标。
+
+今晚，Danielle——我们正在行动。
+
+退伍军人事务部正在开创将有毒暴露与疾病联系起来的新方法，已经帮助更多退伍军人获得福利。
+
+今晚，我宣布我们将资格扩大到患有九种呼吸道癌症的退伍军人。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 88}
+----------------------------------------------------------------------------------------------------
+文档 3:
+
+一级军士长 Heath Robinson 的遗孀。
+
+他生来就是一名士兵。陆军国民警卫队。曾在科索沃和伊拉克担任战斗医护兵。
+
+驻扎在巴格达附近，距离足球场大小的露天焚烧坑仅几码远。
+
+Heath 的遗孀 Danielle 今晚和我们在一起。他们喜欢去俄亥俄州立大学看橄榄球赛。他喜欢和他们的女儿一起搭乐高。
+
+但长期暴露于焚烧坑导致的癌症侵蚀了 Heath 的肺部和身体。
+
+Danielle 说 Heath 战斗到了最后一刻。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 87}
+----------------------------------------------------------------------------------------------------
+文档 4:
+
+我也呼吁国会：通过一项法律，确保在伊拉克和阿富汗遭受有毒暴露摧残的退伍军人最终获得他们应得的福利和全面医疗保健。
+
+第四，让我们终结我们所知的癌症。
+
+这对我和 Jill、对 Kamala、对你们中的许多人来说都是个人的事。
+
+癌症是美国第二大死因——仅次于心脏病。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 89}
+----------------------------------------------------------------------------------------------------
+文档 5:
+
+每届政府都说他们会这么做，但我们实际上正在做。
+
+我们将购买美国产品，以确保从航空母舰甲板到高速公路护栏的钢材都是美国制造。
+
+但为了竞争未来的最佳工作，我们还需要与中国和其他竞争对手创造公平的竞争环境。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 29}
+----------------------------------------------------------------------------------------------------
+文档 6:
+
+他见到了乌克兰人民。
+
+从泽连斯基总统到每一位乌克兰人，他们的无畏、勇气和决心激励着世界。
+
+公民团体用身体阻挡坦克。从学生到退休人员，教师变成士兵，保卫他们的家园。
+
+在这场斗争中，正如泽连斯基总统在欧洲议会的演讲中所说：“光明将战胜黑暗。”乌克兰驻美国大使今晚在此。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 2}
+----------------------------------------------------------------------------------------------------
+文档 7:
+
+正如俄亥俄州参议员 Sherrod Brown 所说：“是时候埋葬‘锈带’这个标签了。”
+
+是时候了。
+
+尽管我们的经济有许多亮点，创纪录的就业增长和更高的工资，但太多家庭仍在艰难维持生计，支付账单。
+
+通货膨胀正在剥夺他们本可能感受到的收益。
+
+我理解。这就是为什么我的首要任务是控制物价。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 35}
+----------------------------------------------------------------------------------------------------
+文档 8:
+
+但涓滴经济学理论导致了经济增长放缓、工资降低、赤字扩大，以及近一个世纪以来顶层与其他人之间最大的差距。
+
+哈里斯副总统和我竞选时提出了美国的新经济愿景。
+
+投资美国。教育美国人。壮大劳动力。自下而上、从中产阶级向外建设经济，而不是自上而下。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 23}
+----------------------------------------------------------------------------------------------------
+文档 9:
+
+致所有美国人，我将对你们坦诚相待，正如我一直承诺的那样。一个俄罗斯独裁者入侵外国，给全世界带来了代价。
+
+我正在采取强有力的行动，确保我们制裁的痛苦针对俄罗斯经济。我将使用我们掌握的一切工具来保护美国企业和消费者。
+
+今晚，我可以宣布，美国已与另外 30 个国家合作，从全球储备中释放 6000 万桶石油。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 14}
+----------------------------------------------------------------------------------------------------
+文档 10:
+
+所有美国人都同意的一件事是税收制度不公平。我们必须修复它。
+
+我不是要惩罚任何人。但让我们确保企业和最富有的美国人开始支付他们应得的份额。
+
+就在去年，55 家财富 500 强公司赚取了 400 亿美元的利润，却缴纳了零美元的联邦所得税。
+
+这根本不公平。这就是为什么我提议对企业实行 15% 的最低税率。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 46}
+----------------------------------------------------------------------------------------------------
+文档 11:
+
+Joshua 今晚和我们在一起。昨天是他的生日。生日快乐，伙计。
+
+为了 Joshua 和另外 20 万名患有 1 型糖尿病的年轻人，让我们将胰岛素的费用上限设为每月 35 美元，这样每个人都能负担得起。
+
+制药公司仍然会做得很好。与此同时，让 Medicare 像退伍军人事务部已经做的那样，协商降低处方药价格。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 41}
+----------------------------------------------------------------------------------------------------
+文档 12:
+
+正如我告诉习近平主席的，赌美国人民输从来不是好赌注。
+
+我们将为数百万美国人创造良好的就业机会，在全国范围内实现道路、机场、港口和水道的现代化。
+
+我们将全力以赴，以抵御气候危机的破坏性影响，并促进环境正义。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 26}
+----------------------------------------------------------------------------------------------------
+文档 13:
+
+正如我去年所说，特别是对我们年轻的跨性别美国人，作为你们的总统，我将永远支持你们，这样你们就可以做自己，发挥上帝赋予的潜力。
+
+虽然我们似乎经常意见不一，但事实并非如此。去年我签署了 80 项两党法案成为法律。从防止政府停摆，到保护亚裔美国人免受仍然常见的仇恨犯罪，到改革军事司法。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 79}
+----------------------------------------------------------------------------------------------------
+文档 14:
+
+我的政府正在提供职业培训和住房方面的援助，现在正在帮助低收入退伍军人获得免费的退伍军人事务部医疗。
+
+我们在伊拉克和阿富汗的部队面临许多危险。
+
+其中之一是驻扎在基地，吸入焚烧战争废料（医疗和危险材料、喷气燃料等）的“焚烧坑”产生的有毒烟雾。
+
+当他们回国时，许多世界上体格最健壮、训练最精良的战士再也不复从前。
+
+头痛。麻木。头晕。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 85}
+----------------------------------------------------------------------------------------------------
+文档 15:
+
+曾是私人执业领域的顶级诉讼律师。曾是联邦公设辩护人。来自公立学校教育工作者和警察家庭。共识建立者。自她被提名以来，她获得了广泛的支持——从警察兄弟会到由民主党和共和党任命的前法官。
+
+如果我们要推进自由和正义，就需要确保边境安全并改革移民制度。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 74}
+----------------------------------------------------------------------------------------------------
+文档 16:
+
+我与他们的家人交谈，告诉他们我们永远感激他们的牺牲，我们将继续他们的使命，恢复每个社区应得的信任和安全。
+
+我在这些问题上工作了很长时间。
+
+我知道什么有效：投资于犯罪预防和社区警察，他们会巡逻，了解社区，并能恢复信任和安全。
+
+所以，让我们不要放弃我们的街道。或者在安全与平等正义之间做出选择。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 67}
+----------------------------------------------------------------------------------------------------
+文档 17:
+
+我们将建设一个由 50 万个电动汽车充电站组成的全国网络，开始更换有毒的铅管——这样每个孩子——每个美国人——在家和学校都能喝到干净的水，为每个美国人——城市、郊区、农村和部落社区——提供负担得起的高速互联网。
+
+已经宣布了 4000 个项目。
+
+今晚，我宣布今年我们将开始修复超过 65,000 英里的高速公路和 1500 座破损的桥梁。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 27}
+----------------------------------------------------------------------------------------------------
+文档 18:
+
+癌症是美国第二大死因——仅次于心脏病。
+
+上个月，我宣布了我们的计划，以加速奥巴马总统六年前请我领导的“癌症登月计划”。
+
+我们的目标是在未来 25 年内将癌症死亡率至少降低 50%，将更多癌症从死刑转变为可治疗的疾病。
+
+为患者和家庭提供更多支持。
+
+为此，我呼吁国会资助 ARPA-H，即健康高级研究计划局。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 90}
+----------------------------------------------------------------------------------------------------
+文档 19:
+
+他永远不会熄灭他们对自由的热爱。他永远不会削弱自由世界的决心。
+
+今晚，我们相聚在一个经历了这个国家有史以来最艰难两年的美国。
+
+疫情是惩罚性的。
+
+如此多的家庭靠薪水度日，艰难应对食品、汽油、住房等不断上涨的成本。
+
+我理解。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 18}
+----------------------------------------------------------------------------------------------------
+文档 20:
+
+他和他的父亲都患有 1 型糖尿病，这意味着他们每天都需要胰岛素。制造一瓶胰岛素的成本约为 10 美元。
+
+但制药公司向像 Joshua 和他父亲这样的家庭收取高达 30 倍的费用。我和 Joshua 的母亲谈过。
+
+想象一下，看着需要胰岛素的孩子，却不知道如何支付费用是什么感觉。
+
+这对你的尊严、你直视孩子眼睛的能力、成为你期望成为的父母意味着什么。
+元数据: {'source': '../../how_to/state_of_the_union.txt', 'id': 40}
+```
+
+## 使用 OpenVINO 进行重排序
+
+现在让我们用 `ContextualCompressionRetriever` 包装我们的基础检索器，使用 `OpenVINOReranker` 作为压缩器。
+
+```python
+from langchain_classic.retrievers.contextual_compression import ContextualCompressionRetriever
+from langchain_community.document_compressors.openvino_rerank import OpenVINOReranker
+
+model_name = "BAAI/bge-reranker-large"
+
+ov_compressor = OpenVINOReranker(model_name_or_path=model_name, top_n=4)
+compression_retriever = ContextualCompressionRetriever(
+        base_compressor=ov_compressor, base_retriever=retriever
+)
+
+compressed_docs = compression_retriever.invoke(
+    "总统对 Ketanji Jackson Brown 说了什么"
+)
+print([doc.metadata["id"] for doc in compressed_docs])
+```
+
+重排序后，前 4 个文档与基础检索器检索到的前 4 个文档不同。
+
+```python
+pretty_print_docs(compressed_docs)
+```
+
+```text
+文档 1:
+
+总统最严肃的宪法职责之一是提名某人担任美国最高法院大法官。
+
+我在 4 天前做到了这一点，当时我提名了联邦巡回上诉法院法官 Ketanji Brown Jackson。她是我们国家顶尖的法律人才之一，将延续布雷耶大法官的卓越传统。
+元数据: {'id': 0, 'relevance_score': tensor(0.6148)}
+----------------------------------------------------------------------------------------------------
+文档 2:
+
+他永远不会熄灭他们对自由的热爱。他永远不会削弱自由世界的决心。
+
+今晚，我们相聚在一个经历了这个国家有史以来最艰难两年的美国。
+
+疫情是惩罚性的。
+
+如此多的家庭靠薪水度日，艰难应对食品、汽油、住房等不断上涨的成本。
+
+我理解。
+元数据: {'id': 16, 'relevance_score': tensor(0.0373)}
+----------------------------------------------------------------------------------------------------
+文档 3:
+
+曾是私人执业领域的顶级诉讼律师。曾是联邦公设辩护人。来自公立学校教育工作者和警察家庭。共识建立者。自她被提名以来，她获得了广泛的支持——从警察兄弟会到由民主党和共和党任命的前法官。
+
+如果我们要推进自由和正义，就需要确保边境安全并改革移民制度。
+元数据: {'id': 18, 'relevance_score': tensor(0.0131)}
+----------------------------------------------------------------------------------------------------
+文档 4:
+
+致所有美国人，我将对你们坦诚相待，正如我一直承诺的那样。一个俄罗斯独裁者入侵外国，给全世界带来了代价。
+
+我正在采取强有力的行动，确保我们制裁的痛苦针对俄罗斯经济。我将使用我们掌握的一切工具来保护美国企业和消费者。
+
+今晚，我可以宣布，美国已与另外 30 个国家合作，从全球储备中释放 6000 万桶石油。
+元数据: {'id': 6, 'relevance_score': tensor(0.0098)}
+```
+
+## 导出 IR 模型
+
+可以使用 `OVModelForSequenceClassification` 将重排序模型导出为 OpenVINO IR 格式，并从本地文件夹加载模型。
+
+```python
+from pathlib import Path
+
+ov_model_dir = "bge-reranker-large-ov"
+if not Path(ov_model_dir).exists():
+    ov_compressor.save_model(ov_model_dir)
+```
+
+```python
+ov_compressor = OpenVINOReranker(model_name_or_path=ov_model_dir)
+```
+
+```text
+正在将模型编译到 CPU ...
+```
+
+更多信息请参考：
+
+* [OpenVINO LLM 指南](https://docs.openvino.ai/2024/learn-openvino/llm_inference_guide.html)。
+
+* [OpenVINO 文档](https://docs.openvino.ai/2024/home.html)。
+
+* [OpenVINO 入门指南](https://www.intel.com/content/www/us/en/content-details/819067/openvino-get-started-guide.html)。
+
+* [使用 LangChain 的 RAG 笔记本](https://github.com/openvinotoolkit/openvino_notebooks/tree/latest/notebooks/llm-rag-langchain)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_transformers\openvino_rerank.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

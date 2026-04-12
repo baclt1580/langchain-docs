@@ -1,0 +1,103 @@
+---
+title: "递归分割 - 文本分割器集成指南"
+---
+
+此[文本分割器](/oss/python/integrations/splitters/)是通用文本的推荐选择。它通过一个字符列表进行参数化配置，会按顺序尝试在这些字符处分割，直到生成的块足够小。默认列表为 `["\n\n", "\n", " ", ""]`。这样做的效果是尽可能保持所有段落（然后是句子，接着是词语）的完整性，因为这些通常被视为语义关联最强的文本片段。
+
+1. 文本如何分割：按字符列表进行分割。
+2. 块大小如何衡量：按字符数计算。
+
+下面我们展示使用示例。
+
+```shell
+pip install -qU langchain-text-splitters
+```
+
+
+
+要直接获取字符串内容，请使用 `.split_text`。
+
+要创建 LangChain [Document](https://reference.langchain.com/python/langchain-core/documents/base/Document) 对象（例如用于下游任务），请使用 `.create_documents`。
+
+```python
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# 加载示例文档
+with open("state_of_the_union.txt") as f:
+    state_of_the_union = f.read()
+
+text_splitter = RecursiveCharacterTextSplitter(
+    # 设置非常小的块大小，仅用于演示。
+    chunk_size=100,
+    chunk_overlap=20,
+    length_function=len,
+    is_separator_regex=False,
+)
+texts = text_splitter.create_documents([state_of_the_union])
+print(texts[0])
+print(texts[1])
+```
+```python
+page_content='Madam Speaker, Madam Vice President, our First Lady and Second Gentleman. Members of Congress and'
+page_content='of Congress and the Cabinet. Justices of the Supreme Court. My fellow Americans.'
+```
+
+```python
+print(text_splitter.split_text(state_of_the_union)[:2])
+```
+
+```python
+['Madam Speaker, Madam Vice President, our First Lady and Second Gentleman. Members of Congress and',
+ 'of Congress and the Cabinet. Justices of the Supreme Court. My fellow Americans.']
+```
+
+
+
+
+让我们看看上面为 `RecursiveCharacterTextSplitter` 设置的参数：
+
+- `chunk_size`：块的最大大小，大小由 `length_function` 决定。
+- `chunk_overlap`：块之间的目标重叠量。重叠块有助于减轻上下文在块之间分割时造成的信息丢失。
+- `length_function`：确定块大小的函数。
+- `is_separator_regex`：分隔符列表（默认为 `["\n\n", "\n", " ", ""]`）是否应解释为正则表达式。
+
+
+
+
+## 分割无词边界语言的文本
+
+某些书写系统没有[词边界](https://en.wikipedia.org/wiki/Category:Writing_systems_without_word_boundaries)，例如中文、日文和泰文。使用默认分隔符列表 `["\n\n", "\n", " ", ""]` 分割文本可能导致词语被分割到不同的块中。为了保持词语的完整性，您可以覆盖分隔符列表，添加额外的标点符号：
+
+* 添加 ASCII 全角句点 "`.`"、[Unicode 全角](https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block))句点 "`．`"（用于中文文本）和[表意句点](https://en.wikipedia.org/wiki/CJK_Symbols_and_Punctuation) "`。`"（用于日文和中文）
+* 添加泰文、缅甸文、高棉文和日文中使用的[零宽空格](https://en.wikipedia.org/wiki/Zero-width_space)。
+* 添加 ASCII 逗号 "`,`"、Unicode 全角逗号 "`，`" 和 Unicode 表意逗号 "`、`"
+
+```python
+text_splitter = RecursiveCharacterTextSplitter(
+    separators=[
+        "\n\n",
+        "\n",
+        " ",
+        ".",
+        ",",
+        "\u200b",  # 零宽空格
+        "\uff0c",  # 全角逗号
+        "\u3001",  # 表意逗号
+        "\uff0e",  # 全角句点
+        "\u3002",  # 表意句点
+        "",
+    ],
+    # 其他参数保持不变
+)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\integrations\splitters\recursive_text_splitter.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,95 @@
+---
+title: "递归分割 - 文本分割器集成指南"
+---
+
+此[文本分割器](/oss/javascript/integrations/splitters/)是通用文本的推荐选择。它通过一个字符列表进行参数化配置，会按顺序尝试在这些字符处分割，直到生成的块足够小。默认列表为 `["\n\n", "\n", " ", ""]`。这样做的效果是尽可能保持所有段落（然后是句子，接着是词语）的完整性，因为这些通常被视为语义关联最强的文本片段。
+
+1. 文本如何分割：按字符列表进行分割。
+2. 块大小如何衡量：按字符数计算。
+
+下面我们展示使用示例。
+
+
+<CodeGroup>
+```bash npm
+npm install @langchain/textsplitters
+```
+
+```bash pnpm
+pnpm install @langchain/textsplitters
+```
+
+```bash yarn
+yarn add @langchain/textsplitters
+```
+
+```bash bun
+bun add @langchain/textsplitters
+```
+</CodeGroup>
+
+
+
+
+要直接获取字符串内容，请使用 `.splitText`。
+
+要创建 LangChain [Document](https://reference.langchain.com/javascript/langchain-core/documents/Document) 对象（例如用于下游任务），请使用 `.createDocuments`。
+
+```ts
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+
+const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 100, chunkOverlap: 0 })
+const texts = splitter.createDocuments([{ pageContent: "..." }])
+```
+```javascript
+[
+  { pageContent: "...", metadata: {} },
+]
+```
+
+
+让我们看看上面为 `RecursiveCharacterTextSplitter` 设置的参数：
+
+
+
+- `chunkSize`：块的最大大小，大小由 `lengthFunction` 决定。
+- `chunkOverlap`：块之间的目标重叠量。重叠块有助于减轻上下文在块之间分割时造成的信息丢失。
+
+
+## 分割无词边界语言的文本
+
+某些书写系统没有[词边界](https://en.wikipedia.org/wiki/Category:Writing_systems_without_word_boundaries)，例如中文、日文和泰文。使用默认分隔符列表 `["\n\n", "\n", " ", ""]` 分割文本可能导致词语被分割到不同的块中。为了保持词语的完整性，您可以覆盖分隔符列表，添加额外的标点符号：
+
+* 添加 ASCII 全角句点 "`.`"、[Unicode 全角](https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block))句点 "`．`"（用于中文文本）和[表意句点](https://en.wikipedia.org/wiki/CJK_Symbols_and_Punctuation) "`。`"（用于日文和中文）
+* 添加泰文、缅甸文、高棉文和日文中使用的[零宽空格](https://en.wikipedia.org/wiki/Zero-width_space)。
+* 添加 ASCII 逗号 "`,`"、Unicode 全角逗号 "`，`" 和 Unicode 表意逗号 "`、`"
+
+
+```ts
+const splitter = new RecursiveCharacterTextSplitter({
+  separators: [
+    "\n\n",
+    "\n",
+    " ",
+    ".",
+    ",",
+    "\u200b",  // 零宽空格
+    "\uff0c",  // 全角逗号
+    "\u3001",  // 表意逗号
+    "\uff0e",  // 全角句点
+    "\u3002",  // 表意句点
+    "",
+  ],
+});
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\integrations\splitters\recursive_text_splitter.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,54 @@
+---
+title: 访问与监督
+description: 控制谁能访问智能体、如何进行身份验证，并审计其所有操作。
+---
+
+Fleet 为您提供了在组织内规模化部署智能体的控制层：分级权限、凭证管理、人工介入监督，以及智能体操作的审计追踪。
+
+## 权限与共享
+
+Fleet 在两个维度上为每个智能体提供精细化的控制：**谁能访问**以及**他们能做什么**。
+
+- **谁**：与单个用户或整个工作区共享。
+- **做什么**：三个权限级别：
+  - **克隆** — 复制并自定义智能体
+  - **运行** — 使用但不修改
+  - **编辑** — 完全访问权限，可更改指令、工具和设置
+
+您可以叠加这些权限。为核心团队授予编辑权限，与更广泛的组织共享仅运行权限，并随时可以撤销。
+
+有关设置说明，请参阅[更改对智能体的访问权限](/langsmith/fleet/manage-agent-settings#change-access-to-the-agent)。
+
+## 智能体身份与凭证
+
+Fleet 提供两种凭证模型，用于控制智能体如何向外部工具进行身份验证：
+
+- **固定凭证（"Claws"）**：无论谁运行智能体，它都使用同一套凭证。适用于共享资源型智能体，例如团队 Slack 机器人，每个人都通过同一个账户进行交互。
+- **用户凭证（"Assistants"）**：智能体代表调用它的个人用户行事。每个用户通过 OAuth 使用自己的账户进行身份验证。适用于用户具有不同访问级别的工具，例如个人邮件助手。
+
+每个智能体都可以单独配置此选项，因此您可以为每个用例选择合适的模型。
+
+有关设置说明，请参阅[智能体身份](/langsmith/fleet/agent-identity)。
+
+## 可观测性与审计追踪
+
+Fleet 中的智能体操作会被捕获到结构化的 [LangSmith 追踪记录](/langsmith/observability)中，包括工具调用、决策和输出。您可以检查、搜索和导出这些追踪记录。
+
+结合智能体身份和权限，追踪功能可以告诉您哪个智能体执行了操作、代表谁执行、使用了什么凭证，以及它在每个步骤中做了什么。
+
+## 人工介入监督
+
+Fleet 提供了一个[中央收件箱](https://smith.langchain.com/agents/inbox)，用于审查您所有智能体的操作。您可以配置智能体，使其在执行特定操作前暂停并请求批准，然后在一个地方进行审查、批准、编辑或拒绝。
+
+有关设置说明，请参阅[人工介入监督](/langsmith/fleet/essentials#human-in-the-loop)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\access-and-oversight.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

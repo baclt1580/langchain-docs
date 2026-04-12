@@ -1,0 +1,42 @@
+---
+title: "Ontotext GraphDB 集成"
+description: "使用 LangChain Python 与 Ontotext GraphDB 进行集成。"
+---
+
+>[Ontotext GraphDB](https://graphdb.ontotext.com/) 是一个符合 RDF 和 SPARQL 标准的图数据库和知识发现工具。
+
+## 依赖项
+
+通过以下方式安装 [rdflib](https://github.com/RDFLib/rdflib) 包：
+
+<CodeGroup>
+```bash pip
+pip install rdflib==7.0.0
+```
+
+```bash uv
+uv add "rdflib==7.0.0"
+```
+</CodeGroup>
+
+## 图 QA 链
+
+将您的 GraphDB 数据库与聊天模型连接，以获取数据洞察。
+
+请参阅 [Ontotext GraphDB 笔记本示例](/oss/python/integrations/graphs/ontotext)。
+
+```python
+from langchain_community.graphs import OntotextGraphDBGraph
+from langchain_classic.chains import OntotextGraphDBQAChain
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\ontotext_graphdb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

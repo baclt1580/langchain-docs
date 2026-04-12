@@ -1,0 +1,33 @@
+---
+title: "Hazy Research 集成"
+description: "使用 LangChain Python 与 Hazy Research 进行集成。"
+---
+
+本页面介绍如何在 LangChain 中使用 Hazy Research 生态系统。
+它分为两部分：安装和设置，以及特定 Hazy Research 包装器的参考。
+
+## 安装和设置
+- 要使用 `manifest`，请使用 `pip install manifest-ml` 进行安装
+
+## 包装器
+
+### LLM
+
+存在一个围绕 Hazy Research 的 `manifest` 库的 LLM 包装器。
+`manifest` 是一个 Python 库，它本身是许多模型提供者的包装器，并增加了缓存、历史记录等功能。
+
+要使用此包装器：
+```python
+from langchain_community.llms.manifest import ManifestWrapper
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\hazy_research.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

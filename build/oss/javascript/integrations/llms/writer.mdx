@@ -1,0 +1,54 @@
+---
+title: "Writer 集成"
+description: "使用 LangChain JavaScript 与 Writer LLM 集成。"
+---
+
+LangChain.js 支持调用 [WRITER](https://writer.com/) LLM。
+
+## 设置
+
+首先，您需要在 https://writer.com/ 注册一个账户。创建一个服务账户并记下您的 API 密钥。
+
+接下来，您需要安装官方包作为 peer 依赖：
+
+```bash npm
+yarn add @writerai/writer-sdk
+```
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+## 使用方式
+
+```typescript
+import { Writer } from "@langchain/community/llms/writer";
+
+const model = new Writer({
+  maxTokens: 20,
+  apiKey: "YOUR-API-KEY", // 在 Node.js 中默认为 process.env.WRITER_API_KEY
+  orgId: "YOUR-ORGANIZATION-ID", // 在 Node.js 中默认为 process.env.WRITER_ORG_ID
+});
+const res = await model.invoke(
+  "一家生产彩色袜子的公司，起什么名字比较好？"
+);
+console.log({ res });
+```
+
+## 相关链接
+
+- [模型指南](/oss/javascript/langchain/models)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\llms\writer.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

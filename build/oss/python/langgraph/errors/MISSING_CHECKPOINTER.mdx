@@ -1,0 +1,53 @@
+---
+title: MISSING_CHECKPOINTER
+---
+
+你正在尝试使用 LangGraph 内置的持久化功能，但未提供检查点处理器。
+
+当 [`StateGraph`](https://reference.langchain.com/python/langgraph/graph/state/StateGraph) 或 [`@entrypoint`](https://reference.langchain.com/python/langgraph/func/entrypoint) 的 `compile()` 方法中缺少 `checkpointer` 时，会出现此错误。
+
+
+
+
+
+## 故障排除
+
+以下方法可能有助于解决此错误：
+
+-   初始化一个检查点处理器，并将其传递给 [`StateGraph`](https://reference.langchain.com/python/langgraph/graph/state/StateGraph) 或 [`@entrypoint`](https://reference.langchain.com/python/langgraph/func/entrypoint) 的 `compile()` 方法。
+
+
+
+```python
+from langgraph.checkpoint.memory import InMemorySaver
+checkpointer = InMemorySaver()
+
+# Graph API
+graph = StateGraph(...).compile(checkpointer=checkpointer)
+
+# Functional API
+@entrypoint(checkpointer=checkpointer)
+def workflow(messages: list[str]) -> str:
+    ...
+```
+
+
+
+
+
+-   使用 LangGraph API，这样你就不需要手动实现或配置检查点处理器。API 会为你处理所有持久化基础设施。
+
+## 相关链接
+
+-   了解更多关于[持久化](/oss/python/langgraph/persistence)的信息。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\errors\MISSING_CHECKPOINTER.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

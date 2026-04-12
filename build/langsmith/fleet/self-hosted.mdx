@@ -1,0 +1,517 @@
+---
+title: 管理 Fleet
+sidebarTitle: Fleet
+---
+
+[LangSmith Fleet](/langsmith/fleet/index) 允许用户在 LangSmith 中无需代码即可创建、部署和管理 AI 智能体。在 Fleet 中创建的智能体本质上就是 LangSmith Deployment 上的一个助手。本页说明如何在[自托管 LangSmith 实例](/langsmith/self-hosted)上管理 Fleet。
+
+<Note>
+Fleet 会追踪所有智能体运行并将其存储在 LangSmith 中。自托管客户可以禁用追踪，但运行数据始终存储在 LangSmith Deployment 中。请根据您组织的要求配置数据保留策略。
+</Note>
+
+## 前提条件
+
+在启用 Fleet 之前，您必须完成以下设置步骤：
+
+1. 安装基础 LangSmith 平台：
+   - [在 Kubernetes 上安装](/langsmith/kubernetes)。
+   - [在 Docker 上安装](/langsmith/docker)。
+1. [启用 LangSmith Deployment](/langsmith/deploy-self-hosted-full-platform)（智能体部署能力）。
+
+<Info>
+Fleet 在 [LangSmith Self-Hosted v0.13](https://changelog.langchain.com/announcements/langsmith-self-hosted-v0-13) 及更高版本上可用。自托管是企业版计划的附加功能。更多详情，请参阅[定价](https://www.langchain.com/pricing)。如果您想获取许可证密钥以在您的环境中试用 LangSmith，请[联系我们的销售团队](https://www.langchain.com/contact-sales)。
+</Info>
+
+## 组件
+
+Fleet 由以下组件组成：
+
+- `agentBootstrap`：部署 Fleet 所需的 LangSmith Deployment（智能体）的作业。
+- `agentBuilder`
+    - `toolServer`：为智能体提供 MCP 工具执行。
+    - `triggerServer`：处理 Webhook 和计划触发器。
+    - `agent`：处理智能体生成的主要智能体，所有助手都将在此创建。
+
+## 启用 Fleet
+
+要启用 Fleet，请将以下内容添加到您的 `values.yaml` 文件中：
+
+```yaml
+backend:
+  agentBootstrap:
+    enabled: true
+
+config:
+  agentBuilder:
+    enabled: true
+    encryptionKey: "<key>"
+
+agentBuilderToolServer:
+  enabled: true
+
+agentBuilderTriggerServer:
+  enabled: true
+```
+
+### 生成加密密钥
+
+Fleet 需要一个 Fernet 加密密钥来安全存储密钥。使用 Python 生成一个：
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+<Note>
+您可以使用 `fleet_encryption_key` 参数将加密密钥存储在预定义的 Kubernetes 密钥中。详情请参阅[使用现有密钥](/langsmith/self-host-using-an-existing-secret#parameters)。
+</Note>
+
+## 启用 OAuth 工具和触发器（可选）
+
+要启用基于 OAuth 的工具（如 Gmail、Slack、GitHub），请配置 `oauthProviderOrgId` 并为要启用的每个集成添加提供商 ID。您可以启用任意组合的提供商。
+
+### 可用提供商
+
+| 提供商 | 启用的工具 | 启用的触发器 | 设置指南 |
+|----------|--------------|-----------------|---------------------|
+| `githubOAuthProvider` | GitHub | - | [见下文](#github-oauth-provider)
+| `googleOAuthProvider` | Gmail、Google Calendar、Google Sheets、BigQuery | Gmail | [见下文](#google-oauth-provider)
+| `linearOAuthProvider` | Linear | - | [见下文](#linear-oauth-provider)
+| `linkedinOAuthProvider` | LinkedIn | - | [见下文](#linkedin-oauth-provider)
+| `microsoftOAuthProvider` | Outlook、Calendar、Teams、SharePoint、Word、Excel、PowerPoint | Outlook | [见下文](#microsoft-oauth-provider)
+| `slackOAuthProvider` | Slack | Slack | [见下文](#slack-oauth-provider)
+
+### 通用配置
+
+将以下内容添加到您的 `values.yaml` 文件中。仅包含您需要的提供商。
+
+```yaml
+backend:
+  agentBootstrap:
+    enabled: true
+
+config:
+  agentBuilder:
+    # 配置 OAuth 提供商的组织的 ID
+    oauthProviderOrgId: "<your-org-id>"
+    oauth:
+      # 添加您要启用的集成的提供商 ID，
+      # Slack 需要额外配置
+      slackOAuthProvider: "<provider-id>"
+      slackSigningSecret: "<signing-secret>"
+      slackBotId: "<bot-id>"
+      googleOAuthProvider: "<provider-id>"
+      linkedinOAuthProvider: "<provider-id>"
+      linearOAuthProvider: "<provider-id>"
+      microsoftOAuthProvider: "<provider-id>"
+      githubOAuthProvider: "<provider-id>"
+```
+
+<Warning>
+提供商 ID 必须唯一，且不能以 `-agent-builder` 或 `-oauth-provider` 结尾。
+</Warning>
+
+### 提供商设置指南
+
+<AccordionGroup>
+<Accordion title="GitHub OAuth 提供商" id="github-oauth-provider">
+
+要为 Fleet 启用 GitHub OAuth，您需要创建一个 GitHub OAuth 应用并使用所需权限进行配置。
+
+<Steps>
+  <Step title="创建 GitHub OAuth 应用">
+    前往 [GitHub 设置 > 开发者设置 > OAuth Apps](https://github.com/settings/developers)，点击 **New OAuth App**。
+  </Step>
+
+  <Step title="配置应用">
+    填写应用详情。您可以随意命名，并保留默认的复选框设置。
+  </Step>
+
+  <Step title="设置权限">
+    授予应用对 **Pull Requests** 和 **Issues** 的读写权限。
+  </Step>
+
+  <Step title="添加回调 URL">
+    设置回调 URL，将 `<hostname>` 替换为您的 LangSmith 主机名，`<provider-id>` 替换为您的提供商 ID：
+
+    ```
+    https://<hostname>/host-oauth-callback/<provider-id>
+    ```
+  </Step>
+
+  <Step title="生成客户端密钥">
+    点击 **Generate a new client secret**，复制 **Client ID**（显示在应用页面顶部）和 **Client Secret**。
+  </Step>
+
+  <Step title="在 LangSmith 中配置 OAuth 提供商">
+    在 LangSmith 中，前往 **Settings > OAuth Providers** 并添加新提供商：
+    - **Client ID**：来自 GitHub 应用
+    - **Client Secret**：来自 GitHub 应用
+    - **Authorization URL**：`https://github.com/login/oauth/authorize`
+    - **Token URL**：`https://github.com/login/oauth/access_token`
+    - **Provider ID**：唯一字符串，例如：`github`
+  </Step>
+
+  <Step title="部署">
+    将以下内容添加到您的 `values.yaml` 并部署：
+
+    ```yaml
+    config:
+      agentBuilder:
+        oauthProviderOrgId: "<your-org-id>"
+        oauth:
+          githubOAuthProvider: "<provider-id>"
+    ```
+  </Step>
+
+  <Step title="在仓库上安装应用">
+    创建应用后，您需要：
+    1. 向您的 GitHub 账户验证该应用。
+    2. 前往 **Settings > Applications > Installed GitHub Apps**，在您希望其访问的仓库上安装该应用。
+
+    <Note>
+    对于私有仓库，您必须在每个希望 Fleet 访问的仓库上显式安装该应用。
+    </Note>
+  </Step>
+</Steps>
+
+</Accordion>
+
+<Accordion title="Google OAuth 提供商" id="google-oauth-provider">
+
+要为 Fleet 启用 Google OAuth，您需要在 GCP 中创建一个 OAuth 客户端，并使用所需的 URL 和凭据进行配置。
+
+<Steps>
+  <Step title="在 GCP 中创建 OAuth 客户端">
+    在 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 中创建一个新的 OAuth 客户端应用（Web 应用程序）。
+  </Step>
+
+  <Step title="向 GCP 添加 URL">
+    将以下 URL 添加到您的 OAuth 客户端，将 `<hostname>` 替换为您的 LangSmith 主机名，`<provider-id>` 替换为您将使用的提供商 ID（例如 `google`）：
+
+    **Authorized JavaScript origins:**
+    - `https://<hostname>`
+
+    **Authorized redirect URIs:**
+    - `https://<hostname>/api-host/v2/auth/callback/<provider-id>`
+    - `https://<hostname>/host-oauth-callback/<provider-id>`
+  </Step>
+
+  <Step title="复制凭据">
+    从 GCP OAuth 应用中复制 **Client ID** 和 **Client Secret**。
+  </Step>
+
+  <Step title="在 LangSmith 中配置 OAuth 提供商">
+    在 LangSmith 中，前往 **Settings > OAuth Providers** 并添加新提供商：
+    - **Client ID**：在 GCP 中查找
+    - **Client Secret**：在 GCP 中查找
+    - **Authorization URL**：`https://accounts.google.com/o/oauth2/auth`
+    - **Token URL**：`https://oauth2.googleapis.com/token`
+    - **Provider ID**：唯一字符串，例如：`google`
+  </Step>
+
+  <Step title="部署">
+    将 LangSmith OAuth 提供商 ID 添加到您的 `values.yaml` 并部署：
+
+    ```yaml
+    config:
+      agentBuilder:
+        oauthProviderOrgId: "<your-org-id>"
+        oauth:
+          googleOAuthProvider: "<provider-id>"
+    ```
+  </Step>
+</Steps>
+
+</Accordion>
+
+<Accordion title="Microsoft OAuth 提供商" id="microsoft-oauth-provider">
+
+要为 Fleet 启用 Microsoft OAuth，请创建一个 Azure 应用注册，添加所需的 Microsoft Graph 委派权限，并在 LangSmith 中配置 Microsoft OAuth 提供商。
+
+<Steps>
+  <Step title="创建 Azure 应用注册">
+    在 [Microsoft Entra 管理中心](https://entra.microsoft.com/)中，前往 **Applications > App registrations** 并创建新注册。
+  </Step>
+
+  <Step title="选择支持的账户类型">
+    选择与您的部署匹配的账户类型。如果您需要来自多个 Microsoft Entra 租户的用户进行身份验证，请选择多租户选项。如果您的部署仅限于一个租户，则可以使用单租户应用注册。
+  </Step>
+
+  <Step title="添加重定向 URI">
+    添加以下 Web 重定向 URI，将 `<hostname>` 替换为您的 LangSmith 主机名，`<provider-id>` 替换为您的提供商 ID：
+
+    ```
+    https://<hostname>/host-oauth-callback/<provider-id>
+    ```
+  </Step>
+
+  <Step title="创建客户端密钥">
+    在 **Certificates & secrets** 中，创建新的客户端密钥。复制 **Application (client) ID** 和生成的客户端密钥值。
+  </Step>
+
+  <Step title="添加 Microsoft Graph 委派权限">
+    在 **API permissions** 中，添加以下 Microsoft Graph 委派权限：
+    - `Mail.ReadWrite`
+    - `Mail.Send`
+    - `Calendars.ReadWrite`
+    - `Team.ReadBasic.All`
+    - `Channel.ReadBasic.All`
+    - `Channel.Create`
+    - `ChannelMessage.Send`
+    - `ChannelMessage.Read.All`
+    - `Chat.Create`
+    - `Chat.ReadWrite`
+    - `User.ReadBasic.All`
+    - `Files.ReadWrite.All`
+    - `Sites.ReadWrite.All`
+
+    <Note>
+    LangSmith 会自动为 Microsoft 提供商请求 `offline_access`，以便用户可以接收刷新令牌。
+    </Note>
+  </Step>
+
+  <Step title="授予租户同意">
+    如果您的 Microsoft 365 策略要求对这些委派权限进行管理员同意，请为租户授予管理员同意。
+  </Step>
+
+  <Step title="在 LangSmith 中配置 OAuth 提供商">
+    在 LangSmith 中，前往 **Settings > OAuth Providers** 并添加新提供商：
+    - **Name**：例如，`Microsoft`
+    - **Provider ID**：唯一字符串，例如：`microsoft-oauth-provider`
+    - **Client ID**：来自 Azure 的 Application (client) ID
+    - **Client Secret**：来自 Azure 的客户端密钥值
+    - **Authorization URL**：`https://login.microsoftonline.com/common/oauth2/v2.0/authorize`
+    - **Token URL**：`https://login.microsoftonline.com/common/oauth2/v2.0/token`
+    - **Provider Type**：`microsoft`
+    - **Token endpoint auth method**：`client_secret_post`
+
+    <Note>
+    如果您创建了单租户应用注册，请将授权和令牌 URL 中的 `common` 替换为您的租户 ID。
+    </Note>
+  </Step>
+
+  <Step title="部署">
+    将以下内容添加到您的 `values.yaml` 并部署：
+
+    ```yaml
+    config:
+      agentBuilder:
+        oauthProviderOrgId: "<your-org-id>"
+        oauth:
+          microsoftOAuthProvider: "<provider-id>"
+    ```
+  </Step>
+</Steps>
+
+</Accordion>
+
+<Accordion title="Linear OAuth 提供商" id="linear-oauth-provider">
+
+要为 Fleet 启用 Linear OAuth，您需要创建一个 Linear OAuth 应用并使用所需凭据进行配置。
+
+<Steps>
+  <Step title="创建 Linear OAuth 应用">
+    前往 [Linear Settings > API > Applications](https://linear.app/settings/api/applications/new) 并创建新的 OAuth 应用。
+  </Step>
+
+  <Step title="添加回调 URL">
+    设置回调 URL，将 `<hostname>` 替换为您的 LangSmith 主机名，`<provider-id>` 替换为您的提供商 ID：
+
+    ```
+    https://<hostname>/host-oauth-callback/<provider-id>
+    ```
+  </Step>
+
+  <Step title="复制凭据">
+    创建应用后，复制 **Client ID** 和 **Client Secret**。
+  </Step>
+
+  <Step title="在 LangSmith 中配置 OAuth 提供商">
+    在 LangSmith 中，前往 **Settings > OAuth Providers** 并添加新提供商：
+    - **Client ID**：来自 Linear 应用
+    - **Client Secret**：来自 Linear 应用
+    - **Authorization URL**：`https://linear.app/oauth/authorize`
+    - **Token URL**：`https://api.linear.app/oauth/token`
+    - **Provider ID**：唯一字符串，例如：`linear`
+  </Step>
+
+  <Step title="部署">
+    将以下内容添加到您的 `values.yaml` 并部署：
+
+    ```yaml
+    config:
+      agentBuilder:
+        oauthProviderOrgId: "<your-org-id>"
+        oauth:
+          linearOAuthProvider: "<provider-id>"
+    ```
+  </Step>
+</Steps>
+
+</Accordion>
+
+<Accordion title="LinkedIn OAuth 提供商" id="linkedin-oauth-provider">
+
+要为 Fleet 启用 LinkedIn OAuth，您需要创建一个 LinkedIn OAuth 应用并使用所需凭据进行配置。
+
+<Steps>
+  <Step title="创建 LinkedIn OAuth 应用">
+    前往 [linkedin.com/developers/apps](https://www.linkedin.com/developers/apps/) 并创建新应用。
+  </Step>
+
+  <Step title="配置 OAuth 设置">
+    在您的应用设置中，前往 **Auth** 选项卡。
+  </Step>
+
+  <Step title="添加重定向 URI">
+    添加以下重定向 URI，将 `<hostname>` 替换为您的 LangSmith 主机名，`<provider-id>` 替换为您的提供商 ID：
+
+    ```
+    https://<hostname>/host-oauth-callback/<provider-id>
+    ```
+  </Step>
+
+  <Step title="复制凭据">
+    从 Auth 选项卡复制 **Client ID** 和 **Client Secret**。
+  </Step>
+
+  <Step title="在 LangSmith 中配置 OAuth 提供商">
+    在 LangSmith 中，前往 **Settings > OAuth Providers** 并添加新提供商：
+    - **Client ID**：来自 LinkedIn 应用
+    - **Client Secret**：来自 LinkedIn 应用
+    - **Authorization URL**：`https://www.linkedin.com/oauth/v2/authorization`
+    - **Token URL**：`https://www.linkedin.com/oauth/v2/accessToken`
+    - **Provider ID**：唯一字符串，例如：`linkedin`
+  </Step>
+
+  <Step title="部署">
+    将以下内容添加到您的 `values.yaml` 并部署：
+
+    ```yaml
+    config:
+      agentBuilder:
+        oauthProviderOrgId: "<your-org-id>"
+        oauth:
+          linkedinOAuthProvider: "<provider-id>"
+    ```
+  </Step>
+</Steps>
+
+</Accordion>
+
+<Accordion title="Slack OAuth 提供商" id="slack-oauth-provider">
+
+要为 Fleet 启用 Slack OAuth，您需要创建一个 Slack 应用，并使用所需范围、凭据和事件订阅进行配置。
+
+<Steps>
+  <Step title="创建 Slack 应用">
+    前往 [api.slack.com/apps](https://api.slack.com/apps) 并点击 **Create New App**。
+  </Step>
+
+  <Step title="添加范围">
+    在 **OAuth & Permissions** 中，添加以下范围：
+    - `channels:history`
+    - `channels:read`
+    - `chat:write`
+    - `groups:history`
+    - `groups:read`
+    - `im:history`
+    - `im:read`
+    - `im:write`
+    - `mpim:history`
+    - `team:read`
+    - `users:read`
+    - `users:read.email`
+  </Step>
+
+  <Step title="从 Slack 复制凭据">
+    从 Slack 应用设置中复制 **Client ID**、**Client Secret** 和 **Signing Secret**。
+  </Step>
+
+  <Step title="在 LangSmith 中配置 OAuth 提供商">
+    在 LangSmith 中，前往 **Settings > OAuth Providers** 并添加新提供商：
+    - **Client ID**：在 Slack 应用中查找
+    - **Client Secret**：在 Slack 应用中查找
+    - **Authorization URL**：`https://slack.com/oauth/v2/authorize`
+    - **Token URL**：`https://slack.com/api/oauth.v2.access`
+    - **Provider ID**：唯一字符串，例如：`slack`
+  </Step>
+
+  <Step title="向 Slack 添加重定向 URI">
+    将以下重定向 URI 添加到您的 Slack 应用中的 **OAuth & Permissions > Redirect URLs**，将 `<hostname>` 替换为您的 LangSmith 主机名，`<provider-id>` 替换为您的提供商 ID（例如 `slack`）：
+
+    ```
+    https://<hostname>/host-oauth-callback/<provider-id>
+    ```
+  </Step>
+
+  <Step title="获取机器人 ID">
+    1. 从 Slack 应用的 **OAuth & Permissions** 中获取机器人令牌。
+    2. 运行以下命令：
+
+    ```bash
+    curl -X POST https://slack.com/api/auth.test \
+      -H "Authorization: Bearer <bot-token>"
+    ```
+
+    3. 从响应中复制 `bot_id`。
+  </Step>
+
+  <Step title="部署 LangSmith">
+    将以下内容添加到您的 `values.yaml` 并部署：
+
+    ```yaml
+    config:
+      agentBuilder:
+        oauthProviderOrgId: "<your-org-id>"
+        oauth:
+          slackOAuthProvider: "<provider-id>"
+          slackSigningSecret: "<signing-secret>"
+          slackBotId: "<bot-id>"
+    ```
+  </Step>
+
+  <Step title="启用事件订阅">
+    1. 部署后，前往 Slack 应用中的 **Event Subscriptions** 并启用事件。
+    2. 将 **Request URL** 设置为：
+
+       ```
+       https://<hostname>/v1/triggers/webhooks/d809e66e-0000-4000-8000-000000000002
+       ```
+
+    3. 添加以下机器人事件：
+       - `message.channels`
+       - `message.groups`
+       - `message.im`
+       - `message.mpim`
+  </Step>
+
+  <Step title="设置触发器和工具">
+    1. 将 Slack 机器人添加到您希望它读取的频道。
+    2. 在 Fleet 中配置 Slack 工具或触发器时，提供 **channel ID** 和 **channel name**。
+  </Step>
+</Steps>
+
+</Accordion>
+</AccordionGroup>
+
+## 禁用 Fleet
+
+要禁用 Fleet，请在您的 `values.yaml` 中将以下内容设置为 `false`：
+
+```yaml
+config:
+    agentBuilder:
+        enabled: false
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\self-hosted.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

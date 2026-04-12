@@ -1,0 +1,41 @@
+---
+title: "Postgres 集成"
+description: "使用 LangChain Python 与 Postgres 进行集成。"
+---
+
+> [pg_embedding](https://github.com/neondatabase/pg_embedding) 是一个开源包，用于
+> 使用 `Postgres` 和 `Hierarchical Navigable Small Worlds`
+> 算法进行向量相似度搜索，以实现近似最近邻搜索。
+
+## 安装和设置
+
+我们需要安装几个 Python 包。
+
+<CodeGroup>
+```bash pip
+pip install psycopg2-binary
+```
+
+```bash uv
+uv add psycopg2-binary
+```
+</CodeGroup>
+
+## 向量存储
+
+查看 [使用示例](/oss/python/integrations/vectorstores/pgembedding)。
+
+```python
+from langchain_community.vectorstores import PGEmbedding
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\pg_embedding.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

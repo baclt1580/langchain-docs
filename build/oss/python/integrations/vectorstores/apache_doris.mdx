@@ -1,0 +1,145 @@
+---
+title: "Apache Doris 集成"
+description: "使用 LangChain Python 与 Apache Doris 向量存储进行集成。"
+---
+
+>[Apache Doris](https://doris.apache.org/) 是一个用于实时分析的现代数据仓库。
+它能够在大规模上提供闪电般的实时数据分析速度。
+
+>通常 `Apache Doris` 被归类为 OLAP，并且在 [ClickBench — a Benchmark For Analytical DBMS](https://benchmark.clickhouse.com/) 中展示了卓越的性能。由于它拥有超快的向量化执行引擎，它也可以用作快速的向量数据库。
+
+您需要安装 `langchain-community`（使用 `pip install -qU langchain-community`）来使用此集成
+
+在这里我们将展示如何使用 Apache Doris 向量存储。
+
+## 设置
+
+```python
+pip install -qU  pymysql
+```
+
+在开始时设置 `update_vectordb = False`。如果没有文档更新，那么我们就不需要重新构建文档的嵌入。
+
+```python
+!pip install  sqlalchemy
+!pip install langchain
+```
+
+```python
+from langchain_classic.chains import RetrievalQA
+from langchain_community.document_loaders import (
+    DirectoryLoader,
+    UnstructuredMarkdownLoader,
+)
+from langchain_community.vectorstores.apache_doris import (
+    ApacheDoris,
+    ApacheDorisSettings,
+)
+from langchain_openai import OpenAI, OpenAIEmbeddings
+from langchain_text_splitters import TokenTextSplitter
+
+update_vectordb = False
+```
+
+## 加载文档并将它们拆分为令牌
+
+加载 `docs` 目录下的所有 markdown 文件
+
+对于 Apache Doris 文档，您可以从 [github.com/apache/doris](https://github.com/apache/doris) 克隆仓库，其中包含 `docs` 目录。
+
+```python
+loader = DirectoryLoader(
+    "./docs", glob="**/*.md", loader_cls=UnstructuredMarkdownLoader
+)
+documents = loader.load()
+```
+
+将文档拆分为令牌，并设置 `update_vectordb = True`，因为存在新文档/令牌。
+
+```python
+# load text splitter and split docs into snippets of text
+text_splitter = TokenTextSplitter(chunk_size=400, chunk_overlap=50)
+split_docs = text_splitter.split_documents(documents)
+
+# tell vectordb to update text embeddings
+update_vectordb = True
+```
+
+split_docs[-20]
+
+print("# docs  = %d, # splits = %d" % (len(documents), len(split_docs)))
+
+## 创建向量数据库实例
+
+### 将 Apache Doris 用作向量数据库
+
+```python
+def gen_apache_doris(update_vectordb, embeddings, settings):
+    if update_vectordb:
+        docsearch = ApacheDoris.from_documents(split_docs, embeddings, config=settings)
+    else:
+        docsearch = ApacheDoris(embeddings, settings)
+    return docsearch
+```
+
+## 将令牌转换为嵌入并放入向量数据库
+
+这里我们使用 Apache Doris 作为向量数据库，您可以通过 `ApacheDorisSettings` 配置 Apache Doris 实例。
+
+配置 Apache Doris 实例与配置 MySQL 实例非常相似。您需要指定：
+
+1. host/port
+2. username(default: 'root')
+3. password(default: '')
+4. database(default: 'default')
+5. table(default: 'langchain')
+
+```python
+import os
+from getpass import getpass
+
+if "OPENAI_API_KEY" not in os.environ:
+    os.environ["OPENAI_API_KEY"] = getpass()
+```
+
+```python
+update_vectordb = True
+
+embeddings = OpenAIEmbeddings()
+
+# configure Apache Doris settings(host/port/user/pw/db)
+settings = ApacheDorisSettings()
+settings.port = 9030
+settings.host = "172.30.34.130"
+settings.username = "root"
+settings.password = ""
+settings.database = "langchain"
+docsearch = gen_apache_doris(update_vectordb, embeddings, settings)
+
+print(docsearch)
+
+update_vectordb = False
+```
+
+## 构建问答系统并向其提问
+
+```python
+llm = OpenAI()
+qa = RetrievalQA.from_chain_type(
+    llm=llm, chain_type="stuff", retriever=docsearch.as_retriever()
+)
+query = "what is apache doris"
+resp = qa.run(query)
+print(resp)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\apache_doris.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

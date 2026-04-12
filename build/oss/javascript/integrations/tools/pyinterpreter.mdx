@@ -1,0 +1,76 @@
+---
+title: "Python 解释器集成"
+description: "使用 LangChain JavaScript 集成 Python 解释器工具。"
+---
+
+<Warning>
+此工具会执行代码，并可能执行破坏性操作。请确保你信任传递给它的任何代码！
+</Warning>
+
+LangChain 提供了一个实验性工具，用于执行任意的 Python 代码。
+这对于与能够生成代码以执行更强大计算的 LLM 结合使用非常有用。
+
+## 使用方法
+
+```typescript
+import { OpenAI } from "@langchain/openai";
+import { PythonInterpreterTool } from "@langchain/community/experimental/tools/pyinterpreter";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+
+const prompt = ChatPromptTemplate.fromTemplate(
+  `生成实现 {input} 的 Python 代码。不要生成其他任何内容。`
+);
+
+const model = new OpenAI({});
+
+const interpreter = await PythonInterpreterTool.initialize({
+  indexURL: "../node_modules/pyodide",
+});
+
+// 注意：在 Deno 中，自行初始化解释器可能更容易：
+// import pyodideModule from "npm:pyodide/pyodide.js";
+// import { PythonInterpreterTool } from "npm:@langchain/community/experimental/tools/pyinterpreter";
+
+// const pyodide = await pyodideModule.loadPyodide();
+// const pythonTool = new PythonInterpreterTool({instance: pyodide})
+
+const chain = prompt
+  .pipe(model)
+  .pipe(new StringOutputParser())
+  .pipe(interpreter);
+
+const result = await chain.invoke({
+  input: `打印 "Hello LangChain"`,
+});
+
+console.log(JSON.parse(result).stdout);
+
+// 安装 Python 包：
+// 这会使用 loadPackages 命令。
+// 这适用于使用 pyodide 构建的包。
+await interpreter.addPackage("numpy");
+// 但对于其他包，你可能需要使用 micropip。
+// 更多信息请参阅：https://pyodide.org/en/stable/usage/loading-packages.html
+await interpreter.addPackage("micropip");
+// 以下代码大致相当于：
+// pyodide.runPython(`import ${pkgname}; ${pkgname}`);
+const micropip = interpreter.pyodideInstance.pyimport("micropip");
+await micropip.install("numpy");
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/javascript/langchain/tools)
+- 工具 [操作指南](/oss/javascript/langchain/tools)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\pyinterpreter.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

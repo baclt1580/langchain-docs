@@ -1,0 +1,59 @@
+---
+title: "Azure Blob 存储文件集成"
+description: "使用 LangChain JavaScript 集成 Azure Blob 存储文件文档加载器。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+本文介绍如何将 Azure 文件加载为 LangChain 文档。
+
+## 环境设置
+
+要使用此加载器，你需要确保 Unstructured 服务已配置完成，并可通过一个可访问的 URL 端点使用。也可以配置为本地运行。
+
+有关如何设置的信息，请参阅 [Unstructured 文件加载器文档](/oss/javascript/integrations/document_loaders/file_loaders/unstructured)。
+
+你还需要安装官方的 Azure 存储 Blob 客户端库：
+
+```bash npm
+npm install @langchain/community @langchain/core @azure/storage-blob
+```
+
+## 使用方法
+
+配置好 Unstructured 后，你可以使用 Azure Blob 存储文件加载器来加载文件，并将其转换为 Document 对象。
+
+```typescript
+import { AzureBlobStorageFileLoader } from "@langchain/community/document_loaders/web/azure_blob_storage_file";
+
+const loader = new AzureBlobStorageFileLoader({
+  azureConfig: {
+    connectionString: "",
+    container: "container_name",
+    blobName: "example.txt",
+  },
+  unstructuredConfig: {
+    apiUrl: "http://localhost:8000/general/v0/general",
+    apiKey: "", // 此参数即将变为必填项
+  },
+});
+
+const docs = await loader.load();
+
+console.log(docs);
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\web_loaders\azure_blob_storage_file.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

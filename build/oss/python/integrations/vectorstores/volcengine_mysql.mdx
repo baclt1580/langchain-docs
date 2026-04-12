@@ -1,0 +1,101 @@
+---
+title: "火山引擎 RDS for MySQL 集成"
+description: "使用 LangChain Python 集成 Volcengine RDS for MySQL 向量存储。"
+---
+
+> [火山引擎 RDS for MySQL](https://www.volcengine.com/docs/6313) 是由火山引擎（Volcengine）开发的完全托管、稳定且可扩展的关系型数据库服务。[火山引擎](https://www.volcengine.com/docs?lang=en) 是字节跳动（TikTok 的母公司）开发的云服务平台。此集成允许您在 LangChain 中将 RDS for MySQL 用作向量存储。
+
+## 设置
+
+要使用 Volcengine MySQL 向量存储，您需要一个 Volcengine 账户和一个 RDS for MySQL 实例。
+
+### 安装
+
+安装集成包：
+
+```bash pip
+pip install -U langchain-volcengine-mysql
+```
+---
+
+## 实例化
+
+配置 `mysql` 子模块，然后访问 `mysql.vector_store`。
+
+```python
+from langchain_volcengine_mysql import mysql
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings()
+
+mysql.configure(
+    host="your-mysql-host.example.com",
+    port=3306,
+    user="your_user",
+    password="your_password",
+    database="your_db",
+    table_name="langchain_vectors",
+    embedding_function=embeddings,
+)
+
+vector_store = mysql.vector_store
+retriever = mysql.retriever
+```
+
+---
+
+## 管理向量存储
+
+### 添加项
+
+```python
+from langchain_core.documents import Document
+
+docs = [
+    Document(page_content="Volcengine RDS for MySQL is a managed relational database.", metadata={"source": "docs"}),
+    Document(page_content="You can use it as a LangChain vector store.", metadata={"source": "docs"}),
+]
+
+vector_store.add_documents(documents=docs, ids=["1", "2"])
+```
+
+### 删除项
+
+```python
+vector_store.delete(ids=["2"])
+```
+
+---
+
+## 查询向量存储
+
+### 相似度搜索
+
+```python
+results = vector_store.similarity_search(query="What is RDS for MySQL?", k=1)
+for doc in results:
+    print(f"* {doc.page_content} [{doc.metadata}]")
+```
+
+### 作为检索器使用
+
+```python
+docs = retriever.invoke("What is RDS for MySQL?")
+```
+
+---
+
+## API 参考
+
+请参阅官方 [PyPI 文档](https://pypi.org/project/langchain-volcengine-mysql/)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\volcengine_mysql.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

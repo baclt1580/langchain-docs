@@ -1,0 +1,109 @@
+---
+title: "AzureAIOpenAIApiChatModel 集成"
+description: "使用 LangChain Python 集成 AzureAIOpenAIApiChatModel 聊天模型。"
+---
+
+本文将帮助您开始使用 `AzureAIOpenAIApiChatModel` [聊天模型](/oss/python/langchain/models)。
+
+`AzureAIOpenAIApiChatModel` 类使用 Azure AI Foundry 中提供的 OpenAI 兼容 API。AI Foundry 包含多种聊天模型，包括 AzureOpenAI、Cohere、Llama、Phi-3/4 和 DeepSeek-R1 等。您可以在 [Azure 文档](https://learn.microsoft.com/azure/ai-studio/how-to/model-catalog-overview) 中查看其最新模型的相关信息，包括成本、上下文窗口和支持的输入类型。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | [JS 支持](https://reference.langchain.com/javascript/langchain-openai/AzureChatOpenAI) | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| `AzureAIOpenAIApiChatModel` | `langchain-azure-ai` | ✅ | ✅ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-azure-ai?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-azure-ai?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/python/langchain/tools) | [结构化输出](/oss/python/langchain/structured-output) | [图像输入](/oss/python/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/python/langchain/streaming/) | 原生异步 | [令牌使用量](/oss/python/langchain/models#token-usage) | [对数概率](/oss/python/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅|
+
+## 设置
+
+要访问 `AzureAIOpenAIApiChatModel` 模型，您需要创建一个 [Azure 账户](https://azure.microsoft.com/pricing/purchase-options/azure-account)，获取 API 密钥，并安装 `langchain-azure-ai` 集成包。
+
+### 凭据
+
+请前往 [Azure 文档](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/develop/sdk-overview?tabs=sync&pivots=programming-language-python) 查看如何创建部署并生成 API 密钥。模型部署完成后，在 AI Foundry 中点击“获取端点”按钮。这将显示您的端点和 API 密钥。完成此操作后，设置环境变量：
+
+```python
+import getpass
+import os
+
+if not os.getenv("AZURE_AI_PROJECT_ENDPOINT"):
+    os.environ["AZURE_AI_PROJECT_ENDPOINT"] = getpass.getpass(
+        "输入您的 Azure AI 项目端点："
+    )
+```
+
+如果您希望自动追踪模型调用，还可以通过取消注释以下代码来设置 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+```
+
+### 安装
+
+LangChain `AzureAIOpenAIApiChatModel` 集成位于 `langchain-azure-ai` 包中：
+
+```python
+pip install -qU langchain-azure-ai
+```
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+```python
+from langchain_azure_ai.chat_models import AzureAIOpenAIApiChatModel
+from azure.identity import DefaultAzureCredential
+
+llm = AzureAIOpenAIApiChatModel(
+    model="gpt-4o",
+    credential=DefaultAzureCredential(),
+    temperature=0,
+    max_tokens=None,
+    max_retries=2,
+)
+```
+
+## 调用
+
+```python
+messages = [
+    (
+        "system",
+        "您是一个将英语翻译成法语的助手。请翻译用户的句子。",
+    ),
+    ("human", "I love programming."),
+]
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+```text
+AIMessage(content="J'adore programmer.", additional_kwargs={}, response_metadata={'model': 'gpt-4o-2024-05-13', 'token_usage': {'input_tokens': 31, 'output_tokens': 4, 'total_tokens': 35}, 'finish_reason': 'stop'}, id='run-c082dffd-b1de-4b3f-943f-863836663ddb-0', usage_metadata={'input_tokens': 31, 'output_tokens': 4, 'total_tokens': 35})
+```
+
+```python
+print(ai_msg.content)
+```
+
+```text
+J'adore programmer.
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\azure_ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

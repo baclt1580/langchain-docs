@@ -1,0 +1,49 @@
+---
+title: "Jupyter notebook 集成"
+description: "使用 LangChain Python 与 Jupyter notebook 文档加载器集成。"
+---
+
+>[Jupyter Notebook](https://en.wikipedia.org/wiki/Project_Jupyter#Applications)（原名 `IPython Notebook`）是一个基于 Web 的交互式计算环境，用于创建笔记本文档。
+
+本文档介绍如何将数据从 `Jupyter notebook (.ipynb)` 加载为适合 LangChain 使用的格式。
+
+```python
+from langchain_community.document_loaders import NotebookLoader
+```
+
+```python
+loader = NotebookLoader(
+    "example_data/notebook.ipynb",
+    include_outputs=True,
+    max_output_length=20,
+    remove_newline=True,
+)
+```
+
+`NotebookLoader.load()` 将 `.ipynb` 笔记本文件加载到 [`Document`](https://reference.langchain.com/python/langchain-core/documents/base/Document) 对象中。
+
+**参数**：
+
+* `include_outputs` (bool)：是否在生成的文档中包含单元格输出（默认为 False）。
+* `max_output_length` (int)：每个单元格输出中包含的最大字符数（默认为 10）。
+* `remove_newline` (bool)：是否从单元格源代码和输出中移除换行符（默认为 False）。
+* `traceback` (bool)：是否包含完整回溯信息（默认为 False）。
+
+```python
+loader.load()
+```
+
+```python
+[Document(page_content='\'markdown\' cell: \'[\'# Notebook\', \'\', \'This notebook covers how to load data from an .html notebook into a format suitable by LangChain.\']\'\n\n \'code\' cell: \'[\'from langchain_community.document_loaders import NotebookLoader\']\'\n\n \'code\' cell: \'[\'loader = NotebookLoader("example_data/notebook.html")\']\'\n\n \'markdown\' cell: \'[\'`NotebookLoader.load()` loads the `.html` notebook file into a @[`Document`] object.\', \'\', \'**Parameters**:\', \'\', \'* `include_outputs` (bool): whether to include cell outputs in the resulting document (default is False).\', \'* `max_output_length` (int): the maximum number of characters to include from each cell output (default is 10).\', \'* `remove_newline` (bool): whether to remove newline characters from the cell sources and outputs (default is False).\', \'* `traceback` (bool): whether to include full traceback (default is False).\']\'\n\n \'code\' cell: \'[\'loader.load(include_outputs=True, max_output_length=20, remove_newline=True)\']\'\n\n', metadata={'source': 'example_data/notebook.html'})]
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\jupyter_notebook.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

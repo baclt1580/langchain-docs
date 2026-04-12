@@ -1,0 +1,31 @@
+```ts
+import { InMemoryStore } from "@langchain/langgraph";
+
+const embed = (texts: string[]): number[][] => {
+  // 替换为实际的嵌入函数或 LangChain 嵌入对象
+  return texts.map(() => [1.0, 2.0]);
+};
+
+// InMemoryStore 将数据保存到内存字典中。在生产环境中请使用基于数据库的存储。
+const store = new InMemoryStore({ index: { embed, dims: 2 } });
+const userId = "my-user";
+const applicationContext = "chitchat";
+const namespace = [userId, applicationContext];
+
+await store.put(namespace, "a-memory", {
+  rules: [
+    "User likes short, direct language",
+    "User only speaks English & TypeScript",
+  ],
+  "my-key": "my-value",
+});
+
+// 通过 ID 获取 "memory"
+const item = await store.get(namespace, "a-memory");
+
+// 在此命名空间中搜索 "memories"，按内容等价性过滤，按向量相似度排序
+const items = await store.search(namespace, {
+  filter: { "my-key": "my-value" },
+  query: "language preferences",
+});
+```

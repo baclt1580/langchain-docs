@@ -1,0 +1,97 @@
+---
+title: "文件系统集成"
+description: "使用 LangChain Python 与文件系统工具进行集成。"
+---
+
+LangChain 开箱即用提供了与本地文件系统交互的工具。本笔记本将介绍其中一些工具。
+
+**注意：** 不建议在沙盒环境之外使用这些工具！
+
+```python
+pip install -qU langchain-community
+```
+
+首先，我们将导入这些工具。
+
+```python
+from tempfile import TemporaryDirectory
+
+from langchain_community.agent_toolkits import FileManagementToolkit
+
+# We'll make a temporary directory to avoid clutter
+working_directory = TemporaryDirectory()
+```
+
+## FileManagementToolkit
+
+如果您希望向您的代理提供所有文件工具，使用工具包可以轻松实现。我们将临时目录作为根目录传入，作为 LLM 的工作空间。
+
+建议始终传入一个根目录，因为如果没有它，LLM 很容易污染工作目录，而且没有它，就无法防止简单的提示注入。
+
+```python
+toolkit = FileManagementToolkit(
+    root_dir=str(working_directory.name)
+)  # If you don't provide a root_dir, operations will default to the current working directory
+toolkit.get_tools()
+```
+
+```text
+[CopyFileTool(root_dir='/tmp/tmprdvsw3tg'),
+ DeleteFileTool(root_dir='/tmp/tmprdvsw3tg'),
+ FileSearchTool(root_dir='/tmp/tmprdvsw3tg'),
+ MoveFileTool(root_dir='/tmp/tmprdvsw3tg'),
+ ReadFileTool(root_dir='/tmp/tmprdvsw3tg'),
+ WriteFileTool(root_dir='/tmp/tmprdvsw3tg'),
+ ListDirectoryTool(root_dir='/tmp/tmprdvsw3tg')]
+```
+
+### 选择文件系统工具
+
+如果您只想选择某些工具，可以在初始化工具包时作为参数传入，或者单独初始化所需的工具。
+
+```python
+tools = FileManagementToolkit(
+    root_dir=str(working_directory.name),
+    selected_tools=["read_file", "write_file", "list_directory"],
+).get_tools()
+tools
+```
+
+```text
+[ReadFileTool(root_dir='/tmp/tmprdvsw3tg'),
+ WriteFileTool(root_dir='/tmp/tmprdvsw3tg'),
+ ListDirectoryTool(root_dir='/tmp/tmprdvsw3tg')]
+```
+
+```python
+read_tool, write_tool, list_tool = tools
+write_tool.invoke({"file_path": "example.txt", "text": "Hello World!"})
+```
+
+```text
+'File written successfully to example.txt.'
+```
+
+```python
+# List files in the working directory
+list_tool.invoke({})
+```
+
+```text
+'example.txt'
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\tools\filesystem.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

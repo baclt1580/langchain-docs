@@ -1,0 +1,39 @@
+---
+title: "HTML 转文本集成"
+description: "使用 LangChain Python 与 HTML 转文本进行集成。"
+---
+
+>[html2text](https://github.com/Alir3z4/html2text/) 是一个将页面 `HTML` 转换为干净、易读的纯 `ASCII 文本` 的 Python 包。
+
+ASCII 同时也恰好是有效的 `Markdown`（一种文本到 HTML 的格式）。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install html2text
+```
+
+```bash uv
+uv add html2text
+```
+</CodeGroup>
+
+## 文档转换器
+
+查看 [使用示例](/oss/python/integrations/document_transformers/html2text)。
+
+```python
+from langchain_community.document_loaders import Html2TextTransformer
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\html2text.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

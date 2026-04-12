@@ -1,0 +1,33 @@
+---
+title: "语雀集成"
+description: "使用 LangChain Python 集成语雀文档加载器。"
+---
+
+>[语雀](https://www.yuque.com/) 是一个专业的云端知识库，用于团队文档协作。
+
+本笔记本介绍如何从 `语雀` 加载文档。
+
+您可以在 [个人设置](https://www.yuque.com/settings/tokens) 页面点击个人头像获取个人访问令牌。
+
+```python
+from langchain_community.document_loaders import YuqueLoader
+```
+
+```python
+loader = YuqueLoader(access_token="<your_personal_access_token>")
+```
+
+```python
+docs = loader.load()
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\yuque.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

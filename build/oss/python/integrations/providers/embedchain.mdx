@@ -1,0 +1,44 @@
+---
+title: "Embedchain 集成"
+description: "使用 LangChain Python 与 Embedchain 进行集成。"
+---
+
+> [Embedchain](https://github.com/embedchain/embedchain) 是一个用于创建数据管道的 RAG 框架。
+> 它加载、索引、检索并同步所有数据。
+>
+> 它既可作为 [开源包](https://github.com/embedchain/embedchain) 提供，也可作为 [托管平台解决方案](https://app.embedchain.ai/) 提供。
+
+
+## 安装和设置
+
+使用 pip 安装包：
+
+<CodeGroup>
+```bash pip
+pip install embedchain
+```
+
+```bash uv
+uv add embedchain
+```
+</CodeGroup>
+
+
+## 检索器
+
+查看 [使用示例](/oss/python/integrations/retrievers/embedchain)。
+
+```python
+from langchain_community.retrievers import EmbedchainRetriever
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\embedchain.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

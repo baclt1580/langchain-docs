@@ -1,0 +1,42 @@
+---
+title: "Reddit 集成"
+description: "使用 LangChain Python 与 Reddit 集成。"
+---
+
+>[Reddit](https://www.reddit.com) 是一个美国的社会新闻聚合、内容评分和讨论网站。
+
+## 安装和设置
+
+首先，你需要安装一个 Python 包。
+
+<CodeGroup>
+```bash pip
+pip install praw
+```
+
+```bash uv
+uv add praw
+```
+</CodeGroup>
+
+创建一个 [Reddit 应用程序](https://www.reddit.com/prefs/apps/) 并使用你的 Reddit API 凭据初始化加载器。
+
+## 文档加载器
+
+查看 [使用示例](/oss/python/integrations/document_loaders/reddit)。
+
+
+```python
+from langchain_community.document_loaders import RedditPostsLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\reddit.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

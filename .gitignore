@@ -13,7 +13,6 @@ src/code-samples-generated/
 
 # Distribution / packaging
 .Python
-build/
 develop-eggs/
 dist/
 downloads/

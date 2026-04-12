@@ -1,0 +1,76 @@
+---
+title: "Jaguar 集成"
+description: "使用 LangChain Python 与 Jaguar 集成。"
+---
+
+本文档介绍如何在 LangChain 中使用 Jaguar 向量数据库。
+它包含三个部分：简介、安装和设置，以及 Jaguar API。
+
+
+## 简介
+
+Jaguar 向量数据库具有以下特性：
+
+1. 它是一个分布式向量数据库
+2. JaguarDB 的“ZeroMove”功能实现了即时水平扩展
+3. 多模态：嵌入、文本、图像、视频、PDF、音频、时间序列和地理空间
+4. 全主模式：允许并行读取和写入
+5. 异常检测能力
+6. RAG 支持：将 LLM 与专有数据和实时数据相结合
+7. 共享元数据：在多个向量索引之间共享元数据
+8. 距离度量：Euclidean, Cosine, InnerProduct, Manhatten, Chebyshev, Hamming, Jeccard, Minkowski
+
+[Overview of Jaguar scalable vector database](http://www.jaguardb.com)
+
+您可以在 Docker 容器中运行 JaguarDB；或者下载软件并在云端或本地运行。
+
+## 安装和设置
+
+- 在一个或多个主机上安装 JaguarDB
+- 在一个主机上安装 Jaguar HTTP Gateway 服务器
+- 安装 JaguarDB HTTP 客户端包
+
+步骤描述见 [Jaguar Documents](http://www.jaguardb.com/support.html)
+
+客户端程序中的环境变量：
+
+        export OPENAI_API_KEY="......"
+        export JAGUAR_API_KEY="......"
+
+
+## Jaguar API
+
+配合 LangChain，通过 Python 导入可提供 Jaguar 客户端类：
+
+```python
+from langchain_community.vectorstores.jaguar import Jaguar
+```
+
+Jaguar 类支持的 API 函数包括：
+
+- `add_texts`
+- `add_documents`
+- `from_texts`
+- `from_documents`
+- `similarity_search`
+- `is_anomalous`
+- `create`
+- `delete`
+- `clear`
+- `drop`
+- `login`
+- `logout`
+
+
+有关 Jaguar API 的更多详细信息，请参阅 [this notebook](/oss/python/integrations/vectorstores/jaguar)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\jaguar.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,394 @@
+---
+title: 使用 LangChain 构建语义搜索引擎
+sidebarTitle: 语义搜索
+---
+
+import EmbeddingsTabsPy from '/snippets/embeddings-tabs-py.mdx';
+import EmbeddingsTabsJS from '/snippets/embeddings-tabs-js.mdx';
+import VectorstoreTabsPy from '/snippets/vectorstore-tabs-py.mdx';
+import VectorstoreTabsJS from '/snippets/vectorstore-tabs-js.mdx';
+
+## 概述
+
+本教程将帮助你熟悉 LangChain 的[文档加载器](/oss/javascript/integrations/document_loaders)、[嵌入模型](/oss/javascript/integrations/embeddings)和[向量存储](/oss/javascript/integrations/vectorstores)抽象。这些抽象旨在支持从（向量）数据库和其他来源检索数据，以便集成到 LLM 工作流中。对于需要获取数据以在模型推理过程中进行推理的应用程序（例如检索增强生成或 [RAG](/oss/javascript/langchain/retrieval)）来说，它们非常重要。
+
+在这里，我们将构建一个基于 PDF 文档的搜索引擎。这将允许我们检索 PDF 中与输入查询相似的段落。本指南还包括在搜索引擎基础上实现的一个最小 RAG 示例。
+
+### 概念
+
+本指南侧重于文本数据的检索。我们将涵盖以下概念：
+
+- [文档和文档加载器](/oss/javascript/integrations/document_loaders)；
+- [文本分割器](/oss/javascript/integrations/splitters)；
+- [嵌入模型](/oss/javascript/integrations/embeddings)；
+- [向量存储](/oss/javascript/integrations/vectorstores) 和 [检索器](/oss/javascript/integrations/retrievers)。
+
+## 设置
+
+### 安装
+
+
+
+本指南需要 `@langchain/community` 和 `pdf-parse`：
+
+<CodeGroup>
+```bash npm
+npm i @langchain/community pdf-parse
+```
+```bash yarn
+yarn add @langchain/community pdf-parse
+```
+```bash pnpm
+pnpm add @langchain/community pdf-parse
+```
+</CodeGroup>
+
+
+
+更多详情，请参阅我们的[安装指南](/oss/javascript/langchain/install)。
+
+### LangSmith
+
+使用 LangChain 构建的许多应用程序将包含多个步骤和多次 LLM 调用。随着这些应用程序变得越来越复杂，能够检查链或代理内部究竟发生了什么变得至关重要。最好的方法是使用 [LangSmith](https://smith.langchain.com)。
+
+在通过上方链接注册后，请确保设置环境变量以开始记录追踪：
+
+```shell
+export LANGSMITH_TRACING="true"
+export LANGSMITH_API_KEY="..."
+```
+
+
+
+## 1. 文档和文档加载器
+
+LangChain 实现了 [Document](https://reference.langchain.com/javascript/langchain-core/documents/Document) 抽象，旨在表示一个文本单元及其关联的元数据。它有三个属性：
+
+
+- `pageContent`：表示内容的字符串；
+- `metadata`：包含任意元数据的字典；
+- `id`：（可选）文档的字符串标识符。
+
+
+`metadata` 属性可以捕获有关文档来源、其与其他文档的关系以及其他信息。请注意，单个 [`Document`](https://reference.langchain.com/javascript/langchain-core/documents/Document) 对象通常代表较大文档的一个块。
+
+我们可以在需要时生成示例文档：
+
+
+```typescript
+import { Document } from "@langchain/core/documents";
+
+const documents = [
+  new Document({
+    pageContent:
+      "Dogs are great companions, known for their loyalty and friendliness.",
+    metadata: { source: "mammal-pets-doc" },
+  }),
+  new Document({
+    pageContent: "Cats are independent pets that often enjoy their own space.",
+    metadata: { source: "mammal-pets-doc" },
+  }),
+];
+```
+
+
+然而，LangChain 生态系统实现了与数百个常见源集成的[文档加载器](/oss/javascript/integrations/document_loaders)。这使得可以轻松地将这些来源的数据整合到你的 AI 应用程序中。
+
+### 加载文档
+
+让我们将一个 PDF 加载到一系列 [`Document`](https://reference.langchain.com/javascript/langchain-core/documents/Document) 对象中。[这里是一个示例 PDF](https://github.com/langchain-ai/langchain/blob/v0.3/docs/docs/example_data/nke-10k-2023.pdf) —— 耐克 2023 年的 10-k 文件。我们可以查阅 LangChain 文档以了解[可用的 PDF 文档加载器](/oss/javascript/integrations/document_loaders/#pdfs)。
+
+
+```typescript
+import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+
+const loader = new PDFLoader("../../data/nke-10k-2023.pdf");
+
+const docs = await loader.load();
+console.log(docs.length);
+```
+```text
+107
+```
+
+`PDFLoader` 为每个 PDF 页面加载一个 [`Document`](https://reference.langchain.com/javascript/langchain-core/documents/Document) 对象。对于每个对象，我们可以轻松访问：
+
+- 页面的字符串内容；
+- 包含文件名和页码的元数据。
+
+
+
+```typescript
+console.log(docs[0].pageContent.slice(0, 200));
+```
+```text
+Table of Contents
+UNITED STATES
+SECURITIES AND EXCHANGE COMMISSION
+Washington, D.C. 20549
+FORM 10-K
+(Mark One)
+☑ ANNUAL REPORT PURSUANT TO SECTION 13 OR 15(D) OF THE SECURITIES EXCHANGE ACT OF 1934
+FO
+```
+```typescript
+console.log(docs[0].metadata);
+```
+```javascript
+{
+  source: '../../data/nke-10k-2023.pdf',
+  pdf: {
+    version: '1.10.100',
+    info: {
+      PDFFormatVersion: '1.4',
+      IsAcroFormPresent: false,
+      IsXFAPresent: false,
+      Title: '0000320187-23-000039',
+      Author: 'EDGAR Online, a division of Donnelley Financial Solutions',
+      Subject: 'Form 10-K filed on 2023-07-20 for the period ending 2023-05-31',
+      Keywords: '0000320187-23-000039; ; 10-K',
+      Creator: 'EDGAR Filing HTML Converter',
+      Producer: 'EDGRpdf Service w/ EO.Pdf 22.0.40.0',
+      CreationDate: "D:20230720162200-04'00'",
+      ModDate: "D:20230720162208-04'00'"
+    },
+    metadata: null,
+    totalPages: 107
+  },
+  loc: { pageNumber: 1 }
+}
+```
+
+
+### 分割
+
+对于信息检索和下游问答目的，页面可能是一个过于粗糙的表示。我们的最终目标是检索能够回答输入查询的 [`Document`](https://reference.langchain.com/javascript/langchain-core/documents/Document) 对象，进一步分割我们的 PDF 将有助于确保文档相关部分的意义不会被周围的文本“冲淡”。
+
+我们可以为此使用[文本分割器](/oss/javascript/integrations/splitters)。这里我们将使用一个基于字符进行分区的简单文本分割器。我们将把文档分割成 1000 个字符的块，块之间有 200 个字符的重叠。重叠有助于减轻将语句与其重要上下文分离的可能性。我们使用 `RecursiveCharacterTextSplitter`，它将使用常见分隔符（如换行符）递归地分割文档，直到每个块达到适当的大小。这是通用文本用例的推荐文本分割器。
+
+
+```typescript
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+
+const textSplitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 1000,
+  chunkOverlap: 200,
+});
+
+const allSplits = await textSplitter.splitDocuments(docs);
+
+console.log(allSplits.length);
+```
+
+
+```text
+514
+```
+
+
+## 2. 嵌入模型
+
+向量搜索是存储和搜索非结构化数据（如非结构化文本）的常见方法。其思想是存储与文本关联的数字向量。给定一个查询，我们可以将其[嵌入](/oss/javascript/integrations/embeddings)为相同维度的向量，并使用向量相似性度量（如余弦相似度）来识别相关文本。
+
+LangChain 支持来自[数十个提供商](/oss/javascript/integrations/embeddings/)的嵌入模型。这些模型指定了如何将文本转换为数字向量。让我们选择一个模型：
+
+
+<EmbeddingsTabsJS />
+
+```typescript
+const vector1 = await embeddings.embedQuery(allSplits[0].pageContent);
+const vector2 = await embeddings.embedQuery(allSplits[1].pageContent);
+
+assert vector1.length === vector2.length;
+console.log(`Generated vectors of length ${vector1.length}\n`);
+console.log(vector1.slice(0, 10));
+```
+
+
+```text
+Generated vectors of length 1536
+
+[-0.008586574345827103, -0.03341241180896759, -0.008936782367527485, -0.0036674530711025, 0.010564599186182022, 0.009598285891115665, -0.028587326407432556, -0.015824200585484505, 0.0030416189692914486, -0.012899317778646946]
+```
+有了生成文本嵌入的模型，接下来我们可以将它们存储在支持高效相似性搜索的特殊数据结构中。
+
+## 3. 向量存储
+
+LangChain [VectorStore](https://reference.langchain.com/javascript/langchain-core/vectorstores/VectorStore) 对象包含将文本和 [`Document`](https://reference.langchain.com/javascript/langchain-core/documents/Document) 对象添加到存储中的方法，以及使用各种相似性度量进行查询的方法。它们通常使用[嵌入模型](/oss/javascript/integrations/embeddings)进行初始化，嵌入模型决定了文本数据如何转换为数字向量。
+
+LangChain 包含一系列与不同向量存储技术的[集成](/oss/javascript/integrations/vectorstores)。一些向量存储由提供商托管（例如，各种云提供商），需要使用特定的凭据；一些（如 [Postgres](/oss/javascript/integrations/vectorstores/pgvector)）运行在可以本地运行或通过第三方运行的独立基础设施中；其他可以内存运行以处理轻量级工作负载。让我们选择一个向量存储：
+
+
+<VectorstoreTabsJS />
+
+
+实例化向量存储后，我们现在可以对文档建立索引。
+
+
+```typescript
+await vectorStore.addDocuments(allSplits);
+```
+
+
+请注意，大多数向量存储实现都允许你连接到现有的向量存储——例如，通过提供客户端、索引名称或其他信息。有关更多详细信息，请参阅特定[集成](/oss/javascript/integrations/vectorstores)的文档。
+
+
+
+一旦我们实例化了包含文档的 [`VectorStore`](https://reference.langchain.com/javascript/langchain-core/vectorstores/VectorStore)，我们就可以查询它。[VectorStore](https://reference.langchain.com/javascript/langchain-core/vectorstores/VectorStore) 包含用于查询的方法：
+- 同步和异步；
+- 通过字符串查询和向量；
+- 返回和不返回相似性分数；
+- 通过相似性和 [最大边际相关性](https://reference.langchain.com/javascript/classes/_langchain_core.vectorstores.VectorStore.html#maxMarginalRelevanceSearch)（以平衡查询相似性与检索结果的多样性）。
+
+
+
+这些方法通常在其输出中包含一个 [Document](https://reference.langchain.com/javascript/langchain-core/documents/Document) 对象列表。
+
+**用法**
+
+嵌入通常将文本表示为“密集”向量，使得具有相似含义的文本在几何上接近。这使我们能够仅通过传入问题来检索相关信息，而无需了解文档中使用的任何特定关键术语。
+
+根据与字符串查询的相似性返回文档：
+
+
+```typescript
+const results1 = await vectorStore.similaritySearch(
+  "When was Nike incorporated?"
+);
+
+console.log(results1[0]);
+```
+```javascript
+Document {
+    pageContent: 'direct to consumer operations sell products...',
+    metadata: {'page': 4, 'source': '../example_data/nke-10k-2023.pdf', 'start_index': 3125}
+}
+```
+
+
+
+
+返回分数：
+
+
+```typescript
+const results2 = await vectorStore.similaritySearchWithScore(
+  "What was Nike's revenue in 2023?"
+);
+
+console.log(results2[0]);
+```
+```javascript
+Score: 0.23699893057346344
+
+Document {
+    pageContent: 'Table of Contents...',
+    metadata: {'page': 35, 'source': '../example_data/nke-10k-2023.pdf', 'start_index': 0}
+}
+```
+
+
+根据与嵌入查询的相似性返回文档：
+
+
+```typescript
+const embedding = await embeddings.embedQuery(
+  "How were Nike's margins impacted in 2023?"
+);
+
+const results3 = await vectorStore.similaritySearchVectorWithScore(
+  embedding,
+  1
+);
+
+console.log(results3[0]);
+```
+```javascript
+Document {
+    pageContent: 'FISCAL 2023 COMPARED TO FISCAL 2022...',
+    metadata: {
+        'page': 36,
+        'source': '../example_data/nke-10k-2023.pdf',
+        'start_index': 0
+    }
+}
+```
+
+
+了解更多：
+
+- [API 参考](https://reference.langchain.com/javascript/langchain-core/vectorstores/VectorStore)
+- [集成特定文档](/oss/javascript/integrations/vectorstores)
+
+## 4. 检索器
+
+LangChain [`VectorStore`](https://reference.langchain.com/javascript/langchain-core/vectorstores/VectorStore) 对象不继承 [Runnable](https://reference.langchain.com/javascript/langchain-core/runnables/Runnable)。LangChain [Retrievers](https://reference.langchain.com/javascript/interfaces/_langchain_core.retrievers.BaseRetriever.html) 是 Runnables，因此它们实现了一组标准方法（例如，同步和异步的 `invoke` 和 `batch` 操作）。虽然我们可以从向量存储构建检索器，但检索器也可以与非向量存储数据源（如外部 API）交互。
+
+
+
+Vectorstores 实现了一个 `as_retriever` 方法，该方法将生成一个 Retriever，具体来说是 [`VectorStoreRetriever`](https://reference.langchain.com/python/langchain-core/vectorstores/base/VectorStoreRetriever)。这些检索器包含特定的 `search_type` 和 `search_kwargs` 属性，用于标识要调用的底层向量存储的方法以及如何参数化它们。例如，我们可以使用以下方式复制上述内容：
+
+
+```typescript
+const retriever = vectorStore.asRetriever({
+  searchType: "mmr",
+  searchKwargs: {
+    fetchK: 1,
+  },
+});
+
+await retriever.batch([
+  "When was Nike incorporated?",
+  "What was Nike's revenue in 2023?",
+]);
+```
+```javascript
+[
+    [Document {
+        metadata: {'page': 4, 'source': '../example_data/nke-10k-2023.pdf', 'start_index': 3125},
+        pageContent: 'direct to consumer operations sell products...',
+    }],
+    [Document {
+        metadata: {'page': 3, 'source': '../example_data/nke-10k-2023.pdf', 'start_index': 0},
+        pageContent: 'Table of Contents...',
+    }],
+]
+```
+
+
+检索器可以轻松地集成到更复杂的应用程序中，例如[检索增强生成 (RAG)](/oss/javascript/langchain/retrieval) 应用程序，这些应用程序将给定问题与检索到的上下文结合到 LLM 的提示中。要了解有关构建此类应用程序的更多信息，请查看 [RAG 教程](/oss/javascript/langchain/rag) 教程。
+
+
+## 后续步骤
+
+你现在已经了解了如何基于 PDF 文档构建语义搜索引擎。
+
+有关文档加载器的更多信息：
+
+- [概述](/oss/javascript/langchain/retrieval)
+- [可用集成](/oss/javascript/integrations/document_loaders/)
+
+有关嵌入模型的更多信息：
+
+- [概述](/oss/javascript/langchain/retrieval)
+- [可用集成](/oss/javascript/integrations/embeddings/)
+
+有关向量存储的更多信息：
+
+- [概述](/oss/javascript/langchain/retrieval)
+- [可用集成](/oss/javascript/integrations/vectorstores/)
+
+有关 RAG 的更多信息，请参阅：
+
+- [构建检索增强生成 (RAG) 应用程序](/oss/javascript/langchain/rag/)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\knowledge-base.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

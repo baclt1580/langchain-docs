@@ -1,0 +1,436 @@
+---
+title: 图执行
+description: 可视化多步骤图流水线，展示每个节点的状态和流式内容
+---
+
+LangGraph 智能体并非黑盒。每个图都由**命名节点**组成，这些节点按顺序或并行执行：分类、研究、分析、综合。图执行卡片通过为每个节点渲染一张卡片，显示其状态、实时流式传输其内容，并跟踪整个工作流的完成情况，使这一流水线变得可见。用户可以清晰地看到智能体正在做什么、当前处于哪一步骤，以及每个步骤产生了什么结果。
+
+import { PatternEmbed } from "/snippets/pattern-embed.jsx"
+
+<PatternEmbed pattern="graph-execution-cards" />
+
+## 图节点如何映射到 UI 卡片
+
+一个 LangGraph 图定义了一系列节点，每个节点负责一项特定任务。例如，一个研究流水线可能包含：
+
+1.  **分类**：对用户查询进行分类
+2.  **研究**：收集相关信息
+3.  **分析**：从研究中得出结论
+4.  **综合**：生成最终的、经过润色的响应
+
+每个节点将其输出写入图状态的特定键。通过将这些节点名称和状态键映射到 UI 组件，您可以创建整个流水线的可视化表示。
+
+```ts
+const PIPELINE_NODES = [
+  { name: "classify", stateKey: "classification", label: "分类" },
+  { name: "do_research", stateKey: "research", label: "研究" },
+  { name: "analyze", stateKey: "analysis", label: "分析" },
+  { name: "synthesize", stateKey: "synthesis", label: "综合" },
+];
+
+const PIPELINE_NODE_NAMES = new Set(PIPELINE_NODES.map((n) => n.name));
+```
+
+## 设置 useStream
+
+像往常一样连接 `useStream`。您将使用的关键属性是 `messages`（用于流式内容路由）、`values`（用于已完成的节点输出）和 `getMessagesMetadata`（用于识别每个令牌是由哪个节点产生的）。
+
+
+
+导入您的智能体，并将 `typeof myAgent` 作为类型参数传递给 `useStream`，以便对状态值进行类型安全访问：
+
+```ts
+import type { myAgent } from "./agent";
+```
+
+
+
+<CodeGroup>
+```tsx React
+import { useStream } from "@langchain/react";
+
+const AGENT_URL = "http://localhost:2024";
+
+export function PipelineChat() {
+  const stream = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "graph_execution_cards",
+  });
+
+  return (
+    <div>
+      <PipelineProgress nodes={PIPELINE_NODES} values={stream.values} />
+      <NodeCardList
+        nodes={PIPELINE_NODES}
+        messages={stream.messages}
+        values={stream.values}
+        getMetadata={stream.getMessagesMetadata}
+      />
+    </div>
+  );
+}
+```
+
+```vue Vue
+<script setup lang="ts">
+import { useStream } from "@langchain/vue";
+
+const AGENT_URL = "http://localhost:2024";
+
+const stream = useStream<typeof myAgent>({
+  apiUrl: AGENT_URL,
+  assistantId: "graph_execution_cards",
+});
+</script>
+
+<template>
+  <div>
+    <PipelineProgress :nodes="PIPELINE_NODES" :values="stream.values.value" />
+    <NodeCardList
+      :nodes="PIPELINE_NODES"
+      :messages="stream.messages.value"
+      :values="stream.values.value"
+      :get-metadata="stream.getMessagesMetadata"
+    />
+  </div>
+</template>
+```
+
+```svelte Svelte
+<script lang="ts">
+  import { useStream } from "@langchain/svelte";
+
+  const AGENT_URL = "http://localhost:2024";
+
+  const { messages, values, getMessagesMetadata, submit } = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "graph_execution_cards",
+  });
+</script>
+
+<div>
+  <PipelineProgress nodes={PIPELINE_NODES} values={$values} />
+  <NodeCardList
+    nodes={PIPELINE_NODES}
+    messages={$messages}
+    values={$values}
+    getMetadata={getMessagesMetadata}
+  />
+</div>
+```
+
+```ts Angular
+import { Component } from "@angular/core";
+import { useStream } from "@langchain/angular";
+
+const AGENT_URL = "http://localhost:2024";
+
+@Component({
+  selector: "app-pipeline-chat",
+  template: `
+    <div>
+      <app-pipeline-progress
+        [nodes]="PIPELINE_NODES"
+        [values]="stream.values()"
+      />
+      <app-node-card-list
+        [nodes]="PIPELINE_NODES"
+        [messages]="stream.messages()"
+        [values]="stream.values()"
+        [getMetadata]="stream.getMessagesMetadata"
+      />
+    </div>
+  `,
+})
+export class PipelineChatComponent {
+  PIPELINE_NODES = PIPELINE_NODES;
+
+  stream = useStream<typeof myAgent>({
+    apiUrl: AGENT_URL,
+    assistantId: "graph_execution_cards",
+  });
+}
+```
+</CodeGroup>
+
+## 将流式令牌路由到节点
+
+当智能体流式传输时，每条消息都附有元数据，用于标识是哪个图节点产生了它。使用 `getMessagesMetadata` 提取 `langgraph_node` 值，并将令牌路由到正确的卡片：
+
+```ts
+function getStreamingContent(
+  messages: BaseMessage[],
+  getMetadata: (msg: BaseMessage) => MessageMetadata | undefined
+): Record<string, string> {
+  const content: Record<string, string> = {};
+
+  for (const message of messages) {
+    if (message.type !== "ai") continue;
+
+    const metadata = getMetadata(message);
+    const node = metadata?.streamMetadata?.langgraph_node;
+
+    if (node && PIPELINE_NODE_NAMES.has(node)) {
+      content[node] = typeof message.content === "string"
+        ? message.content
+        : "";
+    }
+  }
+
+  return content;
+}
+```
+
+这为您提供了一个从节点名称到其当前流式内容的映射。随着令牌到达，相应的卡片会实时更新。
+
+<Note>
+`streamMetadata.langgraph_node` 字段由 LangGraph 自动设置。您在后端不需要任何特殊配置。只需像往常一样流式传输消息，元数据就会包含在内。
+</Note>
+
+## 确定节点状态
+
+每个节点可能处于四种状态之一：未开始、流式传输中、已完成或空闲。您可以从两个来源推导出状态：流式内容映射（用于活动节点）和 `stream.values`（用于已完成的节点）：
+
+```ts
+type NodeStatus = "idle" | "streaming" | "complete";
+
+function getNodeStatus(
+  node: { name: string; stateKey: string },
+  streamingContent: Record<string, string>,
+  values: Record<string, unknown>
+): NodeStatus {
+  if (values?.[node.stateKey]) return "complete";
+  if (streamingContent[node.name]) return "streaming";
+  return "idle";
+}
+```
+
+## 构建流水线进度条
+
+顶部的水平进度条为用户提供了整个流水线的鸟瞰视图。每个步骤都是一个带标签的段，随着节点完成而填充：
+
+```tsx
+function PipelineProgress({
+  nodes,
+  values,
+  streamingContent,
+}: {
+  nodes: typeof PIPELINE_NODES;
+  values: Record<string, unknown>;
+  streamingContent: Record<string, string>;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {nodes.map((node, i) => {
+        const status = getNodeStatus(node, streamingContent, values);
+        const colors = {
+          idle: "bg-gray-200 text-gray-500",
+          streaming: "bg-blue-400 text-white animate-pulse",
+          complete: "bg-green-500 text-white",
+        };
+
+        return (
+          <div key={node.name} className="flex items-center">
+            <div
+              className={`rounded-full px-3 py-1 text-xs font-medium ${colors[status]}`}
+            >
+              {node.label}
+            </div>
+            {i < nodes.length - 1 && (
+              <div
+                className={`mx-1 h-0.5 w-6 ${
+                  status === "complete" ? "bg-green-500" : "bg-gray-200"
+                }`}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+## 构建可折叠的 NodeCard 组件
+
+每个节点都有自己的卡片，显示状态徽章、内容（流式或最终）以及用于长输出的可折叠主体：
+
+```tsx
+function NodeCard({
+  node,
+  status,
+  streamingContent,
+  completedContent,
+}: {
+  node: { name: string; stateKey: string; label: string };
+  status: NodeStatus;
+  streamingContent: string | undefined;
+  completedContent: unknown;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const displayContent =
+    status === "complete"
+      ? formatContent(completedContent)
+      : streamingContent ?? "";
+
+  const statusBadge = {
+    idle: { text: "等待中", className: "bg-gray-100 text-gray-600" },
+    streaming: {
+      text: "运行中",
+      className: "bg-blue-100 text-blue-700 animate-pulse",
+    },
+    complete: { text: "已完成", className: "bg-green-100 text-green-700" },
+  };
+
+  const badge = statusBadge[status];
+
+  return (
+    <div className="rounded-lg border bg-white shadow-sm">
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="flex w-full items-center justify-between p-4"
+      >
+        <div className="flex items-center gap-3">
+          <h3 className="font-semibold">{node.label}</h3>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}
+          >
+            {badge.text}
+          </span>
+        </div>
+        <ChevronIcon direction={collapsed ? "down" : "up"} />
+      </button>
+
+      {!collapsed && displayContent && (
+        <div className="border-t px-4 py-3">
+          <div className="prose prose-sm max-w-none">
+            {displayContent}
+            {status === "streaming" && (
+              <span className="inline-block h-4 w-1 animate-pulse bg-blue-500" />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatContent(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  return JSON.stringify(value, null, 2);
+}
+```
+
+## 流式内容与已完成内容
+
+每个节点有两个内容来源，选择合适的来源对于流畅的用户体验很重要：
+
+| 来源 | 何时使用 |
+| --- | --- |
+| `streamingContent[node.name]` | 当节点正在主动流式传输时，此属性包含到达的令牌 |
+| `stream.values[node.stateKey]` | 节点完成后，此属性包含最终的、已提交的输出 |
+
+模式是：显示流式内容以获取实时更新，节点完成后回退到已提交的状态值。
+
+```ts
+for (const node of PIPELINE_NODES) {
+  const status = getNodeStatus(node, streamingContent, stream.values);
+
+  const content =
+    status === "streaming"
+      ? streamingContent[node.name]
+      : stream.values?.[node.stateKey];
+}
+```
+
+<Tip>
+流式内容可能包含部分令牌或尚未完全形成的 Markdown。如果您渲染 Markdown，请确保您的渲染器能够优雅地处理不完整的语法（例如，未闭合的粗体标记 `**`）。
+</Tip>
+
+## 整体整合
+
+以下是结合了路由、状态检测和卡片渲染的完整卡片列表：
+
+```tsx
+function NodeCardList({
+  nodes,
+  messages,
+  values,
+  getMetadata,
+}: {
+  nodes: typeof PIPELINE_NODES;
+  messages: BaseMessage[];
+  values: Record<string, unknown>;
+  getMetadata: (msg: BaseMessage) => MessageMetadata | undefined;
+}) {
+  const streamingContent = getStreamingContent(messages, getMetadata);
+
+  return (
+    <div className="space-y-3">
+      {nodes.map((node) => {
+        const status = getNodeStatus(node, streamingContent, values);
+        return (
+          <NodeCard
+            key={node.name}
+            node={node}
+            status={status}
+            streamingContent={streamingContent[node.name]}
+            completedContent={values?.[node.stateKey]}
+          />
+        );
+      })}
+    </div>
+  );
+}
+```
+
+## 使用场景
+
+图执行卡片适用于任何需要可见性的多步骤流水线：
+
+-   **研究流水线**：分类 → 收集来源 → 分析 → 综合报告
+-   **内容生成**：大纲 → 草稿 → 事实核查 → 编辑 → 发布
+-   **数据处理**：摄取 → 验证 → 转换 → 聚合 → 导出
+-   **代码生成**：理解需求 → 规划架构 → 编写代码 → 审查 → 测试
+-   **决策工作流**：收集上下文 → 评估选项 → 评分备选方案 → 推荐
+
+## 处理动态流水线
+
+并非所有图都有固定的节点集。一些流水线会根据输入添加或跳过节点。通过检查哪些状态键实际有值来处理这种情况：
+
+```ts
+const activeNodes = PIPELINE_NODES.filter(
+  (node) =>
+    streamingContent[node.name] ||
+    values?.[node.stateKey] ||
+    node.name === currentNode
+);
+```
+
+这确保您的 UI 只显示与当前执行相关的节点的卡片，避免出现空的占位卡片。
+
+<Info>
+如果您的图具有条件分支（例如，对于简单的查询跳过“研究”步骤），被跳过的节点将永远不会出现在流式内容或状态值中。您的流水线进度条应通过变灰或隐藏跳过的步骤来反映这一点。
+</Info>
+
+## 最佳实践
+
+-   **声明式定义节点**。将您的 `PIPELINE_NODES` 数组作为单一事实来源，映射节点名称、状态键和显示标签。
+-   **优先使用流式内容处理活动节点**。它为用户提供即时反馈。仅在节点完成后才回退到已提交的状态值。
+-   **自动折叠已完成的节点**。在长流水线中，自动折叠已完成的卡片，以便用户可以专注于当前活动的步骤。
+-   **显示预估时间**。如果您有每个节点所需时间的历史数据，请显示时间预估以设定用户期望。
+-   **添加全局进度指示器**。在流水线视图的顶部，用整体进度条（例如，“第 2 步，共 4 步”）来补充每个节点的卡片。
+-   **按节点处理错误**。如果某个节点失败，在其卡片中显示错误，而不要折叠整个流水线。其他节点可能仍会成功完成。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\frontend\graph-execution.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,82 @@
+---
+title: 追踪 Microsoft Agent Framework 应用
+sidebarTitle: Microsoft Agent Framework
+---
+
+LangSmith 可以通过其内置的 OpenTelemetry 工具捕获由 [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/agent-framework-overview) 生成的追踪数据。本指南将展示如何自动捕获来自 Microsoft Agent Framework 智能体的追踪数据，并将其发送到 LangSmith 进行监控和分析。
+
+## 安装
+
+安装所需的软件包：
+
+<CodeGroup>
+
+```bash pip
+pip install agent-framework opentelemetry-exporter-otlp-proto-http
+```
+
+```bash uv
+uv add agent-framework opentelemetry-exporter-otlp-proto-http
+```
+
+</CodeGroup>
+
+## 设置
+
+### 1. 配置环境变量
+
+启用智能体的 OpenTelemetry 工具，并设置 OpenTelemetry 环境变量以指向 LangSmith 的 OTEL 端点：
+
+```bash
+export ENABLE_INSTRUMENTATION=true
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.smith.langchain.com/otel/v1/traces
+export OTEL_EXPORTER_OTLP_HEADERS="x-api-key=<你的_langsmith_api_key>,Langsmith-Project=<你的项目名称>"
+```
+
+### 2. 在应用中启用 OpenTelemetry
+
+在你的 Microsoft Agent Framework 应用中，使用内置的 `configure_otel_providers` 函数启用 OpenTelemetry 追踪：
+
+```python
+from agent_framework.observability import configure_otel_providers
+
+# 启用 OpenTelemetry 追踪
+configure_otel_providers(enable_sensitive_data=True)
+```
+
+<Note>
+设置 `enable_sensitive_data=True` 允许在追踪中捕获输入和输出内容。如需排除敏感数据，请设置为 `False`。
+</Note>
+
+### 3. 创建并运行你的智能体
+
+配置完成后，你的 Microsoft Agent Framework 智能体将自动向 LangSmith 发送追踪数据：
+
+```python
+from agent_framework import ChatAgent
+from agent_framework.observability import configure_otel_providers
+from agent_framework.openai import OpenAIChatClient
+
+# 启用 OpenTelemetry 追踪
+configure_otel_providers(enable_sensitive_data=True)
+
+
+agent = ChatAgent(
+    chat_client=OpenAIChatClient(model_id="gpt-4o"),
+)
+
+result = await agent.run("巴伐利亚的首府是哪里？")
+print(result.text)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\trace-with-microsoft-agent-framework.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

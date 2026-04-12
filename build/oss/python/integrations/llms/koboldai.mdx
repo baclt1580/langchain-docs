@@ -1,0 +1,39 @@
+---
+title: "Koboldai API 集成"
+description: "使用 LangChain Python 与 Koboldai API LLM 进行集成。"
+---
+
+[KoboldAI](https://github.com/KoboldAI/KoboldAI-Client) 是一个“基于浏览器的 AI 辅助写作前端，支持多种本地和远程 AI 模型……”。它拥有公共和本地 API，可在 langchain 中使用。
+
+本示例介绍如何使用 LangChain 与该 API 配合。
+
+文档可以通过在浏览器中的端点末尾添加 /api 来访问（例如 [127.0.0.1/:5000/api](http://127.0.0.1/:5000/api)）。
+
+```python
+from langchain_community.llms import KoboldApiLLM
+```
+
+请将下方显示的端点替换为启动 webui 时使用 --api 或 --public-api 参数后输出中显示的端点。
+
+可选地，您可以传递诸如 temperature 或 max_length 之类的参数。
+
+```python
+llm = KoboldApiLLM(endpoint="http://192.168.1.144:5000", max_length=80)
+```
+
+```python
+response = llm.invoke(
+    "### Instruction:\nWhat is the first book of the bible?\n### Response:"
+)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\koboldai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

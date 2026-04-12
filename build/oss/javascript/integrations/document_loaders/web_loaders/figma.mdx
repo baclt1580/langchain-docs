@@ -1,0 +1,37 @@
+---
+title: "Figma 集成"
+description: "使用 LangChain JavaScript 与 Figma 文档加载器进行集成。"
+---
+
+本示例将介绍如何从 Figma 文件中加载数据。
+你需要一个 Figma 访问令牌才能开始。
+
+```typescript
+import { FigmaFileLoader } from "@langchain/community/document_loaders/web/figma";
+
+const loader = new FigmaFileLoader({
+  accessToken: "FIGMA_ACCESS_TOKEN", // 或从 process.env.FIGMA_ACCESS_TOKEN 加载
+  nodeIds: ["id1", "id2", "id3"],
+  fileKey: "key",
+});
+const docs = await loader.load();
+
+console.log({ docs });
+```
+
+你可以在浏览器中打开 Figma 文件，并从 URL 中提取文件密钥和节点 ID：
+
+```
+https://www.figma.com/file/<你的文件密钥>/LangChainJS-Test?type=whiteboard&node-id=<你的节点ID>&t=e6lqWkKecuYQRyRg-0
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_loaders\web_loaders\figma.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

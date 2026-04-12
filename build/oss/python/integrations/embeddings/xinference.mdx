@@ -1,0 +1,71 @@
+---
+title: "Xorbits 推理 (Xinference) 集成"
+description: "使用 LangChain Python 与 Xorbits 推理 (Xinference) 嵌入模型进行集成。"
+---
+
+本笔记本介绍如何在 LangChain 中使用 Xinference 嵌入
+
+## 安装
+
+通过 PyPI 安装 `Xinference`：
+
+```python
+pip install -qU  "xinference[all]"
+```
+
+## 在本地或分布式集群中部署 xinference
+
+对于本地部署，运行 `xinference`。
+
+要在集群中部署 Xinference，首先使用 `xinference-supervisor` 启动一个 Xinference 协调器。您还可以使用选项 -p 指定端口和 -H 指定主机。默认端口是 9997。
+
+然后，在您想要运行它们的每台服务器上，使用 `xinference-worker` 启动 Xinference 工作节点。
+
+您可以查阅 [Xinference](https://github.com/xorbitsai/inference) 的 README 文件以获取更多信息。
+
+## 封装
+
+要将 Xinference 与 LangChain 配合使用，您需要先启动一个模型。您可以使用命令行界面 (CLI) 来执行此操作：
+
+```python
+!xinference launch -n vicuna-v1.3 -f ggmlv3 -q q4_0
+```
+
+```text
+Model uid: 915845ee-2a04-11ee-8ed4-d29396a3f064
+```
+
+将返回一个模型 UID 供您使用。现在您可以将 Xinference 嵌入与 LangChain 配合使用了：
+
+```python
+from langchain_community.embeddings import XinferenceEmbeddings
+
+xinference = XinferenceEmbeddings(
+    server_url="http://0.0.0.0:9997", model_uid="915845ee-2a04-11ee-8ed4-d29396a3f064"
+)
+```
+
+```python
+query_result = xinference.embed_query("This is a test query")
+```
+
+```python
+doc_result = xinference.embed_documents(["text A", "text B"])
+```
+
+最后，当您不再需要使用该模型时，请终止它：
+
+```python
+!xinference terminate --model-uid "915845ee-2a04-11ee-8ed4-d29396a3f064"
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\xinference.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

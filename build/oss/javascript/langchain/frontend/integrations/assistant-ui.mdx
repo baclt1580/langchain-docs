@@ -1,0 +1,179 @@
+---
+title: assistant-ui
+description: 无头 React AI 聊天框架，具备完整的运行时层，通过 useStream 桥接
+---
+
+[assistant-ui](https://www.assistant-ui.com/) 是一个用于 AI 聊天的无头 React UI 框架。它提供了一个完整的运行时层——线程管理、消息分支、附件处理——通过 `useExternalStoreRuntime` 适配器连接到 `useStream`。
+
+import { ExampleEmbed } from "/snippets/example-embed.jsx"
+
+<ExampleEmbed example="assistant-ui" minHeight={700} />
+
+<Tip>
+  克隆并运行 [完整的 assistant-ui 示例](https://github.com/langchain-ai/langgraphjs/tree/main/examples/assistant-ui-claude)，查看一个 Claude 风格的聊天界面如何通过 `useExternalStoreRuntime` 连接到 LangChain 智能体。
+</Tip>
+
+## 工作原理
+
+1.  **使用 `useStream` 进行流式处理** — 连接到你的智能体，获取响应式消息、加载状态以及提交/取消回调
+2.  **使用 `useExternalStoreRuntime` 适配** — 将 `stream.messages` 桥接到 assistant-ui 的运行时格式，将 `BaseMessage[]` 转换为 `ThreadMessageLike[]`
+3.  **提供运行时** — 用 `AssistantRuntimeProvider` 包装你的 UI，并渲染任何 assistant-ui 的线程组件
+
+## 安装
+
+```bash
+bun add @assistant-ui/react @assistant-ui/react-markdown
+```
+
+## 连接 useStream
+
+`useExternalStoreRuntime` 适配器将 `stream.messages` 桥接到 assistant-ui 运行时。将其传递给 `AssistantRuntimeProvider` 并渲染任何线程组件：
+
+```tsx
+import { useCallback, useMemo } from "react";
+import {
+  AssistantRuntimeProvider,
+  useExternalStoreRuntime,
+  type AppendMessage,
+  type ThreadMessageLike,
+} from "@assistant-ui/react";
+import { useStream } from "@langchain/react";
+import { Thread } from "@assistant-ui/react";
+
+export function Chat() {
+  const stream = useStream({
+    apiUrl: "http://localhost:2024",
+    assistantId: "agent",
+  });
+
+  const onNew = useCallback(
+    async (message: AppendMessage) => {
+      const text = message.content
+        .filter((c) => c.type === "text")
+        .map((c) => c.text)
+        .join("");
+      await stream.submit({ messages: [{ type: "human", content: text }] });
+    },
+    [stream],
+  );
+
+  // 将 LangChain 消息转换为 assistant-ui 的 ThreadMessageLike 格式
+  const messages = useMemo(
+    () => toThreadMessages(stream.messages),
+    [stream.messages],
+  );
+
+  const runtime = useExternalStoreRuntime<ThreadMessageLike>({
+    messages,
+    onNew,
+    onCancel: () => stream.stop(),
+    convertMessage: (m) => m,
+  });
+
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      <Thread />
+    </AssistantRuntimeProvider>
+  );
+}
+```
+
+### 转换消息
+
+`toThreadMessages` 将 LangChain 的 `BaseMessage[]` 映射为 assistant-ui 期望的 `ThreadMessageLike[]` 格式。处理每种消息类型——人类、AI 和工具——并转换内容块、工具调用和推理令牌：
+
+```tsx expandable
+import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
+import type { ThreadMessageLike } from "@assistant-ui/react";
+
+export function toThreadMessages(messages: BaseMessage[]): ThreadMessageLike[] {
+  const result: ThreadMessageLike[] = [];
+
+  for (const msg of messages) {
+    if (HumanMessage.isInstance(msg)) {
+      result.push({
+        role: "user",
+        content: [{ type: "text", text: getTextContent(msg.content) }],
+      });
+    } else if (AIMessage.isInstance(msg)) {
+      const parts: ThreadMessageLike["content"] = [];
+
+      // 推理令牌
+      const reasoning = getReasoningText(msg);
+      if (reasoning) parts.push({ type: "reasoning", reasoning });
+
+      // 工具调用
+      for (const tc of msg.tool_calls ?? []) {
+        parts.push({
+          type: "tool-call",
+          toolCallId: tc.id ?? "",
+          toolName: tc.name,
+          args: tc.args,
+        });
+      }
+
+      // 文本响应
+      const text = getTextContent(msg.content);
+      if (text) parts.push({ type: "text", text });
+
+      result.push({ role: "assistant", content: parts });
+    } else if (ToolMessage.isInstance(msg)) {
+      // 将工具结果附加到前一个助手消息
+      const last = result[result.length - 1];
+      if (last?.role === "assistant") {
+        for (const part of last.content) {
+          if (
+            part.type === "tool-call" &&
+            part.toolCallId === msg.tool_call_id
+          ) {
+            (part as { result?: string }).result = getTextContent(msg.content);
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+}
+```
+
+## 自定义线程 UI
+
+`<Thread />` 提供了一个完整的默认线程 UI，包括消息列表、输入框和滚动管理。通过覆盖组件插槽来自定义各个部分：
+
+```tsx
+import { Thread, ThreadMessages, Composer } from "@assistant-ui/react";
+
+function CustomThread() {
+  return (
+    <Thread.Root>
+      <ThreadMessages
+        components={{
+          UserMessage: MyUserMessage,
+          AssistantMessage: MyAssistantMessage,
+          ToolFallback: MyToolCard,
+        }}
+      />
+      <Composer />
+    </Thread.Root>
+  );
+}
+```
+
+## 最佳实践
+
+-   **记忆化消息转换：** 将 `toThreadMessages(stream.messages)` 包装在 `useMemo` 中，避免在每次渲染时重新运行转换
+-   **处理附件：** 使用 `CompositeAttachmentAdapter` 配合 `SimpleImageAttachmentAdapter` 处理图片上传；通过自定义适配器扩展以支持文件
+-   **使用分支：** assistant-ui 通过 `MessageBranch` 内置了消息分支支持；编辑消息可以从该点重新生成
+-   **线程持久化：** 使用 `useStream` 并设置 `fetchStateHistory: true` 和 `reconnectOnMount: true`，让 assistant-ui 在页面加载时能够访问完整的线程历史
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\frontend\integrations\assistant-ui.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,37 @@
+---
+title: "开放文档格式 (Odt) 集成"
+description: "使用 LangChain Python 与开放文档格式 (Odt) 文档加载器集成。"
+---
+
+> [办公应用程序开放文档格式 (ODF)](https://en.wikipedia.org/wiki/OpenDocument)，也称为 `OpenDocument`，是一种用于文字处理文档、电子表格、演示文稿和图形的开放文件格式，采用 ZIP 压缩的 XML 文件。它的开发旨在为办公应用程序提供一个开放的、基于 XML 的文件格式规范。
+
+> 该标准由结构化信息标准促进组织 (`OASIS`) 联盟的技术委员会开发和维护。它基于 Sun Microsystems 为 `OpenOffice.org` 制定的 OpenOffice.org XML 规范，这也是 `OpenOffice.org` 和 `LibreOffice` 的默认格式。它最初是为 `StarOffice` 开发的，“旨在为办公文档提供一个开放标准”。
+
+`UnstructuredODTLoader` 用于加载 `Open Office ODT` 文件。
+
+```python
+from langchain_community.document_loaders import UnstructuredODTLoader
+
+loader = UnstructuredODTLoader("example_data/fake.odt", mode="elements")
+docs = loader.load()
+docs[0]
+```
+
+```python
+Document(page_content='Lorem ipsum dolor sit amet.', metadata={'source': 'example_data/fake.odt', 'category_depth': 0, 'file_directory': 'example_data', 'filename': 'fake.odt', 'last_modified': '2023-12-19T13:42:18', 'languages': ['por', 'cat'], 'filetype': 'application/vnd.oasis.opendocument.text', 'category': 'Title'})
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\odt.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

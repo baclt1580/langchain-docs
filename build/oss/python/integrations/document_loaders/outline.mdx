@@ -1,0 +1,86 @@
+---
+title: "Outline 集成"
+description: "使用 LangChain Python 与 Outline 文档加载器集成。"
+---
+
+>[Outline](https://www.getoutline.com/) 是一个开源的协作知识库平台，专为团队信息共享而设计。
+
+本笔记本展示了如何从您的 Outline 集合中获取 LangChain 文档。
+
+## 概述
+
+[Outline 文档加载器](https://github.com/10Pines/langchain-outline) 可用于将 Outline 集合加载为 LangChain 文档，以便集成到检索增强生成（RAG）工作流中。
+
+本示例演示：
+
+* 设置文档加载器以从 Outline 实例加载所有文档。
+
+### 设置
+
+开始之前，请确保设置了以下环境变量：
+
+* OUTLINE_API_KEY：用于验证您的 Outline 实例的 API 密钥（[www.getoutline.com/developers#section/Authentication](https://www.getoutline.com/developers#section/Authentication)）。
+* OUTLINE_INSTANCE_URL：您的 Outline 实例的 URL（包括协议）。
+
+```python
+import os
+
+os.environ["OUTLINE_API_KEY"] = "ol_api_xyz123"
+os.environ["OUTLINE_INSTANCE_URL"] = "https://app.getoutline.com"
+```
+
+## 初始化
+
+要初始化 OutlineLoader，您需要以下参数：
+
+* outline_base_url：您的 Outline 实例的 URL（或将从环境变量中获取）。
+* outline_api_key：用于验证您的 Outline 实例的 API 密钥（或将从环境变量中获取）。
+* outline_collection_id_list：要检索的集合 ID 列表。如果为 None，则将检索所有集合。
+* page_size：由于 Outline API 使用分页结果，您可以配置每个 API 请求将检索多少结果（文档）。如果未指定，将使用默认值。
+
+## 实例化
+
+```python
+# 选项 1：使用环境变量（确保已设置）
+from langchain_outline.document_loaders.outline import OutlineLoader
+
+loader = OutlineLoader()
+
+# 选项 2：直接传递参数
+loader = OutlineLoader(
+    outline_base_url="YOUR_OUTLINE_URL", outline_api_key="YOUR_API_KEY"
+)
+```
+
+## 加载
+
+要加载并返回 Outline 实例中所有可用的文档：
+
+```python
+loader.load()
+```
+
+## 惰性加载
+
+lazy_load 方法允许您从 Outline 集合中迭代加载文档，并在获取每个文档时生成它：
+
+```python
+loader.lazy_load()
+```
+
+---
+
+## API 参考
+
+有关所有 `Outline` 功能和配置的详细文档，请访问 API 参考：[www.getoutline.com/developers](https://www.getoutline.com/developers)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\outline.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

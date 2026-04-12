@@ -1,0 +1,104 @@
+---
+title: "ChatYi 集成"
+description: "使用 LangChain Python 集成 ChatYi 聊天模型。"
+---
+
+本文将帮助您开始使用 Yi [聊天模型](/oss/python/langchain/models)。
+
+[01.AI](https://www.lingyiwanwu.com/en) 由李开复博士创立，是一家处于 AI 2.0 前沿的全球化公司。他们提供尖端的大型语言模型，包括参数规模从 6B 到数千亿不等的 Yi 系列模型。01.AI 还提供多模态模型、开放的 API 平台以及开源选项，如 Yi-34B/9B/6B 和 Yi-VL。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | JS 支持 | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| `ChatYi` | [`langchain_community`](https://reference.langchain.com/python/langchain-community) | ❌ | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain_community?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain_community?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/python/langchain/tools) | [结构化输出](/oss/python/langchain/structured-output) | [图像输入](/oss/python/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/python/langchain/streaming/) | 原生异步 | [令牌使用量](/oss/python/langchain/models#token-usage) | [对数概率](/oss/python/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+
+## 设置
+
+要访问 ChatYi 模型，您需要创建一个 01.AI 账户，获取 API 密钥，并安装 `langchain_community` 集成包。
+
+### 凭证
+
+前往 [01.AI](https://platform.01.ai) 注册 01.AI 并生成 API 密钥。完成后，请设置 `YI_API_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+if "YI_API_KEY" not in os.environ:
+    os.environ["YI_API_KEY"] = getpass.getpass("请输入您的 Yi API 密钥：")
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("请输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+LangChain ChatYi 集成位于 `langchain_community` 包中：
+
+```python
+pip install -qU langchain_community
+```
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+- TODO: 使用相关参数更新模型实例化。
+
+```python
+from langchain_community.chat_models.yi import ChatYi
+
+llm = ChatYi(
+    model="yi-large",
+    temperature=0,
+    timeout=60,
+    yi_api_base="https://api.01.ai/v1/chat/completions",
+    # 其他参数...
+)
+```
+
+## 调用
+
+```python
+from langchain.messages import HumanMessage, SystemMessage
+
+messages = [
+    SystemMessage(content="您是一位专注于技术趋势的 AI 助手。"),
+    HumanMessage(
+        content="大型语言模型在医疗保健领域有哪些潜在应用？"
+    ),
+]
+
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+```text
+AIMessage(content="大型语言模型（LLMs）有潜力通过增强患者护理、研究和行政流程的各个方面，对医疗保健领域产生重大影响。以下是一些潜在应用：\n\n1. **临床文档和报告**：LLMs 可以通过理解和总结临床记录来协助生成患者报告和文档，使流程更高效，并减轻医疗保健专业人员的行政负担。\n\n2. **医疗编码和计费**：这些模型可以通过将临床记录准确翻译为标准代码，帮助自动化医疗计费的编码过程，减少错误并提高计费效率。\n\n3. **临床决策支持**：LLMs 可以分析患者数据和医学文献，为医疗保健提供者提供基于证据的建议，辅助诊断和治疗规划。\n\n4. **患者教育和沟通**：通过简化医学术语，LLMs 可以帮助患者了解其病情、治疗方案和预防性护理，提高患者参与度和健康素养。\n\n5. **电子健康记录（EHRs）的自然语言处理（NLP）**：LLMs 可以增强电子健康记录（EHRs）系统中的 NLP 能力，从而更好地从非结构化数据（如临床记录）中提取信息，以支持数据驱动的决策。\n\n6. **药物发现和开发**：LLMs 可以分析生物医学文献和临床试验数据，以识别新的候选药物、预测药物相互作用，并支持个性化药物的开发。\n\n7. **远程医疗和虚拟健康助手**：集成到远程医疗平台中，LLMs 可以提供初步评估和分诊，为患者提供基本的健康建议并确定其需求的紧急性，从而优化医疗资源的利用。\n\n8. **研究和文献综述**：LLMs 可以通过快速识别相关研究并总结发现，加速医学文献的综述过程，从而加速研究和基于证据的实践。\n\n9. **个性化医疗**：通过分析患者的遗传信息和病史，LLMs 可以帮助定制治疗计划和药物剂量，促进个性化医疗的发展。\n\n10. **质量改进和风险评估**：LLMs 可以分析医疗保健数据，以识别可能指示质量改进领域或潜在风险（如医院获得性感染或药物不良事件）的模式。\n\n11. **心理健康支持**：LLMs 可以通过提供应对策略、正念练习和初步评估来提供心理健康支持，作为专业心理健康服务的补充。\n\n12. **继续医学教育（CME）**：LLMs 可以根据医疗保健提供者的执业领域、患者人口统计数据和新兴医学文献推荐教育内容，从而个性化继续医学教育，确保专业人员了解最新进展。\n\n虽然 LLMs 在医疗保健领域的应用前景广阔，但解决数据隐私、模型偏见以及监管批准需求等挑战至关重要，以确保这些技术能够安全、合乎道德地实施。", response_metadata={'token_usage': {'completion_tokens': 656, 'prompt_tokens': 40, 'total_tokens': 696}, 'model': 'yi-large'}, id='run-870850bd-e4bf-4265-8730-1736409c0acf-0')
+```
+
+---
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\yi.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

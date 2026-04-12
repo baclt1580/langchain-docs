@@ -1,0 +1,45 @@
+---
+title: "TigerGraph 集成"
+description: "使用 LangChain Python 与 TigerGraph 集成。"
+---
+
+>[TigerGraph](https://www.tigergraph.com/tigergraph-db/) 是一款原生分布式且高性能的图数据库。
+> 以顶点和边的图格式存储数据能够形成丰富的关系，
+> 非常适合为 LLM 的回答提供依据。
+
+## 安装和设置
+
+请按照 [如何连接到 `TigerGraph` 数据库](https://docs.tigergraph.com/pytigergraph/current/getting-started/connection) 的说明操作。
+
+安装 Python SDK：
+
+<CodeGroup>
+```bash pip
+pip install pyTigerGraph
+```
+
+```bash uv
+uv add pyTigerGraph
+```
+</CodeGroup>
+
+## 图存储
+
+### TigerGraph
+
+查看 [使用示例](/oss/python/integrations/graphs/tigergraph)。
+
+```python
+from langchain_community.graphs import TigerGraph
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\tigergraph.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

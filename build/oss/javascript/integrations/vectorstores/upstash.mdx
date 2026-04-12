@@ -1,0 +1,247 @@
+---
+title: "UpstashVectorStore 集成"
+description: "使用 LangChain JavaScript 集成 UpstashVectorStore。"
+---
+
+[Upstash Vector](https://upstash.com/) 是一个基于 REST 的无服务器向量数据库，专为处理向量嵌入而设计。
+
+本指南提供了开始使用 Upstash [向量存储](/oss/javascript/integrations/vectorstores) 的快速概述。有关 `UpstashVectorStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/upstash/UpstashVectorStore)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [Python 支持](https://python.langchain.com/docs/integrations/vectorstores/upstash/) | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`UpstashVectorStore`](https://reference.langchain.com/javascript/langchain-community/vectorstores/upstash/UpstashVectorStore) | [`@langchain/community`](https://npmjs.com/@langchain/community) | ✅ |  ![NPM - 版本](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+## 设置
+
+要使用 Upstash 向量存储，您需要创建一个 Upstash 账户、创建一个索引，并安装 `@langchain/community` 集成包。您还需要安装 [`@upstash/vector`](https://www.npmjs.com/package/@upstash/vector) 包作为对等依赖项。
+
+本指南还将使用 [OpenAI 嵌入](/oss/javascript/integrations/embeddings/openai)，这需要您安装 `@langchain/openai` 集成包。如果您愿意，也可以使用 [其他支持的嵌入模型](/oss/javascript/integrations/embeddings)。
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/core @upstash/vector @langchain/openai
+```
+```bash yarn
+yarn add @langchain/community @langchain/core @upstash/vector @langchain/openai
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/core @upstash/vector @langchain/openai
+```
+</CodeGroup>
+
+您可以从 [Upstash 控制台](https://console.upstash.com/login) 创建索引。更多参考信息，请参阅 [官方文档](https://upstash.com/docs/vector/overall/getstarted)。
+
+Upstash Vector 还内置了嵌入支持。这意味着您可以直接使用它，而无需额外的嵌入模型。有关更多详细信息，请查看 [嵌入模型文档](https://upstash.com/docs/vector/features/embeddingmodels)。
+
+<Note>
+要使用内置的 Upstash 嵌入，您需要在创建索引时选择一个嵌入模型。
+</Note>
+
+### 凭证
+
+设置好索引后，请设置以下环境变量：
+
+```typescript
+process.env.UPSTASH_VECTOR_REST_URL = "您的 REST URL";
+process.env.UPSTASH_VECTOR_REST_TOKEN = "您的 REST 令牌";
+```
+
+如果您在本指南中使用 OpenAI 嵌入，还需要设置您的 OpenAI 密钥：
+
+```typescript
+process.env.OPENAI_API_KEY = "您的 API 密钥";
+```
+
+如果您希望获得模型调用的自动追踪，还可以通过取消注释以下内容来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```typescript
+// process.env.LANGSMITH_TRACING="true"
+// process.env.LANGSMITH_API_KEY="您的 API 密钥"
+```
+
+## 实例化
+
+请确保您的索引与您的嵌入具有相同的维度数量。OpenAI `text-embedding-3-small` 的默认维度是 1536。
+
+```typescript
+import { UpstashVectorStore } from "@langchain/community/vectorstores/upstash";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+import { Index } from "@upstash/vector";
+
+const embeddings = new OpenAIEmbeddings({
+  model: "text-embedding-3-small",
+});
+
+const indexWithCredentials = new Index({
+  url: process.env.UPSTASH_VECTOR_REST_URL,
+  token: process.env.UPSTASH_VECTOR_REST_TOKEN,
+});
+
+const vectorStore = new UpstashVectorStore(embeddings, {
+  index: indexWithCredentials,
+  // 您可以使用命名空间在索引中对数据进行分区
+  // namespace: "test-namespace",
+});
+```
+
+## 使用内置嵌入
+
+要使用内置的 Upstash 嵌入，您可以将一个 `FakeEmbeddings` 实例传递给 `UpstashVectorStore` 构造函数。这将使 `UpstashVectorStore` 使用您在创建索引时选择的内置嵌入。
+
+```typescript
+import { UpstashVectorStore } from "@langchain/community/vectorstores/upstash";
+import { FakeEmbeddings } from "@langchain/core/utils/testing";
+
+import { Index } from "@upstash/vector";
+
+const indexWithEmbeddings = new Index({
+  url: process.env.UPSTASH_VECTOR_REST_URL,
+  token: process.env.UPSTASH_VECTOR_REST_TOKEN,
+});
+
+const vectorStore = new UpstashVectorStore(new FakeEmbeddings(), {
+  index: indexWithEmbeddings,
+});
+```
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```typescript
+import type { Document } from "@langchain/core/documents";
+
+const document1: Document = {
+  pageContent: "细胞的动力源是线粒体",
+  metadata: { source: "https://example.com" }
+};
+
+const document2: Document = {
+  pageContent: "建筑物由砖块构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document3: Document = {
+  pageContent: "线粒体由脂质构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document4: Document = {
+  pageContent: "2024 年奥运会在巴黎举行",
+  metadata: { source: "https://example.com" }
+}
+
+const documents = [document1, document2, document3, document4];
+
+await vectorStore.addDocuments(documents, { ids: ["1", "2", "3", "4"] });
+```
+
+```python
+[ '1', '2', '3', '4' ]
+```
+
+**注意：** 添加文档后，可能需要稍等片刻才能进行查询。
+
+### 从向量存储中删除项目
+
+```typescript
+await vectorStore.delete({ ids: ["4"] });
+```
+
+## 查询向量存储
+
+一旦您的向量存储创建完成并添加了相关文档，您很可能希望在运行链或代理时查询它。
+
+### 直接查询
+
+执行简单的相似性搜索可以按如下方式进行：
+
+```typescript
+const filter = "source = 'https://example.com'";
+
+const similaritySearchResults = await vectorStore.similaritySearch("生物学", 2, filter);
+
+for (const doc of similaritySearchResults) {
+  console.log(`* ${doc.pageContent} [${JSON.stringify(doc.metadata, null)}]`);
+}
+```
+
+```text
+* 细胞的动力源是线粒体 [{"source":"https://example.com"}]
+* 线粒体由脂质构成 [{"source":"https://example.com"}]
+```
+
+有关 Upstash Vector 过滤器语法的更多信息，请参阅 [此页面](https://upstash.com/docs/vector/features/filtering)。
+
+如果您想执行相似性搜索并获取相应的分数，可以运行：
+
+```typescript
+const similaritySearchWithScoreResults = await vectorStore.similaritySearchWithScore("生物学", 2, filter)
+
+for (const [doc, score] of similaritySearchWithScoreResults) {
+  console.log(`* [相似度=${score.toFixed(3)}] ${doc.pageContent} [${JSON.stringify(doc.metadata)}]`);
+}
+```
+
+```text
+* [相似度=0.576] 细胞的动力源是线粒体 [{"source":"https://example.com"}]
+* [相似度=0.557] 线粒体由脂质构成 [{"source":"https://example.com"}]
+```
+
+### 通过转换为检索器进行查询
+
+您还可以将向量存储转换为 [检索器](/oss/javascript/langchain/retrieval)，以便在您的链中更轻松地使用。
+
+```typescript
+const retriever = vectorStore.asRetriever({
+  // 可选过滤器
+  filter: filter,
+  k: 2,
+});
+await retriever.invoke("生物学");
+```
+
+```javascript
+[
+  Document {
+    pageContent: '细胞的动力源是线粒体',
+    metadata: { source: 'https://example.com' },
+    id: undefined
+  },
+  Document {
+    pageContent: '线粒体由脂质构成',
+    metadata: { source: 'https://example.com' },
+    id: undefined
+  }
+]
+```
+
+### 用于检索增强生成
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [使用 LangChain 构建 RAG 应用](/oss/javascript/langchain/rag)。
+- [代理式 RAG](/oss/javascript/langgraph/agentic-rag)
+- [检索文档](/oss/javascript/langchain/retrieval)
+
+---
+
+## API 参考
+
+有关 `UpstashVectorStore` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/upstash/UpstashVectorStore)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\upstash.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

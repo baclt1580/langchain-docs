@@ -1,0 +1,43 @@
+---
+title: "Trubrics 集成"
+description: "使用 LangChain Python 与 Trubrics 集成。"
+---
+
+>[Trubrics](https://trubrics.com) 是一个 LLM 用户分析平台，允许您收集、分析和管理工作用户
+提示及 AI 模型的反馈。
+>
+>查看 [Trubrics 仓库](https://github.com/trubrics/trubrics-sdk) 以获取更多关于 `Trubrics` 的信息。
+
+## 安装和设置
+
+我们需要安装 `trubrics` Python 包：
+
+<CodeGroup>
+```bash pip
+pip install trubrics
+```
+
+```bash uv
+uv add trubrics
+```
+</CodeGroup>
+
+
+## 回调
+
+查看 [使用示例](/oss/python/integrations/callbacks/trubrics)。
+
+```python
+from langchain.callbacks import TrubricsCallbackHandler
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\trubrics.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

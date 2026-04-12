@@ -1,0 +1,39 @@
+---
+title: "Annoy 集成"
+description: "使用 LangChain Python 与 Annoy 进行集成。"
+---
+
+> [Annoy](https://github.com/spotify/annoy) (`Approximate Nearest Neighbors Oh Yeah`)
+> 是一个带有 Python 绑定的 C++ 库，用于在空间中搜索接近给定查询点的点。它还会创建大型只读基于文件的数据结构，这些结构被映射到内存中，以便多个进程可以共享相同的数据。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install annoy
+```
+
+```bash uv
+uv add annoy
+```
+</CodeGroup>
+
+
+## 向量存储
+
+查看 [使用示例](/oss/python/integrations/vectorstores/annoy)。
+
+```python
+from langchain_community.vectorstores import Annoy
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\annoy.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

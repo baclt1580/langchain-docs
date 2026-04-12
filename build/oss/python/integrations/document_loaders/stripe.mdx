@@ -1,0 +1,54 @@
+---
+title: "Stripe 集成"
+description: "使用 LangChain Python 与 Stripe 文档加载器集成。"
+---
+
+>[Stripe](https://stripe.com/en-ca) 是一家爱尔兰-美国的金融服务和软件即服务（SaaS）公司。它为电子商务网站和移动应用程序提供支付处理软件和应用程序编程接口。
+
+本笔记本介绍了如何将数据从 `Stripe REST API` 加载到可以导入 LangChain 的格式，并包含向量化使用的示例。
+
+```python
+from langchain.indexes import VectorstoreIndexCreator
+from langchain_community.document_loaders import StripeLoader
+```
+
+Stripe API 需要一个访问令牌，该令牌可以在 Stripe 仪表板中找到。
+
+此文档加载器还需要一个 `resource` 选项，用于定义要加载的数据。
+
+以下是可用的资源：
+
+`balance_transations` [文档](https://stripe.com/docs/api/balance_transactions/list)
+
+`charges` [文档](https://stripe.com/docs/api/charges/list)
+
+`customers` [文档](https://stripe.com/docs/api/customers/list)
+
+`events` [文档](https://stripe.com/docs/api/events/list)
+
+`refunds` [文档](https://stripe.com/docs/api/refunds/list)
+
+`disputes` [文档](https://stripe.com/docs/api/disputes/list)
+
+```python
+stripe_loader = StripeLoader("charges")
+```
+
+```python
+# 从加载器创建向量存储检索器
+# 更多详情请参阅 https://python.langchain.com/en/latest/modules/data_connection/getting_started.html
+
+index = VectorstoreIndexCreator().from_loaders([stripe_loader])
+stripe_doc_retriever = index.vectorstore.as_retriever()
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\stripe.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

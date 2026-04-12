@@ -1,0 +1,43 @@
+---
+title: "TiDB 集成"
+description: "使用 LangChain Python 与 TiDB 集成。"
+---
+
+> [TiDB Cloud](https://www.pingcap.com/tidb-serverless) 是一个全面的数据库即服务 (DBaaS) 解决方案，
+> 提供专用和 无服务器 选项。`TiDB Serverless` 现在正在将
+> 内置向量搜索功能整合到 MySQL 生态中。通过此增强功能，您可以无缝地
+> 使用 `TiDB Serverless` 开发 AI 应用程序，而无需新的数据库或额外的
+> 技术栈。创建一个免费的 TiDB Serverless 集群，并在 https://pingcap.com/ai 开始使用向量搜索功能。
+
+
+## 安装和设置
+
+您需要获取 TiDB 数据库的连接详情。
+请访问 [TiDB Cloud](https://tidbcloud.com/) 以获取连接详情。
+
+```bash
+## Document loader
+
+```python
+from langchain_community.document_loaders import TiDBLoader
+```
+See the [TiDB document loader documentation](/oss/python/integrations/document_loaders/tidb) for details.
+```
+
+## 向量存储
+
+```python
+from langchain_community.vectorstores import TiDBVectorStore
+```
+有关详细信息，请参阅 [TiDB 向量存储文档](/oss/python/integrations/vectorstores/tidb_vector)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\tidb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

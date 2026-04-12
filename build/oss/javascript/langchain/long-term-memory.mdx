@@ -1,0 +1,134 @@
+---
+title: 长期记忆
+description: 为 LangChain 智能体添加长期记忆，实现跨对话和会话的数据存储与回忆
+---
+
+import LongTermMemoryCreateAgentInmemoryPy from '/snippets/code-samples/long-term-memory-create-agent-inmemory-py.mdx';
+import LongTermMemoryCreateAgentInmemoryJs from '/snippets/code-samples/long-term-memory-create-agent-inmemory-js.mdx';
+import LongTermMemoryCreateAgentPostgresPy from '/snippets/code-samples/long-term-memory-create-agent-postgres-py.mdx';
+import LongTermMemoryCreateAgentPostgresJs from '/snippets/code-samples/long-term-memory-create-agent-postgres-js.mdx';
+import LongTermMemoryStorageInmemoryPy from '/snippets/code-samples/long-term-memory-storage-inmemory-py.mdx';
+import LongTermMemoryStorageInmemoryJs from '/snippets/code-samples/long-term-memory-storage-inmemory-js.mdx';
+import LongTermMemoryStoragePostgresPy from '/snippets/code-samples/long-term-memory-storage-postgres-py.mdx';
+import LongTermMemoryStoragePostgresJs from '/snippets/code-samples/long-term-memory-storage-postgres-js.mdx';
+import LongTermMemoryReadToolInmemoryPy from '/snippets/code-samples/long-term-memory-read-tool-inmemory-py.mdx';
+import LongTermMemoryReadToolInmemoryJs from '/snippets/code-samples/long-term-memory-read-tool-inmemory-js.mdx';
+import LongTermMemoryReadToolPostgresPy from '/snippets/code-samples/long-term-memory-read-tool-postgres-py.mdx';
+import LongTermMemoryReadToolPostgresJs from '/snippets/code-samples/long-term-memory-read-tool-postgres-js.mdx';
+import LongTermMemoryWriteToolInmemoryPy from '/snippets/code-samples/long-term-memory-write-tool-inmemory-py.mdx';
+import LongTermMemoryWriteToolInmemoryJs from '/snippets/code-samples/long-term-memory-write-tool-inmemory-js.mdx';
+import LongTermMemoryWriteToolPostgresPy from '/snippets/code-samples/long-term-memory-write-tool-postgres-py.mdx';
+import LongTermMemoryWriteToolPostgresJs from '/snippets/code-samples/long-term-memory-write-tool-postgres-js.mdx';
+
+长期记忆使您的智能体能够跨不同对话和会话存储并回忆信息。
+与仅限于单个线程的[短期记忆](/oss/javascript/langchain/short-term-memory)不同，长期记忆可跨线程持久保存，并可在任意时刻被回忆。
+
+长期记忆构建于 [LangGraph 存储](/oss/javascript/langgraph/persistence#memory-store)之上，该存储将数据保存为按命名空间和键组织的 JSON 文档。
+
+## 使用方法
+
+要为智能体添加长期记忆，请创建一个存储并将其传递给 [`create_agent`](https://reference.langchain.com/javascript/langchain/index/createAgent)：
+
+<Tabs>
+    <Tab title="InMemoryStore">
+
+
+<LongTermMemoryCreateAgentInmemoryJs />
+
+
+    </Tab>
+    <Tab title="PostgreSQL">
+
+
+```shell
+npm install @langchain/langgraph-checkpoint-postgres
+```
+
+<LongTermMemoryCreateAgentPostgresJs />
+
+
+    </Tab>
+</Tabs>
+
+随后，工具可通过 `runtime.store` 参数从存储中读取数据或向存储写入数据。具体示例请参阅[在工具中读取长期记忆](#read-long-term-memory-in-tools)和[从工具写入长期记忆](#write-long-term-memory-from-tools)。
+
+<Tip>
+    若需深入了解记忆类型（语义记忆、情景记忆、程序性记忆）及记忆写入策略，请参阅[记忆概念指南](/oss/javascript/concepts/memory#long-term-memory)。
+</Tip>
+
+## 记忆存储
+
+LangGraph 将长期记忆作为 JSON 文档存储在[存储](/oss/javascript/langgraph/persistence#memory-store)中。
+
+每条记忆都组织在自定义的 `namespace`（类似于文件夹）和唯一的 `key`（类似于文件名）之下。命名空间通常包含用户或组织 ID 或其他便于信息组织的标签。
+
+这种结构支持记忆的层次化组织。跨命名空间的搜索则通过内容过滤器实现。
+
+<Tabs>
+    <Tab title="InMemoryStore">
+
+
+<LongTermMemoryStorageInmemoryJs />
+
+
+    </Tab>
+    <Tab title="PostgreSQL">
+
+
+<LongTermMemoryStoragePostgresJs />
+
+
+    </Tab>
+</Tabs>
+
+有关记忆存储的更多信息，请参阅[持久化](/oss/javascript/langgraph/persistence#memory-store)指南。
+
+## 在工具中读取长期记忆
+
+<Tabs>
+    <Tab title="InMemoryStore">
+
+
+<LongTermMemoryReadToolInmemoryJs />
+
+
+    </Tab>
+    <Tab title="PostgreSQL">
+
+
+<LongTermMemoryReadToolPostgresJs />
+
+
+    </Tab>
+</Tabs>
+
+<a id="write-long-term"></a>
+## 从工具写入长期记忆
+
+<Tabs>
+    <Tab title="InMemoryStore">
+
+
+<LongTermMemoryWriteToolInmemoryJs />
+
+
+    </Tab>
+    <Tab title="PostgreSQL">
+
+
+<LongTermMemoryWriteToolPostgresJs />
+
+
+    </Tab>
+</Tabs>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\long-term-memory.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,208 @@
+---
+title: "CloseVector 集成"
+description: "使用 LangChain JavaScript 与 CloseVector 向量存储进行集成。"
+---
+
+<Tip>
+**兼容性**
+
+可在浏览器和 Node.js 上使用
+</Tip>
+
+[CloseVector](https://closevector.getmegaportal.com/) 是一个跨平台的向量数据库，可在浏览器和 Node.js 中运行。例如，您可以在 Node.js 上创建索引，然后在浏览器中加载/查询它。更多信息请访问 [CloseVector 文档](https://closevector-docs.getmegaportal.com/)。
+
+## 安装设置
+
+### CloseVector Web
+
+```bash npm
+npm install -S closevector-web
+```
+### CloseVector node
+
+```bash npm
+npm install -S closevector-node
+```
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+## 使用方式
+
+### 从文本创建新索引
+
+```typescript
+// 如果想导入浏览器版本，请改用以下行：
+// import { CloseVectorWeb } from "@langchain/community/vectorstores/closevector/web";
+import { CloseVectorNode } from "@langchain/community/vectorstores/closevector/node";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+export const run = async () => {
+  // 如果想导入浏览器版本，请改用以下行：
+  // const vectorStore = await CloseVectorWeb.fromTexts(
+  const vectorStore = await CloseVectorNode.fromTexts(
+    ["Hello world", "Bye bye", "hello nice world"],
+    [{ id: 2 }, { id: 1 }, { id: 3 }],
+    new OpenAIEmbeddings()
+  );
+
+  const resultOne = await vectorStore.similaritySearch("hello world", 1);
+  console.log(resultOne);
+};
+```
+
+### 从加载器创建新索引
+
+```typescript
+// 如果想导入浏览器版本，请改用以下行：
+// import { CloseVectorWeb } from "@langchain/community/vectorstores/closevector/web";
+import { CloseVectorNode } from "@langchain/community/vectorstores/closevector/node";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
+
+// 使用加载器创建文档
+const loader = new TextLoader("src/document_loaders/example_data/example.txt");
+const docs = await loader.load();
+
+// 将文档加载到向量存储中
+// 如果想导入浏览器版本，请改用以下行：
+// const vectorStore = await CloseVectorWeb.fromDocuments(
+const vectorStore = await CloseVectorNode.fromDocuments(
+  docs,
+  new OpenAIEmbeddings()
+);
+
+// 搜索最相似的文档
+const resultOne = await vectorStore.similaritySearch("hello world", 1);
+console.log(resultOne);
+```
+
+### 将索引保存到 CloseVector CDN 并重新加载
+
+CloseVector 支持将索引保存到云端/从云端加载。要使用此功能，您需要在 [CloseVector](https://closevector.getmegaportal.com/) 上创建一个账户。请阅读 [CloseVector 文档](https://closevector-docs.getmegaportal.com/) 并通过[登录](https://closevector.getmegaportal.com/) 首先生成您的 API 密钥。
+
+```typescript
+// 如果想导入浏览器版本，请改用以下行：
+// import { CloseVectorWeb } from "@langchain/community/vectorstores/closevector/web";
+import { CloseVectorNode } from "@langchain/community/vectorstores/closevector/node";
+import { CloseVectorWeb } from "@langchain/community/vectorstores/closevector/web";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+// 通过任意方法创建向量存储，这里以从文本创建为例
+// 如果想导入浏览器版本，请改用以下行：
+// const vectorStore = await CloseVectorWeb.fromTexts(
+const vectorStore = await CloseVectorNode.fromTexts(
+  ["Hello world", "Bye bye", "hello nice world"],
+  [{ id: 2 }, { id: 1 }, { id: 3 }],
+  new OpenAIEmbeddings(),
+  undefined,
+  {
+    key: "your access key",
+    secret: "your secret",
+  }
+);
+
+// 将向量存储保存到云端
+await vectorStore.saveToCloud({
+  description: "example",
+  public: true,
+});
+
+const { uuid } = vectorStore.instance;
+
+// 从云端加载向量存储
+// const loadedVectorStore = await CloseVectorWeb.load(
+const loadedVectorStore = await CloseVectorNode.loadFromCloud({
+  uuid,
+  embeddings: new OpenAIEmbeddings(),
+  credentials: {
+    key: "your access key",
+    secret: "your secret",
+  },
+});
+
+// 如果想导入 Node.js 版本，请改用以下行：
+// const loadedVectorStoreOnNode = await CloseVectorNode.loadFromCloud({
+//   uuid,
+//   embeddings: new OpenAIEmbeddings(),
+//   credentials: {
+//     key: "your access key",
+//     secret: "your secret"
+//   }
+// });
+
+const loadedVectorStoreOnBrowser = await CloseVectorWeb.loadFromCloud({
+  uuid,
+  embeddings: new OpenAIEmbeddings(),
+  credentials: {
+    key: "your access key",
+    secret: "your secret",
+  },
+});
+
+// vectorStore 和 loadedVectorStore 是相同的
+const result = await loadedVectorStore.similaritySearch("hello world", 1);
+console.log(result);
+
+// 或者
+const resultOnBrowser = await loadedVectorStoreOnBrowser.similaritySearch(
+  "hello world",
+  1
+);
+console.log(resultOnBrowser);
+```
+
+### 将索引保存到文件并重新加载
+
+```typescript
+// 如果想导入浏览器版本，请改用以下行：
+// import { CloseVectorWeb } from "@langchain/community/vectorstores/closevector/web";
+import { CloseVectorNode } from "@langchain/community/vectorstores/closevector/node";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+// 通过任意方法创建向量存储，这里以从文本创建为例
+// 如果想导入浏览器版本，请改用以下行：
+// const vectorStore = await CloseVectorWeb.fromTexts(
+const vectorStore = await CloseVectorNode.fromTexts(
+  ["Hello world", "Bye bye", "hello nice world"],
+  [{ id: 2 }, { id: 1 }, { id: 3 }],
+  new OpenAIEmbeddings()
+);
+
+// 将向量存储保存到目录
+const directory = "your/directory/here";
+
+await vectorStore.save(directory);
+
+// 从同一目录加载向量存储
+// 如果想导入浏览器版本，请改用以下行：
+// const loadedVectorStore = await CloseVectorWeb.load(
+const loadedVectorStore = await CloseVectorNode.load(
+  directory,
+  new OpenAIEmbeddings()
+);
+
+// vectorStore 和 loadedVectorStore 是相同的
+const result = await loadedVectorStore.similaritySearch("hello world", 1);
+console.log(result);
+```
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储[操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\closevector.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,31 @@
+---
+title: "Zotero 集成"
+description: "使用 LangChain Python 与 Zotero 集成。"
+---
+
+[Zotero](https://www.zotero.org/) 是一个开源参考文献管理系统，旨在管理书目数据及相关研究材料。您可以通过 [API](https://www.zotero.org/support/dev/web_api/v3/start) 连接至您的个人库以及共享群组库。此检索器实现利用 [PyZotero](https://github.com/urschrei/pyzotero) 来访问库。
+
+## 安装
+
+```bash
+pip install pyzotero
+```
+
+## 检索器
+
+查看 [使用示例](/oss/python/integrations/retrievers/zotero)。
+
+```python
+from langchain_zotero_retriever.retrievers import ZoteroRetriever
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\zotero.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,67 @@
+---
+title: "Anthropic 集成"
+sidebarTitle: "概述"
+description: "使用 LangChain JavaScript 与 Anthropic 集成。"
+---
+
+所有与 Anthropic 模型相关的功能。
+
+[Anthropic](https://www.anthropic.com/) 是一家 AI 安全与研究公司，也是 Claude 的创造者。
+本页面涵盖了 Anthropic 模型与 LangChain 之间的所有集成。
+
+## 提示词最佳实践
+
+与 OpenAI 模型相比，Anthropic 模型有几项提示词最佳实践。
+
+**系统消息只能作为第一条消息**
+
+Anthropic 模型要求任何系统消息必须是提示词中的第一条消息。
+
+## `ChatAnthropic`
+
+`ChatAnthropic` 是 LangChain `ChatModel` 的子类，这意味着它最适合与 `ChatPromptTemplate` 配合使用。
+你可以通过以下代码导入此包装器：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/anthropic @langchain/core
+```
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+const model = new ChatAnthropic({});
+```
+
+在使用 ChatModels 时，建议将你的提示词设计为 `ChatPromptTemplate`。
+下面是一个示例：
+
+```typescript
+import { ChatPromptTemplate } from "@langchain/classic/prompts";
+
+const prompt = ChatPromptTemplate.fromMessages([
+  ["system", "你是一个有用的聊天机器人"],
+  ["human", "给我讲一个关于 {topic} 的笑话"],
+]);
+```
+
+然后，你可以在链中如下使用它：
+
+```typescript
+const chain = prompt.pipe(model);
+await chain.invoke({ topic: "熊" });
+```
+
+更多示例（包括多模态输入），请参阅[聊天模型集成页面](/oss/javascript/integrations/chat/anthropic/)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\providers\anthropic.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

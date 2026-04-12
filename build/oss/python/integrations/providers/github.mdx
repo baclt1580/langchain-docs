@@ -1,0 +1,57 @@
+---
+title: "GitHub 集成"
+description: "使用 LangChain Python 与 GitHub 集成。"
+---
+
+>[GitHub](https://github.com/) 是一个开发者平台，允许开发者创建、
+> 存储、管理和分享他们的代码。它使用 `Git` 软件，提供
+> Git 的分布式版本控制，以及访问控制、错误跟踪、
+> 软件功能请求、任务管理、持续集成和每个项目的维基。
+
+
+## 安装和设置
+
+要访问 GitHub API，你需要一个 [个人访问令牌](https://github.com/settings/tokens)。
+
+
+## 文档加载器
+
+GitHub 有两个可用的文档加载器。
+
+查看 [使用示例](/oss/python/integrations/document_loaders/github)。
+
+```python
+from langchain_community.document_loaders import GitHubIssuesLoader, GithubFileLoader
+```
+
+## 工具/工具包
+
+### GitHubToolkit
+`GitHub` 工具包包含使 LLM 代理能够与 GitHub 仓库交互的工具。
+
+该工具包是 `PyGitHub` 库的封装。
+
+```python
+from langchain_community.agent_toolkits.github.toolkit import GitHubToolkit
+```
+
+在 [示例笔记本](/oss/python/integrations/tools/github) 中了解更多。
+
+### GitHubAction
+
+用于与 GitHub API 交互的工具。
+
+```python
+from langchain_community.tools.github.tool import GitHubAction
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\github.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

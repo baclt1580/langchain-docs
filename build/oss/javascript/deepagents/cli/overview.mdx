@@ -1,0 +1,775 @@
+---
+title: Deep Agents CLI
+sidebarTitle: 使用 CLI
+description: 基于 Deep Agents SDK 构建的终端编码代理
+---
+
+Deep Agents CLI 是一个开源的终端编码代理，基于 [Deep Agents SDK](/oss/javascript/deepagents/quickstart) 构建。
+它保留持久记忆，跨会话维护上下文，学习项目约定，使用可定制的技能，并在批准控制下执行代码。
+
+![Deep Agents CLI](/oss/images/deepagents/deepagents-cli.png)
+
+Deep Agents CLI 具有以下内置功能：
+
+* <Icon icon="file" size={16} /> **文件操作** - 使用工具读取、写入和编辑项目中的文件，使代理能够管理和修改代码与文档。
+* <Icon icon="terminal" size={16} /> **Shell 命令执行** - 执行 shell 命令以运行测试、构建项目、管理依赖项以及与版本控制系统交互。
+* <Icon icon="search" size={16} /> **网页搜索** - 搜索网页以获取最新信息和文档（需要 Tavily API 密钥）。
+* <Icon icon="globe" size={16} /> **HTTP 请求** - 向 API 和外部服务发出 HTTP 请求，用于数据获取和集成任务。
+* <Icon icon="list-check" size={16} /> **任务规划与跟踪** - 将复杂任务分解为离散步骤，并通过内置的待办事项系统跟踪进度。
+* <Icon icon="brain" size={16} /> **记忆存储与检索** - 跨会话存储和检索信息，使代理能够记住项目约定和学习到的模式。
+* <Icon icon="arrows-minimize" size={16} /> **上下文压缩与卸载** - 总结较旧的对话消息并将原始消息卸载到后端存储，在长会话期间释放上下文窗口空间。
+* <Icon icon="user" size={16} /> **人机协同** - 要求对敏感工具操作进行人工批准。
+* <Icon icon="puzzle" size={16} /> **技能** - 使用存储在技能目录中的自定义专业知识和指令扩展代理能力。
+* <Icon icon="plug" size={16} /> **[MCP 工具](/oss/javascript/deepagents/cli/mcp-tools)** - 通过自动发现或显式配置文件从[模型上下文协议](https://modelcontextprotocol.io/)服务器加载外部工具。
+* <Icon icon="chart-dots" size={16} /> **[追踪](/oss/javascript/deepagents/cli/overview#tracing-with-langsmith)** - 在 LangSmith 中追踪代理操作、工具调用和决策，以实现可观测性和调试。
+
+<Accordion title="内置工具完整列表">
+    ## 内置工具
+
+    代理附带以下内置工具，无需配置即可使用：
+
+    | 工具 | 描述 | 人机协同 |
+    |------|-------------|-------------------|
+    | `ls` | 列出文件和目录 | - |
+    | `read_file` | 读取文件内容；支持图像（`.png`、`.jpg`、`.jpeg`、`.gif`、`.webp`）作为多模态内容 | - |
+    | `write_file` | 创建或覆盖文件 | 需要<sup>1</sup> |
+    | `edit_file` | 对现有文件进行针对性编辑 | 需要<sup>1</sup> |
+    | `glob` | 查找匹配模式的文件（例如 `**/*.py`） | - |
+    | `grep` | 跨文件搜索文本模式 | - |
+    | `execute` | 在本地或远程沙箱中执行 shell 命令 | 需要<sup>1</sup> |
+    | `http_request` | 向 API 和 Web 服务发出 HTTP 请求（`GET`、`POST`、`PUT`、`DELETE` 等） | - |
+    | `web_search` | 使用 Tavily API 搜索网页 | 需要<sup>1</sup> |
+    | `fetch_url` | 获取网页并将其转换为 markdown | 需要<sup>1</sup> |
+    | `task` | 将工作委托给子代理以进行并行执行 | 需要<sup>1</sup> |
+    | `ask_user` | 当需要澄清时，向用户提出自由形式或选择题 | - |
+    | `compact_conversation` | 总结较旧的消息，将原始消息卸载到后端存储，并用总结替换上下文中的原始消息 | 混合<sup>2</sup> |
+    | `write_todos` | 为复杂工作创建和管理任务列表 | - |
+
+    <sup>1</sup>：可能具有破坏性的操作需要用户批准才能执行。要绕过人工批准，您可以切换自动批准或使用 `auto-approve` 选项启动深度代理：
+
+    ```bash
+    deepagents -y
+    ```
+
+    <Note>
+        当以非交互方式运行 CLI 时（通过 `-n` 或管道 stdin），即使使用 `-y`/`--auto-approve`，默认也会禁用 shell 执行。使用 `-S`/`--shell-allow-list` 来允许特定命令（例如 `-S "pytest,git,make"`），使用 `recommended` 以获得安全默认值，或使用 `all` 以允许任何命令。还支持 `DEEPAGENTS_SHELL_ALLOW_LIST` 环境变量。有关更多详细信息，请参阅[非交互模式和管道](#non-interactive-mode-and-piping)。
+    </Note>
+
+    <sup>2</sup>：当令牌使用量超过模型感知阈值时，CLI 会在后台自动卸载对话。卸载通过 LLM 总结较旧的消息，并将原始消息弹出到后端存储（`/conversation_history/{thread_id}.md`），用总结替换上下文中的原始消息。如果需要，代理仍然可以从卸载的文件中检索完整历史记录。`compact_conversation` 工具允许代理（或您）按需触发卸载。当作为工具调用时，默认需要用户批准。
+</Accordion>
+
+<Tip>
+    [观看演示视频](https://youtu.be/IrnacLa9PJc?si=3yUnPbxnm2yaqVQb)了解 Deep Agents CLI 的工作原理。
+</Tip>
+
+## 快速开始
+
+<Steps>
+    <Step title="设置模型凭证" icon="key">
+        将您提供商的 API 密钥导出为环境变量。例如：
+
+        ```bash
+        export OPENAI_API_KEY="your-api-key"
+        ```
+
+        CLI 可与[任何支持工具调用的 LLM](/oss/javascript/deepagents/cli/providers) 配合使用 — OpenAI、Anthropic、Google、Ollama 等等。有关设置详细信息，请参阅[提供商](#providers)。
+    </Step>
+
+    <Step title="安装并运行" icon="terminal">
+        CLI 默认支持 OpenAI、Anthropic 和 Google。其他提供商（Ollama、Groq、xAI 等）作为可选附加组件安装 — 有关详细信息，请参阅[提供商](#providers)。
+
+        <CodeGroup>
+            ```bash Script
+            curl -LsSf https://raw.githubusercontent.com/langchain-ai/deepagents/refs/heads/main/libs/cli/scripts/install.sh | bash
+            ```
+
+            ```bash Script with extras
+            DEEPAGENTS_EXTRAS="ollama,groq" curl -LsSf https://raw.githubusercontent.com/langchain-ai/deepagents/refs/heads/main/libs/cli/scripts/install.sh | bash
+            ```
+
+            ```bash uv
+            uv tool install 'deepagents-cli[ollama,groq]'
+            ```
+        </CodeGroup>
+
+        ```bash
+        deepagents
+        ```
+    </Step>
+
+    <Step title="给代理分配任务" icon="message">
+        ```txt
+        创建一个打印 "Hello, World!" 的 Python 脚本
+        ```
+
+        代理会在修改文件前，提出带有差异的更改以供您批准。
+    </Step>
+
+    <Step title="启用追踪（可选）" icon="chart-dots">
+        在 [LangSmith](#tracing-with-langsmith) 中查看代理操作、工具调用和决策：
+
+        ```bash
+        export LANGCHAIN_TRACING=true
+        export LANGCHAIN_API_KEY="your-api-key"
+        ```
+    </Step>
+</Steps>
+
+## 提供商
+
+CLI 刻意保持轻量 — 它默认支持 OpenAI、Anthropic 和 Google。每个额外的模型提供商都是一个独立的依赖项，因此您只需引入所需的内容。
+
+```bash
+# 向现有安装添加额外提供商
+uv tool install deepagents-cli --with langchain-xai
+```
+
+要使用特定提供商，请在启动时传递 `--model` 或在会话中使用 `/model` 切换。
+
+```bash
+deepagents --model anthropic:claude-opus-4-5
+```
+
+有关支持提供商的完整列表，请参阅[模型提供商](/oss/javascript/deepagents/cli/providers)。
+
+## 交互模式
+
+像在聊天界面中一样自然地输入。
+代理将使用其内置工具、技能和记忆来帮助您完成任务。
+
+<AccordionGroup>
+    <Accordion title="斜杠命令" icon="slash">
+        在 CLI 会话中使用以下命令：
+
+        - `/model` - 切换模型或打开交互式模型选择器。有关详细信息，请参阅[切换模型](#switch-models)
+        - `/remember [context]` - 回顾对话并更新记忆和技能。可选择传递额外上下文
+        - `/offload` - 通过将消息卸载到后端存储并在对话中保留总结占位符来释放上下文窗口空间。如果需要，代理可以从卸载的文件中检索完整历史记录。
+        - `/tokens` - 显示当前上下文窗口令牌使用情况明细
+        - `/clear` - 清除对话历史并开始新线程
+        - `/threads` - 浏览和恢复之前的对话线程
+        - `/reload` - 刷新运行时配置（API 密钥、`.env` 更改、shell 允许列表），无需重启。会话状态得以保留
+        - `/trace` - 在 LangSmith 中打开当前线程（需要 `LANGSMITH_API_KEY`）
+        - `/editor` - 在外部编辑器（`$VISUAL` / `$EDITOR`）中打开当前提示。请参阅[外部编辑器](/oss/javascript/deepagents/cli/configuration#external-editor)
+        - `/changelog` - 在浏览器中打开 CLI 变更日志
+        - `/docs` - 在浏览器中打开文档
+        - `/feedback` - 打开 GitHub 问题页面以提交错误报告或功能请求
+        - `/version` - 显示已安装的 `deepagents-cli` 和 SDK 版本
+        - `/help` - 显示帮助和可用命令
+        - `/quit` - 退出 CLI
+    </Accordion>
+
+    <Accordion title="Shell 命令" icon="prompt">
+        输入 `!` 进入 shell 模式，然后输入您的命令。
+
+        ```bash
+        git status
+        npm test
+        ls -la
+        ```
+    </Accordion>
+
+    <Accordion title="键盘快捷键" icon="keyboard">
+        **通用**
+
+        | 快捷键 | 操作 |
+        |-|-|
+        | `Enter` | 提交提示 |
+        | `Shift+Enter`、`Ctrl+J`、`Alt+Enter` 或 `Ctrl+Enter` | 插入换行符 |
+        | `Ctrl+A` | 选择输入中的所有文本 |
+        | `@filename` | 自动补全文件并注入内容 |
+        | `Shift+Tab` 或 `Ctrl+T` | 切换自动批准 |
+        | `Ctrl+U` | 删除当前行 |
+        | `Ctrl+X` | 在外部编辑器中打开提示 |
+        | `Ctrl+E` | 展开/折叠最近的工具输出 |
+        | `Escape` | 中断当前操作 |
+        | `Ctrl+C` | 中断或退出 |
+        | `Ctrl+D` | 退出 |
+    </Accordion>
+</AccordionGroup>
+
+## 非交互模式和管道
+
+使用 `-n` 运行单个任务，无需启动交互式 UI：
+
+```bash
+deepagents -n "Write a Python script that prints hello world"
+```
+
+您也可以通过 stdin 管道输入。当输入被管道化时，CLI 会自动以非交互方式运行：
+
+```bash
+echo "Explain this code" | deepagents
+cat error.log | deepagents -n "What's causing this error?"
+git diff | deepagents -n "Review these changes"
+```
+
+当管道输入与 `-n` 或 `-m` 结合时，管道内容会被前置到标志的值中。
+
+<Note>
+    最大管道输入大小为 10 MiB。
+</Note>
+
+在非交互模式下，默认禁用 shell 执行。使用 `-S`/`--shell-allow-list` 启用特定命令（例如 `-S "pytest,git,make"`），使用 `recommended` 以获得安全默认值，或使用 `all` 以允许任何命令。
+
+<AccordionGroup>
+    <Accordion title="干净输出和缓冲" icon="buffer">
+        使用 `-q` 获得适合管道传输到其他命令的干净输出，使用 `--no-stream` 在写入 stdout 之前缓冲完整响应（而不是流式传输）：
+
+        ```bash
+        deepagents -n "Generate a .gitignore for Python" -q > .gitignore
+        deepagents -n "List dependencies" -q --no-stream | sort
+        ```
+
+        在非交互模式下，代理被指示做出合理假设并自主进行，而不是提出澄清问题。它也更倾向于非交互式命令变体（例如 `npm init -y`、`apt-get install -y`）。
+    </Accordion>
+
+    <Accordion title="Shell 执行示例" icon="shield-check">
+        ```bash
+        # 允许特定命令（根据列表验证）
+        deepagents -n "Run the tests and fix failures" -S "pytest,git,make"
+
+        # 使用精选的安全命令列表
+        deepagents -n "Build the project" -S recommended
+
+        # 允许任何 shell 命令
+        deepagents -n "Fix the build" -S all
+        ```
+    </Accordion>
+</AccordionGroup>
+
+<Warning>
+    `-S all` / `--shell-allow-list all` 允许代理在没有人工确认的情况下执行任意 shell 命令。请谨慎使用。
+</Warning>
+
+## 切换模型
+
+您可以在会话期间使用 `/model` 命令切换模型，而无需重启 CLI，或者在启动时使用 `--model` 标志：
+
+```txt
+> /model anthropic:claude-opus-4-5
+> /model openai:gpt-4o
+```
+
+```bash
+deepagents --model openai:gpt-4o
+```
+
+运行不带参数的 `/model` 以打开交互式模型选择器，该选择器显示按提供商分组的可用模型。
+
+有关切换模型、设置默认模型和配置自定义提供商的完整详细信息，请参阅[模型提供商](/oss/javascript/deepagents/cli/providers)。有关 `config.toml` 参考和生命周期钩子，请参阅[配置](/oss/javascript/deepagents/cli/configuration)。
+
+<AccordionGroup>
+    <Accordion title="交互式模型选择器" icon="list">
+        选择器会显示高亮模型的详细信息页脚，包括上下文窗口大小、输入模态（文本、图像、音频、PDF、视频）和功能（推理、工具调用、结构化输出）。被 `--profile-override` 或 `config.toml` 覆盖的值会以黄色 `*` 前缀标记。
+    </Accordion>
+
+    <Accordion title="模型参数" icon="adjustments">
+        在会话中途切换时，使用 `--model-params` 传递额外的模型构造函数参数：
+
+        ```txt
+        > /model --model-params '{"temperature": 0.7}' anthropic:claude-sonnet-4-5
+        > /model --model-params '{"temperature": 0.7}'  # 打开选择器，将参数应用于所选模型
+        ```
+
+        这些是仅限会话的覆盖，具有最高优先级，会覆盖配置文件 `params` 中的值。`--model-params` 不能与 `--default` 结合使用。
+    </Accordion>
+</AccordionGroup>
+
+## 配置
+
+CLI 将所有配置存储在 `~/.deepagents/` 下。在该目录中，每个代理都有自己的子目录（默认：`agent`）：
+
+| 路径 | 用途 |
+|------|---------|
+| `~/.deepagents/config.toml` | 模型默认值、提供商设置、构造函数参数、配置文件覆盖、MCP 信任存储 |
+| `~/.deepagents/hooks.json` | 生命周期事件钩子（会话开始/结束、任务完成等） |
+| `~/.deepagents/<agent_name>/` | 每个代理的记忆、技能和对话线程 |
+| `.deepagents/`（项目根目录） | 项目特定的记忆和技能，在 git 仓库内运行时加载 |
+
+```bash
+# 列出所有已配置的代理
+deepagents list
+```
+
+有关完整参考 — 包括 `config.toml` 模式、提供商参数、配置文件覆盖和钩子配置 — 请参阅[配置](/oss/javascript/deepagents/cli/configuration)。
+
+## 教您的代理项目约定
+
+当您使用代理时，它会自动将信息存储在 `~/.deepagents/<agent_name>/memories/` 中，作为使用记忆优先协议的 markdown 文件：
+
+1. **研究**：在开始任务之前搜索记忆以获取相关上下文
+2. **响应**：在执行过程中不确定时检查记忆
+3. **学习**：自动保存新信息以供将来会话使用
+
+代理按主题组织其记忆，并使用描述性文件名：
+
+```
+~/.deepagents/backend-dev/memories/
+├── api-conventions.md
+├── database-schema.md
+└── deployment-process.md
+```
+
+当您教代理约定时：
+
+```bash
+uvx deepagents-cli --agent backend-dev
+> 我们的 API 使用蛇形命名法，并包含 created_at/updated_at 时间戳
+```
+
+它会记住以备将来会话使用：
+
+```bash
+> 创建一个 /users 端点
+# 无需提示即可应用约定
+```
+
+## 自定义您的深度代理
+
+有两种主要方法可以自定义任何代理：
+
+- **记忆**：全局和项目特定的 `AGENTS.md` 文件，在会话开始时完整加载。
+  使用记忆来存储通用编码风格和偏好。
+
+- **技能**：全局和项目特定的上下文、约定、指南或指令。
+  使用技能来存储仅在执行特定任务时才需要的上下文。
+
+### 提供项目或用户上下文
+
+[`AGENTS.md` 文件](https://agents.md/)提供持久记忆，在会话开始时始终加载。
+
+- **全局**：`~/.deepagents/<agent_name>/AGENTS.md` — 每个会话都加载。
+- **项目**：任何 git 项目根目录中的 `.deepagents/AGENTS.md` — 当 CLI 从该项目内运行时加载。
+
+这两个文件都会在启动时附加到系统提示中。使用 `/remember` 明确提示代理从当前对话更新其记忆和技能。
+
+<AccordionGroup>
+    <Accordion title="记忆如何工作" icon="brain">
+        当回答项目特定问题或当您引用过去的工作或模式时，代理也可能会读取其记忆文件。
+
+        当您提供关于代理应如何行为、对其工作的反馈或要记住某些内容的指令时，代理将更新 `AGENTS.md`。
+        如果它从您的交互中识别出模式或偏好，它也会更新其记忆。
+
+        要在额外的记忆文件中添加更多结构化的项目知识，请将它们添加到 `.deepagents/` 中，并在 `AGENTS.md` 文件中引用它们。
+        您必须在 `AGENTS.md` 文件中引用额外文件，以便代理知道它们的存在。
+        额外文件不会在启动时读取，但代理可以在需要时引用和更新它们。
+    </Accordion>
+
+    <Accordion title="何时使用全局与项目 AGENTS.md" icon="arrows-split">
+        **全局 `AGENTS.md`**（`~/.deepagents/agent/AGENTS.md`）
+
+        - 您的个性、风格和通用编码偏好
+        - 一般语气和沟通风格
+        - 通用编码偏好（格式化、类型提示等）
+        - 适用于所有地方的工具使用模式
+        - 每个项目都不会改变的工作流程和方法论
+
+        **项目 `AGENTS.md`**（项目根目录中的 `.deepagents/AGENTS.md`）
+
+        - 项目特定的上下文和约定
+        - 项目架构和设计模式
+        - 特定于此代码库的编码约定
+        - 测试策略和部署流程
+        - 团队指南和项目结构
+    </Accordion>
+</AccordionGroup>
+
+## 使用技能
+
+技能是可重用的代理能力，提供专门的工作流程和领域知识。
+您可以使用[技能](/oss/javascript/deepagents/skills)为您的深度代理提供新的能力和专业知识。
+深度代理技能遵循[代理技能标准](https://agentskills.io/)。
+一旦您添加了技能，您的深度代理将自动使用它们，并在您使用代理并为其提供额外信息时更新它们。
+
+使用 `/remember` 明确提示代理从当前对话更新技能和记忆。
+
+<AccordionGroup>
+    <Accordion title="添加技能" icon="plus">
+        1. 创建一个技能：
+
+            ```bash
+            # 用户技能（存储在 ~/.deepagents/<agent_name>/skills/ 中）
+            deepagents skills create test-skill
+
+            # 项目技能（存储在 .deepagents/skills/ 中）
+            deepagents skills create test-skill --project
+            ```
+
+            这将生成：
+
+            ```plaintext
+            skills/
+            └── test-skill
+                └── SKILL.md
+            ```
+
+        1. 打开生成的 `SKILL.md` 并编辑文件以包含您的指令。
+
+        1. 可选择将其他脚本或资源添加到 `test-skill` 文件夹。有关更多信息，请参阅[示例](/oss/javascript/deepagents/skills#example)。
+
+        您也可以直接将现有技能复制到代理的文件夹中：
+
+        ```bash
+        mkdir -p ~/.deepagents/<agent_name>/skills
+        cp -r examples/skills/web-research ~/.deepagents/<agent_name>/skills/
+        ```
+    </Accordion>
+
+    <Accordion title="安装社区技能" icon="download">
+        您可以使用 Vercel 的 [Skills CLI](https://github.com/vercel-labs/skills) 等工具在您的环境中安装社区[代理技能](https://agentskills.io/)，并使它们可用于您的深度代理：
+
+        ```bash
+        # 全局安装技能
+        npx skills add vercel-labs/agent-skills --skill web-design-guidelines -a deepagents -g -y
+
+        # 列出已安装的技能
+        npx skills ls -a deepagents -g
+        ```
+
+        全局安装（`-g`）将技能符号链接到 `~/.deepagents/agent/skills/` — 默认代理的用户级技能目录。项目级安装（省略 `-g`）将技能放在相对于当前目录的 `.deepagents/skills/` 中，使它们可用于在该项目中运行的任何代理，无论代理名称如何。
+
+        <Note>
+            全局安装仅针对默认的 `agent` 目录。如果您使用自定义命名的代理，请使用项目级安装或手动将技能符号链接到 `~/.deepagents/{your-agent}/skills/`。
+        </Note>
+    </Accordion>
+
+    <Accordion title="技能发现" icon="radar">
+        在启动时，CLI 会从 Deep Agents 和共享别名目录中发现技能：
+
+        ```text
+        `~/.deepagents/<agent_name>/skills/`
+        `~/.agents/skills/`
+        `.deepagents/skills/`
+        `.agents/skills/`。
+        ```
+
+        当存在重复的技能名称时，优先级较低的目录会覆盖优先级较高的目录（请参阅[应用数据](/oss/javascript/deepagents/data-locations#skills)）。
+
+        对于项目特定的技能，项目的根文件夹必须包含一个 `.git` 文件夹。
+        当您从项目文件夹内的任何位置启动 CLI 时，CLI 将通过检查包含的 `.git` 文件夹来找到项目的根文件夹。
+
+        对于每个技能，CLI 会从 `SKILL.md` 文件的前置元数据中读取名称和描述。
+        当您使用 CLI 时，如果任务与技能描述匹配，代理将读取技能文件并遵循其指令。
+    </Accordion>
+
+    <Accordion title="列出技能" icon="list">
+        ```bash
+        # 列出所有用户技能
+        deepagents skills list
+
+        # 列出项目技能
+        deepagents skills list --project
+
+        # 获取有关特定技能的详细信息
+        deepagents skills info test-skill
+        deepagents skills info test-skill --project
+        ```
+    </Accordion>
+</AccordionGroup>
+
+## 自定义子代理
+
+将自定义[子代理](/oss/javascript/deepagents/subagents)定义为 markdown 文件，以便 CLI 代理可以将专门任务委托给它们。每个子代理都位于自己的文件夹中，并包含一个 `AGENTS.md` 文件：
+
+```text
+.deepagents/agents/{subagent-name}/AGENTS.md   # 项目级
+~/.deepagents/{agent}/agents/{subagent-name}/AGENTS.md  # 用户级
+```
+
+项目子代理会覆盖同名的用户子代理（请参阅[优先级规则](/oss/javascript/deepagents/data-locations#subagents)）。
+
+前置元数据需要 `name` 和 `description`（与 [SubAgent 字典规范](/oss/javascript/deepagents/subagents#subagent-dictionary-based)相同）。markdown 正文成为子代理的 `system_prompt`。除了基本规范外，`AGENTS.md` 文件还支持可选的 `model` 前置元数据字段，该字段会为此子代理覆盖主代理的模型。使用 `provider:model-name` 格式（例如 `anthropic:claude-haiku-4-5-20251001`、`openai:gpt-4o`）。省略则继承主代理的模型。
+
+<Note>
+    其他 SubAgent 字段（`tools`、`middleware`、`interrupt_on`、`skills`）不能通过 `AGENTS.md` 前置元数据进行配置 — 以这种方式定义的自定义子代理会继承主代理的工具。如需完全控制，请直接使用 SDK。
+</Note>
+
+<AccordionGroup>
+    <Accordion title="文件格式" icon="file">
+        子代理 `AGENTS.md` 文件使用 YAML 前置元数据，后跟 markdown 正文：
+
+        ```markdown
+        ---
+        name: researcher
+        description: 在撰写内容之前研究网络主题
+        model: anthropic:claude-haiku-4-5-20251001
+        ---
+
+        您是一个研究助理，可以访问网络搜索。
+
+        ## 您的流程
+        1. 搜索相关信息
+        2. 清晰地总结发现
+        ```
+    </Accordion>
+
+    <Accordion title="示例：经济高效的子代理" icon="dollar-sign">
+        为简单的委托任务使用更便宜、更快的模型，同时让主代理使用功能更强大的模型：
+
+        ```markdown
+        ---
+        name: general-purpose
+        description: 用于研究和多步骤任务的通用代理
+        model: anthropic:claude-haiku-4-5-20251001
+        ---
+
+        您是一个通用助手。高效完成任务并返回简洁的总结。
+        ```
+
+        这将覆盖内置的通用子代理，将所有委托任务路由到更便宜的模型。有关更多信息，请参阅[覆盖通用子代理](/oss/javascript/deepagents/subagents#override-the-general-purpose-subagent)。
+    </Accordion>
+</AccordionGroup>
+
+## 使用 MCP 工具
+
+使用来自外部 [MCP（模型上下文协议）](https://modelcontextprotocol.io/)服务器的工具扩展 CLI。将 `.mcp.json` 放在项目根目录，CLI 会自动发现它。有关配置格式、自动发现和故障排除，请参阅 [MCP 工具指南](/oss/javascript/deepagents/cli/mcp-tools)。
+
+## 使用远程沙箱
+
+CLI 使用[沙箱即工具](/oss/javascript/deepagents/sandboxes#sandbox-as-tool-pattern)模式：CLI 进程（LLM 循环、记忆、工具分发）在您的机器上运行，但代理工具调用（`read_file`、`write_file`、`execute` 等）目标是远程沙箱，而不是您的本地文件系统。要将文件放入沙箱，请使用[设置脚本](#setup-scripts)或提供商的文件传输 API（请参阅[处理文件](/oss/javascript/deepagents/sandboxes#working-with-files)）。
+
+有关沙箱架构、集成模式和安全最佳实践的更深入了解，请参阅[沙箱](/oss/javascript/deepagents/sandboxes)。
+
+<Note>
+    LangSmith 沙箱支持默认包含在 CLI 中。AgentCore、Modal、Daytona 和 Runloop 需要安装附加组件。
+</Note>
+
+<Steps>
+    <Step title="安装提供商依赖项" icon="download">
+        <Tabs>
+            <Tab title="LangSmith">
+                安装 `deepagents-cli` 时默认包含。无需额外安装。
+            </Tab>
+            <Tab title="AgentCore">
+            ```bash
+                uv tool install deepagents-cli --with langchain-agentcore-codeinterpreter
+            ```
+            </Tab>
+            <Tab title="Daytona">
+                ```bash
+                uv tool install deepagents-cli --with langchain-daytona
+                ```
+            </Tab>
+            <Tab title="Runloop">
+                ```bash
+                uv tool install deepagents-cli --with langchain-runloop
+                ```
+            </Tab>
+            <Tab title="Modal">
+                ```bash
+                uv tool install deepagents-cli --with langchain-modal
+                ```
+            </Tab>
+        </Tabs>
+    </Step>
+
+    <Step title="设置提供商凭证" icon="key">
+        <Tabs>
+            <Tab title="LangSmith">
+                ```bash
+                export LANGSMITH_API_KEY="your-key"
+                ```
+            </Tab>
+            <Tab title="AgentCore">
+            ```bash
+                export AWS_ACCESS_KEY_ID="your-key"
+                export AWS_SECRET_ACCESS_KEY="your-secret"
+                export AWS_SESSION_TOKEN="session-token"
+                export AWS_REGION="us-west-2"
+            ```
+            </Tab>
+            <Tab title="Daytona">
+                ```bash
+                export DAYTONA_API_KEY="your-key"
+                ```
+            </Tab>
+            <Tab title="Runloop">
+                ```bash
+                export RUNLOOP_API_KEY="your-key"
+                ```
+            </Tab>
+            <Tab title="Modal">
+                ```bash
+                modal setup
+                ```
+            </Tab>
+        </Tabs>
+    </Step>
+
+    <Step title="使用沙箱运行 CLI" icon="player-play">
+        <Tabs>
+            <Tab title="LangSmith">
+                ```bash
+                deepagents --sandbox langsmith
+                ```
+            </Tab>
+            <Tab title="AgentCore">
+            ```bash
+                deepagents --sandbox agentcore
+            ```
+            </Tab>
+            <Tab title="Daytona">
+                ```bash
+                deepagents --sandbox daytona
+                ```
+            </Tab>
+            <Tab title="Runloop">
+                ```bash
+                deepagents --sandbox runloop
+                ```
+            </Tab>
+            <Tab title="Modal">
+                ```bash
+                deepagents --sandbox modal
+                ```
+            </Tab>
+        </Tabs>
+    </Step>
+</Steps>
+
+<AccordionGroup>
+    <Accordion title="沙箱标志和示例" icon="flag">
+        | 标志 | 描述 |
+        |------|-------------|
+        | `--sandbox TYPE` | 要使用的沙箱提供商：`langsmith`、`agentcore`、`modal`、`daytona` 或 `runloop`（默认：`none`） |
+        | `--sandbox-id ID` | 重用现有沙箱 ID，而不是创建新沙箱。跳过创建和清理。请参阅您的沙箱文档以了解更多信息 |
+        | `--sandbox-setup PATH` | 创建后在沙箱内运行的设置脚本路径 |
+
+        示例：
+
+        ```bash
+        # 创建新的 Daytona 沙箱
+        deepagents --sandbox daytona
+
+        # 重用现有沙箱（跳过创建和清理）
+        deepagents --sandbox runloop --sandbox-id dbx_abc123
+
+        # 在沙箱创建后运行设置脚本
+        deepagents --sandbox modal --sandbox-setup ./setup.sh
+        ```
+    </Accordion>
+
+    <Accordion title="设置脚本" icon="file-code">
+        使用 `--sandbox-setup` 在沙箱创建后在沙箱内运行 shell 脚本。这对于克隆仓库、安装依赖项和配置环境变量非常有用。
+
+        ```bash title="setup.sh"
+        #!/bin/bash
+        set -e
+
+        # 使用 GitHub 令牌克隆仓库
+        git clone https://x-access-token:${GITHUB_TOKEN}@github.com/username/repo.git $HOME/workspace
+        cd $HOME/workspace
+
+        # 使环境变量持久化
+        cat >> ~/.bashrc <<'EOF'
+        export GITHUB_TOKEN="${GITHUB_TOKEN}"
+        export OPENAI_API_KEY="${OPENAI_API_KEY}"
+        cd $HOME/workspace
+        EOF
+        source ~/.bashrc
+        ```
+
+        CLI 使用您的本地环境变量扩展设置脚本中的 `${VAR}` 引用。将秘密存储在本地 `.env` 文件中，以便设置脚本访问。
+    </Accordion>
+</AccordionGroup>
+
+<Warning>
+    沙箱隔离代码执行，但代理仍然容易受到不受信任输入的提示注入攻击。请使用人机协同批准、短期秘密和仅受信任的设置脚本。有关详细信息，请参阅[安全考虑](/oss/javascript/deepagents/sandboxes#security-considerations)。
+</Warning>
+
+## 使用 LangSmith 追踪
+
+启用 LangSmith 追踪以在 LangSmith 项目中查看代理操作：
+
+1. 启用 LangSmith 追踪：
+
+   ```bash
+   export LANGCHAIN_TRACING=true
+   export LANGCHAIN_API_KEY="your-api-key"
+   ```
+
+1. 为深度代理操作（如工具调用和代理决策）配置代理追踪：
+
+   ```bash
+   export DEEPAGENTS_LANGSMITH_PROJECT="my-deep-agent-execution"
+   ```
+
+1. 如果您正在使用 Deep Agents 构建 LangChain 应用，并希望将代理追踪与应用追踪分开，也请配置 `LANGSMITH_PROJECT`：
+
+   ```bash
+   export LANGSMITH_PROJECT="my-app-calls-to-langchain"
+   ```
+
+配置后，CLI 会显示：
+
+```sh
+✓ LangSmith tracing: 'my-project'
+```##命令参考
+
+```bash
+# 使用特定的代理配置
+deepagents --agent mybot
+
+# 使用特定模型（格式：提供者:模型 或自动检测）
+deepagents --model anthropic:claude-sonnet-4-5
+deepagents --model gpt-4o
+
+# 自动批准工具使用（跳过人工介入提示）
+deepagents -y
+```
+
+<AccordionGroup>
+    <Accordion title="命令行选项" icon="flag">
+        | 选项                           | 描述                                                         |
+        |-------------------------------|--------------------------------------------------------------|
+        | `-a`, `--agent NAME`           | 使用具有独立记忆的命名代理（默认值：`agent`）                |
+        | `-M`, `--model MODEL`          | 使用特定模型（`提供者:模型`）                                |
+        | `--model-params JSON`          | 以 JSON 字符串形式传递给模型的额外 kwargs（例如 `'{"temperature": 0.7}'`） |
+        | `--default-model [MODEL]`      | 设置默认模型                                                 |
+        | `--clear-default-model`        | 清除默认模型                                                 |
+        | `-r`, `--resume [ID]`          | 恢复会话：`-r` 恢复最近会话，`-r <ID>` 恢复特定线程          |
+        | `-m`, `--message TEXT`         | 会话启动时自动提交的初始提示（交互模式）                     |
+        | `-n`, `--non-interactive TEXT` | 以非交互方式运行单个任务后退出。除非设置 `--shell-allow-list`，否则禁用 Shell |
+        | `-q`, `--quiet`                | 干净的管道输出——仅代理的响应输出到 stdout。需要 `-n` 或管道 stdin |
+        | `--no-stream`                  | 缓冲完整响应并一次性写入 stdout，而非流式输出。需要 `-n` 或管道 stdin |
+        | `-y`, `--auto-approve`         | 自动批准所有工具调用而不提示（禁用人工介入）。在交互会话期间可使用 `Shift+Tab` 切换 |
+        | `-S`, `--shell-allow-list LIST` | 要自动批准的 Shell 命令列表（逗号分隔），`'recommended'` 表示安全默认值，或 `'all'` 允许任何命令。同时适用于 `-n` 和交互模式 |
+        | `--json`                       | 从管理子命令（`list`、`reset`、`threads`、`skills`）输出机器可读的 JSON。输出信封格式：`{"schema_version": 1, "command": "...", "data": ...}` |
+        | `--sandbox TYPE`               | 用于代码执行的远程沙箱：`none`（默认值）、`langsmith`、`agentcore`、`modal`、`daytona`、`runloop`。LangSmith 已包含；AgentCore/Modal/Daytona/Runloop 需要额外安装 |
+        | `--sandbox-id ID`              | 重用现有沙箱（跳过创建和清理）                               |
+        | `--sandbox-setup PATH`         | 创建后在沙箱中运行的设置脚本路径                             |
+        | `--mcp-config PATH`            | 添加显式 MCP 配置作为最高优先级来源（与自动发现的配置合并）  |
+        | `--no-mcp`                     | 禁用所有 MCP 工具加载                                        |
+        | `--trust-project-mcp`          | 信任项目级 MCP 配置中的 stdio 服务器（跳过批准提示）         |
+        | `-v`, `--version`              | 显示版本                                                     |
+        | `-h`, `--help`                 | 显示帮助                                                     |
+    </Accordion>
+
+    <Accordion title="CLI 命令" icon="terminal">
+        | 命令                                             | 描述                                                         |
+        |-------------------------------------------------|--------------------------------------------------------------|
+        | `deepagents help`                               | 显示帮助                                                     |
+        | `deepagents list`                               | 列出所有代理                                                 |
+        | `deepagents reset --agent NAME`                 | 清除代理记忆并重置为默认值                                   |
+        | `deepagents reset --agent NAME --target SOURCE` | 从另一个代理复制记忆                                         |
+        | `deepagents skills list [--project]`            | 列出所有技能（别名：`ls`）                                   |
+        | `deepagents skills create NAME [--project]`     | 使用模板 `SKILL.md` 创建新技能                               |
+        | `deepagents skills info NAME [--project]`       | 显示技能的详细信息                                           |
+        | `deepagents skills delete NAME [--project] [-f]` | 删除技能及其内容                                             |
+        | `deepagents threads list [--agent NAME] [--limit N]` | 列出会话（别名：`ls`）。默认限制：20。`-n` 是 `--limit` 的短标志。其他标志：`--sort {created,updated}`、`--branch TEXT`（按 git 分支筛选）、`-v`/`--verbose`（显示所有列，包括分支、创建时间和初始提示）、`-r`/`--relative`（相对时间戳） |
+        | `deepagents threads delete ID`                  | 删除会话                                                     |
+
+        所有管理子命令均支持 `--json` 以输出机器可读格式。详见[命令行选项](#命令行选项)。
+    </Accordion>
+</AccordionGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\cli\overview.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

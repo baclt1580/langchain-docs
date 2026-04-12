@@ -1,0 +1,222 @@
+---
+title: "ChatCerebras 集成"
+description: "使用 LangChain Python 与 ChatCerebras 聊天模型集成。"
+---
+
+本指南提供了快速入门 Cerebras [聊天模型](/oss/python/langchain/models) 的概述。有关 `ChatCerebras` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-cerebras/chat_models/ChatCerebras)。
+
+在 Cerebras，我们开发了世界上最大、最快的 AI 处理器——晶圆级引擎-3（WSE-3）。由 WSE-3 驱动的 Cerebras CS-3 系统代表了一类新型 AI 超级计算机，为生成式 AI 训练和推理设定了标准，提供了无与伦比的性能和可扩展性。
+
+选择 Cerebras 作为您的推理提供商，您可以：
+
+- 为 AI 推理工作负载实现前所未有的速度
+- 以高吞吐量进行商业构建
+- 利用我们无缝的集群技术轻松扩展 AI 工作负载
+
+我们的 CS-3 系统可以快速、轻松地集群，创建世界上最大的 AI 超级计算机，从而简化大型模型的部署和运行。领先的企业、研究机构和政府已经在使用 Cerebras 解决方案开发专有模型并训练流行的开源模型。
+
+想要体验 Cerebras 的强大功能？请访问我们的[网站](https://cerebras.ai)获取更多资源，并探索通过 Cerebras 云或本地部署访问我们技术的选项！
+
+有关 Cerebras 云的更多信息，请访问 [cloud.cerebras.ai](https://cloud.cerebras.ai/)。我们的 API 参考可在 [inference-docs.cerebras.ai](https://inference-docs.cerebras.ai/) 获取。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/chat/cerebras) | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| [`ChatCerebras`](https://reference.langchain.com/python/langchain-cerebras/chat_models/ChatCerebras) | [`langchain-cerebras`](https://reference.langchain.com/python/langchain-cerebras) | beta | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-cerebras?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-cerebras?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/python/langchain/tools/) | [结构化输出](/oss/python/langchain/structured-output) | [图像输入](/oss/python/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/python/langchain/streaming/) | 原生异步 | [令牌使用量](/oss/python/langchain/models#token-usage) | [对数概率](/oss/python/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅  | ✅ | ❌ |
+
+## 设置
+
+```bash
+pip install langchain-cerebras
+```
+
+### 凭证
+
+从 [cloud.cerebras.ai](https://cloud.cerebras.ai/) 获取 API 密钥，并将其添加到环境变量中：
+
+```
+export CEREBRAS_API_KEY="your-api-key-here"
+```
+
+```python
+import getpass
+import os
+
+if "CEREBRAS_API_KEY" not in os.environ:
+    os.environ["CEREBRAS_API_KEY"] = getpass.getpass("输入您的 Cerebras API 密钥：")
+```
+
+```text
+输入您的 Cerebras API 密钥： ········
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+LangChain Cerebras 集成位于 `langchain-cerebras` 包中：
+
+```python
+pip install -qU langchain-cerebras
+```
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+```python
+from langchain_cerebras import ChatCerebras
+
+llm = ChatCerebras(
+    model="llama-3.3-70b",
+    # 其他参数...
+)
+```
+
+## 调用
+
+```python
+messages = [
+    (
+        "system",
+        "您是一个将英语翻译成法语的助手。请翻译用户的句子。",
+    ),
+    ("human", "I love programming."),
+]
+ai_msg = llm.invoke(messages)
+ai_msg
+```
+
+```text
+AIMessage(content='Je adore le programmation.', response_metadata={'token_usage': {'completion_tokens': 7, 'prompt_tokens': 35, 'total_tokens': 42}, 'model_name': 'llama3-8b-8192', 'system_fingerprint': 'fp_be27ec77ff', 'finish_reason': 'stop'}, id='run-e5d66faf-019c-4ac6-9265-71093b13202d-0', usage_metadata={'input_tokens': 35, 'output_tokens': 7, 'total_tokens': 42})
+```
+
+## 流式传输
+
+```python
+from langchain_cerebras import ChatCerebras
+from langchain_core.prompts import ChatPromptTemplate
+
+llm = ChatCerebras(
+    model="llama-3.3-70b",
+    # 其他参数...
+)
+
+system = "您是一位动物专家，必须用 5 岁孩子能理解的方式回答问题。"
+human = "我想了解更多关于这种动物的信息：{animal}"
+prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+
+chain = prompt | llm
+
+for chunk in chain.stream({"animal": "Lion"}):
+    print(chunk.content, end="", flush=True)
+```
+
+```text
+哇！让我来告诉你关于狮子的所有事情！
+
+狮子是丛林之王！它们体型巨大，脖子上有漂亮、蓬松的鬃毛。鬃毛就像一顶巨大的金色王冠！
+
+狮子生活在称为狮群的群体中。狮群就像一个大家庭，母狮（我们称雌性狮子为母狮）负责照顾幼崽。母狮就像妈妈一样，教幼崽如何捕猎和玩耍。
+
+狮子非常擅长捕猎。它们一起合作捕捉食物，比如斑马和羚羊。它们速度超快，跑得真的非常非常快！
+
+但狮子也很爱睡觉。它们喜欢在阳光下长时间打盹，一天可以睡上 20 个小时！你能想象睡那么久吗？
+
+狮子也非常吵闹。它们会大声吼叫来互相交流。就像在说：“吼！我是丛林之王！”
+
+猜猜看？狮子非常社交。它们喜欢一起玩耍和依偎。它们就像大大的、毛茸茸的泰迪熊！
+
+所以，这就是狮子！它们是不是最酷的？
+```
+
+## 异步
+
+```python
+from langchain_cerebras import ChatCerebras
+from langchain_core.prompts import ChatPromptTemplate
+
+llm = ChatCerebras(
+    model="llama-3.3-70b",
+    # 其他参数...
+)
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "human",
+            "我们来玩一个反义词游戏。{topic} 的反义词是什么？只给我答案，不要额外输入。",
+        )
+    ]
+)
+chain = prompt | llm
+await chain.ainvoke({"topic": "fire"})
+```
+
+```text
+AIMessage(content='Ice', response_metadata={'token_usage': {'completion_tokens': 2, 'prompt_tokens': 36, 'total_tokens': 38}, 'model_name': 'llama3-8b-8192', 'system_fingerprint': 'fp_be27ec77ff', 'finish_reason': 'stop'}, id='run-7434bdde-1bec-44cf-827b-8d978071dfe8-0', usage_metadata={'input_tokens': 36, 'output_tokens': 2, 'total_tokens': 38})
+```
+
+## 异步流式传输
+
+```python
+from langchain_cerebras import ChatCerebras
+from langchain_core.prompts import ChatPromptTemplate
+
+llm = ChatCerebras(
+    model="llama-3.3-70b",
+    # 其他参数...
+)
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "human",
+            "写一个关于 {subject} 的冗长复杂的故事。我需要 {num_paragraphs} 个段落。",
+        )
+    ]
+)
+chain = prompt | llm
+
+async for chunk in chain.astream({"num_paragraphs": 3, "subject": "blackholes"}):
+    print(chunk.content, end="", flush=True)
+```
+
+```text
+在宇宙的遥远角落，存在一种被称为“永恒之蚀”的奇特现象，这是一个旋转的黑暗漩涡，其奥秘已笼罩了无数纪元。据说这个黑洞诞生于两颗古老恒星灾难性的碰撞，一直在缓慢吞噬时空结构本身，扭曲现实的本质。随着银河系的天体围绕它舞动，它们开始注意到空间结构中一种奇怪、几乎难以察觉的扭曲，仿佛黑洞的引力正在对事件本身的进程施加影响。
+
+几个世纪过去，来自银河系各地的天文学家对永恒之蚀越来越着迷，他们仔细研究古代文献，在宇宙中搜寻任何关于其秘密的线索。其中一位学者，一位才华横溢且隐居的天体物理学家埃拉拉·维克斯博士，痴迷于解开黑洞的奥秘。她花了数年时间研究古代文献，破译暗示黑洞中心曾存在一个早已失落的文明的隐秘信息和隐藏代码。根据传说，这个古老文明拥有超越人类理解的宇宙知识，并利用他们对宇宙的掌握创造了永恒之蚀，作为通往其他维度的门户。
+
+随着维克斯博士深入研究，她开始经历奇怪而逼真的梦境，这些幻象似乎将她传送到了黑洞的中心。在这些梦中，她看到了古老的生物，他们的脸庞因被虚空吞噬而扭曲。她看到了恒星和星系，它们的光被黑洞的引力扭曲变形。她还看到了永恒之蚀本身，其旋转的黑暗漩涡脉动着一种超凡脱俗的能量，似乎在召唤她。随着梦境变得越来越逼真和频繁，维克斯博士确信自己正被拉入黑洞的中心，而宇宙的秘密就在另一边等待着她。
+```
+
+---
+
+## API 参考
+
+有关 `ChatCerebras` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-cerebras/chat_models/ChatCerebras)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\cerebras.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,64 @@
+---
+title: "异步 Chromium 集成"
+description: "使用 LangChain Python 与异步 Chromium 文档加载器集成。"
+---
+
+Chromium 是 Playwright 支持的浏览器之一，Playwright 是一个用于控制浏览器自动化的库。
+
+通过运行 `p.chromium.launch(headless=True)`，我们启动了一个无头模式的 Chromium 实例。
+
+无头模式意味着浏览器在没有图形用户界面的情况下运行。
+
+在下面的示例中，我们将使用 `AsyncChromiumLoader` 加载页面，然后使用 [`Html2TextTransformer`](/oss/python/integrations/document_transformers/html2text/) 去除 HTML 标签和其他语义信息。
+
+```python
+pip install -qU playwright beautifulsoup4 html2text
+!playwright install
+```
+
+**注意：** 如果您正在使用 Jupyter notebooks，可能还需要在加载文档之前安装并应用 `nest_asyncio`，如下所示：
+
+```python
+!pip install nest_asyncio
+import nest_asyncio
+
+nest_asyncio.apply()
+```
+
+```python
+from langchain_community.document_loaders import AsyncChromiumLoader
+
+urls = ["https://docs.langchain.com/langsmith/home"]
+loader = AsyncChromiumLoader(urls, user_agent="MyAppUserAgent")
+docs = loader.load()
+docs[0].page_content[0:100]
+```
+
+```text
+'<!DOCTYPE html><html lang="en" dir="ltr" class="docs-wrapper docs-doc-page docs-version-2.0 plugin-d'
+```
+
+现在，让我们使用转换器将文档转换为更易读的格式：
+
+```python
+from langchain_community.document_transformers import Html2TextTransformer
+
+html2text = Html2TextTransformer()
+docs_transformed = html2text.transform_documents(docs)
+docs_transformed[0].page_content[0:500]
+```
+
+```text
+'Skip to main content\n\nGo to API Docs\n\nSearch`⌘``K`\n\nGo to App\n\n  * Quick start\n  * Tutorials\n\n  * How-to guides\n\n  * Concepts\n\n  * Reference\n\n  * Pricing\n  * Self-hosting\n\n  * LangGraph Cloud\n\n  *   * Quick start\n\nOn this page\n\n# Get started with LangSmith\n\n**LangSmith** is a platform for building production-grade LLM applications. It\nallows you to closely monitor and evaluate your application, so you can ship\nquickly and with confidence. Use of LangChain is not necessary - LangSmith\nworks on it'
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\async_chromium.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

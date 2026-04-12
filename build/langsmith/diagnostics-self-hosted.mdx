@@ -1,0 +1,190 @@
+---
+title: 自托管部署故障排除
+sidebarTitle: 故障排除
+description: 在联系支持前，用于诊断自托管 LangSmith 部署问题的排查步骤。
+---
+
+本页面提供诊断步骤，帮助你在联系支持前排查自托管 [LangSmith 部署](/langsmith/deployment)的问题。请按步骤系统性地识别和解决常见的部署问题。
+
+<Callout icon="headset" iconType="solid" color="#9333ea">
+如果你完成了这些诊断步骤后仍需要帮助，请参考本指南末尾的[支持](#support)部分，了解在联系前需要收集哪些信息。
+</Callout>
+
+## 前提条件
+
+开始诊断步骤前，请确保你具备：
+
+- 对 Kubernetes 集群的 `kubectl` 访问权限。
+- 查看 Pod、Deployment、Service 等的适当权限。
+- 熟悉你的 [Helm Chart 配置](/langsmith/kubernetes#configure-your-helm-charts:)。
+
+## 步骤 1. 了解你的部署
+
+验证已部署的内容并了解系统的基线状态。这有助于你识别正常运行状态，并在问题发生时发现异常。
+
+运行以下命令以查看所有已部署的 Kubernetes 资源。
+
+<Note>
+运行本节中的命令时，请确保处于正确的命名空间。或者，使用 `-n` 标志显式指定命名空间。例如：`kubectl get deployments -n langsmith`。
+</Note>
+
+列出所有 Deployment：
+
+```bash
+kubectl get deployments
+```
+
+列出所有 Pod：
+
+```bash
+kubectl get pods
+```
+
+列出所有 Service：
+
+```bash
+kubectl get services
+```
+
+列出所有 `lgps` 资源（仅在创建 [Agent Server](/langsmith/agent-server) 后存在）：
+
+```bash
+kubectl get lgps
+```
+
+### 关键部署组件
+
+你的部署包含以下核心组件：
+
+- **`langsmith-frontend`**：LangSmith 前端 UI，用于创建 Agent Server 部署。此应用向 `langsmith-host-backend` 发起 API 调用。属于[控制平面](/langsmith/control-plane)。
+- **`langsmith-host-backend`**：LangSmith 部署的[控制平面](/langsmith/control-plane)，接收来自 `langsmith-frontend` 的请求，并将部署请求持久化到控制平面的 Postgres 数据库。
+- **`langsmith-listener`**：LangSmith 部署[数据平面](/langsmith/data-plane)的一部分。通过 HTTP API 轮询 `langsmith-host-backend` 以获取需要创建、更新或删除的部署。将任务加入队列供工作进程处理。
+- **`langsmith-redis`**：作为 `langsmith-listener` 任务队列的 [Redis](/langsmith/data-plane#redis) 实例。监听器将任务加入此队列，工作进程从此队列拉取任务。
+- **`langsmith-operator`**：用于协调 `lgps` 资源底层 Kubernetes 资源的 `lgps` Kubernetes Operator。属于数据平面基础设施。
+
+<Note>
+根据你的配置，部署中可能存在其他组件。有关概述，请参阅 [LangSmith 部署组件](/langsmith/components)。
+</Note>
+
+## 步骤 2. 启用调试日志
+
+排查问题时，第一步通常是启用调试级别的日志记录，以收集有关系统运行情况的更详细信息。
+
+### 针对控制平面或数据平面部署
+
+如果你遇到控制平面部署（例如 `langsmith-host-backend`）或数据平面部署（例如 `langsmith-listener`）的问题，请使用 `LOG_LEVEL=DEBUG` 环境变量重新安装 Helm Chart。将以下内容添加到你的 `values.yaml` 文件中：
+
+```yaml
+extraEnv:
+  - name: LOG_LEVEL
+    value: DEBUG
+```
+
+### 针对 Agent Server 部署
+
+如果问题出现在单个 Agent Server 部署上：
+
+1.  在 [LangSmith UI](https://smith.langchain.com) 中导航到 **Deployments** 选项卡。
+2.  在部署详情页面上，选择 **+ New Revision**。
+3.  添加新的环境变量 `LOG_LEVEL` 并将其值设置为 `DEBUG`。
+
+<Note>
+你也可以在 UI 的部署详情页面上找到调试日志，点击 **Server Logs**，然后在 **Log level: Info** 下拉菜单中选择 **Debug**。
+</Note>
+
+### 针对广泛存在的问题
+
+如果不确定问题根源，请在所有位置（控制平面、数据平面和所有 Agent Server 部署）启用 `DEBUG` 日志记录。
+
+### 查看应用日志
+
+跟踪每个 Pod 的日志以了解基线行为：
+
+```bash
+kubectl logs -f <pod_name>
+```
+
+然后查找以下日志行：
+
+- **`langsmith-listener`**：`Reconciling projects...`（每 10 秒出现一次）
+- **`langsmith-operator`**：`Starting reconciliation`（定期出现）
+
+在健康的部署中，不应看到任何错误。所有日志都应显示正常且常规。
+
+### 解读调试日志
+
+查找以下问题指示器：
+
+- 异常或堆栈跟踪。
+- 错误消息（包含 `"ERROR"` 字样）。
+- 与正常操作不同的异常模式。
+
+根据发现的错误：
+
+- **配置问题**：如果怀疑是配置问题，请向运行 [`helm install`](/langsmith/kubernetes) 的人员提出。
+- **用户代码错误**：如果怀疑是用户代码中的错误（例如 LangGraph OSS 图实现），请向创建 [`langgraph.json`](/langsmith/application-structure#configuration-file) 文件的 Agent Server 应用所有者提出。
+
+## 步骤 3. 描述部署和 Pod
+
+描述 Kubernetes 资源可以揭示应用日志中可能未出现的错误事件和状态。这些错误通常由配置或基础设施问题引起，而非应用代码错误。描述资源还会显示其配置（例如环境变量），这对调试很有帮助。
+
+运行以下命令来描述你的资源。
+
+描述 Kubernetes Deployment：
+
+```bash
+kubectl describe deployment <deployment_name>
+```
+
+描述 Kubernetes Pod：
+
+```bash
+kubectl describe pod <pod_name>
+```
+
+描述 `lgps` 资源（仅在创建 Agent Server 后相关）：
+
+```bash
+kubectl describe lgps <lgps_name>
+```
+
+### 解读结果
+
+查看输出的 `Events:` 部分，并验证一切是否正常。常见的出现的问题包括：
+
+- 存活性或就绪性探针失败
+- 镜像拉取错误
+- 资源限制（CPU、内存）
+- 卷挂载问题
+- 配置错误
+
+确保没有错误事件，并且所有事件都表明运行正常。
+
+## 其他资源
+
+有关更多故障排除信息，请参阅：
+
+- [故障排除](/langsmith/troubleshooting)：通用故障排除指南，提供常见问题的解决方案。
+- [自托管概述](/langsmith/self-hosted)：关于系统架构和组件交互的详细信息。
+
+## 支持
+
+如果你已遵循这些诊断步骤但仍需要帮助，请在联系支持前收集以下信息：
+
+- [诊断步骤](#step-1-understand-your-deployment) 的输出。
+- 你的 Helm Chart 配置。
+- 相关的错误消息和日志。
+- 问题发生时你正在尝试执行的操作描述。
+
+准备好这些信息将有助于[支持团队](mailto:support@langchain.dev)更快地诊断和解决你的问题。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\diagnostics-self-hosted.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

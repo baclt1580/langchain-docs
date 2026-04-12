@@ -1,0 +1,1148 @@
+---
+title: 智能体中的上下文工程
+sidebarTitle: 上下文工程
+---
+
+## 概述
+
+构建智能体（或任何 LLM 应用）的难点在于使其足够可靠。虽然它们可能在原型阶段有效，但在实际用例中往往会失败。
+
+### 为什么智能体会失败？
+
+当智能体失败时，通常是因为智能体内的 LLM 调用了错误的操作 / 没有按预期执行。LLM 失败的原因主要有两个：
+
+1. 底层 LLM 能力不足
+2. 未向 LLM 传递“正确”的上下文
+
+大多数情况下——实际上是第二个原因导致智能体不可靠。
+
+**上下文工程**是指以正确的格式提供正确的信息和工具，以便 LLM 能够完成任务。这是 AI 工程师的首要工作。缺乏“正确”的上下文是更可靠智能体的首要障碍，而 LangChain 的智能体抽象设计独特，旨在促进上下文工程。
+
+<Tip>
+初次接触上下文工程？请从 [概念概述](/oss/javascript/concepts/context) 开始，了解不同类型的上下文及其使用时机。
+</Tip>
+
+### 智能体循环
+
+典型的智能体循环包含两个主要步骤：
+
+1. **模型调用** - 使用提示词和可用工具调用 LLM，返回响应或执行工具的请求
+2. **工具执行** - 执行 LLM 请求的工具，返回工具结果
+
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <img
+    src="/oss/images/core_agent_loop.png"
+    alt="核心智能体循环图"
+    className="rounded-lg"
+  />
+</div>
+
+此循环持续进行，直到 LLM 决定结束。
+
+### 你可以控制的内容
+
+要构建可靠的智能体，你需要控制智能体循环中每一步发生的情况，以及步骤之间发生的情况。
+
+| 上下文类型 | 你控制的内容 | 临时或持久 |
+|--------------|------------------|-------------------------|
+| **[模型上下文](#model-context)** | 进入模型调用的内容（指令、消息历史、工具、响应格式） | 临时 |
+| **[工具上下文](#tool-context)** | 工具可以访问和生成的内容（读写状态、存储、运行时上下文） | 持久 |
+| **[生命周期上下文](#life-cycle-context)** | 模型调用和工具调用之间发生的情况（摘要、护栏、日志记录等） | 持久 |
+
+<CardGroup>
+  <Card title="临时上下文" icon="bolt" iconType="duotone">
+    LLM 单次调用所看到的内容。你可以修改消息、工具或提示词，而无需更改保存在状态中的内容。
+  </Card>
+  <Card title="持久上下文" icon="database" iconType="duotone">
+    跨轮次保存在状态中的内容。生命周期钩子和工具写入会永久修改此内容。
+  </Card>
+</CardGroup>
+
+### 数据源
+
+在此过程中，你的智能体会访问（读取/写入）不同的数据源：
+
+| 数据源 | 也称为 | 范围 | 示例 |
+|-------------|---------------|-------|----------|
+| **运行时上下文** | 静态配置 | 会话范围 | 用户 ID、API 密钥、数据库连接、权限、环境设置 |
+| **状态** | 短期记忆 | 会话范围 | 当前消息、上传的文件、认证状态、工具结果 |
+| **存储** | 长期记忆 | 跨会话 | 用户偏好、提取的见解、记忆、历史数据 |
+
+### 工作原理
+
+LangChain [中间件](/oss/javascript/langchain/middleware) 是幕后机制，使上下文工程对使用 LangChain 的开发人员变得实用。
+
+中间件允许你挂钩到智能体生命周期的任何步骤并：
+
+* 更新上下文
+* 跳转到智能体生命周期中的不同步骤
+
+在本指南中，你将频繁看到中间件 API 的使用，作为实现上下文工程的手段。
+
+## 模型上下文
+
+控制每个模型调用的内容——指令、可用工具、使用的模型以及输出格式。这些决策直接影响可靠性和成本。
+
+<CardGroup cols={2}>
+    <Card title="系统提示词" icon="message-2" href="#system-prompt">
+        开发者给 LLM 的基础指令。
+    </Card>
+    <Card title="消息" icon="messages" href="#messages">
+        发送给 LLM 的完整消息列表（对话历史）。
+    </Card>
+    <Card title="工具" icon="tool" href="#tools">
+        智能体可用于采取行动的工具。
+    </Card>
+    <Card title="模型" icon="cpu" href="#model">
+        实际调用的模型（包括配置）。
+    </Card>
+    <Card title="响应格式" icon="braces" href="#response-format">
+        模型最终响应的模式规范。
+    </Card>
+</CardGroup>
+
+所有这些类型的模型上下文都可以从 **状态**（短期记忆）、**存储**（长期记忆）或 **运行时上下文**（静态配置）中获取。
+
+### 系统提示词
+
+系统提示词设定 LLM 的行为和能力。不同的用户、上下文或对话阶段需要不同的指令。成功的智能体会利用记忆、偏好和配置来为当前对话状态提供正确的指令。
+
+<Tabs>
+  <Tab title="状态">
+    从状态中访问消息计数或对话上下文：
+
+
+
+    ```typescript
+    import { createAgent } from "langchain";
+
+    const agent = createAgent({
+      model: "gpt-4.1",
+      tools: [...],
+      middleware: [
+        dynamicSystemPromptMiddleware((state) => {
+          // Read from State: check conversation length
+          const messageCount = state.messages.length;
+
+          let base = "You are a helpful assistant.";
+
+          if (messageCount > 10) {
+            base += "\nThis is a long conversation - be extra concise.";
+          }
+
+          return base;
+        }),
+      ],
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="存储">
+    从长期记忆中访问用户偏好：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createAgent, dynamicSystemPromptMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userId: z.string(),
+    });
+
+    type Context = z.infer<typeof contextSchema>;
+
+    const agent = createAgent({
+      model: "gpt-4.1",
+      tools: [...],
+      contextSchema,
+      middleware: [
+        dynamicSystemPromptMiddleware<Context>(async (state, runtime) => {
+          const userId = runtime.context.userId;
+
+          // Read from Store: get user preferences
+          const store = runtime.store;
+          const userPrefs = await store.get(["preferences"], userId);
+
+          let base = "You are a helpful assistant.";
+
+          if (userPrefs) {
+            const style = userPrefs.value?.communicationStyle || "balanced";
+            base += `\nUser prefers ${style} responses.`;
+          }
+
+          return base;
+        }),
+      ],
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="运行时上下文">
+    从运行时上下文中访问用户 ID 或配置：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createAgent, dynamicSystemPromptMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userRole: z.string(),
+      deploymentEnv: z.string(),
+    });
+
+    type Context = z.infer<typeof contextSchema>;
+
+    const agent = createAgent({
+      model: "gpt-4.1",
+      tools: [...],
+      contextSchema,
+      middleware: [
+        dynamicSystemPromptMiddleware<Context>((state, runtime) => {
+          // Read from Runtime Context: user role and environment
+          const userRole = runtime.context.userRole;
+          const env = runtime.context.deploymentEnv;
+
+          let base = "You are a helpful assistant.";
+
+          if (userRole === "admin") {
+            base += "\nYou have admin access. You can perform all operations.";
+          } else if (userRole === "viewer") {
+            base += "\nYou have read-only access. Guide users to read operations only.";
+          }
+
+          if (env === "production") {
+            base += "\nBe extra careful with any data modifications.";
+          }
+
+          return base;
+        }),
+      ],
+    });
+    ```
+
+  </Tab>
+
+</Tabs>
+
+### 消息
+
+消息构成了发送给 LLM 的提示词。
+管理消息内容至关重要，以确保 LLM 拥有正确信息以做出良好响应。
+
+<Tabs>
+  <Tab title="状态">
+    在相关时将上传文件的上下文注入到状态中：
+
+
+
+    ```typescript
+    import { createMiddleware } from "langchain";
+
+    const injectFileContext = createMiddleware({
+      name: "InjectFileContext",
+      wrapModelCall: (request, handler) => {
+        // request.state is a shortcut for request.state.messages
+        const uploadedFiles = request.state.uploadedFiles || [];  # [!code highlight]
+
+        if (uploadedFiles.length > 0) {
+          // Build context about available files
+          const fileDescriptions = uploadedFiles.map(file =>
+            `- ${file.name} (${file.type}): ${file.summary}`
+          );
+
+          const fileContext = `Files you have access to in this conversation:
+${fileDescriptions.join("\n")}
+
+Reference these files when answering questions.`;
+
+          // Inject file context before recent messages
+          const messages = [  # [!code highlight]
+            ...request.messages,  # Rest of conversation
+            { role: "user", content: fileContext }
+          ];
+          request = request.override({ messages });  # [!code highlight]
+        }
+
+        return handler(request);
+      },
+    });
+
+    const agent = createAgent({
+      model: "gpt-4.1",
+      tools: [...],
+      middleware: [injectFileContext],
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="存储">
+    从存储中注入用户的电子邮件写作风格以指导起草：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userId: z.string(),
+    });
+
+    const injectWritingStyle = createMiddleware({
+      name: "InjectWritingStyle",
+      contextSchema,
+      wrapModelCall: async (request, handler) => {
+        const userId = request.runtime.context.userId;  # [!code highlight]
+
+        # Read from Store: get user's writing style examples
+        const store = request.runtime.store;  # [!code highlight]
+        const writingStyle = await store.get(["writing_style"], userId);  # [!code highlight]
+
+        if (writingStyle) {
+          const style = writingStyle.value;
+          # Build style guide from stored examples
+          const styleContext = `Your writing style:
+- Tone: ${style.tone || 'professional'}
+- Typical greeting: "${style.greeting || 'Hi'}"
+- Typical sign-off: "${style.signOff || 'Best'}"
+- Example email you've written:
+${style.exampleEmail || ''}`;
+
+          # Append at end - models pay more attention to final messages
+          const messages = [
+            ...request.messages,
+            { role: "user", content: styleContext }
+          ];
+          request = request.override({ messages });  # [!code highlight]
+        }
+
+        return handler(request);
+      },
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="运行时上下文">
+    根据用户的司法管辖区从运行时上下文中注入合规规则：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userJurisdiction: z.string(),
+      industry: z.string(),
+      complianceFrameworks: z.array(z.string()),
+    });
+
+    type Context = z.infer<typeof contextSchema>;
+
+    const injectComplianceRules = createMiddleware<Context>({
+      name: "InjectComplianceRules",
+      contextSchema,
+      wrapModelCall: (request, handler) => {
+        # Read from Runtime Context: get compliance requirements
+        const { userJurisdiction, industry, complianceFrameworks } = request.runtime.context;  # [!code highlight]
+
+        # Build compliance constraints
+        const rules = [];
+        if (complianceFrameworks.includes("GDPR")) {
+          rules.push("- Must obtain explicit consent before processing personal data");
+          rules.push("- Users have right to data deletion");
+        }
+        if (complianceFrameworks.includes("HIPAA")) {
+          rules.push("- Cannot share patient health information without authorization");
+          rules.push("- Must use secure, encrypted communication");
+        }
+        if (industry === "finance") {
+          rules.push("- Cannot provide financial advice without proper disclaimers");
+        }
+
+        if (rules.length > 0) {
+          const complianceContext = `Compliance requirements for ${userJurisdiction}:
+${rules.join("\n")}`;
+
+          # Append at end - models pay more attention to final messages
+          const messages = [
+            ...request.messages,
+            { role: "user", content: complianceContext }
+          ];
+          request = request.override({ messages });  # [!code highlight]
+        }
+
+        return handler(request);
+      },
+    });
+    ```
+
+  </Tab>
+
+</Tabs>
+
+<Note>
+**临时与持久消息更新：**
+
+上面的示例使用 `wrap_model_call` 进行**临时**更新——修改发送给模型的单条调用中的消息，而不更改保存在状态中的内容。
+
+对于修改状态的**持久**更新，你可以：
+
+
+
+- 直接从 `wrapModelCall` 返回 [`Command`]，以从模型调用层注入状态更新。
+- 使用生命周期钩子如 `beforeModel`、`afterModel` 或 `wrapToolCall`（用于工具返回）来更新对话历史。有关更多详细信息，请参阅 [中间件文档](/oss/javascript/langchain/middleware)。
+
+
+有关更多信息，请参阅 [状态更新](/oss/javascript/langchain/middleware/custom#state-updates)。
+</Note>
+
+### 工具
+
+工具让模型能够与数据库、API 和外部系统交互。你如何定义和选择工具直接影响模型能否有效完成任务。
+
+#### 定义工具
+
+每个工具都需要清晰的名字、描述、参数名称和参数描述。这些不仅仅是元数据——它们指导模型关于何时以及如何使用该工具的推理。
+
+
+
+```typescript
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+
+const searchOrders = tool(
+  async ({ userId, status, limit }) => {
+    // Implementation here
+  },
+  {
+    name: "search_orders",
+    description: `Search for user orders by status.
+
+    Use this when the user asks about order history or wants to check
+    order status. Always filter by the provided status.`,
+    schema: z.object({
+      userId: z.string().describe("Unique identifier for the user"),
+      status: z.enum(["pending", "shipped", "delivered"]).describe("Order status to filter by"),
+      limit: z.number().default(10).describe("Maximum number of results to return"),
+    }),
+  }
+);
+```
+
+
+#### 选择工具
+
+并非所有工具都适用于每种情况。过多的工具可能会使模型不堪重负（上下文过载）并增加错误；过少的工具则限制能力。动态工具选择会根据认证状态、用户权限、功能标志或对话阶段调整可用工具集。
+
+<Tabs>
+  <Tab title="状态">
+    仅在达到特定对话里程碑后启用高级工具：
+
+
+
+    ```typescript
+    import { createMiddleware } from "langchain";
+
+    const stateBasedTools = createMiddleware({
+      name: "StateBasedTools",
+      wrapModelCall: (request, handler) => {
+        # Read from State: check authentication and conversation length
+        const state = request.state;  # [!code highlight]
+        const isAuthenticated = state.authenticated || false;  # [!code highlight]
+        const messageCount = state.messages.length;
+
+        let filteredTools = request.tools;
+
+        # Only enable sensitive tools after authentication
+        if (!isAuthenticated) {
+          filteredTools = request.tools.filter(t => t.name.startsWith("public_"));  # [!code highlight]
+        } else if (messageCount < 5) {
+          filteredTools = request.tools.filter(t => t.name !== "advanced_search");  # [!code highlight]
+        }
+
+        return handler({ ...request, tools: filteredTools });  # [!code highlight]
+      },
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="存储">
+    根据存储中的用户偏好或功能标志过滤工具：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userId: z.string(),
+    });
+
+    const storeBasedTools = createMiddleware({
+      name: "StoreBasedTools",
+      contextSchema,
+      wrapModelCall: async (request, handler) => {
+        const userId = request.runtime.context.userId;  # [!code highlight]
+
+        # Read from Store: get user's enabled features
+        const store = request.runtime.store;  # [!code highlight]
+        const featureFlags = await store.get(["features"], userId);  # [!code highlight]
+
+        let filteredTools = request.tools;
+
+        if (featureFlags) {
+          const enabledFeatures = featureFlags.value?.enabledTools || [];
+          filteredTools = request.tools.filter(t => enabledFeatures.includes(t.name));  # [!code highlight]
+        }
+
+        return handler({ ...request, tools: filteredTools });  # [!code highlight]
+      },
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="运行时上下文">
+    根据运行时上下文中的用户权限过滤工具：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userRole: z.string(),
+    });
+
+    const contextBasedTools = createMiddleware({
+      name: "ContextBasedTools",
+      contextSchema,
+      wrapModelCall: (request, handler) => {
+        # Read from Runtime Context: get user role
+        const userRole = request.runtime.context.userRole;  # [!code highlight]
+
+        let filteredTools = request.tools;
+
+        if (userRole === "admin") {
+          # Admins get all tools
+        } else if (userRole === "editor") {
+          filteredTools = request.tools.filter(t => t.name !== "delete_data");  # [!code highlight]
+        } else {
+          filteredTools = request.tools.filter(t => t.name.startsWith("read_"));  # [!code highlight]
+        }
+
+        return handler({ ...request, tools: filteredTools });  # [!code highlight]
+      },
+    });
+    ```
+
+  </Tab>
+</Tabs>
+
+有关过滤预注册工具和运行时注册工具（例如来自 MCP 服务器）的更多信息，请参阅 [动态工具](/oss/javascript/langchain/agents#dynamic-tools)。
+
+### 模型
+
+不同的模型具有不同的优势、成本和上下文窗口。为手头的任务选择合适的模型，这可能在智能体运行期间发生变化。
+
+<Tabs>
+  <Tab title="状态">
+    根据状态中的对话长度使用不同的模型：
+
+
+
+    ```typescript
+    import { createMiddleware, initChatModel } from "langchain";
+
+    # Initialize models once outside the middleware
+    const largeModel = initChatModel("claude-sonnet-4-6");
+    const standardModel = initChatModel("gpt-4.1");
+    const efficientModel = initChatModel("gpt-4.1-mini");
+
+    const stateBasedModel = createMiddleware({
+      name: "StateBasedModel",
+      wrapModelCall: (request, handler) => {
+        # request.messages is a shortcut for request.state.messages
+        const messageCount = request.messages.length;  # [!code highlight]
+        let model;
+
+        if (messageCount > 20) {
+          model = largeModel;
+        } else if (messageCount > 10) {
+          model = standardModel;
+        } else {
+          model = efficientModel;
+        }
+
+        return handler({ ...request, model });  # [!code highlight]
+      },
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="存储">
+    使用存储中的用户首选模型：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware, initChatModel } from "langchain";
+
+    const contextSchema = z.object({
+      userId: z.string(),
+    });
+
+    # Initialize available models once
+    const MODEL_MAP = {
+      "gpt-4.1": initChatModel("gpt-4.1"),
+      "gpt-4.1-mini": initChatModel("gpt-4.1-mini"),
+      "claude-sonnet": initChatModel("claude-sonnet-4-6"),
+    };
+
+    const storeBasedModel = createMiddleware({
+      name: "StoreBasedModel",
+      contextSchema,
+      wrapModelCall: async (request, handler) => {
+        const userId = request.runtime.context.userId;  # [!code highlight]
+
+        # Read from Store: get user's preferred model
+        const store = request.runtime.store;  # [!code highlight]
+        const userPrefs = await store.get(["preferences"], userId);  # [!code highlight]
+
+        let model = request.model;
+
+        if (userPrefs) {
+          const preferredModel = userPrefs.value?.preferredModel;
+          if (preferredModel && MODEL_MAP[preferredModel]) {
+            model = MODEL_MAP[preferredModel];  # [!code highlight]
+          }
+        }
+
+        return handler({ ...request, model });  # [!code highlight]
+      },
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="运行时上下文">
+    根据运行时上下文中的成本限制或环境选择模型：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware, initChatModel } from "langchain";
+
+    const contextSchema = z.object({
+      costTier: z.string(),
+      environment: z.string(),
+    });
+
+    # Initialize models once outside the middleware
+    const premiumModel = initChatModel("claude-sonnet-4-6");
+    const standardModel = initChatModel("gpt-4.1");
+    const budgetModel = initChatModel("gpt-4.1-mini");
+
+    const contextBasedModel = createMiddleware({
+      name: "ContextBasedModel",
+      contextSchema,
+      wrapModelCall: (request, handler) => {
+        # Read from Runtime Context: cost tier and environment
+        const costTier = request.runtime.context.costTier;  # [!code highlight]
+        const environment = request.runtime.context.environment;  # [!code highlight]
+
+        let model;
+
+        if (environment === "production" && costTier === "premium") {
+          model = premiumModel;
+        } else if (costTier === "budget") {
+          model = budgetModel;
+        } else {
+          model = standardModel;
+        }
+
+        return handler({ ...request, model });  # [!code highlight]
+      },
+    });
+    ```
+
+  </Tab>
+</Tabs>
+
+有关更多示例，请参阅 [动态模型](/oss/javascript/langchain/agents#dynamic-model)。
+
+### 响应格式
+
+结构化输出将非结构化文本转换为经过验证的结构化数据。当提取特定字段或为下游系统返回数据时，自由文本是不够的。
+
+**工作原理：** 当你提供模式作为响应格式时，模型的最终响应保证符合该模式。智能体运行模型/工具调用循环，直到模型完成工具调用，然后将最终响应强制转换为提供的格式。
+
+#### 定义格式
+
+模式定义指导模型。字段名、类型和描述指定输出应遵循的确切格式。
+
+
+
+```typescript
+import { z } from "zod";
+
+const customerSupportTicket = z.object({
+  category: z.enum(["billing", "technical", "account", "product"]).describe(
+    "Issue category"
+  ),
+  priority: z.enum(["low", "medium", "high", "critical"]).describe(
+    "Urgency level"
+  ),
+  summary: z.string().describe(
+    "One-sentence summary of the customer's issue"
+  ),
+  customerSentiment: z.enum(["frustrated", "neutral", "satisfied"]).describe(
+    "Customer's emotional tone"
+  ),
+}).describe("Structured ticket information extracted from customer message");
+```
+
+
+#### 选择格式
+
+动态响应格式选择根据用户偏好、对话阶段或角色调整模式——早期返回简单格式，随着复杂性增加返回详细格式。
+
+<Tabs>
+  <Tab title="状态">
+    根据对话状态配置结构化输出：
+
+
+
+    ```typescript
+    import { createMiddleware } from "langchain";
+    import { z } from "zod";
+
+    const simpleResponse = z.object({
+      answer: z.string().describe("A brief answer"),
+    });
+
+    const detailedResponse = z.object({
+      answer: z.string().describe("A detailed answer"),
+      reasoning: z.string().describe("Explanation of reasoning"),
+      confidence: z.number().describe("Confidence score 0-1"),
+    });
+
+    const stateBasedOutput = createMiddleware({
+      name: "StateBasedOutput",
+      wrapModelCall: (request, handler) => {
+        # request.state is a shortcut for request.state.messages
+        const messageCount = request.messages.length;  # [!code highlight]
+
+        let responseFormat;
+        if (messageCount < 3) {
+          # Early conversation - use simple format
+          responseFormat = simpleResponse; # [!code highlight]
+        } else {
+          # Established conversation - use detailed format
+          responseFormat = detailedResponse; # [!code highlight]
+        }
+
+        return handler({ ...request, responseFormat });
+      },
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="存储">
+    根据存储中的用户偏好配置输出格式：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userId: z.string(),
+    });
+
+    const verboseResponse = z.object({
+      answer: z.string().describe("Detailed answer"),
+      sources: z.array(z.string()).describe("Sources used"),
+    });
+
+    const conciseResponse = z.object({
+      answer: z.string().describe("Brief answer"),
+    });
+
+    const storeBasedOutput = createMiddleware({
+      name: "StoreBasedOutput",
+      wrapModelCall: async (request, handler) => {
+        const userId = request.runtime.context.userId;  # [!code highlight]
+
+        # Read from Store: get user's preferred response style
+        const store = request.runtime.store;  # [!code highlight]
+        const userPrefs = await store.get(["preferences"], userId);  # [!code highlight]
+
+        if (userPrefs) {
+          const style = userPrefs.value?.responseStyle || "concise";
+          if (style === "verbose") {
+            request.responseFormat = verboseResponse;  # [!code highlight]
+          } else {
+            request.responseFormat = conciseResponse;  # [!code highlight]
+          }
+        }
+
+        return handler(request);
+      },
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="运行时上下文">
+    根据运行时上下文（如用户角色或环境）配置输出格式：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createMiddleware } from "langchain";
+
+    const contextSchema = z.object({
+      userRole: z.string(),
+      environment: z.string(),
+    });
+
+    const adminResponse = z.object({
+      answer: z.string().describe("Answer"),
+      debugInfo: z.record(z.any()).describe("Debug information"),
+      systemStatus: z.string().describe("System status"),
+    });
+
+    const userResponse = z.object({
+      answer: z.string().describe("Answer"),
+    });
+
+    const contextBasedOutput = createMiddleware({
+      name: "ContextBasedOutput",
+      wrapModelCall: (request, handler) => {
+        # Read from Runtime Context: user role and environment
+        const userRole = request.runtime.context.userRole;  # [!code highlight]
+        const environment = request.runtime.context.environment;  # [!code highlight]
+
+        let responseFormat;
+        if (userRole === "admin" && environment === "production") {
+          responseFormat = adminResponse;  # [!code highlight]
+        } else {
+          responseFormat = userResponse;  # [!code highlight]
+        }
+
+        return handler({ ...request, responseFormat });
+      },
+    });
+    ```
+
+  </Tab>
+</Tabs>
+
+## 工具上下文
+
+工具的特殊之处在于它们既读取又写入上下文。
+
+在最基本的情况下，当工具执行时，它接收 LLM 的请求参数并返回工具消息。工具执行其工作并产生结果。
+
+工具还可以为模型获取重要信息，使其能够执行和完成任务。
+
+### 读取
+
+大多数现实世界的工具不仅需要 LLM 的参数。它们需要用户 ID 进行数据库查询、外部服务的 API 密钥或当前会话状态以做出决策。工具从状态、存储和运行时上下文中读取以访问这些信息。
+
+<Tabs>
+  <Tab title="状态">
+    从状态中读取以检查当前会话信息：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createAgent, tool, type ToolRuntime } from "langchain";
+
+    const checkAuthentication = tool(
+      async (_, runtime: ToolRuntime) => {
+        # Read from State: check current auth status
+        const currentState = runtime.state;
+        const isAuthenticated = currentState.authenticated || false;
+
+        if (isAuthenticated) {
+          return "User is authenticated";
+        } else {
+          return "User is not authenticated";
+        }
+      },
+      {
+        name: "check_authentication",
+        description: "Check if user is authenticated",
+        schema: z.object({}),
+      }
+    );
+    ```
+
+  </Tab>
+
+  <Tab title="存储">
+    从存储中读取以访问持久化用户偏好：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createAgent, tool, type ToolRuntime } from "langchain";
+
+    const contextSchema = z.object({
+      userId: z.string(),
+    });
+
+    const getPreference = tool(
+      async ({ preferenceKey }, runtime: ToolRuntime) => {
+        const userId = runtime.context.userId;
+
+        # Read from Store: get existing preferences
+        const store = runtime.store;
+        const existingPrefs = await store.get(["preferences"], userId);
+
+        if (existingPrefs) {
+          const value = existingPrefs.value?.[preferenceKey];
+          return value ? `${preferenceKey}: ${value}` : `No preference set for ${preferenceKey}`;
+        } else {
+          return "No preferences found";
+        }
+      },
+      {
+        name: "get_preference",
+        description: "Get user preference from Store",
+        schema: z.object({
+          preferenceKey: z.string(),
+        }),
+      }
+    );
+    ```
+
+  </Tab>
+
+  <Tab title="运行时上下文">
+    从运行时上下文中读取配置，如 API 密钥和用户 ID：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { tool } from "@langchain/core/tools";
+    import { createAgent } from "langchain";
+
+    const contextSchema = z.object({
+      userId: z.string(),
+      apiKey: z.string(),
+      dbConnection: z.string(),
+    });
+
+    const fetchUserData = tool(
+      async ({ query }, runtime: ToolRuntime<any, typeof contextSchema>) => {
+        # Read from Runtime Context: get API key and DB connection
+        const { userId, apiKey, dbConnection } = runtime.context;
+
+        # Use configuration to fetch data
+        const results = await performDatabaseQuery(dbConnection, query, apiKey);
+
+        return `Found ${results.length} results for user ${userId}`;
+      },
+      {
+        name: "fetch_user_data",
+        description: "Fetch data using Runtime Context configuration",
+        schema: z.object({
+          query: z.string(),
+        }),
+      }
+    );
+
+    const agent = createAgent({
+      model: "gpt-4.1",
+      tools: [fetchUserData],
+      contextSchema,
+    });
+    ```
+
+  </Tab>
+</Tabs>
+
+### 写入
+
+工具结果可用于帮助智能体完成给定任务。工具既可以直接向模型返回结果，也可以更新智能体的内存，以便将来步骤可以使用重要上下文。
+
+<Tabs>
+  <Tab title="状态">
+    使用 Command 写入状态以跟踪会话特定信息：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { tool } from "@langchain/core/tools";
+    import { createAgent } from "langchain";
+    import { Command } from "@langchain/langgraph";
+
+    const authenticateUser = tool(
+      async ({ password }) => {
+        # Perform authentication
+        if (password === "correct") {
+          # Write to State: mark as authenticated using Command
+          return new Command({
+            update: { authenticated: true },
+          });
+        } else {
+          return new Command({ update: { authenticated: false } });
+        }
+      },
+      {
+        name: "authenticate_user",
+        description: "Authenticate user and update State",
+        schema: z.object({
+          password: z.string(),
+        }),
+      }
+    );
+    ```
+
+  </Tab>
+
+  <Tab title="存储">
+    写入存储以跨会话持久化数据：
+
+
+
+    ```typescript
+    import * as z from "zod";
+    import { createAgent, tool, type ToolRuntime } from "langchain";
+
+    const savePreference = tool(
+      async ({ preferenceKey, preferenceValue }, runtime: ToolRuntime<any, typeof contextSchema>) => {
+        const userId = runtime.context.userId;
+
+        # Read existing preferences
+        const store = runtime.store;
+        const existingPrefs = await store.get(["preferences"], userId);
+
+        # Merge with new preference
+        const prefs = existingPrefs?.value || {};
+        prefs[preferenceKey] = preferenceValue;
+
+        # Write to Store: save updated preferences
+        await store.put(["preferences"], userId, prefs);
+
+        return `Saved preference: ${preferenceKey} = ${preferenceValue}`;
+      },
+      {
+        name: "save_preference",
+        description: "Save user preference to Store",
+        schema: z.object({
+          preferenceKey: z.string(),
+          preferenceValue: z.string(),
+        }),
+      }
+    );
+    ```
+
+  </Tab>
+</Tabs>
+
+有关在工具中访问状态、存储和运行时上下文的全面示例，请参阅 [工具](/oss/javascript/langchain/tools)。
+
+## 生命周期上下文
+
+控制核心智能体步骤**之间**发生的情况——拦截数据流以实现跨领域关注点，如摘要、护栏和日志记录。
+
+正如你在 [模型上下文](#model-context) 和 [工具上下文](#tool-context) 中所见，[中间件](/oss/javascript/langchain/middleware) 是使上下文工程实用的机制。中间件允许你挂钩到智能体生命周期的任何步骤并：
+
+1. **更新上下文** - 修改状态和存储以持久化更改，更新对话历史，或保存见解
+2. **跳转生命周期** - 根据上下文移动到智能体循环中的不同步骤（例如，如果满足条件则跳过工具执行，用修改后的上下文重复模型调用）
+
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <img
+    src="/oss/images/middleware_final.png"
+    alt="智能体循环中的中间件钩子"
+    className="rounded-lg"
+  />
+</div>
+
+### 示例：摘要
+
+最常见的生命周期模式之一是当对话历史过长时自动压缩它。与 [模型上下文](#messages) 中显示的临时消息修剪不同，摘要**持久更新状态**——永久替换旧消息为摘要，该摘要保存供所有未来轮次使用。
+
+LangChain 为此提供了内置中间件：
+
+
+
+```typescript
+import { createAgent, summarizationMiddleware } from "langchain";
+
+const agent = createAgent({
+  model: "gpt-4.1",
+  tools: [...],
+  middleware: [
+    summarizationMiddleware({
+      model: "gpt-4.1-mini",
+      trigger: { tokens: 4000 },
+      keep: { messages: 20 },
+    }),
+  ],
+});
+```
+
+
+当对话超过令牌限制时，`SummarizationMiddleware` 会自动：
+1. 使用单独的 LLM 调用总结旧消息
+2. 在状态中用摘要消息替换它们（永久）
+3. 保留最近的完整消息以供上下文使用
+
+摘要的对话历史被永久更新——未来的轮次将看到摘要而不是原始消息。
+
+<Note>
+有关内置中间件的完整列表、可用钩子以及如何创建自定义中间件，请参阅 [中间件文档](/oss/javascript/langchain/middleware)。
+</Note>
+
+## 最佳实践
+
+1. **从简单开始** - 从静态提示词和工具开始，仅在需要时添加动态功能
+2. **增量测试** - 一次添加一个上下文工程功能
+3. **监控性能** - 跟踪模型调用、令牌使用和延迟
+4. **使用内置中间件** - 利用 [`SummarizationMiddleware`](/oss/javascript/langchain/middleware#summarization)、[`LLMToolSelectorMiddleware`](/oss/javascript/langchain/middleware#llm-tool-selector) 等
+5. **记录你的上下文策略** - 明确说明传递了什么上下文以及为什么
+6. **理解临时与持久**：模型上下文更改是临时的（每次调用），而生命周期上下文更改持久保存到状态
+
+## 相关资源
+
+- [上下文概念概述](/oss/javascript/concepts/context) - 了解上下文类型及其使用时机
+- [中间件](/oss/javascript/langchain/middleware) - 完整的中间件指南
+- [工具](/oss/javascript/langchain/tools) - 工具创建和上下文访问
+- [记忆](/oss/javascript/concepts/memory) - 短期和长期记忆模式
+- [智能体](/oss/javascript/langchain/agents) - 核心智能体概念
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\context-engineering.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

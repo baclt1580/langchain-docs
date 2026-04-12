@@ -1,0 +1,69 @@
+---
+title: "与 AWS Lambda 集成的智能体"
+description: "使用 LangChain JavaScript 与 AWS Lambda 工具集成智能体。"
+---
+
+完整文档请见：https://docs.aws.amazon.com/lambda/index.html
+
+**AWS Lambda** 是亚马逊云服务（AWS）提供的一项无服务器计算服务，旨在让开发者无需预置或管理服务器即可构建和运行应用程序与服务。这种无服务器架构使您能够专注于编写和部署代码，而 AWS 会自动处理运行应用程序所需的基础设施的扩展、修补和管理。
+
+通过将 AWSLambda 包含在提供给智能体的工具列表中，您可以授予智能体调用在 AWS 云中运行的代码的能力，以满足您的各种需求。
+
+当智能体使用 AWSLambda 工具时，它将提供一个类型为 `string` 的参数，该参数随后将通过 `event` 参数传递给 Lambda 函数。
+
+本快速入门将演示智能体如何使用 Lambda 函数通过 [Amazon Simple Email Service](https://aws.amazon.com/ses/) 发送电子邮件。发送电子邮件的 Lambda 代码未在此提供，但如果您想了解如何实现，请参阅 [如何使用 Lambda 和 SES 发送电子邮件](https://repost.aws/knowledge-center/lambda-send-email-ses)。请注意，这是一个特意简化的示例；Lambda 可用于执行几乎无限数量的其他用途（包括执行更多 LangChain 功能）！
+
+### 关于凭证的说明：
+
+- 如果您尚未通过 AWS CLI 运行 [`aws configure`](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)，则必须向 AWSLambda 构造函数提供 `region`、`accessKeyId` 和 `secretAccessKey`。
+- 与这些凭证对应的 IAM 角色必须具有调用 Lambda 函数的权限。
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/core
+```
+```typescript
+import { OpenAI } from "@langchain/openai";
+import { SerpAPI } from "@langchain/classic/tools";
+import { AWSLambda } from "@langchain/classic/tools/aws_lambda";
+import { initializeAgentExecutorWithOptions } from "@langchain/classic/agents";
+
+const model = new OpenAI({ temperature: 0 });
+const emailSenderTool = new AWSLambda({
+  name: "email-sender",
+  // 明确告知智能体该工具的功能
+  description:
+    "将指定内容发送电子邮件至 testing123@gmail.com",
+  region: "us-east-1", // 可选：函数部署所在的 AWS 区域
+  accessKeyId: "abc123", // 可选：具有调用权限的 IAM 用户的访问密钥 ID
+  secretAccessKey: "xyz456", // 可选：该 IAM 用户的秘密访问密钥
+  functionName: "SendEmailViaSES", // 在 AWS 控制台中看到的函数名称
+});
+const tools = [emailSenderTool, new SerpAPI("api_key_goes_here")];
+const executor = await initializeAgentExecutorWithOptions(tools, model, {
+  agentType: "zero-shot-react-description",
+});
+
+const input = `查找克罗地亚的首都。找到后，将答案通过电子邮件发送至 testing123@gmail.com。`;
+const result = await executor.invoke({ input });
+console.log(result);
+```
+
+## 相关链接
+
+- 工具[概念指南](/oss/javascript/langchain/tools)
+- 工具[操作指南](/oss/javascript/langchain/tools)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\lambda_agent.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

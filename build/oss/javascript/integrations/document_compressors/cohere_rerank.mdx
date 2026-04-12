@@ -1,0 +1,204 @@
+---
+title: "Cohere 重排序集成"
+description: "使用 LangChain JavaScript 集成 Cohere 重排序文档压缩器。"
+---
+
+重排序文档可以极大地提升任何 RAG 应用和文档检索系统的效果。
+
+从高层次来看，重排序 API 是一种语言模型，它分析文档并根据它们与给定查询的相关性重新排序。
+
+Cohere 提供了用于重排序文档的 API。在本示例中，我们将展示如何使用它。
+
+## 安装设置
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/cohere @langchain/core
+```
+
+```typescript
+import { CohereRerank } from "@langchain/cohere";
+import { Document } from "@langchain/core/documents";
+
+const query = "What is the capital of the United States?";
+const docs = [
+  new Document({
+    pageContent:
+      "Carson City is the capital city of the American state of Nevada. At the 2010 United States Census, Carson City had a population of 55,274.",
+  }),
+  new Document({
+    pageContent:
+      "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
+  }),
+  new Document({
+    pageContent:
+      "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
+  }),
+  new Document({
+    pageContent:
+      "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district. The President of the USA and many major national government offices are in the territory. This makes it the political center of the United States of America.",
+  }),
+  new Document({
+    pageContent:
+      "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states. The federal government (including the United States military) also uses capital punishment.",
+  }),
+];
+
+const cohereRerank = new CohereRerank({
+  apiKey: process.env.COHERE_API_KEY, // 默认值
+  model: "rerank-english-v2.0",
+});
+
+const rerankedDocuments = await cohereRerank.rerank(docs, query, {
+  topN: 5,
+});
+
+console.log(rerankedDocuments);
+/**
+[
+  { index: 3, relevanceScore: 0.9871293 },
+  { index: 1, relevanceScore: 0.29961726 },
+  { index: 4, relevanceScore: 0.27542195 },
+  { index: 0, relevanceScore: 0.08977329 },
+  { index: 2, relevanceScore: 0.041462272 }
+]
+ */
+```
+
+这里，我们可以看到 `.rerank()` 方法仅返回文档的索引（与输入文档的索引匹配）及其相关性分数。
+
+如果我们希望方法本身返回文档，可以使用 `.compressDocuments()` 方法。
+
+```typescript
+import { CohereRerank } from "@langchain/cohere";
+import { Document } from "@langchain/core/documents";
+
+const query = "What is the capital of the United States?";
+const docs = [
+  new Document({
+    pageContent:
+      "Carson City is the capital city of the American state of Nevada. At the 2010 United States Census, Carson City had a population of 55,274.",
+  }),
+  new Document({
+    pageContent:
+      "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
+  }),
+  new Document({
+    pageContent:
+      "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
+  }),
+  new Document({
+    pageContent:
+      "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district. The President of the USA and many major national government offices are in the territory. This makes it the political center of the United States of America.",
+  }),
+  new Document({
+    pageContent:
+      "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states. The federal government (including the United States military) also uses capital punishment.",
+  }),
+];
+
+const cohereRerank = new CohereRerank({
+  apiKey: process.env.COHERE_API_KEY, // 默认值
+  topN: 3, // 默认值
+  model: "rerank-english-v2.0",
+});
+
+const rerankedDocuments = await cohereRerank.compressDocuments(docs, query);
+
+console.log(rerankedDocuments);
+/**
+[
+  Document {
+    pageContent: 'Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district. The President of the USA and many major national government offices are in the territory. This makes it the political center of the United States of America.',
+    metadata: { relevanceScore: 0.9871293 }
+  },
+  Document {
+    pageContent: 'The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.',
+    metadata: { relevanceScore: 0.29961726 }
+  },
+  Document {
+    pageContent: 'Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states. The federal government (including the United States military) also uses capital punishment.',
+    metadata: { relevanceScore: 0.27542195 }
+  }
+]
+ */
+```
+
+从结果中，我们可以看到它返回了前 3 个文档，并为每个文档分配了一个 `relevanceScore`。
+
+正如预期的那样，`relevanceScore` 最高的文档是提到华盛顿特区的那个，分数为 `98.7%`！
+
+### 与 `CohereClient` 一起使用
+
+如果您在 Azure、AWS Bedrock 或独立实例上使用 Cohere，可以使用 `CohereClient` 来创建带有您端点的 `CohereRerank` 实例。
+
+```typescript
+import { CohereRerank } from "@langchain/cohere";
+import { CohereClient } from "cohere-ai";
+import { Document } from "@langchain/core/documents";
+
+const query = "What is the capital of the United States?";
+const docs = [
+  new Document({
+    pageContent:
+      "Carson City is the capital city of the American state of Nevada. At the 2010 United States Census, Carson City had a population of 55,274.",
+  }),
+  new Document({
+    pageContent:
+      "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
+  }),
+  new Document({
+    pageContent:
+      "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
+  }),
+  new Document({
+    pageContent:
+      "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district. The President of the USA and many major national government offices are in the territory. This makes it the political center of the United States of America.",
+  }),
+  new Document({
+    pageContent:
+      "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states. The federal government (including the United States military) also uses capital punishment.",
+  }),
+];
+
+const client = new CohereClient({
+  token: process.env.COHERE_API_KEY,
+  environment: "<your-cohere-deployment-url>", // 可选
+  // 其他参数
+});
+
+const cohereRerank = new CohereRerank({
+  client, // 即使提供了 apiKey 也会被忽略
+  model: "rerank-english-v2.0",
+});
+
+const rerankedDocuments = await cohereRerank.rerank(docs, query, {
+  topN: 5,
+});
+
+console.log(rerankedDocuments);
+
+/*
+  [
+    { index: 3, relevanceScore: 0.9871293 },
+    { index: 1, relevanceScore: 0.29961726 },
+    { index: 4, relevanceScore: 0.27542195 },
+    { index: 0, relevanceScore: 0.08977329 },
+    { index: 2, relevanceScore: 0.041462272 }
+  ]
+*/
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_compressors\cohere_rerank.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

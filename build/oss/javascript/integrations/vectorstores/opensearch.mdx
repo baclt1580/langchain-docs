@@ -1,0 +1,131 @@
+---
+title: "OpenSearch 集成"
+description: "使用 LangChain JavaScript 与 OpenSearch 向量存储进行集成。"
+---
+
+<Tip>
+**兼容性说明**
+
+仅适用于 Node.js 环境。
+</Tip>
+
+[OpenSearch](https://opensearch.org/) 是 [Elasticsearch](https://www.elastic.co/elasticsearch/) 的一个分支，完全兼容 Elasticsearch API。了解更多关于 [OpenSearch 近似最近邻搜索支持](https://opensearch.org/docs/latest/search-plugins/knn/approximate-knn/)的信息。
+
+LangChain.js 接受 [@opensearch-project/opensearch](https://opensearch.org/docs/latest/clients/javascript/index/) 作为 OpenSearch 向量存储的客户端。
+
+## 安装设置
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此章节](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install -S @langchain/openai @langchain/core @opensearch-project/opensearch
+```
+您还需要运行一个 OpenSearch 实例。可以使用[官方 Docker 镜像](https://opensearch.org/docs/latest/opensearch/install/docker/)来开始。也可以参考这个[示例 OpenSearch docker-compose 文件](https://github.com/langchain-ai/langchainjs/blob/main/examples/src/indexes/vector_stores/opensearch/docker-compose.yml)。
+
+## 索引文档
+
+```typescript
+import { Client } from "@opensearch-project/opensearch";
+import { Document } from "@langchain/classic/document";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { OpenSearchVectorStore } from "@langchain/community/vectorstores/opensearch";
+
+const client = new Client({
+  nodes: [process.env.OPENSEARCH_URL ?? "http://127.0.0.1:9200"],
+});
+
+const docs = [
+  new Document({
+    metadata: { foo: "bar" },
+    pageContent: "opensearch 也是一个向量数据库",
+  }),
+  new Document({
+    metadata: { foo: "bar" },
+    pageContent: "敏捷的棕色狐狸跳过了懒狗",
+  }),
+  new Document({
+    metadata: { baz: "qux" },
+    pageContent: "lorem ipsum dolor sit amet",
+  }),
+  new Document({
+    metadata: { baz: "qux" },
+    pageContent:
+      "OpenSearch 是一个可扩展、灵活且可扩展的开源软件套件，用于搜索、分析和可观测性应用",
+  }),
+];
+
+await OpenSearchVectorStore.fromDocuments(docs, new OpenAIEmbeddings(), {
+  client,
+  indexName: process.env.OPENSEARCH_INDEX, // 默认为 `documents`
+});
+```
+## 查询文档
+
+```typescript
+import { Client } from "@opensearch-project/opensearch";
+import { VectorDBQAChain } from "@langchain/classic/chains";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { OpenAI } from "@langchain/openai";
+import { OpenSearchVectorStore } from "@langchain/community/vectorstores/opensearch";
+
+const client = new Client({
+  nodes: [process.env.OPENSEARCH_URL ?? "http://127.0.0.1:9200"],
+});
+
+const vectorStore = new OpenSearchVectorStore(new OpenAIEmbeddings(), {
+  client,
+});
+
+/* 使用元数据过滤器独立搜索向量数据库 */
+const results = await vectorStore.similaritySearch("hello world", 1);
+console.log(JSON.stringify(results, null, 2));
+/* [
+    {
+      "pageContent": "Hello world",
+      "metadata": {
+        "id": 2
+      }
+    }
+  ] */
+
+/* 作为链的一部分使用（目前不支持元数据过滤器） */
+const model = new OpenAI();
+const chain = VectorDBQAChain.fromLLM(model, vectorStore, {
+  k: 1,
+  returnSourceDocuments: true,
+});
+const response = await chain.call({ query: "什么是 opensearch？" });
+
+console.log(JSON.stringify(response, null, 2));
+/*
+  {
+    "text": " Opensearch 是一系列技术的集合，允许搜索引擎以标准格式发布搜索结果，使用户能够更轻松地在多个网站上进行搜索。",
+    "sourceDocuments": [
+      {
+        "pageContent": "这是什么？",
+        "metadata": {
+          "id": 3
+        }
+      }
+    ]
+  }
+  */
+```
+
+## 相关链接
+
+- 向量存储[概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储[操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\opensearch.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

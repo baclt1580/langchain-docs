@@ -1,0 +1,42 @@
+---
+title: "Typesense 集成"
+description: "使用 LangChain Python 与 Typesense 集成。"
+---
+
+> [Typesense](https://typesense.org) 是一个开源的内存搜索引擎，您可以选择
+> [自行托管](https://typesense.org/docs/guide/install-typesense.html#option-2-local-machine-self-hosting) 或在
+> [Typesense Cloud](https://cloud.typesense.org/) 上运行。
+> `Typesense` 通过将整个索引存储在 RAM 中（并在磁盘上备份）来专注于性能，同时也
+> 专注于通过简化可用选项和设置良好的默认值来提供开箱即用的开发者体验。
+
+## 安装和设置
+
+
+<CodeGroup>
+```bash pip
+pip install typesense openapi-schema-pydantic
+```
+
+```bash uv
+uv add typesense openapi-schema-pydantic
+```
+</CodeGroup>
+
+## 向量存储
+
+查看 [使用示例](/oss/python/integrations/vectorstores/typesense)。
+
+```python
+from langchain_community.vectorstores import Typesense
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\typesense.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

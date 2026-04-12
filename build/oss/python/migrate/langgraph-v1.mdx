@@ -1,0 +1,85 @@
+---
+title: LangGraph v1 迁移指南
+sidebarTitle: LangGraph v1
+---
+
+本指南概述了 LangGraph v1 中的变更以及如何从之前的版本进行迁移。有关变更的概览，请参阅 [更新内容](/oss/python/releases/langgraph-v1) 页面。
+
+要升级：
+
+<CodeGroup>
+```bash pip
+pip install -U langgraph langchain-core
+```
+```bash uv
+uv add langgraph langchain-core
+```
+</CodeGroup>
+
+## 变更摘要
+
+LangGraph v1 与之前的版本在很大程度上向后兼容。主要变更是弃用 [`create_react_agent`](https://reference.langchain.com/python/langchain-classic/agents/react/agent/create_react_agent)，转而使用 LangChain 的新 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 函数。
+
+## 弃用项
+
+下表列出了 LangGraph v1 中所有已弃用的项目：
+
+| 弃用项 | 替代方案 |
+|----------------|-------------|
+| `create_react_agent` | [`langchain.agents.create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) |
+| `AgentState` | [`langchain.agents.AgentState`](https://reference.langchain.com/python/langchain/agents/middleware/types/AgentState) |
+| `AgentStatePydantic` | `langchain.agents.AgentState`（不再需要 pydantic 状态） |
+| `AgentStateWithStructuredResponse` | `langchain.agents.AgentState` |
+| `AgentStateWithStructuredResponsePydantic` | `langchain.agents.AgentState`（不再需要 pydantic 状态） |
+| `HumanInterruptConfig` | `langchain.agents.middleware.human_in_the_loop.InterruptOnConfig` |
+| `ActionRequest` | `langchain.agents.middleware.human_in_the_loop.InterruptOnConfig` |
+| `HumanInterrupt` | `langchain.agents.middleware.human_in_the_loop.HITLRequest` |
+| `ValidationNode` | 工具在使用 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 时会自动验证输入 |
+| `MessageGraph` | 带有 `messages` 键的 [`StateGraph`](https://reference.langchain.com/python/langgraph/graph/state/StateGraph)，类似于 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 所提供的 |
+
+## create_react_agent → create_agent
+
+LangGraph v1 弃用了 [`create_react_agent`](https://reference.langchain.com/python/langchain-classic/agents/react/agent/create_react_agent) 预构建组件。请使用 LangChain 的 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent)，它在 LangGraph 上运行并添加了灵活的中间件系统。
+
+有关详细信息，请参见 LangChain v1 文档：
+
+- [发布说明](/oss/python/releases/langchain-v1#createagent)
+- [迁移指南](/oss/python/migrate/langchain-v1#migrate-to-create_agent)
+
+<CodeGroup>
+```python v1 (new)
+from langchain.agents import create_agent
+
+agent = create_agent(  # [!code highlight]
+    model,
+    tools,
+    system_prompt="You are a helpful assistant.",
+)
+```
+```python v0 (old)
+from langgraph.prebuilt import create_react_agent
+
+agent = create_react_agent(  # [!code highlight]
+    model,
+    tools,
+    prompt="You are a helpful assistant.",  # [!code highlight]
+)
+```
+</CodeGroup>
+
+## 破坏性变更
+
+### 不再支持 Python 3.9
+
+所有 LangChain 包现在都需要 **Python 3.10 或更高版本**。Python 3.9 已于 2025 年 10 月达到 [生命周期结束](https://devguide.python.org/versions/)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\migrate\langgraph-v1.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

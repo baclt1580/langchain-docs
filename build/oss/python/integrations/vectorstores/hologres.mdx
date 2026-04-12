@@ -1,0 +1,111 @@
+---
+title: "Hologres 集成"
+description: "使用 LangChain Python 与 Hologres 向量存储进行集成。"
+---
+
+>[Hologres](https://www.alibabacloud.com/help/en/hologres/latest/introduction) 是阿里云开发的一种统一实时数据仓库服务。您可以使用 Hologres 实时写入、更新、处理和分析大量数据。
+>Hologres 支持标准 SQL 语法，兼容 PostgreSQL，并支持大多数 PostgreSQL 函数。Hologres 支持高达 PB 级数据的在线分析处理（OLAP）和即席分析，并提供高并发、低延迟的在线数据服务。
+
+>Hologres 通过采用 [VSAG](https://github.com/antgroup/vsag)（从 r4.0.0 版本开始）或 [Proxima](https://www.alibabacloud.com/help/en/hologres/latest/vector-processing)（适用于早于 r4.0.0 的版本）提供**向量数据库**功能。
+>[VSAG](https://github.com/antgroup/vsag) 是由蚂蚁集团开发的开源向量索引库，用于相似性搜索。与 Proxima 相比，VSAG 具有更低的内存开销、简化的配置、在并发写入下改进的查询稳定性，以及处理超大规模向量数据集的能力。
+>Proxima 是阿里巴巴达摩院开发的高性能软件库，用于早于 r4.0.0 版本的 Hologres。它允许您以高吞吐量和低延迟搜索向量的最近邻。
+
+本笔记本展示了如何使用与 `Hologres` 向量数据库相关的功能。
+[在阿里云上部署 Hologres 云实例](https://www.alibabacloud.com/zh/product/hologres) 以开始使用。
+
+```bash
+pip install -qU langchain_community
+```
+
+安装与您实例版本匹配的 Hologres SDK：
+
+- 如果 Hologres 实例版本低于 r4.0.0，请安装 `hologres-vector`。
+- 如果 Hologres 实例版本为 r4.0.0 或更高，请安装 `holo-search-sdk`。
+
+```bash
+pip install hologres-vector
+# or
+pip install holo-search-sdk
+```
+
+```python
+from langchain_community.vectorstores import Hologres
+from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import CharacterTextSplitter
+```
+
+拆分文档并通过调用 OpenAI API 获取嵌入
+
+```python
+from langchain_community.document_loaders import TextLoader
+
+loader = TextLoader("../../how_to/state_of_the_union.txt")
+documents = loader.load()
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+
+embeddings = OpenAIEmbeddings()
+```
+
+通过设置相关环境变量连接到 Hologres。
+
+```
+export PG_HOST={host}
+export PG_PORT={port} # Optional, default is 80
+export PG_DATABASE={db_name} # Optional, default is postgres
+export PG_USER={username}
+export PG_PASSWORD={password}
+```
+
+然后将您的嵌入和文档存储到 Hologres 中
+
+```python
+import os
+
+connection_string = Hologres.connection_string_from_db_params(
+    host=os.environ.get("PGHOST", "localhost"),
+    port=int(os.environ.get("PGPORT", "80")),
+    database=os.environ.get("PGDATABASE", "postgres"),
+    user=os.environ.get("PGUSER", "postgres"),
+    password=os.environ.get("PGPASSWORD", "postgres"),
+)
+
+vector_db = Hologres.from_documents(
+    docs,
+    embeddings,
+    connection_string=connection_string,
+    table_name="langchain_example_embeddings",
+)
+```
+
+查询和检索数据
+
+```python
+query = "What did the president say about Ketanji Brown Jackson"
+docs = vector_db.similarity_search(query)
+```
+
+```python
+print(docs[0].page_content)
+```
+
+```text
+Tonight. I call on the Senate to: Pass the Freedom to Vote Act. Pass the John Lewis Voting Rights Act. And while you're at it, pass the Disclose Act so Americans can know who is funding our elections.
+
+Tonight, I'd like to honor someone who has dedicated his life to serve this country: Justice Stephen Breyer—an Army veteran, Constitutional scholar, and retiring Justice of the United States Supreme Court. Justice Breyer, thank you for your service.
+
+One of the most serious constitutional responsibilities a President has is nominating someone to serve on the United States Supreme Court.
+
+And I did that 4 days ago, when I nominated Circuit Court of Appeals Judge Ketanji Brown Jackson. One of our nation's top legal minds, who will continue Justice Breyer's legacy of excellence.
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\hologres.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

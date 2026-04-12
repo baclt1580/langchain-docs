@@ -1,0 +1,58 @@
+---
+title: "Google Trends 集成"
+description: "使用 LangChain JavaScript 与 Google Trends 工具集成。"
+---
+
+Google Trends 工具允许您的代理通过 SerpApi 调用 Google Trends API，以获取和分析搜索兴趣数据。
+这有助于了解热门话题、区域搜索兴趣以及搜索词的历史流行度。
+
+有关 API 详情，请参阅 [Google Trends API 文档](https://serpapi.com/google-trends-api)。
+
+SerpApi 会缓存查询，因此首次查询会较慢，而后续相同查询会很快。
+偶尔，相关查询可能无法工作，而随时间变化的兴趣数据则正常。您可以在 [SerpApi 游乐场中检查您的查询](https://serpapi.com/playground?engine=google_trends&q=monster&data_type=RELATED_QUERIES)。
+
+## 设置
+
+要使用此工具，您需要配置对 SerpApi 提供的 Google Trends API 的访问权限。
+
+从 [SerpApi](https://serpapi.com/users/sign_in) 获取 API 密钥。
+
+然后，将您的 API 密钥设置为 `process.env.SERPAPI_API_KEY`，或通过 `apiKey` 构造函数参数传入。
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+```typescript
+import { SERPGoogleTrendsTool } from "@langchain/community/tools/google_trends";
+
+export async function run() {
+  const tool = new SERPGoogleTrendsTool();
+
+  const res = await tool.invoke("Monster");
+
+  console.log(res);
+}
+```
+
+## 相关
+
+- 工具[概念指南](/oss/javascript/langchain/tools)
+- 工具[操作指南](/oss/javascript/langchain/tools)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\google_trends.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

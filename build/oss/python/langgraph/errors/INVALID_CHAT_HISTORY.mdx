@@ -1,0 +1,46 @@
+---
+title: INVALID_CHAT_HISTORY
+---
+
+此错误在预构建的 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 中，当 `call_model` 图节点接收到格式错误的消息列表时触发。具体来说，当存在带有 `tool_calls`（LLM 请求调用工具）的 `AIMessages`，但没有对应的 [`ToolMessage`](https://reference.langchain.com/python/langchain-core/messages/tool/ToolMessage)（工具调用的结果，需返回给 LLM）时，即被视为格式错误。
+
+
+
+
+出现此错误可能有以下几种原因：
+
+1. 你在调用图时手动传递了格式错误的消息列表，例如 `graph.invoke({'messages': [AIMessage(..., tool_calls=[...])]})`
+2. 图在从 `tools` 节点（即一组 [`ToolMessage`](https://reference.langchain.com/python/langchain-core/messages/tool/ToolMessage)）接收更新之前被中断，并且你使用了一个非 None 或非 ToolMessage 的输入来调用它，
+    例如 `graph.invoke({'messages': [HumanMessage(...)]}, config)`。
+    这种中断可能由以下方式之一触发：
+        * 你在 `create_agent` 中手动设置了 `interrupt_before = ['tools']`
+    * 某个工具抛出了未被 [`ToolNode`](https://reference.langchain.com/python/langgraph/agents/#langgraph.prebuilt.tool_node.ToolNode) (`"tools"`) 处理的错误
+
+
+
+
+## 故障排除
+
+要解决此问题，你可以采取以下措施之一：
+
+1. 不要使用格式错误的消息列表来调用图
+2. 在发生中断（手动或由于错误）的情况下，你可以：
+
+* 提供与现有工具调用匹配的 [`ToolMessage`](https://reference.langchain.com/python/langchain-core/messages/tool/ToolMessage) 对象，并调用 `graph.invoke({'messages': [ToolMessage(...)]})`。
+  **注意**：这会将消息追加到历史记录中，并从 START 节点开始运行图。
+  * 手动更新状态并从中断处恢复图：
+    1. 使用 `graph.get_state(config)` 从图状态获取最新的消息列表
+    2. 修改消息列表，要么从 AIMessages 中移除未应答的工具调用
+
+要么添加带有与未应答工具调用匹配的 `tool_call_ids` 的 [`ToolMessage`](https://reference.langchain.com/python/langchain-core/messages/tool/ToolMessage) 对象 3. 使用修改后的消息列表调用 `graph.update_state(config, {'messages': ...})` 4. 恢复图，例如调用 `graph.invoke(None, config)`
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langgraph\errors\INVALID_CHAT_HISTORY.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

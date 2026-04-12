@@ -1,0 +1,48 @@
+---
+title: "Nia 集成"
+description: "使用 LangChain Python 与 Nia 集成。"
+---
+
+[Nia](https://trynia.ai) 是一个搜索和索引 API，它持续提供来自文档、研究论文、数据集、代码库等的上下文——因此智能体永远不会依赖过时数据。可扩展，成本低 5 倍，且可靠。
+
+## 安装与设置
+
+<CodeGroup>
+```bash pip
+pip install langchain-nia
+```
+
+```bash uv
+uv add langchain-nia
+```
+</CodeGroup>
+
+设置您的 API 密钥：
+
+```bash
+export NIA_API_KEY="nk_..."
+```
+
+## 工具
+
+langchain-nia 包提供了 20 个工具，并整理为一个可配置的工具包。
+
+有关完整详情、使用示例以及可用工具的完整列表，请查看 [Nia 工具集集成指南](/oss/python/integrations/tools/nia)。
+
+```python
+from langchain_nia import NiaToolkit
+
+toolkit = NiaToolkit()
+tools = toolkit.get_tools()  # 20 tools
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\nia.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

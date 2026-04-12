@@ -1,0 +1,207 @@
+---
+title: "GoogleGenerativeAIEmbeddings 集成"
+sidebarTitle: GoogleGenerativeAIEmbeddings
+description: "使用 LangChain Python 与 Google Gemini API 嵌入模型集成。"
+---
+
+本文将帮助您开始使用 LangChain 集成 Google Generative AI 嵌入模型。有关 `GoogleGenerativeAIEmbeddings` 功能和配置选项的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-google-genai/embeddings/GoogleGenerativeAIEmbeddings)。
+
+## 概述
+
+<Note>
+    `gemini-embedding-2-preview` 原生支持通过 Google GenAI SDK 的 `embed_content()` API 处理文本、图像、视频、音频和 PDF 输入。然而，LangChain 的 `Embeddings` 接口（`embed_query` / `embed_documents`）目前仅接受文本输入。LangChain 中的多模态嵌入支持计划在未来的版本中提供。对于当前的多模态用例，请直接使用 [Google GenAI SDK](https://ai.google.dev/gemini-api/docs)。
+</Note>
+
+### 集成详情
+
+## 设置
+
+要访问 Google Gemini 嵌入模型，您需要创建一个 Google Cloud 项目、启用 Generative Language API、获取 API 密钥，并安装 `langchain-google-genai` 集成包。
+
+### 凭证
+
+前往 [Google AI Studio](https://aistudio.google.com/apikey) 注册并生成 API 密钥。更多详情请参阅 [Gemini API 密钥文档](https://ai.google.dev/gemini-api/docs/api-key)。完成后，设置 `GOOGLE_API_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+if not os.getenv("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = getpass.getpass("输入您的 Google API 密钥：")
+```
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+```
+
+### 安装
+
+LangChain Google Generative AI 集成位于 `langchain-google-genai` 包中：
+
+```bash
+pip install -qU langchain-google-genai
+```
+
+## 实例化
+
+现在我们可以实例化模型对象并生成嵌入向量：
+
+```python
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
+vector = embeddings.embed_query("hello, world!")
+vector[:5]
+```
+
+```text
+[-0.024917153641581535,
+ 0.012005362659692764,
+ -0.003886754624545574,
+ -0.05774897709488869,
+ 0.0020742062479257584]
+```
+
+### 降维
+
+`gemini-embedding-2-preview` 通过 Matryoshka Representation Learning (MRL) 支持灵活的输出版本维度。您可以降低维度以优化存储和延迟：
+
+```python
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="gemini-embedding-2-preview",
+    output_dimensionality=768,  # 建议值：768、1536 或 3072（默认）
+)
+vector = embeddings.embed_query("hello, world!")
+len(vector)
+```
+
+```text
+768
+```
+
+## 批量处理
+
+您也可以一次性嵌入多个字符串以提升处理速度：
+
+```python
+vectors = embeddings.embed_documents(
+    [
+        "Today is Monday",
+        "Today is Tuesday",
+        "Today is April Fools day",
+    ]
+)
+len(vectors), len(vectors[0])
+```
+
+```text
+(3, 768)
+```
+
+## 索引与检索
+
+嵌入模型通常用于检索增强生成 (RAG) 流程中，既用于索引数据，也用于后续检索。更详细的说明请参阅我们的 [RAG 教程](/oss/python/langchain/rag)。
+
+下面展示如何使用上面初始化的 `embeddings` 对象来索引和检索数据。在此示例中，我们将在 `InMemoryVectorStore` 中索引和检索一个示例文档。
+
+```python
+# 使用示例文本创建向量存储
+from langchain_core.vectorstores import InMemoryVectorStore
+
+text = "LangChain is the framework for building context-aware reasoning applications"
+
+vectorstore = InMemoryVectorStore.from_texts(
+    [text],
+    embedding=embeddings,
+)
+
+# 将向量存储用作检索器
+retriever = vectorstore.as_retriever()
+
+# 检索最相似的文本
+retrieved_documents = retriever.invoke("What is LangChain?")
+
+# 显示检索到的文档内容
+retrieved_documents[0].page_content
+```
+
+```text
+'LangChain is the framework for building context-aware reasoning applications'
+```
+
+## 任务类型
+
+`GoogleGenerativeAIEmbeddings` 可选支持 `task_type`，当前必须是以下之一：
+
+- `SEMANTIC_SIMILARITY`：用于生成优化以评估文本相似性的嵌入向量。
+- `CLASSIFICATION`：用于生成优化以根据预设标签对文本进行分类的嵌入向量。
+- `CLUSTERING`：用于生成优化以基于相似性对文本进行聚类的嵌入向量。
+- `RETRIEVAL_DOCUMENT`、`RETRIEVAL_QUERY`、`QUESTION_ANSWERING` 和 `FACT_VERIFICATION`：用于生成优化用于文档搜索或信息检索的嵌入向量。
+- `CODE_RETRIEVAL_QUERY`：用于基于自然语言查询（如对数组排序或反转链表）检索代码块。代码块的嵌入向量使用 `RETRIEVAL_DOCUMENT` 计算。
+
+默认情况下，我们在 `embed_documents` 方法中使用 `RETRIEVAL_DOCUMENT`，在 `embed_query` 方法中使用 `RETRIEVAL_QUERY`。如果您提供了任务类型，我们将在所有方法中使用该类型。
+
+```bash
+pip install -qU matplotlib scikit-learn
+```
+
+```python
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from sklearn.metrics.pairwise import cosine_similarity
+
+query_embeddings = GoogleGenerativeAIEmbeddings(
+    model="gemini-embedding-2-preview", task_type="RETRIEVAL_QUERY"
+)
+doc_embeddings = GoogleGenerativeAIEmbeddings(
+    model="gemini-embedding-2-preview", task_type="RETRIEVAL_DOCUMENT"
+)
+
+q_embed = query_embeddings.embed_query("What is the capital of France?")
+d_embed = doc_embeddings.embed_documents(
+    ["The capital of France is Paris.", "Philipp likes to eat pizza."]
+)
+
+for i, d in enumerate(d_embed):
+    print(f"文档 {i + 1}:")
+    print(f"与查询的余弦相似度: {cosine_similarity([q_embed], [d])[0][0]}")
+    print("---")
+```
+
+```text
+文档 1:
+与查询的余弦相似度: 0.7892893360164779
+---
+文档 2:
+与查询的余弦相似度: 0.5438283285204146
+---
+```
+
+## 额外配置
+
+您可以向 `GoogleGenerativeAIEmbeddings` 传递以下参数以自定义 SDK 的行为：
+
+- `base_url`：API 客户端的自定义基础 URL（例如，自定义端点）
+- `output_dimensionality`：降低返回嵌入向量的维度（例如，`output_dimensionality=256`）
+- `request_options`：请求选项字典（例如，`{"timeout": 10}`）
+- `additional_headers`：在 API 请求中包含的额外 HTTP 头
+- `client_args`：传递给底层 HTTP 客户端的额外参数
+
+---
+
+## API 参考
+
+有关 `GoogleGenerativeAIEmbeddings` 功能和配置选项的详细文档，请参阅 [API 参考](https://reference.langchain.com/python/langchain-google-genai/embeddings/GoogleGenerativeAIEmbeddings)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\google_generative_ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,134 @@
+---
+title: "Bittensor 集成"
+description: "使用 LangChain Python 与 Bittensor LLM 集成。"
+---
+
+>[Bittensor](https://bittensor.com/) 是一个挖矿网络，类似于比特币，包含内置激励措施，旨在鼓励矿工贡献计算能力 + 知识。
+>
+>`NIBittensorLLM` 是由 [Neural Internet](https://neuralinternet.ai/) 开发的，由 `Bittensor` 提供支持。
+
+>This LLM 展示了去中心化 AI 的真正潜力，为您提供来自 `Bittensor 协议` 的最佳响应，其中包括各种 AI 模型，如 `OpenAI`、`LLaMA2` 等。
+
+用户可以在 [验证器端点前端](https://api.neuralinternet.ai/) 上查看他们的日志、请求和 API 密钥。然而，目前禁止更改配置；否则，用户的查询将被阻止。
+
+如果您遇到任何困难或有任何疑问，请随时通过 [GitHub](https://github.com/Kunj-2206)、[Discord](https://discordapp.com/users/683542109248159777) 联系我们的开发人员，或加入我们的 Discord 服务器以获取最新更新和问题咨询 [Neural Internet](https://discord.gg/neuralinternet)。
+
+## NIBittensorLLM 的不同参数和响应处理
+
+```python
+import json
+from pprint import pprint
+
+from langchain.globals import set_debug
+from langchain_community.llms import NIBittensorLLM
+
+set_debug(True)
+
+# System parameter in NIBittensorLLM is optional but you can set whatever you want to perform with model
+llm_sys = NIBittensorLLM(
+    system_prompt="Your task is to determine response based on user prompt.Explain me like I am technical lead of a project"
+)
+sys_resp = llm_sys(
+    "What is bittensor and What are the potential benefits of decentralized AI?"
+)
+print(f"Response provided by LLM with system prompt set is : {sys_resp}")
+
+# The top_responses parameter can give multiple responses based on its parameter value
+# This below code retrieve top 10 miner's response all the response are in format of json
+
+# Json response structure is
+""" {
+    "choices":  [
+                    {"index": Bittensor's Metagraph index number,
+                    "uid": Unique Identifier of a miner,
+                    "responder_hotkey": Hotkey of a miner,
+                    "message":{"role":"assistant","content": Contains actual response},
+                    "response_ms": Time in millisecond required to fetch response from a miner}
+                ]
+    } """
+
+multi_response_llm = NIBittensorLLM(top_responses=10)
+multi_resp = multi_response_llm.invoke("What is Neural Network Feeding Mechanism?")
+json_multi_resp = json.loads(multi_resp)
+pprint(json_multi_resp)
+```
+
+## 将 NIBittensorLLM 与 LLMChain 和 PromptTemplate 配合使用
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain.globals import set_debug
+from langchain_community.llms import NIBittensorLLM
+from langchain_core.prompts import PromptTemplate
+
+set_debug(True)
+
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+
+prompt = PromptTemplate.from_template(template)
+
+# System parameter in NIBittensorLLM is optional but you can set whatever you want to perform with model
+llm = NIBittensorLLM(
+    system_prompt="Your task is to determine response based on user prompt."
+)
+
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+question = "What is bittensor?"
+
+llm_chain.run(question)
+```
+
+## 将 NIBittensorLLM 与对话式 Agent 和 Google 搜索工具配合使用
+
+```python
+from langchain_community.utilities import GoogleSearchAPIWrapper
+from langchain.tools import tool
+
+search = GoogleSearchAPIWrapper()
+
+
+@tool
+def google_search(query: str) -> str:
+    """Search Google for recent results."""
+    return search.run(query)
+```
+
+```python
+from langchain_classic import hub
+from langchain.agents import (
+    AgentExecutor,
+    create_agent,
+)
+from langchain.memory import ConversationBufferMemory
+from langchain_community.llms import NIBittensorLLM
+
+tools = [google_search]
+
+prompt = hub.pull("hwchase17/react")
+
+
+llm = NIBittensorLLM(
+    system_prompt="Your task is to determine a response based on user prompt"
+)
+
+memory = ConversationBufferMemory(memory_key="chat_history")
+
+agent = create_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, memory=memory)
+
+response = agent_executor.invoke({"input": prompt})
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\bittensor.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

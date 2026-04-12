@@ -1,0 +1,37 @@
+---
+title: "01.AI 集成"
+description: "使用 LangChain Python 与 01.AI 集成。"
+---
+
+>[01.AI](https://www.lingyiwanwu.com/en)，由李开复博士创立，是一家处于 AI 2.0 前沿的全球公司。他们提供尖端的大型语言模型，包括 Yi 系列，参数量从 6B 到数百亿不等。01.AI 还提供多模态模型、开放 API 平台以及开源选项，例如 Yi-34B/9B/6B 和 Yi-VL。
+
+## 安装与设置
+
+请从 [中国站点](https://platform.lingyiwanwu.com/apikeys) 或 [全球站点](https://platform.01.ai/apikeys) 注册并获取 API 密钥。
+
+## 大型语言模型
+
+查看 [使用示例](/oss/python/integrations/llms/yi)。
+
+```python
+from langchain_community.llms import YiLLM
+```
+
+## 聊天模型
+
+查看 [使用示例](/oss/python/integrations/chat/yi)。
+
+```python
+from langchain_community.chat_models import ChatYi
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\yi.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

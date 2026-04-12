@@ -1,0 +1,149 @@
+---
+title: "BM25 集成"
+description: "使用 LangChain Python 与 BM25 检索器集成。"
+---
+
+>[BM25 (Wikipedia)](https://en.wikipedia.org/wiki/Okapi_BM25) 也称为 `Okapi BM25`，是一种用于信息检索系统的排名函数，用于估算文档与给定搜索查询的相关性。
+>
+>`BM25Retriever` 检索器使用 [`rank_bm25`](https://github.com/dorianbrown/rank_bm25) 包。
+
+```python
+pip install -qU  rank_bm25
+```
+
+```python
+from langchain_community.retrievers import BM25Retriever
+```
+
+## 使用文本创建新检索器
+
+```python
+retriever = BM25Retriever.from_texts(["foo", "bar", "world", "hello", "foo bar"])
+```
+
+## 使用文档创建新检索器
+
+现在，您可以使用已创建的文档创建新的检索器。
+
+```python
+from langchain_core.documents import Document
+
+retriever = BM25Retriever.from_documents(
+    [
+        Document(page_content="foo"),
+        Document(page_content="bar"),
+        Document(page_content="world"),
+        Document(page_content="hello"),
+        Document(page_content="foo bar"),
+    ]
+)
+```
+
+## 使用检索器
+
+我们现在可以使用检索器了！
+
+```python
+result = retriever.invoke("foo")
+```
+
+```python
+result
+```
+
+```text
+[Document(metadata={}, page_content='foo'),
+ Document(metadata={}, page_content='foo bar'),
+ Document(metadata={}, page_content='hello'),
+ Document(metadata={}, page_content='world')]
+```
+
+## 预处理函数
+
+向检索器传递自定义预处理函数以改善搜索结果。在词级别对文本进行分词可以增强检索效果，特别是在使用向量存储（如 Chroma、Pinecone 或 Faiss）处理分块文档时。
+
+```python
+import nltk
+
+nltk.download("punkt_tab")
+```
+
+```python
+from nltk.tokenize import word_tokenize
+
+retriever = BM25Retriever.from_documents(
+    [
+        Document(page_content="foo"),
+        Document(page_content="bar"),
+        Document(page_content="world"),
+        Document(page_content="hello"),
+        Document(page_content="foo bar"),
+    ],
+    k=2,
+    preprocess_func=word_tokenize,
+)
+
+result = retriever.invoke("bar")
+result
+```
+
+```text
+[Document(metadata={}, page_content='bar'),
+ Document(metadata={}, page_content='foo bar')]
+```
+
+
+## BM25Plus 变体
+
+- `BM25Retriever` 还支持 **BM25Plus 变体**，旨在减少标准 BM25 中对短文档的偏见。
+
+- BM25Plus 确保匹配项始终贡献正分数，这可以提高检索增强生成 (RAG) 工作流中常用的短文本、段落或分块文档的召回率。
+
+默认情况下，`BM25Retriever` 使用标准 BM25 (BM25Okapi)。必须显式启用 BM25Plus。
+
+### 示例：使用 BM25Plus
+
+```python
+from langchain_community.retrievers import BM25Retriever
+from langchain_core.documents import Document
+
+docs = [
+    Document(
+        page_content=(
+            "LangChain provides tools for building applications with large language models. "
+            "It supports retrieval augmented generation and agents."
+        )
+    ),
+
+    Document(
+        page_content="LangChain retrieval augmented generation"
+    ),
+]
+
+retriever = BM25Retriever.from_documents(
+    docs,
+    bm25_variant="plus",
+    bm25_params={"delta": 0.5},
+)
+
+result = retriever.invoke("retrieval augmented generation")
+result
+```
+
+BM25Plus 在处理以下情况时特别有用：
+- 短文档或段落
+- RAG 系统中的分块文本
+- 文档长度高度可变的语料库
+
+对于长度均匀的长文档，标准 BM25 可能提供稍高的精度。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\retrievers\bm25.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

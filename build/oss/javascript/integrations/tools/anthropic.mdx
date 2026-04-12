@@ -1,0 +1,627 @@
+---
+title: "Anthropic 集成"
+sidebarTitle: "工具"
+description: "使用 LangChain JavaScript 集成 Anthropic 工具。"
+---
+
+`@langchain/anthropic` 包提供了与 LangChain 兼容的 Anthropic 内置工具封装器。这些工具可以使用 `bindTools()` 或 [`createAgent`](https://reference.langchain.com/javascript/langchain/index/createAgent) 绑定到 `ChatAnthropic`。
+
+### 记忆工具
+
+记忆工具 (`memory_20250818`) 使 Claude 能够通过记忆文件目录在对话之间存储和检索信息。Claude 可以创建、读取、更新和删除在会话之间持久化的文件，使其能够随时间积累知识，而无需将所有内容都保留在上下文窗口中。
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+
+// 创建一个简单的内存文件存储（或使用你自己的持久化层）
+const files = new Map<string, string>();
+
+const memory = tools.memory_20250818({
+  execute: async (command) => {
+    switch (command.command) {
+      case "view":
+        if (!command.path || command.path === "/") {
+          return Array.from(files.keys()).join("\n") || "目录为空。";
+        }
+        return (
+          files.get(command.path) ?? `错误：未找到文件：${command.path}`
+        );
+      case "create":
+        files.set(command.path!, command.file_text ?? "");
+        return `成功创建文件：${command.path}`;
+      case "str_replace":
+        const content = files.get(command.path!);
+        if (content && command.old_str) {
+          files.set(
+            command.path!,
+            content.replace(command.old_str, command.new_str ?? "")
+          );
+        }
+        return `成功替换文本：${command.path}`;
+      case "delete":
+        files.delete(command.path!);
+        return `成功删除：${command.path}`;
+      // 处理其他命令：insert, rename
+      default:
+        return `未知命令`;
+    }
+  },
+});
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+const llmWithMemory = llm.bindTools([memory]);
+
+const response = await llmWithMemory.invoke(
+  "记住我最喜欢的编程语言是 TypeScript"
+);
+```
+
+更多信息，请参阅 [Anthropic 的记忆工具文档](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/memory-tool)。
+
+### 网络搜索工具
+
+网络搜索工具 (`webSearch_20250305`) 让 Claude 能够直接访问实时网络内容，使其能够利用其知识截止日期之后的最新信息回答问题。Claude 会自动引用搜索结果中的来源作为其答案的一部分。
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+// 基本用法
+const response = await llm.invoke("纽约天气如何？", {
+  tools: [tools.webSearch_20250305()],
+});
+```
+
+网络搜索工具支持多种配置选项：
+
+```typescript
+const response = await llm.invoke("关于 AI 的最新新闻？", {
+  tools: [
+    tools.webSearch_20250305({
+      // API 请求中工具的最大使用次数
+      maxUses: 5,
+      // 仅包含来自这些域名的结果
+      allowedDomains: ["reuters.com", "bbc.com"],
+      // 或阻止特定域名（不能与 allowedDomains 同时使用）
+      // blockedDomains: ["example.com"],
+      // 提供用户位置以获得更相关的结果
+      userLocation: {
+        type: "approximate",
+        city: "San Francisco",
+        region: "California",
+        country: "US",
+        timezone: "America/Los_Angeles",
+      },
+    }),
+  ],
+});
+```
+
+更多信息，请参阅 [Anthropic 的网络搜索工具文档](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search-tool)。
+
+### 网页抓取工具
+
+网页抓取工具 (`webFetch_20250910`) 允许 Claude 从指定的网页和 PDF 文档中检索完整内容。Claude 只能抓取用户明确提供的 URL，或者来自先前网络搜索或网页抓取结果的 URL。
+
+> **⚠️ 安全警告：** 在 Claude 处理不受信任输入和敏感数据并存的环境中启用网页抓取工具会带来数据泄露风险。我们建议仅在受信任的环境中或处理非敏感数据时使用此工具。
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+// 基本用法 - 从 URL 抓取内容
+const response = await llm.invoke(
+  "请分析 https://example.com/article 的内容",
+  { tools: [tools.webFetch_20250910()] }
+);
+```
+
+网页抓取工具支持多种配置选项：
+
+```typescript
+const response = await llm.invoke(
+  "总结这篇研究论文：https://arxiv.org/abs/2024.12345",
+  {
+    tools: [
+      tools.webFetch_20250910({
+        // API 请求中工具的最大使用次数
+        maxUses: 5,
+        // 仅从这些域名抓取
+        allowedDomains: ["arxiv.org", "example.com"],
+        // 或阻止特定域名（不能与 allowedDomains 同时使用）
+        // blockedDomains: ["example.com"],
+        // 为抓取的内容启用引用（可选，与网络搜索不同）
+        citations: { enabled: true },
+        // 最大内容长度（以令牌计，有助于控制令牌使用量）
+        maxContentTokens: 50000,
+      }),
+    ],
+  }
+);
+```
+
+你可以将网页抓取与网络搜索结合使用，进行全面的信息收集：
+
+```typescript
+import { tools } from "@langchain/anthropic";
+
+const response = await llm.invoke(
+  "查找关于量子计算的最新文章并分析最相关的一篇",
+  {
+    tools: [
+      tools.webSearch_20250305({ maxUses: 3 }),
+      tools.webFetch_20250910({ maxUses: 5, citations: { enabled: true } }),
+    ],
+  }
+);
+```
+
+更多信息，请参阅 [Anthropic 的网页抓取工具文档](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-fetch-tool)。
+
+### 工具搜索工具
+
+工具搜索工具使 Claude 能够通过动态发现和按需加载来处理数百或数千个工具。当你拥有大量工具但不想一次性将它们全部加载到上下文窗口中时，这非常有用。
+
+有两种变体：
+
+- **`toolSearchRegex_20251119`** - Claude 使用正则表达式模式（使用 Python 的 `re.search()` 语法）来搜索工具
+- **`toolSearchBM25_20251119`** - Claude 使用自然语言查询通过 BM25 算法搜索工具
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+import { tool } from "langchain";
+import { z } from "zod";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+// 创建带有 defer_loading 的工具，使其可通过搜索发现
+const getWeather = tool(
+  async (input: { location: string }) => {
+    return `${input.location} 的天气：晴朗，72°F`;
+  },
+  {
+    name: "get_weather",
+    description: "获取特定位置的天气",
+    schema: z.object({
+      location: z.string(),
+    }),
+    extras: { defer_loading: true },
+  }
+);
+
+const getNews = tool(
+  async (input: { topic: string }) => {
+    return `关于 ${input.topic} 的最新新闻...`;
+  },
+  {
+    name: "get_news",
+    description: "获取关于某个主题的最新新闻",
+    schema: z.object({
+      topic: z.string(),
+    }),
+    extras: { defer_loading: true },
+  }
+);
+
+// Claude 将根据需要搜索和发现工具
+const response = await llm.invoke("旧金山的天气如何？", {
+  tools: [tools.toolSearchRegex_20251119(), getWeather, getNews],
+});
+```
+
+使用 BM25 变体进行自然语言搜索：
+
+```typescript
+import { tools } from "@langchain/anthropic";
+
+const response = await llm.invoke("旧金山的天气如何？", {
+  tools: [tools.toolSearchBM25_20251119(), getWeather, getNews],
+});
+```
+
+更多信息，请参阅 [Anthropic 的工具搜索文档](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/tool-search-tool)。
+
+### 文本编辑器工具
+
+文本编辑器工具 (`textEditor_20250728`) 使 Claude 能够查看和修改文本文件，帮助调试、修复和改进代码或其他文本文档。Claude 可以直接与文件交互，提供实际操作帮助，而不仅仅是建议更改。
+
+可用命令：
+
+- `view` - 检查文件内容或列出目录内容
+- `str_replace` - 替换文件中的特定文本
+- `create` - 创建具有指定内容的新文件
+- `insert` - 在特定行号插入文本
+
+```typescript
+import fs from "node:fs";
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+const textEditor = tools.textEditor_20250728({
+  async execute(args) {
+    switch (args.command) {
+      case "view":
+        const content = fs.readFileSync(args.path, "utf-8");
+        // 返回带行号的内容供 Claude 引用
+        return content
+          .split("\n")
+          .map((line, i) => `${i + 1}: ${line}`)
+          .join("\n");
+      case "str_replace":
+        let fileContent = fs.readFileSync(args.path, "utf-8");
+        fileContent = fileContent.replace(args.old_str, args.new_str);
+        fs.writeFileSync(args.path, fileContent);
+        return "成功替换文本。";
+      case "create":
+        fs.writeFileSync(args.path, args.file_text);
+        return `成功创建文件：${args.path}`;
+      case "insert":
+        const lines = fs.readFileSync(args.path, "utf-8").split("\n");
+        lines.splice(args.insert_line, 0, args.new_str);
+        fs.writeFileSync(args.path, lines.join("\n"));
+        return `成功在第 ${args.insert_line} 行插入文本`;
+      default:
+        return "未知命令";
+    }
+  },
+  // 可选：查看时限制文件内容长度
+  maxCharacters: 10000,
+});
+
+const llmWithEditor = llm.bindTools([textEditor]);
+
+const response = await llmWithEditor.invoke(
+  "我的 primes.py 文件中有一个语法错误。你能帮我修复吗？"
+);
+```
+
+更多信息，请参阅 [Anthropic 的文本编辑器工具文档](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/text-editor-tool)。
+
+### 计算机使用工具
+
+计算机使用工具使 Claude 能够通过屏幕截图捕获、鼠标控制和键盘输入与桌面环境交互，实现自主桌面交互。
+
+> **⚠️ 安全警告：** 计算机使用是测试版功能，具有独特风险。请使用具有最小权限的专用虚拟机或容器。避免授予对敏感数据的访问权限。
+
+有两种变体：
+
+- **`computer_20251124`** - 适用于 Claude Opus 4.5（包含缩放功能）
+- **`computer_20250124`** - 适用于 Claude 4 和 Claude 3.7 模型
+
+可用操作：
+
+- `screenshot` - 捕获当前屏幕
+- `left_click`、`right_click`、`middle_click` - 在坐标处点击鼠标
+- `double_click`、`triple_click` - 多次点击操作
+- `left_click_drag` - 点击并拖动操作
+- `left_mouse_down`、`left_mouse_up` - 精细鼠标控制
+- `scroll` - 滚动屏幕
+- `type` - 输入文本
+- `key` - 按下键盘键/快捷键
+- `mouse_move` - 移动光标
+- `hold_key` - 在执行其他操作时按住一个键
+- `wait` - 等待指定时长
+- `zoom` - 以全分辨率查看特定屏幕区域（仅限 Claude Opus 4.5）
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+const computer = tools.computer_20250124({
+  // 必需：指定显示尺寸
+  displayWidthPx: 1024,
+  displayHeightPx: 768,
+  // 可选：X11 显示编号
+  displayNumber: 1,
+  execute: async (action) => {
+    switch (action.action) {
+      case "screenshot":
+      // 捕获并返回 base64 编码的屏幕截图
+      // ...
+      case "left_click":
+      // 在指定坐标处点击
+      // ...
+      // ...
+    }
+  },
+});
+
+const llmWithComputer = llm.bindTools([computer]);
+
+const response = await llmWithComputer.invoke(
+  "将一张猫的图片保存到我的桌面。"
+);
+```
+
+对于支持缩放的 Claude Opus 4.5：
+
+```typescript
+import { tools } from "@langchain/anthropic";
+
+const computer = tools.computer_20251124({
+  displayWidthPx: 1920,
+  displayHeightPx: 1080,
+  // 启用缩放以详细检查屏幕区域
+  enableZoom: true,
+  execute: async (action) => {
+    // 处理包括 Claude Opus 4.5 的 "zoom" 在内的操作
+    // ...
+  },
+});
+```
+
+更多信息，请参阅 [Anthropic 的计算机使用文档](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/computer-use)。
+
+### 代码执行工具
+
+代码执行工具 (`codeExecution_20250825`) 允许 Claude 在安全的沙盒环境中运行 Bash 命令和操作文件。Claude 可以分析数据、创建可视化、执行计算和处理文件。
+
+当提供此工具时，Claude 自动获得以下访问权限：
+
+- **Bash 命令** - 执行 shell 命令进行系统操作
+- **文件操作** - 直接创建、查看和编辑文件
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+// 基本用法 - 计算和数据分析
+const response = await llm.invoke(
+  "计算 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] 的平均值和标准差",
+  { tools: [tools.codeExecution_20250825()] }
+);
+
+// 文件操作和可视化
+const response2 = await llm.invoke(
+  "创建销售数据的 matplotlib 可视化并将其保存为 chart.png",
+  { tools: [tools.codeExecution_20250825()] }
+);
+```
+
+多步骤工作流的容器重用：
+
+```typescript
+// 第一个请求 - 创建容器
+const response1 = await llm.invoke("将一个随机数写入 /tmp/number.txt", {
+  tools: [tools.codeExecution_20250825()],
+});
+
+// 从响应中提取容器 ID 以供重用
+const containerId = response1.response_metadata?.container?.id;
+
+// 第二个请求 - 重用容器以访问文件
+const response2 = await llm.invoke(
+  "读取 /tmp/number.txt 并计算其平方",
+  {
+    tools: [tools.codeExecution_20250825()],
+    container: containerId,
+  }
+);
+```
+
+更多信息，请参阅 [Anthropic 的代码执行工具文档](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/code-execution-tool)。
+
+### Bash 工具
+
+Bash 工具 (`bash_20250124`) 允许在持久的 bash 会话中执行 shell 命令。与沙盒化的代码执行工具不同，此工具需要你提供自己的执行环境。
+
+> **⚠️ 安全警告：** Bash 工具提供直接系统访问。请实施安全措施，例如在隔离环境（Docker/VM）中运行、命令过滤和资源限制。
+
+Bash 工具提供：
+
+- **持久 bash 会话** - 在命令之间保持状态
+- **Shell 命令执行** - 运行任何 shell 命令
+- **环境访问** - 访问环境变量和工作目录
+- **命令链** - 支持管道、重定向和脚本
+
+可用命令：
+
+- 执行命令：`{ command: "ls -la" }`
+- 重启会话：`{ restart: true }`
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+import { execSync } from "child_process";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+const bash = tools.bash_20250124({
+  execute: async (args) => {
+    if (args.restart) {
+      // 重置会话状态
+      return "Bash 会话已重启";
+    }
+    try {
+      const output = execSync(args.command, {
+        encoding: "utf-8",
+        timeout: 30000,
+      });
+      return output;
+    } catch (error) {
+      return `错误：${(error as Error).message}`;
+    }
+  },
+});
+
+const llmWithBash = llm.bindTools([bash]);
+
+const response = await llmWithBash.invoke(
+  "列出当前目录中的所有 Python 文件"
+);
+
+// 处理工具调用并执行命令
+console.log(response.tool_calls?.[0].name); // "bash"
+console.log(response.tool_calls?.[0].args.command); // "ls -la *.py"
+```
+
+更多信息，请参阅 [Anthropic 的 Bash 工具文档](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/bash-tool)。
+
+### MCP 工具集
+
+MCP 工具集 (`mcpToolset_20251120`) 使 Claude 能够直接从 Messages API 连接到远程 MCP（模型上下文协议）服务器，而无需实现单独的 MCP 客户端。这允许 Claude 使用 MCP 服务器提供的工具。
+
+主要特性：
+
+- **直接 API 集成** - 无需实现 MCP 客户端即可连接到 MCP 服务器
+- **工具调用支持** - 通过 Messages API 访问 MCP 工具
+- **灵活的工具配置** - 启用所有工具、允许特定工具列表或拒绝不需要的工具
+- **按工具配置** - 使用自定义设置配置单个工具
+- **OAuth 认证** - 支持经过认证的服务器的 OAuth Bearer 令牌
+- **多服务器** - 在单个请求中连接到多个 MCP 服务器
+
+```typescript
+import { ChatAnthropic, tools } from "@langchain/anthropic";
+
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+});
+
+// 基本用法 - 启用 MCP 服务器的所有工具
+const response = await llm.invoke("你有什么可用的工具？", {
+  mcp_servers: [
+    {
+      type: "url",
+      url: "https://example-server.modelcontextprotocol.io/sse",
+      name: "example-mcp",
+      authorization_token: "YOUR_TOKEN",
+    },
+  ],
+  tools: [tools.mcpToolset_20251120({ serverName: "example-mcp" })],
+});
+```
+
+**允许列表模式** - 仅启用特定工具：
+
+```typescript
+const response = await llm.invoke("搜索事件", {
+  mcp_servers: [
+    {
+      type: "url",
+      url: "https://calendar.example.com/sse",
+      name: "google-calendar-mcp",
+      authorization_token: "YOUR_TOKEN",
+    },
+  ],
+  tools: [
+    tools.mcpToolset_20251120({
+      serverName: "google-calendar-mcp",
+      // 默认禁用所有工具
+      defaultConfig: { enabled: false },
+      // 显式启用仅这些工具
+      configs: {
+        search_events: { enabled: true },
+        create_event: { enabled: true },
+      },
+    }),
+  ],
+});
+```
+
+**拒绝列表模式** - 禁用特定工具：
+
+```typescript
+const response = await llm.invoke("列出我的事件", {
+  mcp_servers: [
+    {
+      type: "url",
+      url: "https://calendar.example.com/sse",
+      name: "google-calendar-mcp",
+      authorization_token: "YOUR_TOKEN",
+    },
+  ],
+  tools: [
+    tools.mcpToolset_20251120({
+      serverName: "google-calendar-mcp",
+      // 默认启用所有工具，仅禁用危险工具
+      configs: {
+        delete_all_events: { enabled: false },
+        share_calendar_publicly: { enabled: false },
+      },
+    }),
+  ],
+});
+```
+
+**多个 MCP 服务器**：
+
+```typescript
+const response = await llm.invoke("使用两个服务器的工具", {
+  mcp_servers: [
+    {
+      type: "url",
+      url: "https://mcp.example1.com/sse",
+      name: "mcp-server-1",
+      authorization_token: "TOKEN1",
+    },
+    {
+      type: "url",
+      url: "https://mcp.example2.com/sse",
+      name: "mcp-server-2",
+      authorization_token: "TOKEN2",
+    },
+  ],
+  tools: [
+    tools.mcpToolset_20251120({ serverName: "mcp-server-1" }),
+    tools.mcpToolset_20251120({
+      serverName: "mcp-server-2",
+      defaultConfig: { deferLoading: true },
+    }),
+  ],
+});
+```
+
+**结合工具搜索** - 使用延迟加载进行按需工具发现：
+
+```typescript
+const response = await llm.invoke("查找并使用正确的工具", {
+  mcp_servers: [
+    {
+      type: "url",
+      url: "https://example.com/sse",
+      name: "example-mcp",
+    },
+  ],
+  tools: [
+    tools.toolSearchRegex_20251119(),
+    tools.mcpToolset_20251120({
+      serverName: "example-mcp",
+      defaultConfig: { deferLoading: true },
+    }),
+  ],
+});
+```
+
+更多信息，请参阅 [Anthropic 的 MCP 连接器文档](https://docs.anthropic.com/en/docs/agents-and-tools/mcp-connector)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\anthropic.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

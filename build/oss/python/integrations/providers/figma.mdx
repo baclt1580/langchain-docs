@@ -1,0 +1,35 @@
+---
+title: "Figma 集成"
+description: "使用 LangChain Python 与 Figma 集成。"
+---
+
+>[Figma](https://www.figma.com/) 是一款用于界面设计的协作式 Web 应用程序。
+
+## 安装和设置
+
+Figma API 需要 `access token`、`node_ids` 和 `file key`。
+
+`file key` 可以从 URL 中获取。 https://www.figma.com/file/\{filekey\}/sampleFilename
+
+`Node IDs` 也可以在 URL 中找到。点击任意内容并查找 '?node-id=\{node_id\}' 参数。
+
+`Access token` [说明](https://help.figma.com/hc/en-us/articles/8085703771159-Manage-personal-access-tokens)。
+
+## 文档加载器
+
+查看 [使用示例](/oss/python/integrations/document_loaders/figma)。
+
+```python
+from langchain_community.document_loaders import FigmaFileLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\figma.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

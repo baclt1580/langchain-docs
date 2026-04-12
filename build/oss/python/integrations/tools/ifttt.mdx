@@ -1,0 +1,85 @@
+---
+title: "IFTTT Webhooks 集成"
+description: "使用 LangChain Python 与 IFTTT Webhooks 工具集成。"
+---
+
+本笔记本展示了如何使用 IFTTT Webhooks。
+
+来自 [github.com/SidU/teams-langchain-js/wiki/Connecting-IFTTT-Services](https://github.com/SidU/teams-langchain-js/wiki/Connecting-IFTTT-Services)。
+
+## 创建 Webhook
+
+- 前往 [ifttt.com/create](https://ifttt.com/create)
+
+## 配置"If This"
+
+- 点击 IFTTT 界面中的"If This"按钮。
+- 在搜索栏中搜索"Webhooks"。
+- 选择第一个选项"Receive a web request with a JSON payload."。
+- 选择一个特定于您计划连接的服务的事件名称。
+这将使您更容易管理 Webhook URL。
+例如，如果您正在连接 Spotify，您可以使用"Spotify"作为您的
+事件名称。
+- 点击"Create Trigger"按钮以保存设置并创建您的 Webhook。
+
+## 配置"Then That"
+
+- 点击 IFTTT 界面中的"Then That"按钮。
+- 搜索您要连接的服务，例如 Spotify。
+- 从服务中选择一个操作，例如"Add track to a playlist"。
+- 通过指定必要的详细信息来配置操作，例如播放列表名称，
+例如"Songs from AI"。
+- 在您的操作中引用 Webhook 接收到的 JSON 负载。对于 Spotify
+场景，将 `{{JsonPayload}}` 选为您的搜索查询。
+- 点击"Create Action"按钮以保存您的操作设置。
+- 完成操作配置后，点击"Finish"按钮以
+完成设置。
+- 恭喜！您已成功将 Webhook 连接到所需
+的服务，现在可以开始接收数据并触发操作了 🎉
+
+## 完成设置
+
+- 要获取您的 Webhook URL，请访问 [ifttt.com/maker_webhooks/settings](https://ifttt.com/maker_webhooks/settings)
+- 从中复制 IFTTT 密钥值。URL 的格式为
+[maker.ifttt.com/use/YOUR_IFTTT_KEY](https://maker.ifttt.com/use/YOUR_IFTTT_KEY)。获取 YOUR_IFTTT_KEY 的值。
+
+```python
+pip install -qU  langchain-community
+```
+
+```python
+from langchain_community.tools.ifttt import IFTTTWebhook
+```
+
+```python
+import os
+
+key = os.environ["IFTTTKey"]
+url = f"https://maker.ifttt.com/trigger/spotify/json/with/key/{key}"
+tool = IFTTTWebhook(
+    name="Spotify", description="Add a song to spotify playlist", url=url
+)
+```
+
+```python
+tool.run("taylor swift")
+```
+
+```text
+"Congratulations! You've fired the spotify JSON event"
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\tools\ifttt.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

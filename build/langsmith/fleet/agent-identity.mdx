@@ -1,0 +1,54 @@
+---
+title: 代理身份
+description: 选择您的 Fleet 代理使用自身凭证还是每个用户的凭证进行身份验证。
+---
+
+代理身份决定了代理在与应用程序和服务交互时使用谁的[凭证](/langsmith/fleet/setup)。
+
+<Warning>
+代理身份一旦设置，将无法更改。
+</Warning>
+
+## 固定凭证（"Claws"）
+
+无论谁与代理交互，代理始终使用相同的 API 密钥和 OAuth 令牌进行身份验证。
+
+在以下情况下使用固定凭证：
+
+- 代理作为共享服务运行（例如，团队 Slack 机器人或每日简报代理）。
+- 您希望为所有用户使用一组统一的已验证账户。
+- 代理需要在[频道](/langsmith/fleet/channels)或[计划任务](/langsmith/fleet/schedules)上运行，这些功能要求使用固定凭证。
+
+使用固定凭证时，代理执行的所有操作（发送电子邮件、发布消息、读取日历）都将使用代理所有者在设置过程中连接的账户。
+
+## 用户凭证（"Assistants"）
+
+代理使用与之交互的用户的 API 密钥和 OAuth 令牌进行身份验证，代表用户行事。
+
+在以下情况下使用用户凭证：
+
+- 每个用户应通过自己的账户进行操作（例如，一个从用户个人收件箱读取和发送邮件的电子邮件助手）。
+- 您需要基于用户的访问控制，以便代理仅能看到该用户有权访问的内容。
+- 审计追踪需要反映每个操作是由哪个用户执行的。
+
+使用用户凭证时，每个用户在首次与代理交互时需单独进行身份验证。代理将在该用户的所有后续会话中使用该用户的令牌执行操作。
+
+## 设置代理身份
+
+要为代理设置身份：
+
+1. 在 [LangSmith UI](https://smith.langchain.com) 中，导航到您要编辑的代理。
+1. 点击右上角的 <Icon icon="pencil" /> **编辑**。
+1. 点击 **设置身份**，选择您要使用的身份类型。
+1. 点击 **保存**。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\agent-identity.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

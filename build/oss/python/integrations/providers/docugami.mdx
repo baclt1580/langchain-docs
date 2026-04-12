@@ -1,0 +1,41 @@
+---
+title: "Docugami 集成"
+description: "使用 LangChain Python 与 Docugami 进行集成。"
+---
+
+>[Docugami](https://docugami.com) 将业务文档转换为文档 XML 知识图谱，生成代表整个文档的 XML 语义树森林
+> 这种丰富的表示形式包含了文档中各个片段的语义和结构特征，并以 XML 树的形式呈现。
+
+## 安装与设置
+
+
+<CodeGroup>
+```bash pip
+pip install dgml-utils
+pip install docugami-langchain
+```
+
+```bash uv
+uv add dgml-utils
+uv add docugami-langchain
+```
+</CodeGroup>
+
+## 文档加载器
+
+查看 [使用示例](/oss/python/integrations/document_loaders/docugami)。
+
+```python
+from docugami_langchain.document_loaders import DocugamiLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\docugami.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

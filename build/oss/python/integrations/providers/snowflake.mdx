@@ -1,0 +1,49 @@
+---
+title: "Snowflake 集成"
+description: "使用 LangChain Python 与 Snowflake 集成。"
+---
+
+> [Snowflake](https://www.snowflake.com/) 是一个基于云的数据仓库平台，允许您存储和查询大量数据。
+
+本页介绍如何在 `LangChain` 中使用 `Snowflake` 生态系统。
+
+## 嵌入模型
+
+Snowflake 在 [Hugging Face](https://huggingface.co/Snowflake/snowflake-arctic-embed-m-v1.5) 上免费提供其开源权重的 `arctic` 系列嵌入模型。最新的模型 snowflake-arctic-embed-m-v1.5 支持 [套娃嵌入](https://arxiv.org/abs/2205.13147)，允许有效的向量截断。
+您可以通过 [HuggingFaceEmbeddings](/oss/python/integrations/embeddings/huggingfacehub) 连接器使用这些模型：
+
+<CodeGroup>
+```bash pip
+pip install langchain-community sentence-transformers
+```
+
+```bash uv
+uv add langchain-community sentence-transformers
+```
+</CodeGroup>
+
+```python
+from langchain_huggingface import HuggingFaceEmbeddings
+
+model = HuggingFaceEmbeddings(model_name="snowflake/arctic-embed-m-v1.5")
+```
+
+## 文档加载器
+
+您可以使用 [`SnowflakeLoader`](/oss/python/integrations/document_loaders/snowflake)
+来从 Snowflake 加载数据：
+
+```python
+from langchain_community.document_loaders import SnowflakeLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\snowflake.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

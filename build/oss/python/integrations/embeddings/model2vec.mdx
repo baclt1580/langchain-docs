@@ -1,0 +1,75 @@
+---
+title: "Model2vec 集成"
+description: "使用 LangChain Python 集成 Model2vec 嵌入模型。"
+---
+
+Model2Vec 是一种将任何句子转换器转换为非常小的静态模型的技术
+[model2vec](https://github.com/MinishLab/model2vec) 可用于生成嵌入。
+
+## 安装
+
+```bash
+pip install -U langchain-community
+```
+
+## 实例化
+
+请确保已安装 `model2vec`
+
+```bash
+pip install -U model2vec
+```
+
+## 索引与检索
+
+```python
+from langchain_community.embeddings import Model2vecEmbeddings
+```
+
+```python
+embeddings = Model2vecEmbeddings("minishlab/potion-base-8M")
+```
+
+```python
+query_text = "This is a test query."
+query_result = embeddings.embed_query(query_text)
+```
+
+```python
+document_text = "This is a test document."
+document_result = embeddings.embed_documents([document_text])
+```
+
+## 直接使用
+
+以下是直接使用 `model2vec` 的方法
+
+```python
+from model2vec import StaticModel
+
+# Load a model from the HuggingFace hub (in this case the potion-base-8M model)
+model = StaticModel.from_pretrained("minishlab/potion-base-8M")
+
+# Make embeddings
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+
+# Make sequences of token embeddings
+token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+---
+
+## API 参考
+
+如需更多信息，请访问 model2vec 的 GitHub [仓库](https://github.com/MinishLab/model2vec)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\model2vec.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,247 @@
+---
+title: "Chroma 集成"
+description: "使用 LangChain JavaScript 与 Chroma 向量存储进行集成。"
+---
+
+[Chroma](https://docs.trychroma.com/getting-started) 是一个 AI 原生的开源向量数据库，专注于开发者的生产力和幸福感。Chroma 采用 Apache 2.0 许可证。
+
+本指南提供了快速入门 Chroma [向量存储](/oss/javascript/integrations/vectorstores) 的概览。有关 `Chroma` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/chroma/Chroma)。
+
+<Info>
+**Chroma Cloud**
+
+Chroma Cloud 提供无服务器向量和全文搜索功能。它极其快速、经济高效、可扩展且易于使用。创建数据库并在 30 秒内使用 5 美元免费额度进行试用。
+
+[开始使用 Chroma Cloud](https://trychroma.com/signup)
+
+</Info>
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | [Python 支持](https://python.langchain.com/docs/integrations/vectorstores/chroma/) | 版本 |
+| :--- | :--- | :---: | :---: |
+| [`Chroma`](https://reference.langchain.com/javascript/langchain-community/vectorstores/chroma/Chroma) | [`@langchain/community`](https://www.npmjs.com/package/@langchain/community) | ✅ |  ![NPM - 版本](https://img.shields.io/npm/v/@langchain/community?style=flat-square&label=%20&) |
+
+## 设置
+
+要使用 Chroma 向量存储，你需要安装 `@langchain/community` 集成包以及作为对等依赖的 [Chroma JS SDK](https://www.npmjs.com/package/chromadb)。
+
+本指南还将使用 [OpenAI 嵌入](/oss/javascript/integrations/embeddings/openai)，这需要你安装 `@langchain/openai` 集成包。你也可以根据需要选择使用 [其他支持的嵌入模型](/oss/javascript/integrations/embeddings)。
+
+<CodeGroup>
+```bash npm
+npm install @langchain/community @langchain/openai @langchain/core chromadb
+```
+```bash yarn
+yarn add @langchain/community @langchain/openai @langchain/core chromadb
+```
+```bash pnpm
+pnpm add @langchain/community @langchain/openai @langchain/core chromadb
+```
+</CodeGroup>
+
+如果你想在本地运行 Chroma，可以使用 Chroma CLI（随 `chromadb` 包提供）[运行本地 Chroma 服务器](https://docs.trychroma.com/docs/cli/run)：
+
+```
+chroma run
+```
+
+你也可以使用官方的 Chroma 镜像在 Docker 上运行服务器：
+
+```
+docker pull chromadb/chroma
+docker run -p 8000:8000 chromadb/chroma
+```
+
+### 凭证
+
+如果你在本地运行 Chroma，则无需提供任何凭证。
+
+如果你是 [Chroma Cloud](https://trychroma.com/signup) 用户，请设置你的 `CHROMA_TENANT`、`CHROMA_DATABASE` 和 `CHROMA_API_KEY` 环境变量。
+
+Chroma CLI 可以为你设置这些变量。首先，通过 CLI [登录](https://docs.trychroma.com/docs/cli/login)，然后使用 [`connect` 命令](https://docs.trychroma.com/docs/cli/db)：
+
+```
+chroma db connect [db_name] --env-file
+```
+
+如果你在本指南中使用 OpenAI 嵌入，还需要设置你的 OpenAI 密钥：
+
+```typescript
+process.env.OPENAI_API_KEY = "YOUR_API_KEY";
+```
+
+如果你想获取模型调用的自动化追踪，也可以设置你的 [LangSmith](/langsmith/home) API 密钥，取消以下注释即可：
+
+```typescript
+// process.env.LANGSMITH_TRACING="true"
+// process.env.LANGSMITH_API_KEY="your-api-key"
+```
+
+## 实例化
+
+### 设置嵌入函数
+
+首先，选择你的嵌入函数。这里我们使用 `OpenAIEmbeddings`：
+
+```python
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const embeddings = new OpenAIEmbeddings({
+  model: "text-embedding-3-small",
+});
+```
+
+### 本地运行
+
+简单的 `Chroma` 实例化将连接到运行在 `http://localhost:8000` 的本地 Chroma 服务器：
+
+```python
+import { Chroma } from "@langchain/community/vectorstores/chroma";
+
+const vectorStore = new Chroma(embeddings, {
+  collectionName: "a-test-collection"
+});
+```
+
+如果你使用不同的配置运行 Chroma 服务器，可以指定你的 `host`、`port` 以及是否使用 `ssl` 连接：
+
+```python
+import { Chroma } from "@langchain/community/vectorstores/chroma";
+
+const vectorStore = new Chroma(embeddings, {
+  collectionName: "a-test-collection",
+  host: "your-host-address",
+  port: 8080
+});
+```
+
+### Chroma Cloud
+
+要连接到 Chroma Cloud，请提供你的 `tenant`、`database` 和 `chromaCloudAPIKey`：
+
+```python
+import { Chroma } from "@langchain/community/vectorstores/chroma";
+
+const vectorStore = new Chroma(embeddings, {
+  collectionName: "a-test-collection",
+  chromaCloudAPIKey: process.env.CHROMA_API_KEY,
+  clientParams: {
+    host: "api.trychroma.com",
+    port: 8000,
+    ssl: true,
+    tenant: process.env.CHROMA_TENANT,
+    database: process.env.CHROMA_DATABASE,
+  },
+});
+```
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```python
+import type { Document } from "@langchain/core/documents";
+
+const document1: Document = {
+  pageContent: "细胞的动力源是线粒体",
+  metadata: { source: "https://example.com" }
+};
+
+const document2: Document = {
+  pageContent: "建筑物由砖块构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document3: Document = {
+  pageContent: "线粒体由脂质构成",
+  metadata: { source: "https://example.com" }
+};
+
+const document4: Document = {
+  pageContent: "2024 年奥运会在巴黎举行",
+  metadata: { source: "https://example.com" }
+}
+
+const documents = [document1, document2, document3, document4];
+
+await vectorStore.addDocuments(documents, { ids: ["1", "2", "3", "4"] });
+```
+
+### 从向量存储删除项目
+
+你可以通过 id 从 Chroma 中删除文档，如下所示：
+
+```python
+await vectorStore.delete({ ids: ["4"] });
+```
+
+## 查询向量存储
+
+一旦你的向量存储创建完成并添加了相关文档，你很可能会在运行链或代理时查询它。
+
+### 直接查询
+
+执行简单的相似性搜索可以按如下方式进行：
+
+```python
+const filter = { source: "https://example.com" };
+
+const similaritySearchResults = await vectorStore.similaritySearch("生物学", 2, filter);
+
+for (const doc of similaritySearchResults) {
+  console.log(`* ${doc.pageContent} [${JSON.stringify(doc.metadata, null)}]`);
+}
+```
+
+有关 Chroma 过滤语法的更多信息，请参阅 [此页面](https://docs.trychroma.com/guides#filtering-by-metadata)。
+
+如果你想执行相似性搜索并获取相应的分数，可以运行：
+
+```python
+const similaritySearchWithScoreResults = await vectorStore.similaritySearchWithScore("生物学", 2, filter)
+
+for (const [doc, score] of similaritySearchWithScoreResults) {
+  console.log(`* [SIM=${score.toFixed(3)}] ${doc.pageContent} [${JSON.stringify(doc.metadata)}]`);
+}
+```
+
+### 通过转换为检索器进行查询
+
+你也可以将向量存储转换为 [检索器](/oss/javascript/langchain/retrieval)，以便在链中更轻松地使用。
+
+```python
+const retriever = vectorStore.asRetriever({
+  // 可选过滤器
+  filter: filter,
+  k: 2,
+});
+await retriever.invoke("生物学");
+```
+
+### 用于检索增强生成
+
+有关如何使用此向量存储进行检索增强生成 (RAG) 的指南，请参阅以下部分：
+
+- [使用 LangChain 构建 RAG 应用](/oss/javascript/langchain/rag)。
+- [代理式 RAG](/oss/javascript/langgraph/agentic-rag)
+- [检索文档](/oss/javascript/langchain/retrieval)
+
+---
+
+## API 参考
+
+有关 `Chroma` 所有功能和配置的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-community/vectorstores/chroma/Chroma)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\chroma.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,171 @@
+---
+title: "SQLiteVec 集成"
+description: "使用 LangChain Python 与 SQLiteVec 向量存储进行集成。"
+---
+
+本笔记本介绍如何开始使用 SQLiteVec 向量存储。
+
+>[SQLite-Vec](https://alexgarcia.xyz/sqlite-vec/) 是一个专为向量搜索设计的 `SQLite` 扩展，强调本地优先操作和无需外部服务器即可轻松集成到应用程序中。它是同一作者开发的 [SQLite-VSS](https://alexgarcia.xyz/sqlite-vss/) 的继任者。它用零依赖的 C 语言编写，设计为易于构建和使用。
+
+本笔记本展示如何使用 `SQLiteVec` 向量数据库。
+
+## 设置
+
+要使用此集成，您需要安装 `langchain-community`，命令为 `pip install -qU langchain-community`
+
+```python
+# You need to install sqlite-vec as a dependency.
+pip install -qU  sqlite-vec
+```
+
+### 凭据
+
+SQLiteVec 不需要任何凭据即可使用，因为向量存储只是一个简单的 SQLite 文件。
+
+## 初始化
+
+```python
+from langchain_community.embeddings.sentence_transformer import (
+    SentenceTransformerEmbeddings,
+)
+from langchain_community.vectorstores import SQLiteVec
+
+embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+vector_store = SQLiteVec(
+    table="state_union", db_file="/tmp/vec.db", embedding=embedding_function
+)
+```
+
+## 管理向量存储
+
+### 向向量存储添加项目
+
+```python
+vector_store.add_texts(texts=["Ketanji Brown Jackson is awesome", "foo", "bar"])
+```
+
+### 更新向量存储中的项目
+
+尚不支持
+
+### 从向量存储删除项目
+
+尚不支持
+
+## 查询向量存储
+
+### 直接查询
+
+```python
+data = vector_store.similarity_search("Ketanji Brown Jackson", k=4)
+```
+
+### 转换为检索器后查询
+
+尚不支持
+
+## 检索增强生成的用法
+
+有关如何使用它进行检索增强生成的更多信息，请参阅 [alexgarcia.xyz/sqlite-vec/](https://alexgarcia.xyz/sqlite-vec/) 上的 sqlite-vec 文档。
+
+## API 参考
+
+有关所有 `SQLiteVec` 功能和配置的详细文档，请前往 [API reference](https://reference.langchain.com/python/langchain-community/vector-stores)
+
+### 其他示例
+
+```python
+from langchain_community.document_loaders import TextLoader
+from langchain_community.embeddings.sentence_transformer import (
+    SentenceTransformerEmbeddings,
+)
+from langchain_community.vectorstores import SQLiteVec
+from langchain_text_splitters import CharacterTextSplitter
+
+# load the document and split it into chunks
+loader = TextLoader("../../how_to/state_of_the_union.txt")
+documents = loader.load()
+
+# split it into chunks
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+texts = [doc.page_content for doc in docs]
+
+
+# create the open-source embedding function
+embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+
+
+# load it in sqlite-vss in a table named state_union.
+# the db_file parameter is the name of the file you want
+# as your sqlite database.
+db = SQLiteVec.from_texts(
+    texts=texts,
+    embedding=embedding_function,
+    table="state_union",
+    db_file="/tmp/vec.db",
+)
+
+# query it
+query = "What did the president say about Ketanji Brown Jackson"
+data = db.similarity_search(query)
+
+# print results
+data[0].page_content
+```
+
+```text
+'Tonight. I call on the Senate to: Pass the Freedom to Vote Act. Pass the John Lewis Voting Rights Act. And while you’re at it, pass the Disclose Act so Americans can know who is funding our elections. \n\nTonight, I’d like to honor someone who has dedicated his life to serve this country: Justice Stephen Breyer—an Army veteran, Constitutional scholar, and retiring Justice of the United States Supreme Court. Justice Breyer, thank you for your service. \n\nOne of the most serious constitutional responsibilities a President has is nominating someone to serve on the United States Supreme Court. \n\nAnd I did that 4 days ago, when I nominated Circuit Court of Appeals Judge Ketanji Brown Jackson. One of our nation’s top legal minds, who will continue Justice Breyer’s legacy of excellence.'
+```
+
+### 使用现有 SQLite 连接的示例
+
+```python
+from langchain_community.document_loaders import TextLoader
+from langchain_community.embeddings.sentence_transformer import (
+    SentenceTransformerEmbeddings,
+)
+from langchain_community.vectorstores import SQLiteVec
+from langchain_text_splitters import CharacterTextSplitter
+
+# load the document and split it into chunks
+loader = TextLoader("../../how_to/state_of_the_union.txt")
+documents = loader.load()
+
+# split it into chunks
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+texts = [doc.page_content for doc in docs]
+
+
+# create the open-source embedding function
+embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+connection = SQLiteVec.create_connection(db_file="/tmp/vec.db")
+
+db1 = SQLiteVec(
+    table="state_union", embedding=embedding_function, connection=connection
+)
+
+db1.add_texts(["Ketanji Brown Jackson is awesome"])
+# query it again
+query = "What did the president say about Ketanji Brown Jackson"
+data = db1.similarity_search(query)
+
+# print results
+data[0].page_content
+```
+
+```text
+'Ketanji Brown Jackson is awesome'
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\sqlitevec.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,222 @@
+---
+title: "SQLToolkit 集成"
+description: "使用 LangChain JavaScript 集成 SQLToolkit 工具。"
+---
+
+本文将帮助你开始使用 `SqlToolkit` [工具包](/oss/javascript/langchain/tools#toolkits)。更多信息，你也可以查阅 [Python SQL 工具包文档](https://python.langchain.com/docs/integrations/toolkits/sql_database/)。
+
+此工具包包含以下工具：
+
+| 名称               | 描述                                                                                                                                                                                                                               |
+|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `query-sql`        | 此工具的输入是一个详细且正确的 SQL 查询，输出是数据库的查询结果。如果查询不正确，将返回错误信息。如果返回错误，请重写查询、检查查询，然后重试。                                                                                     |
+| `info-sql`         | 此工具的输入是一个逗号分隔的表名列表，输出是这些表的架构和示例行。务必先调用 list-tables-sql 来确认这些表确实存在！示例输入："table1, table2, table3"。                                                                           |
+| `list-tables-sql`  | 输入是一个空字符串，输出是数据库中逗号分隔的表名列表。                                                                                                                                                                             |
+| `query-checker`    | 使用此工具在执行查询前再次检查你的查询是否正确。在使用 query-sql 执行查询前，务必先使用此工具！                                                                                                                                     |
+
+此工具包适用于在 SQL 数据库上提问、执行查询、验证查询等操作。
+
+## 设置
+
+本示例使用 Chinook 数据库，这是一个适用于 SQL Server、Oracle、MySQL 等的示例数据库。要设置它，请按照[这些说明](https://database.guide/2-sample-databases-sqlite/)操作，将 `.db` 文件放在你的代码所在的目录中。
+
+如果你想从单个工具的运行中获取自动化追踪，也可以通过取消注释以下代码来设置你的 [LangSmith](/langsmith/home) API 密钥：
+
+```typescript
+process.env.LANGSMITH_TRACING="true"
+process.env.LANGSMITH_API_KEY="your-api-key"
+```
+
+### 安装
+
+此工具包位于 `langchain` 包中。你还需要安装 `typeorm` 对等依赖。
+
+<CodeGroup>
+```bash npm
+npm install langchain @langchain/core typeorm
+```
+```bash yarn
+yarn add langchain @langchain/core typeorm
+```
+```bash pnpm
+pnpm add langchain @langchain/core typeorm
+```
+</CodeGroup>
+
+## 实例化
+
+首先，我们需要定义要在工具包中使用的 LLM。
+
+```typescript
+// @lc-docs-hide-cell
+
+import { ChatOpenAI } from "@langchain/openai";
+
+const llm = new ChatOpenAI({
+  model: "gpt-4.1-mini",
+  temperature: 0,
+})
+```
+
+```typescript
+import { SqlToolkit } from "@langchain/classic/agents/toolkits/sql"
+import { DataSource } from "typeorm";
+import { SqlDatabase } from "@langchain/classic/sql_db";
+
+const datasource = new DataSource({
+  type: "sqlite",
+  database: "../../../../../../Chinook.db", // 替换为你的数据库链接
+});
+const db = await SqlDatabase.fromDataSourceParams({
+  appDataSource: datasource,
+});
+
+const toolkit = new SqlToolkit(db, llm);
+```
+
+## 工具
+
+查看可用工具：
+
+```typescript
+const tools = toolkit.getTools();
+
+console.log(tools.map((tool) => ({
+  name: tool.name,
+  description: tool.description,
+})))
+```
+
+```text
+[
+  {
+    name: 'query-sql',
+    description: '输入到此工具的是一个详细且正确的 SQL 查询，输出是数据库的结果。\n' +
+      '  如果查询不正确，将返回错误信息。\n' +
+      '  如果返回错误，请重写查询、检查查询，然后重试。'
+  },
+  {
+    name: 'info-sql',
+    description: '输入到此工具的是一个逗号分隔的表名列表，输出是这些表的架构和示例行。\n' +
+      '    务必先调用 list-tables-sql 来确认这些表确实存在！\n' +
+      '\n' +
+      '    示例输入："table1, table2, table3"。'
+  },
+  {
+    name: 'list-tables-sql',
+    description: '输入是一个空字符串，输出是数据库中逗号分隔的表名列表。'
+  },
+  {
+    name: 'query-checker',
+    description: '使用此工具在执行查询前再次检查你的查询是否正确。\n' +
+      '    在使用 query-sql 执行查询前，务必先使用此工具！'
+  }
+]
+```
+
+## 在智能体中使用
+
+首先，确保已安装 LangGraph：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/langgraph
+```
+```bash yarn
+yarn add @langchain/langgraph
+```
+```bash pnpm
+pnpm add @langchain/langgraph
+```
+</CodeGroup>
+
+```typescript
+import { createAgent } from "@langchain/classic"
+
+const agentExecutor = createAgent({ llm, tools });
+```
+
+```typescript
+const exampleQuery = "你能从我的数据库中列出 10 位艺术家吗？"
+
+const events = await agentExecutor.stream(
+  { messages: [["user", exampleQuery]]},
+  { streamMode: "values", }
+)
+
+for await (const event of events) {
+  const lastMsg = event.messages[event.messages.length - 1];
+  if (lastMsg.tool_calls?.length) {
+    console.dir(lastMsg.tool_calls, { depth: null });
+  } else if (lastMsg.content) {
+    console.log(lastMsg.content);
+  }
+}
+```
+
+```json
+[
+  {
+    name: 'list-tables-sql',
+    args: {},
+    type: 'tool_call',
+    id: 'call_LqsRA86SsKmzhRfSRekIQtff'
+  }
+]
+Album, Artist, Customer, Employee, Genre, Invoice, InvoiceLine, MediaType, Playlist, PlaylistTrack, Track
+[
+  {
+    name: 'query-checker',
+    args: { input: 'SELECT * FROM Artist LIMIT 10;' },
+    type: 'tool_call',
+    id: 'call_MKBCjt4gKhl5UpnjsMHmDrBH'
+  }
+]
+你提供的 SQL 查询是：
+
+\`\`\`sql
+SELECT * FROM Artist LIMIT 10;
+\`\`\`
+
+这个查询很简单，不包含任何列出的常见错误。它只是从 `Artist` 表中选择所有列，并将结果限制为 10 行。
+
+因此，没有需要纠正的错误，原始查询可以原样复制：
+
+\`\`\`sql
+SELECT * FROM Artist LIMIT 10;
+\`\`\`
+[
+  {
+    name: 'query-sql',
+    args: { input: 'SELECT * FROM Artist LIMIT 10;' },
+    type: 'tool_call',
+    id: 'call_a8MPiqXPMaN6yjN9i7rJctJo'
+  }
+]
+[{"ArtistId":1,"Name":"AC/DC"},{"ArtistId":2,"Name":"Accept"},{"ArtistId":3,"Name":"Aerosmith"},{"ArtistId":4,"Name":"Alanis Morissette"},{"ArtistId":5,"Name":"Alice In Chains"},{"ArtistId":6,"Name":"Antônio Carlos Jobim"},{"ArtistId":7,"Name":"Apocalyptica"},{"ArtistId":8,"Name":"Audioslave"},{"ArtistId":9,"Name":"BackBeat"},{"ArtistId":10,"Name":"Billy Cobham"}]
+以下是你的数据库中的 10 位艺术家：
+
+1. AC/DC
+2. Accept
+3. Aerosmith
+4. Alanis Morissette
+5. Alice In Chains
+6. Antônio Carlos Jobim
+7. Apocalyptica
+8. Audioslave
+9. BackBeat
+10. Billy Cobham
+```
+
+---
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\sql.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

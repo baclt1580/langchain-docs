@@ -1,0 +1,52 @@
+---
+title: "Jina AI 集成"
+description: "使用 LangChain Python 与 Jina AI 集成。"
+---
+
+>[Jina AI](https://jina.ai/about-us) 是一家搜索 AI 公司。`Jina` 帮助企业及开发者通过更好的搜索解锁多模态数据。
+
+<Warning>
+为确保兼容性，请确保您使用的是版本为 **0.x** 的 `openai` SDK。
+</Warning>
+
+## 安装和设置
+- 从 [Jina AI 嵌入页面](https://jina.ai/embeddings/) 获取 Jina AI API 令牌，并将其设置为环境变量（`JINA_API_TOKEN`）
+
+## 聊天模型
+
+```python
+from langchain_community.chat_models import JinaChat
+```
+
+查看 [使用示例](/oss/python/integrations/chat/jinachat)。
+
+## 嵌入模型
+
+您可以在 [Jina AI 嵌入页面](https://jina.ai/embeddings/) 上查看可用模型列表
+
+```python
+from langchain_community.embeddings import JinaEmbeddings
+```
+
+查看 [使用示例](/oss/python/integrations/embeddings/jina)。
+
+## 文档转换器
+
+### Jina 重排
+
+```python
+from langchain_community.document_compressors import JinaRerank
+```
+
+查看 [使用示例](/oss/python/integrations/document_transformers/jina_rerank)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\jina.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

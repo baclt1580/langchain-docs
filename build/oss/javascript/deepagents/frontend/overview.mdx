@@ -1,0 +1,105 @@
+---
+title: 概述
+description: 构建能够实时显示深度智能体子智能体流、任务进度和沙盒环境的用户界面
+---
+
+构建能够实时可视化深度智能体工作流程的前端界面。这些模式展示了如何渲染子智能体进度、任务规划、流式内容，以及由 `createDeepAgent` 创建的智能体所提供的类 IDE 沙盒体验。
+
+## 架构
+
+深度智能体采用协调器-工作者架构。主智能体负责规划任务并委托给专门的子智能体，每个子智能体都在隔离环境中运行。在前端，`useStream` 会同时暴露协调器的消息和每个子智能体的流式状态。
+
+```mermaid
+%%{
+  init: {
+    "fontFamily": "monospace",
+    "flowchart": {
+      "curve": "curve"
+    }
+  }
+}%%
+graph LR
+  FRONTEND["useStream()"]
+  BACKEND["createDeepAgent()"]
+  SUB1["子智能体 A"]
+  SUB2["子智能体 B"]
+
+  BACKEND --"流"--> FRONTEND
+  FRONTEND --"提交"--> BACKEND
+  BACKEND --"委托"--> SUB1
+  BACKEND --"委托"--> SUB2
+  SUB1 --"结果"--> BACKEND
+  SUB2 --"结果"--> BACKEND
+
+  classDef blueHighlight fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A;
+  classDef greenHighlight fill:#DCFCE7,stroke:#16A34A,color:#14532D;
+  classDef purpleHighlight fill:#EDE9FE,stroke:#7C3AED,color:#4C1D95;
+  class FRONTEND blueHighlight;
+  class BACKEND greenHighlight;
+  class SUB1,SUB2 purpleHighlight;
+```
+
+
+
+```ts
+import { createDeepAgent } from "deepagents";
+
+const agent = createDeepAgent({
+  tools: [getWeather],
+  system: "你是一个乐于助人的助手",
+  subagents: [
+    {
+      name: "researcher",
+      description: "研究助手",
+    },
+  ],
+});
+```
+
+
+
+在前端，使用 `useStream` 进行连接的方式与 `createAgent` 相同。深度智能体模式利用了 `useStream` 的额外功能，如 `stream.subagents`、`stream.values.todos` 和 `filterSubagentMessages`，以渲染针对子智能体的用户界面。
+
+```ts
+import { useStream } from "@langchain/react";
+
+function App() {
+  const stream = useStream<typeof agent>({
+    apiUrl: "http://localhost:2024",
+    assistantId: "agent",
+  });
+
+  // 深度智能体状态（超出消息部分）
+  const todos = stream.values?.todos;
+  const subagents = stream.subagents;
+}
+```
+
+## 模式
+
+<CardGroup cols={3}>
+  <Card title="子智能体流式处理" icon="arrows-split" href="/oss/javascript/deepagents/frontend/subagent-streaming">
+    展示具有流式内容、进度跟踪和可折叠卡片功能的专业子智能体。
+  </Card>
+  <Card title="待办事项列表" icon="list-check" href="/oss/javascript/deepagents/frontend/todo-list">
+    通过从智能体状态同步的实时待办事项列表来跟踪智能体进度。
+  </Card>
+  <Card title="沙盒环境" icon="code" href="/oss/javascript/deepagents/frontend/sandbox">
+    构建一个类 IDE 的用户界面，包含文件浏览器、代码查看器和由沙盒支持的差异对比面板。
+  </Card>
+</CardGroup>
+
+## 相关模式
+
+[LangChain 前端模式](/oss/javascript/langchain/frontend/overview)（包括 Markdown 消息、工具调用和人在回路）同样适用于深度智能体。深度智能体基于相同的 LangGraph 运行时构建，因此 `useStream` 提供了相同的核心 API。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\deepagents\frontend\overview.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

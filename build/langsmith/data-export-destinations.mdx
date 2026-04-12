@@ -1,0 +1,351 @@
+---
+title: 管理批量导出目标
+description: 为 LangSmith 批量导出配置和管理 S3 兼容的导出目标。
+---
+
+<Note>
+**适用于自托管和欧盟区域部署**
+
+对于自托管安装或欧盟区域的组织，请在以下请求中相应地更新 LangSmith URL。
+对于欧盟区域，请使用 `eu.api.smith.langchain.com`。
+</Note>
+
+目标是一个命名配置，用于告知 LangSmith 将导出的跟踪数据写入何处。您只需[创建一次目标](/langsmith/data-export#create-a-destination)，然后在[创建导出作业](/langsmith/data-export#create-an-export-job)时通过 ID 引用它。LangSmith 目前支持 S3 和任何 S3 兼容的存储桶（例如 GCS 或 MinIO）作为目标。导出的数据以 [Parquet](https://parquet.apache.org/docs/overview/) 列式格式写入，并包含与[运行数据格式](/langsmith/run-data-format)等效的字段。
+
+本页涵盖：
+
+- 设置目标所需的[配置字段](#configuration-fields)。
+- AWS S3 和 GCS 所需的存储桶[权限](#permissions-required)。
+- 如何通过 API [创建目标](#create-a-destination)，包括特定于提供商的示例和凭证选项。
+- 如何在不重新创建目标的情况下[轮换目标凭证](#rotate-destination-credentials)。
+- 如何[调试目标错误](#debug-destination-errors)。
+
+## 配置字段
+
+配置目标需要以下信息：
+
+- **存储桶名称**：数据将导出到的 S3 存储桶的名称。
+- **前缀**：存储桶内数据将导出到的根前缀。
+- **S3 区域**：存储桶的区域——对于 AWS S3 存储桶是必需的。
+- **端点 URL**：S3 存储桶的端点 URL——对于 S3 API 兼容的存储桶是必需的。
+- **访问密钥**：S3 存储桶的访问密钥。
+- **秘密密钥**：S3 存储桶的秘密密钥。
+- **在前缀中包含存储桶**（可选）：是否将存储桶名称作为路径前缀的一部分。默认为 `true`。当使用虚拟托管式端点（其中端点 URL 已包含存储桶名称）时，请设置为 `false`。
+
+我们支持任何 S3 兼容的存储桶。对于非 AWS 存储桶（如 GCS 或 MinIO），您需要提供端点 URL。
+
+## 所需权限
+
+`backend` 和 `queue` 服务都需要对目标存储桶具有写入权限：
+
+- `backend` 服务在创建导出目标时会尝试向目标存储桶写入一个测试文件。如果具有删除权限，它将删除该测试文件（删除权限是可选的）。
+- `queue` 服务负责批量导出的执行并将文件上传到存储桶。
+
+### AWS S3 权限
+
+最小的 AWS S3 权限策略依赖于以下权限：
+
+- `s3:PutObject`（必需）：允许向存储桶写入 Parquet 文件。
+- `s3:DeleteObject`（可选）：在目标创建期间清理测试文件。如果缺少此权限，文件将在目标创建后留在 `/tmp` 目录下。
+- `s3:GetObject`（可选但推荐）：写入后验证文件大小。
+- `s3:AbortMultipartUpload`（可选但推荐）：避免残留的多部分上传。
+
+最小 IAM 策略示例：
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_BUCKET_NAME/*"
+      ]
+    }
+  ]
+}
+```
+
+推荐包含额外权限的 IAM 策略示例：
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_BUCKET_NAME/*"
+      ]
+    }
+  ]
+}
+```
+
+### Google Cloud Storage (GCS) 权限
+
+当使用 GCS 的 S3 兼容 XML API 时，需要以下 IAM 权限：
+
+- `storage.objects.create`（必需）：允许向存储桶写入文件。
+- `storage.objects.delete`（可选）：在目标创建期间清理测试文件。如果缺少此权限，文件将在目标创建后留在 `/tmp` 目录下。
+- `storage.objects.get`（可选但推荐）：写入后验证文件大小。
+
+这些权限可以通过“Storage Object Admin”预定义角色或自定义角色授予。
+
+## 创建目标
+
+以下示例演示了如何使用 cURL 创建目标。请将占位符值替换为您的实际配置详情。
+请注意，凭证将以加密形式安全地存储在我们的系统中。
+
+```bash
+curl --request POST \
+  --url 'https://api.smith.langchain.com/api/v1/bulk-exports/destinations' \
+  --header 'Content-Type: application/json' \
+  --header 'X-API-Key: YOUR_API_KEY' \
+  --header 'X-Tenant-Id: YOUR_WORKSPACE_ID' \
+  --data '{
+    "destination_type": "s3",
+    "display_name": "我的 S3 目标",
+    "config": {
+      "bucket_name": "your-s3-bucket-name",
+      "prefix": "root_folder_prefix",
+      "region": "your aws s3 region",
+      "endpoint_url": "your endpoint url for s3 compatible buckets",
+      "include_bucket_in_prefix": true // 默认为 true，可以省略
+    },
+    "credentials": {
+      "access_key_id": "YOUR_S3_ACCESS_KEY_ID",
+      "secret_access_key": "YOUR_S3_SECRET_ACCESS_KEY"
+    }
+  }'
+```
+
+使用返回的 `id` 在后续的批量导出操作中引用此目标。
+
+**如果在创建目标时遇到错误，请参阅[调试目标错误](#debug-destination-errors)了解如何调试此问题。**
+
+### 凭证配置
+
+<Note>**需要 LangSmith Helm 版本 >= `0.10.34`（应用版本 >= `0.10.91`）**</Note>
+
+除了静态的 `access_key_id` 和 `secret_access_key` 外，我们还支持以下额外的凭证格式：
+
+- 要使用包含 AWS 会话令牌的[临时凭证](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)，
+  在创建批量导出目标时额外提供 `credentials.session_token` 键。
+- （仅限自托管）：要使用基于环境的凭证，例如使用 [AWS IAM Roles for Service Accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) (IRSA)，
+  在创建批量导出目标的请求中省略 `credentials` 键。
+  在这种情况下，将按照库定义的顺序检查[标准的 Boto3 凭证位置](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html#credentials)。
+
+### AWS S3 存储桶
+
+对于 AWS S3，您可以省略 `endpoint_url`，并提供与您的存储桶区域匹配的区域。
+
+```bash
+curl --request POST \
+  --url 'https://api.smith.langchain.com/api/v1/bulk-exports/destinations' \
+  --header 'Content-Type: application/json' \
+  --header 'X-API-Key: YOUR_API_KEY' \
+  --header 'X-Tenant-Id: YOUR_WORKSPACE_ID' \
+  --data '{
+    "destination_type": "s3",
+    "display_name": "我的 AWS S3 目标",
+    "config": {
+      "bucket_name": "my_bucket",
+      "prefix": "data_exports",
+      "region": "us-east-1"
+    },
+    "credentials": {
+      "access_key_id": "YOUR_S3_ACCESS_KEY_ID",
+      "secret_access_key": "YOUR_S3_SECRET_ACCESS_KEY"
+    }
+  }'
+```
+
+### Google GCS XML S3 兼容存储桶
+
+使用 Google 的 GCS 存储桶时，您需要使用 XML S3 兼容 API，并提供 `endpoint_url`，
+通常是 `https://storage.googleapis.com`。
+以下是使用与 S3 兼容的 GCS XML API 时的 API 请求示例：
+
+```bash
+curl --request POST \
+  --url 'https://api.smith.langchain.com/api/v1/bulk-exports/destinations' \
+  --header 'Content-Type: application/json' \
+  --header 'X-API-Key: YOUR_API_KEY' \
+  --header 'X-Tenant-Id: YOUR_WORKSPACE_ID' \
+  --data '{
+    "destination_type": "s3",
+    "display_name": "我的 GCS 目标",
+    "config": {
+      "bucket_name": "my_bucket",
+      "prefix": "data_exports",
+      "endpoint_url": "https://storage.googleapis.com"
+      "include_bucket_in_prefix": true // 默认为 true，可以省略
+    },
+    "credentials": {
+      "access_key_id": "YOUR_S3_ACCESS_KEY_ID",
+      "secret_access_key": "YOUR_S3_SECRET_ACCESS_KEY"
+    }
+  }'
+```
+
+更多信息请参阅 [Google 文档](https://cloud.google.com/storage/docs/interoperability#xml_api)
+
+### 使用虚拟托管式端点的 S3 兼容存储桶
+
+如果您的端点 URL 已包含存储桶名称（虚拟托管式），请将 `include_bucket_in_prefix` 设置为 `false`，以避免在路径中重复存储桶名称：
+
+```bash
+curl --request POST \
+  --url 'https://api.smith.langchain.com/api/v1/bulk-exports/destinations' \
+  --header 'Content-Type: application/json' \
+  --header 'X-API-Key: YOUR_API_KEY' \
+  --header 'X-Tenant-Id: YOUR_WORKSPACE_ID' \
+  --data '{
+    "destination_type": "s3",
+    "display_name": "我的虚拟托管式目标",
+    "config": {
+      "bucket_name": "my_bucket",
+      "prefix": "data_exports",
+      "endpoint_url": "https://my_bucket.s3.us-east-1.amazonaws.com",
+      "include_bucket_in_prefix": false
+    },
+    "credentials": {
+      "access_key_id": "YOUR_S3_ACCESS_KEY_ID",
+      "secret_access_key": "YOUR_S3_SECRET_ACCESS_KEY"
+    }
+  }'
+```
+
+## 轮换目标凭证
+
+使用 `PATCH /api/v1/bulk-exports/destinations/{destination_id}` 来更新现有目标的凭证。这允许您在不重新创建目标或其关联的批量导出的情况下轮换或替换凭证。目标配置（存储桶、前缀、区域、端点等）保持不变——仅替换凭证。
+
+### 凭证轮换行为
+
+切换不是即时的：
+
+- **新的批量导出运行** 在 PATCH 完成后立即使用更新后的凭证。
+- **已在运行的批量导出运行** 继续使用之前的凭证，直到它们完成。
+- **两组凭证在过渡期间同时处于活动状态**。此窗口持续到单个批量导出运行的最长运行时间。
+
+请相应规划您的轮换：旧凭证必须保持有效，直到所有正在进行的运行完成。
+
+### 请求
+
+```bash
+curl --request PATCH \
+  --url 'https://api.smith.langchain.com/api/v1/bulk-exports/destinations/{destination_id}' \
+  --header 'Content-Type: application/json' \
+  --header 'X-API-Key: YOUR_API_KEY' \
+  --header 'X-Tenant-Id: YOUR_WORKSPACE_ID' \
+  --data '{
+    "credentials": {
+      "access_key_id": "YOUR_NEW_ACCESS_KEY_ID",
+      "secret_access_key": "YOUR_NEW_SECRET_ACCESS_KEY"
+    }
+  }'
+```
+
+`session_token` 字段是可选的，您可以为[临时凭证](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)包含它。
+
+[**所需权限**](/langsmith/organization-workspace-operations): `WORKSPACES_MANAGE`
+
+在存储新凭证之前，LangSmith 会使用现有的目标配置对存储桶执行测试写入来验证它们。如果凭证没有足够的写入权限，请求将失败并返回 `400`。如果请求失败，请参考[调试目标错误](#debug-destination-errors)。
+
+### 响应
+
+返回更新后的目标对象。凭证值从不返回——只有凭证字段名称包含在响应中的 `credentials_keys` 下。
+
+```json
+{
+  "id": "destination-uuid",
+  "tenant_id": "tenant-uuid",
+  "created_at": "2025-01-01T00:00:00Z",
+  "updated_at": "2025-06-01T00:00:00Z",
+  "credentials_keys": ["access_key_id", "secret_access_key"]
+}
+```
+
+### 轮换清单
+
+1.  在您的云提供商中配置对目标存储桶和前缀具有写入权限的新凭证。
+1.  使用新凭证调用 PATCH 端点。LangSmith 在保存前会验证它们。
+1.  保持旧凭证处于活动状态，直到所有正在进行的批量导出运行完成（最多到[最长运行持续时间](/langsmith/data-export-monitor#automatic-retry-behavior)）。
+1.  一旦没有运行使用旧凭证，就撤销它们。
+
+## 调试目标错误
+
+目标 API 端点将验证目标和凭证是否有效，以及是否对存储桶具有写入权限。
+
+如果您遇到错误，并希望调试此错误，可以使用 [AWS CLI](https://aws.amazon.com/cli/)
+来测试与存储桶的连接性。您应该能够使用与提供给上述目标 API 相同的数据，通过 CLI 写入一个文件。
+
+**AWS S3:**
+
+```bash
+aws configure
+
+# 设置与目标相同的访问密钥凭证和区域
+> AWS Access Key ID: <access_key_id>
+> AWS Secret Access Key: <secret_access_key>
+> Default region name [us-east-1]: <region>
+
+# 列出存储桶
+aws s3 ls /
+
+# 测试写入权限
+touch ./test.txt
+aws s3 cp ./test.txt s3://<bucket-name>/tmp/test.txt
+```
+
+**GCS 兼容存储桶：**
+
+您需要使用 `--endpoint-url` 选项提供 `endpoint_url`。
+对于 GCS，`endpoint_url` 通常是 `https://storage.googleapis.com`：
+
+```bash
+aws configure
+
+# 设置与目标相同的访问密钥凭证和区域
+> AWS Access Key ID: <access_key_id>
+> AWS Secret Access Key: <secret_access_key>
+> Default region name [us-east-1]: <region>
+
+# 列出存储桶
+aws s3 --endpoint-url=<endpoint_url> ls /
+
+# 测试写入权限
+touch ./test.txt
+aws s3 --endpoint-url=<endpoint_url> cp ./test.txt s3://<bucket-name>/tmp/test.txt
+```
+
+### 常见错误
+
+以下是一些常见错误：
+
+| 错误                               | 描述                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 访问被拒绝                         | 对象存储凭证或存储桶无效。当提供的访问密钥和秘密密钥组合没有必要的权限来访问指定的存储桶或执行所需操作时，会发生此错误。                                                                                                                                                                                                             |
+| 存储桶无效                         | 指定的对象存储存储桶无效。当存储桶不存在或没有足够的权限对存储桶执行写入操作时，会抛出此错误。                                                                                                                                                                                                                                       |
+| 提供的密钥 ID 不存在               | 提供的对象存储凭证无效。当用于身份验证的访问密钥 ID 不是有效密钥时，会发生此错误。                                                                                                                                                                                                                                                   |
+| 无效的端点                         | 提供的 `endpoint_url` 无效。当指定的端点是一个无效的端点时，会引发此错误。仅支持 S3 兼容的端点，例如 GCS 的 `https://storage.googleapis.com`，minio 的 `https://play.min.io` 等。如果使用 AWS，您应该省略 `endpoint_url`。                                                                                                            |
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\data-export-destinations.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,43 @@
+---
+title: "Tair 集成"
+description: "使用 LangChain Python 与 Tair 集成。"
+---
+
+>[阿里云 Tair](https://www.alibabacloud.com/help/en/tair/latest/what-is-tair) 是一种云原生内存数据库服务
+>由 `Alibaba Cloud` 开发。它提供丰富的数据模型和企业级功能以
+>支持您的实时在线场景，同时保持与开源 `Redis` 的完全兼容。
+>`Tair` 还引入了持久化内存优化实例，其基于
+>新型非易失性内存（NVM）存储介质。
+
+## 安装和设置
+
+安装 Tair Python SDK：
+
+<CodeGroup>
+```bash pip
+pip install tair
+```
+
+```bash uv
+uv add tair
+```
+</CodeGroup>
+
+## 向量存储
+
+```python
+from langchain_community.vectorstores import Tair
+```
+
+查看 [使用示例](/oss/python/integrations/vectorstores/tair)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\tair.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

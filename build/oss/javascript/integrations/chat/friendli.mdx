@@ -1,0 +1,95 @@
+---
+title: "ChatFriendli 集成"
+description: "使用 LangChain JavaScript 集成 ChatFriendli 聊天模型。"
+---
+
+> [Friendli](https://friendli.ai/) 通过可扩展、高效的部署选项提升 AI 应用性能并优化成本节约，专为高需求的 AI 工作负载量身定制。
+
+本教程将指导您使用 LangChain 集成 `ChatFriendli` 用于聊天应用。`ChatFriendli` 提供了一种灵活的方法来生成对话式 AI 响应，支持同步和异步调用。
+
+## 设置
+
+确保已安装 `@langchain/community`。
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/community @langchain/core
+```
+
+登录 [Friendli Suite](https://suite.friendli.ai/) 创建个人访问令牌，并将其设置为 `FRIENDLI_TOKEN` 环境变量。
+您可以将团队 ID 设置为 `FRIENDLI_TEAM` 环境变量。
+
+您可以通过选择要使用的模型来初始化 Friendli 聊天模型。默认模型为 `meta-llama-3-8b-instruct`。您可以在 [docs.friendli.ai](https://docs.friendli.ai/guides/serverless_endpoints/pricing#text-generation-models) 查看可用模型。
+
+## 使用
+
+```typescript
+import { ChatFriendli } from "@langchain/community/chat_models/friendli";
+
+const model = new ChatFriendli({
+  model: "meta-llama-3-8b-instruct", // 默认值
+  friendliToken: process.env.FRIENDLI_TOKEN,
+  friendliTeam: process.env.FRIENDLI_TEAM,
+  maxTokens: 800,
+  temperature: 0.9,
+  topP: 0.9,
+  frequencyPenalty: 0,
+  stop: [],
+});
+
+const response = await model.invoke(
+  "为软件工程职位起草一封求职信。"
+);
+
+console.log(response.content);
+
+/*
+尊敬的 [招聘经理]：
+
+我很高兴申请 [公司名称] 的软件工程师职位。凭借我对创新、创造力和解决问题的热情，我相信我能为您的团队带来价值。
+
+作为一名高度积极且注重细节的人，...
+*/
+
+const stream = await model.stream(
+  "为软件工程职位起草一封求职信。"
+);
+
+for await (const chunk of stream) {
+  console.log(chunk.content);
+}
+
+/*
+尊
+敬
+的
+ [
+招
+聘
+...
+[
+您
+的
+姓名
+]
+*/
+```
+
+## 相关
+
+- 聊天模型[概念指南](/oss/javascript/langchain/models)
+- 聊天模型[操作指南](/oss/javascript/langchain/models)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\chat\friendli.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

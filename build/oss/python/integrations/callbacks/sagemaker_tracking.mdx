@@ -1,0 +1,221 @@
+---
+title: "SageMaker 追踪集成"
+description: "使用 LangChain Python 与 SageMaker 追踪回调集成。"
+---
+
+>[Amazon SageMaker](https://aws.amazon.com/sagemaker/) 是一项完全托管的服务，用于快速轻松地构建、训练和部署机器学习（ML）模型。
+
+>[Amazon SageMaker Experiments](https://docs.aws.amazon.com/sagemaker/latest/dg/experiments.html) 是 `Amazon SageMaker` 的一项功能，可让您组织、追踪、比较和评估 ML 实验和模型版本。
+
+本笔记本展示了如何使用 LangChain 回调将提示词和其他 LLM 超参数记录并追踪到 `SageMaker Experiments` 中。这里，我们使用不同的场景来展示其功能：
+
+* **场景 1**：*单一 LLM* - 使用单个 LLM 模型基于给定提示词生成输出的情况。
+* **场景 2**：*顺序链* - 使用两个 LLM 模型顺序链的情况。
+* **场景 3**：*带工具的代理（思维链）* - 除了 LLM 外还使用多个工具（搜索和数学）的情况。
+
+在本笔记本中，我们将创建一个实验来记录每个场景的提示词。
+
+## 安装与设置
+
+```python
+pip install -qU  sagemaker
+pip install -qU  langchain-openai
+pip install -qU  google-search-results
+```
+
+首先，设置所需的 API 密钥
+
+* OpenAI: [platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys)（用于 OpenAI LLM 模型）
+* Google SERP API: [serpapi.com/manage-api-key](https://serpapi.com/manage-api-key)（用于 Google 搜索工具）
+
+```python
+import os
+
+## 在下方添加您的 API 密钥
+os.environ["OPENAI_API_KEY"] = "<ADD-KEY-HERE>"
+os.environ["SERPAPI_API_KEY"] = "<ADD-KEY-HERE>"
+```
+
+```python
+from langchain_community.callbacks.sagemaker_callback import SageMakerCallbackHandler
+```
+
+```python
+from langchain.agents import create_agent, load_tools
+from langchain_classic.chains import LLMChain, SimpleSequentialChain
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from sagemaker.analytics import ExperimentAnalytics
+from sagemaker.experiments.run import Run
+from sagemaker.session import Session
+```
+
+## LLM 提示词追踪
+
+```python
+# LLM 超参数
+HPARAMS = {
+    "temperature": 0.1,
+    "model_name": "gpt-3.5-turbo-instruct",
+}
+
+# 用于保存提示词日志的存储桶（使用 `None` 表示保存到默认存储桶，否则请更改）
+BUCKET_NAME = None
+
+# 实验名称
+EXPERIMENT_NAME = "langchain-sagemaker-tracker"
+
+# 使用给定存储桶创建 SageMaker 会话
+session = Session(default_bucket=BUCKET_NAME)
+```
+
+### 场景 1 - LLM
+
+```python
+RUN_NAME = "run-scenario-1"
+PROMPT_TEMPLATE = "给我讲一个关于 {topic} 的笑话"
+INPUT_VARIABLES = {"topic": "鱼"}
+```
+
+```python
+with Run(
+    experiment_name=EXPERIMENT_NAME, run_name=RUN_NAME, sagemaker_session=session
+) as run:
+    # 创建 SageMaker 回调
+    sagemaker_callback = SageMakerCallbackHandler(run)
+
+    # 定义带回调的 LLM 模型
+    llm = OpenAI(callbacks=[sagemaker_callback], **HPARAMS)
+
+    # 创建提示词模板
+    prompt = PromptTemplate.from_template(template=PROMPT_TEMPLATE)
+
+    # 创建 LLM 链
+    chain = LLMChain(llm=llm, prompt=prompt, callbacks=[sagemaker_callback])
+
+    # 运行链
+    chain.run(**INPUT_VARIABLES)
+
+    # 重置回调
+    sagemaker_callback.flush_tracker()
+```
+
+### 场景 2 - 顺序链
+
+```python
+RUN_NAME = "run-scenario-2"
+
+PROMPT_TEMPLATE_1 = """你是一位剧作家。给定剧本的标题，你的工作是为该标题撰写剧情简介。
+标题：{title}
+剧作家：这是上述剧本的剧情简介："""
+PROMPT_TEMPLATE_2 = """你是《纽约时报》的戏剧评论家。给定剧本的剧情简介，你的工作是为该剧本撰写评论。
+剧本简介：{synopsis}
+《纽约时报》戏剧评论家对上述剧本的评论："""
+
+INPUT_VARIABLES = {
+    "input": "关于推动游戏设计边界的优秀视频游戏的纪录片"
+}
+```
+
+```python
+with Run(
+    experiment_name=EXPERIMENT_NAME, run_name=RUN_NAME, sagemaker_session=session
+) as run:
+    # 创建 SageMaker 回调
+    sagemaker_callback = SageMakerCallbackHandler(run)
+
+    # 为链创建提示词模板
+    prompt_template1 = PromptTemplate.from_template(template=PROMPT_TEMPLATE_1)
+    prompt_template2 = PromptTemplate.from_template(template=PROMPT_TEMPLATE_2)
+
+    # 定义带回调的 LLM 模型
+    llm = OpenAI(callbacks=[sagemaker_callback], **HPARAMS)
+
+    # 创建链1
+    chain1 = LLMChain(llm=llm, prompt=prompt_template1, callbacks=[sagemaker_callback])
+
+    # 创建链2
+    chain2 = LLMChain(llm=llm, prompt=prompt_template2, callbacks=[sagemaker_callback])
+
+    # 创建顺序链
+    overall_chain = SimpleSequentialChain(
+        chains=[chain1, chain2], callbacks=[sagemaker_callback]
+    )
+
+    # 运行整体顺序链
+    overall_chain.run(**INPUT_VARIABLES)
+
+    # 重置回调
+    sagemaker_callback.flush_tracker()
+```
+
+### 场景 3 - 带工具的代理
+
+```python
+RUN_NAME = "run-scenario-3"
+PROMPT_TEMPLATE = "谁是仍在世的最年长的人？并且他们当前的年龄的 1.51 次幂是多少？"
+
+with Run(
+    experiment_name=EXPERIMENT_NAME,
+    run_name=RUN_NAME,
+    sagemaker_session=session,
+) as run:
+    # 创建 SageMaker 回调
+    sagemaker_callback = SageMakerCallbackHandler(run)
+
+    # 定义带回调的 LLM 模型
+    llm = OpenAI(callbacks=[sagemaker_callback], **HPARAMS)
+
+    # 定义工具
+    tools = load_tools(
+        ["serpapi", "llm-math"],
+        llm=llm,
+        callbacks=[sagemaker_callback],
+    )
+
+    # 创建代理
+    agent = create_agent(
+        model=llm,
+        tools=tools,
+        callbacks=[sagemaker_callback],
+    )
+
+    # 运行代理
+    agent.invoke(PROMPT_TEMPLATE)
+
+    # 重置回调
+    sagemaker_callback.flush_tracker()
+
+```
+
+## 加载日志数据
+
+一旦提示词被记录，我们可以轻松地加载它们并转换为 Pandas DataFrame，如下所示。
+
+```python
+# 加载
+logs = ExperimentAnalytics(experiment_name=EXPERIMENT_NAME)
+
+# 转换为 pandas dataframe
+df = logs.dataframe(force_refresh=True)
+
+print(df.shape)
+df.head()
+```
+
+如上所示，实验中有三个运行（行），分别对应每个场景。每个运行都将提示词和相关的 LLM 设置/超参数记录为 json 并保存在 s3 存储桶中。您可以自由加载和探索每个 json 路径中的日志数据。
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\callbacks\sagemaker_tracking.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

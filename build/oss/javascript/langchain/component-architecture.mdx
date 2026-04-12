@@ -1,0 +1,164 @@
+---
+title: 组件架构
+---
+
+LangChain 的强大之处在于其组件如何协同工作，以构建复杂的 AI 应用。本页通过图表展示了不同组件之间的关系。
+
+## 核心组件生态系统
+
+下图展示了 LangChain 的主要组件如何连接以形成完整的 AI 应用：
+
+```mermaid
+graph TD
+    %% 输入处理
+    subgraph "📥 输入处理"
+        A[文本输入] --> B[文档加载器]
+        B --> C[文本分割器]
+        C --> D[文档]
+    end
+
+    %% 嵌入与存储
+    subgraph "🔢 嵌入与存储"
+        D --> E[嵌入模型]
+        E --> F[向量]
+        F --> G[(向量存储)]
+    end
+
+    %% 检索
+    subgraph "🔍 检索"
+        H[用户查询] --> I[嵌入模型]
+        I --> J[查询向量]
+        J --> K[检索器]
+        K --> G
+        G --> L[相关上下文]
+    end
+
+    %% 生成
+    subgraph "🤖 生成"
+        M[聊天模型] --> N[工具]
+        N --> O[工具结果]
+        O --> M
+        L --> M
+        M --> P[AI 响应]
+    end
+
+    %% 编排
+    subgraph "🎯 编排"
+        Q[智能体] --> M
+        Q --> N
+        Q --> K
+        Q --> R[记忆]
+    end
+
+    classDef trigger fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef process fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef output fill:#F3E8FF,stroke:#9333EA,stroke-width:2px,color:#581C87
+    classDef neutral fill:#F3F4F6,stroke:#9CA3AF,stroke-width:2px,color:#374151
+
+    class A,H trigger
+    class B,C,E,I,K,M,N,Q process
+    class D,F,J,L,O,P,R neutral
+    class G output
+```
+
+### 组件如何连接
+
+每个组件层都构建在前一层之上：
+
+1.  **输入处理** – 将原始数据转换为结构化文档
+2.  **嵌入与存储** – 将文本转换为可搜索的向量表示
+3.  **检索** – 根据用户查询查找相关信息
+4.  **生成** – 使用 AI 模型创建响应，可选择使用工具
+5.  **编排** – 通过智能体和记忆系统协调所有组件
+
+## 组件类别
+
+LangChain 将组件组织为以下几个主要类别：
+
+| 类别 | 目的 | 关键组件 | 使用场景 |
+|----------|---------|---------------|-----------|
+| **[模型](/oss/javascript/langchain/models)** | AI 推理与生成 | 聊天模型、LLMs、嵌入模型 | 文本生成、推理、语义理解 |
+| **[工具](/oss/javascript/langchain/tools)** | 外部能力 | API、数据库等 | 网络搜索、数据访问、计算 |
+| **[智能体](/oss/javascript/langchain/agents)** | 编排与推理 | ReAct 智能体、工具调用智能体 | 非确定性工作流、决策制定 |
+| **[记忆](/oss/javascript/langchain/short-term-memory)** | 上下文保持 | 消息历史、自定义状态 | 对话、有状态的交互 |
+| **[检索器](/oss/javascript/integrations/retrievers)** | 信息访问 | 向量检索器、网络检索器 | RAG、知识库搜索 |
+| **[文档处理](/oss/javascript/integrations/document_loaders)** | 数据摄取 | 加载器、分割器、转换器 | PDF 处理、网络爬取 |
+| **[向量存储](/oss/javascript/integrations/vectorstores)** | 语义搜索 | Chroma、Pinecone、FAISS | 相似性搜索、嵌入存储 |
+
+## 常见模式
+
+### RAG（检索增强生成）
+```mermaid
+graph LR
+    A[用户问题] --> B[检索器]
+    B --> C[相关文档]
+    C --> D[聊天模型]
+    A --> D
+    D --> E[信息充分的响应]
+
+    classDef trigger fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef process fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef neutral fill:#F3F4F6,stroke:#9CA3AF,stroke-width:2px,color:#374151
+
+    class A trigger
+    class B,D process
+    class C,E neutral
+```
+
+### 带工具的智能体
+```mermaid
+graph LR
+    A[用户请求] --> B[智能体]
+    B --> C{需要工具？}
+    C -->|是| D[调用工具]
+    D --> E[工具结果]
+    E --> B
+    C -->|否| F[最终答案]
+
+    classDef trigger fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef process fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef decision fill:#FEF3C7,stroke:#F59E0B,stroke-width:2px,color:#78350F
+    classDef neutral fill:#F3F4F6,stroke:#9CA3AF,stroke-width:2px,color:#374151
+
+    class A trigger
+    class B,D process
+    class C decision
+    class E,F neutral
+```
+
+### 多智能体系统
+```mermaid
+graph LR
+    A[复杂任务] --> B[监督智能体]
+    B --> C[专家智能体 1]
+    B --> D[专家智能体 2]
+    C --> E[结果]
+    D --> E
+    E --> B
+    B --> F[协调后的响应]
+
+    classDef trigger fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef process fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    classDef neutral fill:#F3F4F6,stroke:#9CA3AF,stroke-width:2px,color:#374151
+
+    class A trigger
+    class B,C,D process
+    class E,F neutral
+```
+
+## 了解更多
+
+-   [创建智能体](/oss/javascript/langchain/agents)
+-   [使用工具](/oss/javascript/langchain/tools)
+-   [浏览集成](/oss/javascript/integrations/providers/overview)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\component-architecture.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

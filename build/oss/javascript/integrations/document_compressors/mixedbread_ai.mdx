@@ -1,0 +1,68 @@
+---
+title: "Mixedbread AI 重排序集成"
+description: "使用 LangChain JavaScript 集成 Mixedbread AI 重排序文档压缩器。"
+---
+
+## 概述
+
+本指南将帮助您集成并使用 [Mixedbread AI](https://mixedbread.ai/) 的重排序 API。该重排序 API 允许您根据给定查询对文档列表进行重新排序，从而提高搜索结果或任何排名列表的相关性。
+
+## 安装
+
+首先，安装 `@langchain/mixedbread-ai` 包：
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash
+npm install @langchain/mixedbread-ai
+```
+
+## 认证
+
+在 [Mixedbread AI](https://mixedbread.ai/) 注册以获取您的 API 密钥。然后，您可以将 `MXBAI_API_KEY` 环境变量设置为您的 Mixedbread AI API 密钥，或在构造类时直接将其作为 `apiKey` 选项传递。
+
+## 使用重排序
+
+`MixedbreadAIReranker` 类提供了对重排序 API 的访问。以下是使用方法：
+
+1. **导入类**：首先，从包中导入 `MixedbreadAIReranker` 类。
+
+```typescript
+import { MixedbreadAIReranker } from "@langchain/mixedbread-ai";
+```
+
+2. **实例化类**：使用您的 API 密钥创建 `MixedbreadAIReranker` 的实例。
+
+```typescript
+const reranker = new MixedbreadAIReranker({ apiKey: "your-api-key" });
+```
+
+3. **重排序文档**：使用 `rerankDocuments` 方法根据查询对文档进行重新排序。
+
+```typescript
+const documents = [
+  { pageContent: "烤面包需要面粉" },
+  { pageContent: "烤面包需要酵母" },
+  { pageContent: "吃面包只需要好胃口" },
+];
+const query = "烤面包需要什么？";
+const result = await reranker.compressDocuments(documents, query);
+console.log(result);
+```
+
+## 其他资源
+
+更多信息，请参阅[重排序 API 文档](https://www.mixedbread.ai/docs/reranking/overview)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\document_compressors\mixedbread_ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,83 @@
+---
+title: "Dataherald 集成"
+description: "使用 LangChain Python 与 Dataherald 进行集成。"
+---
+
+>[Dataherald](https://www.dataherald.com) 是一个自然语言转 SQL 平台。
+
+本页介绍了如何在 LangChain 中使用 `Dataherald API`。
+
+## 安装和设置
+- 使用以下命令安装依赖项
+<CodeGroup>
+```bash pip
+pip install dataherald
+```
+
+```bash uv
+uv add dataherald
+```
+</CodeGroup>
+- 前往 [Dataherald](https://www.dataherald.com) 并注册
+- 创建一个应用并获取您的 `API KEY`
+- 将您的 `API KEY` 设置为环境变量 `DATAHERALD_API_KEY`
+
+## 包装器
+
+### 实用工具
+
+存在一个名为 DataheraldAPIWrapper 的实用工具，用于封装此 API。要导入此实用工具：
+
+```python
+from langchain_community.utilities.dataherald import DataheraldAPIWrapper
+```
+
+有关此包装器的更详细教程，请参阅 [此笔记本](/oss/python/integrations/tools/dataherald)。
+
+### 工具
+
+您可以像这样在代理中使用该工具：
+```python
+from langchain_community.utilities.dataherald import DataheraldAPIWrapper
+from langchain_community.tools.dataherald.tool import DataheraldTextToSQL
+from langchain_openai import ChatOpenAI
+from langchain_classic import hub
+from langchain.agents import AgentExecutor, create_agent, load_tools
+
+api_wrapper = DataheraldAPIWrapper(db_connection_id="<db_connection_id>")
+tool = DataheraldTextToSQL(api_wrapper=api_wrapper)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+prompt = hub.pull("hwchase17/react")
+agent = create_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
+agent_executor.invoke({"input":"Return the sql for this question: How many employees are in the company?"})
+```
+
+输出
+```shell
+> Entering new AgentExecutor chain...
+I need to use a tool that can convert this question into SQL.
+Action: dataherald
+Action Input: How many employees are in the company?Answer: SELECT
+    COUNT(*) FROM employeesI now know the final answer
+Final Answer: SELECT
+    COUNT(*)
+FROM
+    employees
+
+> Finished chain.
+{'input': 'Return the sql for this question: How many employees are in the company?', 'output': "SELECT \n    COUNT(*)\nFROM \n    employees"}
+```
+
+有关工具的更多信息，请参阅 [工具](/oss/python/integrations/tools)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\dataherald.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,198 @@
+---
+title: "ChatOutlines 集成"
+description: "使用 LangChain Python 与 ChatOutlines 聊天模型集成。"
+---
+
+本文将帮助您开始使用 Outlines [聊天模型](/oss/python/langchain/models/)。
+
+[Outlines](https://github.com/outlines-dev/outlines) 是一个用于约束语言生成的库。它允许您在使用各种后端的大型语言模型（LLMs）时，对生成的输出应用约束。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | JS 支持 | 下载量 | 版本 |
+| :--- | :--- | :---: |  :---: | :---: | :---: |
+| [`ChatOutlines`](https://reference.langchain.com/python/langchain-community/chat_models/) | [`langchain-community`](https://reference.langchain.com/python/langchain-community) | ❌ | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-community?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-community?style=flat-square&label=%20) |
+
+### 模型特性
+
+| [工具调用](/oss/python/langchain/tools) | [结构化输出](/oss/python/langchain/structured-output) | [图像输入](/oss/python/langchain/messages#multimodal) | 音频输入 | 视频输入 | [令牌级流式传输](/oss/python/langchain/streaming/) | 原生异步 | [令牌使用量](/oss/python/langchain/models#token-usage) | [对数概率](/oss/python/langchain/models#log-probabilities) |
+| :---: | :---: | :---: |  :---: | :---: | :---: | :---: | :---: | :---: |
+| ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+
+## 设置
+
+要访问 Outlines 模型，您需要互联网连接以下载 huggingface 上的模型权重。根据所需的后端，您需要安装相应的依赖项（参见 [Outlines 文档](https://dottxt-ai.github.io/outlines/latest/installation/)）。
+
+### 凭证
+
+Outlines 没有内置的身份验证机制。
+
+### 安装
+
+LangChain 的 Outlines 集成位于 `langchain-community` 包中，并需要 `outlines` 库：
+
+```python
+pip install -qU langchain-community outlines
+```
+
+## 实例化
+
+现在我们可以实例化模型对象并生成聊天补全：
+
+```python
+from langchain_community.chat_models.outlines import ChatOutlines
+
+# 对于 llamacpp 后端
+model = ChatOutlines(model="TheBloke/phi-2-GGUF/phi-2.Q4_K_M.gguf", backend="llamacpp")
+
+# 对于 vllm 后端（Mac 上不可用）
+model = ChatOutlines(model="meta-llama/Llama-3.2-1B", backend="vllm")
+
+# 对于 mlxlm 后端（仅在 Mac 上可用）
+model = ChatOutlines(model="mistralai/Ministral-8B-Instruct-2410", backend="mlxlm")
+
+# 对于 huggingface transformers 后端
+model = ChatOutlines(model="microsoft/phi-2")  # 默认为 transformers 后端
+```
+
+## 调用
+
+```python
+from langchain.messages import HumanMessage
+
+messages = [HumanMessage(content="火星的首都将会被称为什么？")]
+response = model.invoke(messages)
+
+response.content
+```
+
+## 流式传输
+
+ChatOutlines 支持令牌的流式传输：
+
+```python
+messages = [HumanMessage(content="用法语从 1 数到 10：")]
+
+for chunk in model.stream(messages):
+    print(chunk.content, end="", flush=True)
+```
+
+## 链式调用
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "你是一个有用的助手，能将 {input_language} 翻译成 {output_language}。",
+        ),
+        ("human", "{input}"),
+    ]
+)
+
+chain = prompt | model
+chain.invoke(
+    {
+        "input_language": "英语",
+        "output_language": "德语",
+        "input": "我热爱编程。",
+    }
+)
+```
+
+## 约束生成
+
+ChatOutlines 允许您对生成的输出应用各种约束：
+
+### 正则表达式约束
+
+```python
+model.regex = r"((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)"
+
+response = model.invoke("Google DNS 服务器的 IP 地址是什么？")
+
+response.content
+```
+
+### 类型约束
+
+```python
+model.type_constraints = int
+response = model.invoke("生命、宇宙及一切的答案是什么？")
+
+response.content
+```
+
+### Pydantic 和 JSON 模式
+
+```python
+from pydantic import BaseModel
+
+
+class Person(BaseModel):
+    name: str
+
+
+model.json_schema = Person
+response = model.invoke("谁是 LangChain 的主要贡献者？")
+person = Person.model_validate_json(response.content)
+
+person
+```
+
+### 上下文无关文法
+
+```python
+model.grammar = """
+?start: expression
+?expression: term (("+" | "-") term)*
+?term: factor (("*" | "/") factor)*
+?factor: NUMBER | "-" factor | "(" expression ")"
+%import common.NUMBER
+%import common.WS
+%ignore WS
+"""
+response = model.invoke("给我一个复杂的算术表达式：")
+
+response.content
+```
+
+## LangChain 的结构化输出
+
+您也可以将 LangChain 的结构化输出与 ChatOutlines 结合使用：
+
+```python
+from pydantic import BaseModel
+
+
+class AnswerWithJustification(BaseModel):
+    answer: str
+    justification: str
+
+
+_model = model.with_structured_output(AnswerWithJustification)
+result = _model.invoke("一磅砖和一磅羽毛，哪个更重？")
+
+result
+```
+
+---
+
+## 完整的 Outlines 文档
+
+[dottxt-ai.github.io/outlines/latest/](https://dottxt-ai.github.io/outlines/latest/)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\outlines.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

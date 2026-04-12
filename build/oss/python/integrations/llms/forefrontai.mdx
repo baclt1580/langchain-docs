@@ -1,0 +1,81 @@
+---
+title: "Forefrontai 集成"
+description: "使用 LangChain Python 与 Forefrontai LLM 进行集成。"
+---
+
+`Forefront` 平台为您提供微调和使用 [开源大型语言模型 (LLMs)](https://docs.forefront.ai/get-started/models) 的能力。
+
+本笔记本介绍如何使用 LangChain 与 [ForefrontAI](https://www.forefront.ai/) 配合。
+
+## 导入
+
+```python
+import os
+
+from langchain_classic.chains import LLMChain
+from langchain_community.llms import ForefrontAI
+from langchain_core.prompts import PromptTemplate
+```
+
+## 设置环境变量 API 密钥
+
+请确保从 ForefrontAI 获取您的 API 密钥。您将获得 5 天的免费试用，以测试不同的模型。
+
+```python
+# get a new token: https://docs.forefront.ai/forefront/api-reference/authentication
+
+from getpass import getpass
+
+FOREFRONTAI_API_KEY = getpass()
+```
+
+```python
+os.environ["FOREFRONTAI_API_KEY"] = FOREFRONTAI_API_KEY
+```
+
+## 创建 ForefrontAI 实例
+
+您可以指定不同的参数，例如模型端点 URL、长度、温度等。您必须提供一个端点 URL。
+
+```python
+llm = ForefrontAI(endpoint_url="YOUR ENDPOINT URL HERE")
+```
+
+## 创建提示模板
+
+我们将为问答创建一个提示模板。
+
+```python
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+prompt = PromptTemplate.from_template(template)
+```
+
+## 初始化 LLMChain
+
+```python
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+```
+
+## 运行 LLMChain
+
+提供一个问题并运行 LLMChain。
+
+```python
+question = "What NFL team won the Super Bowl in the year Justin Beiber was born?"
+
+llm_chain.run(question)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\forefrontai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

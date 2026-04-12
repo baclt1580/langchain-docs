@@ -1,0 +1,94 @@
+---
+title: "Google 日历集成"
+description: "使用 LangChain JavaScript 与 Google 日历工具集成。"
+---
+
+Google 日历工具允许您的代理从关联的日历中创建和查看 Google 日历事件。
+
+## 设置
+
+要使用 Google 日历工具，您需要安装以下官方对等依赖项：
+
+```bash npm
+npm install googleapis
+```
+
+## 使用方式
+
+```typescript
+import { createAgent } from "@langchain/agents";
+import { ChatOpenAI } from "@langchain/openai";
+import { Calculator } from "@langchain/community/tools/calculator";
+import {
+  GoogleCalendarCreateTool,
+  GoogleCalendarViewTool,
+} from "@langchain/community/tools/google_calendar";
+
+export async function run() {
+  const model = new ChatOpenAI({
+    temperature: 0,
+    apiKey: process.env.OPENAI_API_KEY,
+    model: "gpt-4.1-mini",
+  });
+
+  const googleCalendarParams = {
+    credentials: {
+      clientEmail: process.env.GOOGLE_CALENDAR_CLIENT_EMAIL,
+      privateKey: process.env.GOOGLE_CALENDAR_PRIVATE_KEY,
+      calendarId: process.env.GOOGLE_CALENDAR_CALENDAR_ID,
+    },
+    scopes: [
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/calendar.events",
+    ],
+    model,
+  };
+
+  const tools = [
+    new Calculator(),
+    new GoogleCalendarCreateTool(googleCalendarParams),
+    new GoogleCalendarViewTool(googleCalendarParams),
+  ];
+
+  const calendarAgent = createAgent({
+    llm: model,
+    tools,
+  });
+
+  const createInput = `下周五下午 4 点与 John Doe 创建一个会议，并将 99 + 99 的结果添加到议程中`;
+
+  const createResult = await calendarAgent.invoke({
+    messages: [{ role: "user", content: createInput }],
+  });
+  //   创建结果 {
+  //     output: '已创建与 John Doe 在 9 月 29 日下午 4 点的会议，并将 99 + 99 的结果添加到了议程中。'
+  //   }
+  console.log("创建结果", createResult);
+
+  const viewInput = `我这周有哪些会议？`;
+
+  const viewResult = await calendarAgent.invoke({
+    messages: [{ role: "user", content: viewInput }],
+  });
+  //   查看结果 {
+  //     output: "您在本周上午 8 点到晚上 8 点之间没有会议。"
+  //   }
+  console.log("查看结果", viewResult);
+}
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/javascript/langchain/tools)
+- 工具 [操作指南](/oss/javascript/langchain/tools)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\google_calendar.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

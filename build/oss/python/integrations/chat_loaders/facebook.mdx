@@ -1,0 +1,309 @@
+---
+title: "Facebook Messenger 集成"
+description: "使用 LangChain Python 与 Facebook Messenger 聊天加载器集成。"
+---
+
+本笔记本展示了如何将 Facebook 的数据加载成可用于微调的格式。整体步骤如下：
+
+1. 将您的 Messenger 数据下载到磁盘。
+2. 创建聊天加载器并调用 `loader.load()`（或 `loader.lazy_load()`）以执行转换。
+3. 可选地使用 `merge_chat_runs` 来合并同一发送者连续的消息，和/或使用 `map_ai_messages` 将指定发送者的消息转换为 "AIMessage" 类。完成此操作后，调用 `convert_messages_for_finetuning` 来为微调准备数据。
+
+完成这些步骤后，您就可以对模型进行微调了。为此，您需要完成以下步骤：
+
+4. 将您的消息上传到 OpenAI 并运行微调任务。
+6. 在您的 LangChain 应用中使用生成的模型！
+
+让我们开始吧。
+
+## 1. 下载数据
+
+要下载您自己的 Messenger 数据，请按照[下载 Facebook Messenger 聊天记录的说明](https://www.zapptales.com/en/download-facebook-messenger-chat-history-how-to/)进行操作。**重要提示** - 确保以 JSON 格式（而非 HTML）下载。
+
+我们在此演练中将使用一个示例数据转储，托管在[此 Google Drive 链接](https://drive.google.com/file/d/1rh1s1o2i7B-Sk1v9o8KNgivLVGwJ-osV/view?usp=sharing)。
+
+```python
+# 这里使用一些示例数据
+import zipfile
+
+import requests
+
+
+def download_and_unzip(url: str, output_path: str = "file.zip") -> None:
+    file_id = url.split("/")[-2]
+    download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+
+    response = requests.get(download_url)
+    if response.status_code != 200:
+        print("Failed to download the file.")
+        return
+
+    with open(output_path, "wb") as file:
+        file.write(response.content)
+        print(f"File {output_path} downloaded.")
+
+    with zipfile.ZipFile(output_path, "r") as zip_ref:
+        zip_ref.extractall()
+        print(f"File {output_path} has been unzipped.")
+
+
+# 要下载的文件 URL
+url = (
+    "https://drive.google.com/file/d/1rh1s1o2i7B-Sk1v9o8KNgivLVGwJ-osV/view?usp=sharing"
+)
+
+# 下载并解压
+download_and_unzip(url)
+```
+
+```text
+File file.zip downloaded.
+File file.zip has been unzipped.
+```
+
+## 2. 创建聊天加载器
+
+我们有 2 个不同的 `FacebookMessengerChatLoader` 类，一个用于加载整个聊天目录，另一个用于加载单个文件。
+
+```python
+directory_path = "./hogwarts"
+```
+
+```python
+from langchain_community.chat_loaders.facebook_messenger import (
+    FolderFacebookMessengerChatLoader,
+    SingleFileFacebookMessengerChatLoader,
+)
+```
+
+```python
+loader = SingleFileFacebookMessengerChatLoader(
+    path="./hogwarts/inbox/HermioneGranger/messages_Hermione_Granger.json",
+)
+```
+
+```python
+chat_session = loader.load()[0]
+chat_session["messages"][:3]
+```
+
+```text
+[HumanMessage(content="Hi Hermione! How's your summer going so far?", additional_kwargs={'sender': 'Harry Potter'}),
+ HumanMessage(content="Harry! Lovely to hear from you. My summer is going well, though I do miss everyone. I'm spending most of my time going through my books and researching fascinating new topics. How about you?", additional_kwargs={'sender': 'Hermione Granger'}),
+ HumanMessage(content="I miss you all too. The Dursleys are being their usual unpleasant selves but I'm getting by. At least I can practice some spells in my room without them knowing. Let me know if you find anything good in your researching!", additional_kwargs={'sender': 'Harry Potter'})]
+```
+
+```python
+loader = FolderFacebookMessengerChatLoader(
+    path="./hogwarts",
+)
+```
+
+```python
+chat_sessions = loader.load()
+len(chat_sessions)
+```
+
+```text
+9
+```
+
+## 3. 为微调做准备
+
+调用 `load()` 会返回我们能提取的所有聊天消息作为人类消息。在与聊天机器人对话时，相对于真实对话，对话通常遵循更严格的交替对话模式。
+
+您可以选择合并消息"连续块"（同一发送者的连续消息），并选择一个发送者来代表"AI"。微调后的 LLM 将学会生成这些 AI 消息。
+
+```python
+from langchain_community.chat_loaders.utils import (
+    map_ai_messages,
+    merge_chat_runs,
+)
+```
+
+```python
+merged_sessions = merge_chat_runs(chat_sessions)
+alternating_sessions = list(map_ai_messages(merged_sessions, "Harry Potter"))
+```
+
+```python
+# 现在所有哈利·波特的消息都将采用 AIMessage 类
+# 这映射到 OpenAI 训练格式中的 'assistant' 角色
+alternating_sessions[0]["messages"][:3]
+```
+
+```text
+[AIMessage(content="Professor Snape, I was hoping I could speak with you for a moment about something that's been concerning me lately.", additional_kwargs={'sender': 'Harry Potter'}),
+ HumanMessage(content="What is it, Potter? I'm quite busy at the moment.", additional_kwargs={'sender': 'Severus Snape'}),
+ AIMessage(content="I apologize for the interruption, sir. I'll be brief. I've noticed some strange activity around the school grounds at night. I saw a cloaked figure lurking near the Forbidden Forest last night. I'm worried someone may be plotting something sinister.", additional_kwargs={'sender': 'Harry Potter'})]
+```
+
+#### 现在我们可以转换为 OpenAI 格式的字典
+
+```python
+from langchain_community.adapters.openai import convert_messages_for_finetuning
+```
+
+```python
+training_data = convert_messages_for_finetuning(alternating_sessions)
+print(f"Prepared {len(training_data)} dialogues for training")
+```
+
+```text
+Prepared 9 dialogues for training
+```
+
+```python
+training_data[0][:3]
+```
+
+```text
+[{'role': 'assistant',
+  'content': "Professor Snape, I was hoping I could speak with you for a moment about something that's been concerning me lately."},
+ {'role': 'user',
+  'content': "What is it, Potter? I'm quite busy at the moment."},
+ {'role': 'assistant',
+  'content': "I apologize for the interruption, sir. I'll be brief. I've noticed some strange activity around the school grounds at night. I saw a cloaked figure lurking near the Forbidden Forest last night. I'm worried someone may be plotting something sinister."}]
+```
+
+OpenAI 目前要求微调任务至少需要 10 个训练示例，但他们建议大多数任务使用 50-100 个。由于我们只有 9 个聊天会话，我们可以（可选地带有一些重叠）细分它们，使得每个训练示例由整个对话的一部分组成。
+
+Facebook 聊天会话（每人一个）通常跨越多天和多个对话，
+因此长距离依赖关系可能对建模来说不那么重要。
+
+```python
+# 我们的聊天是交替的，我们将使每个数据点包含 8 条消息，
+# 并重叠 2 条消息
+chunk_size = 8
+overlap = 2
+
+training_examples = [
+    conversation_messages[i : i + chunk_size]
+    for conversation_messages in training_data
+    for i in range(0, len(conversation_messages) - chunk_size + 1, chunk_size - overlap)
+]
+
+len(training_examples)
+```
+
+```text
+100
+```
+
+## 4. 微调模型
+
+是时候微调模型了。确保已安装 `openai`
+并已正确设置您的 `OPENAI_API_KEY`
+
+```python
+pip install -qU  langchain-openai
+```
+
+```python
+import json
+import time
+from io import BytesIO
+
+import openai
+
+# 我们将在内存中写入 jsonl 文件
+my_file = BytesIO()
+for m in training_examples:
+    my_file.write((json.dumps({"messages": m}) + "\n").encode("utf-8"))
+
+my_file.seek(0)
+training_file = openai.files.create(file=my_file, purpose="fine-tune")
+
+# OpenAI 出于合规原因审核每个训练文件。
+# 这可能需要几分钟
+status = openai.files.retrieve(training_file.id).status
+start_time = time.time()
+while status != "processed":
+    print(f"Status=[{status}]... {time.time() - start_time:.2f}s", end="\r", flush=True)
+    time.sleep(5)
+    status = openai.files.retrieve(training_file.id).status
+print(f"File {training_file.id} ready after {time.time() - start_time:.2f} seconds.")
+```
+
+```text
+File file-ULumAXLEFw3vB6bb9uy6DNVC ready after 0.00 seconds.
+```
+
+文件准备就绪后，是时候启动训练任务了。
+
+```python
+job = openai.fine_tuning.jobs.create(
+    training_file=training_file.id,
+    model="gpt-3.5-turbo",
+)
+```
+
+在您的模型准备期间，喝杯茶吧。这可能需要一些时间！
+
+```python
+status = openai.fine_tuning.jobs.retrieve(job.id).status
+start_time = time.time()
+while status != "succeeded":
+    print(f"Status=[{status}]... {time.time() - start_time:.2f}s", end="\r", flush=True)
+    time.sleep(5)
+    job = openai.fine_tuning.jobs.retrieve(job.id)
+    status = job.status
+```
+
+```text
+Status=[running]... 874.29s. 56.93s
+```
+
+```python
+print(job.fine_tuned_model)
+```
+
+```text
+ft:gpt-3.5-turbo-0613:personal::8QnAzWMr
+```
+
+## 5. 在 LangChain 中使用
+
+您可以直接在 [`ChatOpenAI`](https://reference.langchain.com/python/langchain-openai/chat_models/base/ChatOpenAI) 模型类中使用生成的模型 ID。
+
+```python
+from langchain_openai import ChatOpenAI
+
+model = ChatOpenAI(
+    model=job.fine_tuned_model,
+    temperature=1,
+)
+```
+
+```python
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("human", "{input}"),
+    ]
+)
+
+chain = prompt | model | StrOutputParser()
+```
+
+```python
+for tok in chain.stream({"input": "What classes are you taking?"}):
+    print(tok, end="", flush=True)
+```
+
+```text
+I'm taking Charms, Defense Against the Dark Arts, Herbology, Potions, Transfiguration, and Ancient Runes. How about you?
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat_loaders\facebook.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

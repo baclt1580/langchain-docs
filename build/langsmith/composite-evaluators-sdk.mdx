@@ -1,0 +1,211 @@
+---
+title: 如何创建复合评估器
+sidebarTitle: 复合评估器
+---
+
+_复合评估器_ 是一种将多个评估器分数合并为单个[分数](/langsmith/evaluation-concepts#evaluator-outputs)的方法。当您希望评估应用程序的多个方面并将结果合并为单一结果时，这非常有用。
+
+本指南介绍如何设置一个使用多个评估器并通过自定义聚合函数结合其分数的评估，使用 [LangSmith SDK](https://reference.langchain.com/python/langsmith/observability/sdk)。
+
+<Note> 需要 langsmith>=0.4.29 </Note>
+
+<Tip>
+要在 LangSmith 界面中创建复合评估器，请参考[如何创建复合评估器（界面）](/langsmith/composite-evaluators-ui)。
+</Tip>
+
+## 1. 在数据集上配置评估器
+
+首先配置您的评估器。在本示例中，应用程序根据博客介绍生成一条推文，并使用三个评估器——摘要、语气和格式——来评估输出。
+
+如果您已有配置了评估器的自有数据集，可以跳过此步骤。
+
+```python
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+from langsmith import Client
+from pydantic import BaseModel
+import json
+
+# 从 .env 文件加载环境变量
+load_dotenv()
+
+# 访问环境变量
+openai_api_key = os.getenv('OPENAI_API_KEY')
+langsmith_api_key = os.getenv('LANGSMITH_API_KEY')
+langsmith_project = os.getenv('LANGSMITH_PROJECT', 'default')
+
+
+# 创建数据集。只需执行一次。
+client = Client()
+oai_client = OpenAI()
+
+examples = [
+  {
+    "inputs": {"blog_intro": "今天，我们很高兴地宣布 LangSmith 全面上市——这是我们专为部署和扩展长期运行、有状态的智能体而构建的基础设施和管理层。自去年六月发布测试版以来，已有近 400 家公司使用 LangSmith 将其智能体部署到生产环境。智能体部署是发布可靠智能体的下一个重大挑战，而 LangSmith 通过以下方式显著降低了这一门槛：一键部署，数分钟内即可上线；30 个 API 端点，用于设计适合任何交互模式的自定义用户体验；水平扩展以处理突发性、长期运行的流量；持久层以支持记忆、对话历史以及人机协作或多智能体工作流的异步协作；原生 Studio，智能体集成开发环境，便于调试、可视化和迭代。"},
+  },
+  {
+    "inputs": {"blog_intro": "Klarna 以其以消费者为中心、AI 驱动的支付和购物解决方案重塑了全球商业。拥有超过 8500 万活跃用户和平台上每日 250 万笔交易，Klarna 是一家金融科技领导者，简化购物同时通过更智能、更灵活的金融解决方案赋能消费者。Klarna 的旗舰 AI 助手正在彻底改变购物和支付体验。基于 LangGraph 构建并由 LangSmith 驱动，该 AI 助手处理从客户支付、退款到其他支付升级等任务。迄今为止已处理 250 万次对话，AI 助手不仅仅是一个聊天机器人；它是一个变革性的智能体，其工作量相当于 700 名全职员工，快速交付结果并提高公司效率。"},
+  },
+]
+
+dataset = client.create_dataset(dataset_name="博客介绍")
+
+client.create_examples(
+  dataset_id=dataset.id,
+  examples=examples,
+)
+
+# 定义目标函数。在本例中，我们使用一个简单的函数，根据博客介绍生成推文。
+def generate_tweet(inputs: dict) -> dict:
+    instructions = (
+      "根据博客介绍，请生成一条引人注目且专业的推文，可用于在社交媒体上推广该博客文章。在推文中总结博客文章的关键点。以得体的方式使用表情符号。"
+    )
+    messages = [
+        {"role": "system", "content": instructions},
+        {"role": "user", "content": inputs["blog_intro"]},
+    ]
+    result = oai_client.responses.create(
+        input=messages, model="gpt-5-nano"
+    )
+    return {"tweet": result.output_text}
+
+# 定义评估器。在本例中，我们使用三个评估器：摘要、格式和语气。
+def summary(inputs: dict, outputs: dict) -> bool:
+    """判断推文是否是博客介绍的良好摘要。"""
+    instructions = "给定以下文本和摘要，判断摘要是否是文本的良好摘要。"
+
+    class Response(BaseModel):
+        summary: bool
+
+    msg = f"问题: {inputs['blog_intro']}\n答案: {outputs['tweet']}"
+    response = oai_client.responses.parse(
+        model="gpt-5-nano",
+        input=[{"role": "system", "content": instructions,}, {"role": "user", "content": msg}],
+        text_format=Response
+    )
+
+    parsed_response = json.loads(response.output_text)
+    return parsed_response["summary"]
+
+def formatting(inputs: dict, outputs: dict) -> bool:
+    """判断推文是否格式良好，便于人类阅读。"""
+    instructions = "给定以下文本，判断其格式是否良好，以便人类轻松阅读。特别注意间距和标点符号。"
+
+    class Response(BaseModel):
+        formatting: bool
+
+    msg = f"{outputs['tweet']}"
+    response = oai_client.responses.parse(
+        model="gpt-5-nano",
+        input=[{"role": "system", "content": instructions,}, {"role": "user", "content": msg}],
+        text_format=Response
+    )
+
+    parsed_response = json.loads(response.output_text)
+    return parsed_response["formatting"]
+
+def tone(inputs: dict, outputs: dict) -> bool:
+    """判断推文的语气是否信息丰富、友好且引人入胜。"""
+    instructions = "给定以下文本，判断推文是否信息丰富，同时友好且引人入胜。"
+
+    class Response(BaseModel):
+        tone: bool
+
+    msg = f"{outputs['tweet']}"
+    response = oai_client.responses.parse(
+        model="gpt-5-nano",
+        input=[{"role": "system", "content": instructions,}, {"role": "user", "content": msg}],
+        text_format=Response
+    )
+    parsed_response = json.loads(response.output_text)
+    return parsed_response["tone"]
+
+# 调用 evaluate()，传入数据集、目标函数和评估器。
+results = client.evaluate(
+    generate_tweet,
+    data=dataset.name,
+    evaluators=[summary, tone, formatting],
+    experiment_prefix="gpt-5-nano",
+)
+
+# 获取实验名称，用于下一节中的 client.get_experiment_results()
+experiment_name = results.experiment_name
+```
+
+## 2. 创建复合反馈
+
+创建复合反馈，使用您的自定义函数聚合各个评估器分数。本示例使用各个评估器分数的加权平均值。
+
+```python
+from typing import Dict
+import math
+from langsmith import Client
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# TODO: 替换为您的实验名称。可在界面或上述 client.evaluate() 结果中找到
+YOUR_EXPERIMENT_NAME = "placeholder_experiment_name"
+
+# 为各个评估器分数设置权重
+DEFAULT_WEIGHTS: Dict[str, float] = {
+    "summary": 0.7,
+    "tone": 0.2,
+    "formatting": 0.1,
+}
+WEIGHTED_FEEDBACK_NAME = "weighted_summary"
+
+# 拉取实验结果
+client = Client()
+results = client.get_experiment_results(
+    name=YOUR_EXPERIMENT_NAME,
+)
+
+# 计算每个运行的加权分数
+def calculate_weighted_score(feedback_stats: dict) -> float:
+    if not feedback_stats:
+        return float("nan")
+
+    # 检查所有必需的指标是否存在且包含数据
+    required_metrics = set(DEFAULT_WEIGHTS.keys())
+    available_metrics = set(feedback_stats.keys())
+
+    if not required_metrics.issubset(available_metrics):
+        return float("nan")
+
+    # 计算加权分数
+    total_score = 0.0
+    for metric, weight in DEFAULT_WEIGHTS.items():
+        metric_data = feedback_stats[metric]
+        if metric_data.get("n", 0) > 0 and "avg" in metric_data:
+            total_score += metric_data["avg"] * weight
+        else:
+            return float("nan")
+
+    return total_score
+
+# 处理每个运行并写入反馈
+# 注意：在调用此函数前，需要等待实验结果处理完成。
+for example_with_runs in results["examples_with_runs"]:
+    for run in example_with_runs.runs:
+        if run.feedback_stats:
+            score = calculate_weighted_score(run.feedback_stats)
+            if not math.isnan(score):
+                client.create_feedback(
+                    run_id=run.id,
+                    key=WEIGHTED_FEEDBACK_NAME,
+                    score=float(score)
+                )
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\composite-evaluators-sdk.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

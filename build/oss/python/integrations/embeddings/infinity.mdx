@@ -1,0 +1,175 @@
+---
+title: "Infinity 集成"
+description: "使用 LangChain Python 与 Infinity 嵌入模型进行集成。"
+---
+
+`Infinity` 允许使用 MIT 许可的嵌入服务器创建 [`Embeddings`](https://reference.langchain.com/python/langchain-core/embeddings/embeddings/Embeddings)。
+
+本笔记本介绍如何通过 [Infinity GitHub 项目](https://github.com/michaelfeil/infinity) 在 LangChain 中使用嵌入功能。
+
+## 导入
+
+```python
+from langchain_community.embeddings import InfinityEmbeddings, InfinityEmbeddingsLocal
+```
+
+# 选项 1：从 Python 中使用 infinity
+
+#### 可选：安装 infinity
+
+要安装 infinity，请使用以下命令。更多详细信息请查看 [GitHub 上的文档](https://github.com/michaelfeil/infinity)。
+安装 torch 和 onnx 依赖项。
+
+```bash
+pip install infinity_emb[torch,optimum]
+```
+
+```python
+documents = [
+    "Baguette is a dish.",
+    "Paris is the capital of France.",
+    "numpy is a lib for linear algebra",
+    "You escaped what I've escaped - You'd be in Paris getting fucked up too",
+]
+query = "Where is Paris?"
+```
+
+```python
+embeddings = InfinityEmbeddingsLocal(
+    model="sentence-transformers/all-MiniLM-L6-v2",
+    # 修订版本
+    revision=None,
+    # 最好保持为 32
+    batch_size=32,
+    # 通过 torch 支持 AMD/Nvidia GPU
+    device="cuda",
+    # 在执行前预热模型
+)
+
+
+async def embed():
+    # TODO: 此函数仅用于展示您的调用可以异步运行。
+
+    # 重要：在 `async with` 语句中使用 engine 以启动/停止批处理引擎。
+    async with embeddings:
+        # 避免频繁关闭和启动引擎。
+        # 最好让它保持运行。
+        # 如果您确定何时需要更精细地手动启动/停止执行，可以调用 `await embeddings.__aenter__()` 和 `__aexit__()`
+
+        documents_embedded = await embeddings.aembed_documents(documents)
+        query_result = await embeddings.aembed_query(query)
+        print("嵌入创建成功")
+    return documents_embedded, query_result
+```
+
+```text
+/home/michael/langchain/libs/langchain/.venv/lib/python3.10/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+The BetterTransformer implementation does not support padding during training, as the fused kernels do not support attention masks. Beware that passing padded batched data during training may result in unexpected outputs. Please refer to https://huggingface.co/docs/optimum/bettertransformer/overview for more details.
+/home/michael/langchain/libs/langchain/.venv/lib/python3.10/site-packages/optimum/bettertransformer/models/encoder_models.py:301: UserWarning: The PyTorch API of nested tensors is in prototype stage and will change in the near future. (Triggered internally at ../aten/src/ATen/NestedTensorImpl.cpp:177.)
+  hidden_states = torch._nested_tensor_from_mask(hidden_states, ~attention_mask)
+```
+
+```python
+# 以您喜欢的方式运行异步代码
+# 如果您在 Jupyter Notebook 中，可以使用以下方式
+documents_embedded, query_result = await embed()
+```
+
+```python
+# （演示）计算相似度
+import numpy as np
+
+scores = np.array(documents_embedded) @ np.array(query_result).T
+dict(zip(documents, scores))
+```
+
+# 选项 2：运行服务器，并通过 API 连接
+
+#### 可选：确保启动 infinity 实例
+
+要安装 infinity，请使用以下命令。更多详细信息请查看 [GitHub 上的文档](https://github.com/michaelfeil/infinity)。
+
+```bash
+pip install infinity_emb[all]
+```
+
+# 安装 infinity 包
+
+pip install -qU  infinity_emb[all]
+
+启动服务器 - 最好在单独的终端中执行，而不是在 Jupyter Notebook 内
+
+```bash
+model=sentence-transformers/all-MiniLM-L6-v2
+port=7797
+infinity_emb --port $port --model-name-or-path $model
+```
+
+或者也可以直接使用 docker：
+
+```bash
+model=sentence-transformers/all-MiniLM-L6-v2
+port=7797
+docker run -it --gpus all -p $port:$port michaelf34/infinity:latest --model-name-or-path $model --port $port
+```
+
+## 使用您的 infinity 实例嵌入文档
+
+```python
+documents = [
+    "Baguette is a dish.",
+    "Paris is the capital of France.",
+    "numpy is a lib for linear algebra",
+    "You escaped what I've escaped - You'd be in Paris getting fucked up too",
+]
+query = "Where is Paris?"
+```
+
+```python
+#
+infinity_api_url = "http://localhost:7797/v1"
+# 当前模型未经验证。
+embeddings = InfinityEmbeddings(
+    model="sentence-transformers/all-MiniLM-L6-v2", infinity_api_url=infinity_api_url
+)
+try:
+    documents_embedded = embeddings.embed_documents(documents)
+    query_result = embeddings.embed_query(query)
+    print("嵌入创建成功")
+except Exception as ex:
+    print(
+        "请确保 infinity 实例正在运行。通过点击 "
+        f"{infinity_api_url.replace('v1', 'docs')} 进行验证。异常：{ex}。 "
+    )
+```
+
+```text
+Make sure the infinity instance is running. Verify by clicking on http://localhost:7797/docs Exception: HTTPConnectionPool(host='localhost', port=7797): Max retries exceeded with url: /v1/embeddings (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f91c35dbd30>: Failed to establish a new connection: [Errno 111] Connection refused')).
+```
+
+```python
+# （演示）计算相似度
+import numpy as np
+
+scores = np.array(documents_embedded) @ np.array(query_result).T
+dict(zip(documents, scores))
+```
+
+```json
+{'Baguette is a dish.': 0.31344215908661155,
+ 'Paris is the capital of France.': 0.8148670296896388,
+ 'numpy is a lib for linear algebra': 0.004429399861302009,
+ "You escaped what I've escaped - You'd be in Paris getting fucked up too": 0.5088476180154582}
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\infinity.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

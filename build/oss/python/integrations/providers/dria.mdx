@@ -1,0 +1,44 @@
+---
+title: "Dria 集成"
+description: "使用 LangChain Python 与 Dria 集成。"
+---
+
+> [Dria](https://dria.co/) 是公共 RAG 模型的枢纽，供开发者
+> 贡献并利用共享的嵌入湖。
+
+有关 LangChain 与 Dria 集成的更多详细信息，请查看 [此页面](https://dria.co/docs/integrations/langchain)。
+
+## 安装和设置
+
+您需要安装一个 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install dria
+```
+
+```bash uv
+uv add dria
+```
+</CodeGroup>
+
+您需要从 Dria 获取 API 密钥。您可以通过在 [Dria](https://dria.co/) 注册来获取它。
+
+## 检索器
+
+查看 [使用示例](/oss/python/integrations/retrievers/dria_index)。
+
+```python
+from langchain_community.retrievers import DriaRetriever
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\dria.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

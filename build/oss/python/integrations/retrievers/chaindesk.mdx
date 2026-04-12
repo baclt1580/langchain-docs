@@ -1,0 +1,51 @@
+---
+title: "Chaindesk 集成"
+description: "使用 LangChain Python 与 Chaindesk 检索器集成。"
+---
+
+>[Chaindesk 平台](https://docs.chaindesk.ai/introduction) 将来自任何地方（数据源：文本、PDF、Word、PowerPoint、Excel、Notion、Airtable、Google Sheets 等）的数据带入数据存储区（多个数据源的容器）。
+然后，您的数据存储区可以通过插件连接到 ChatGPT，或通过 `Chaindesk API` 连接到任何其他大型语言模型（LLM）。
+
+本笔记本展示了如何使用 [Chaindesk 的](https://www.chaindesk.ai/) 检索器。
+
+首先，您需要注册 Chaindesk，创建数据存储区，添加一些数据并获取您的数据存储区 API 端点 URL。您需要 [API Key](https://docs.chaindesk.ai/api-reference/authentication)。
+
+```python
+```
+
+## 查询
+
+现在我们的索引已设置好，我们可以设置一个检索器并开始查询它。
+
+```python
+from langchain_community.retrievers import ChaindeskRetriever
+```
+
+```python
+retriever = ChaindeskRetriever(
+    datastore_url="https://clg1xg2h80000l708dymr0fxc.chaindesk.ai/query",
+    # api_key="CHAINDESK_API_KEY", # optional if datastore is public
+    # top_k=10 # optional
+)
+```
+
+```python
+retriever.invoke("What is Daftpage?")
+```
+
+```python
+[Document(page_content='✨ Made with DaftpageOpen main menuPricingTemplatesLoginSearchHelpGetting StartedFeaturesAffiliate ProgramGetting StartedDaftpage is a new type of website builder that works like a doc.It makes website building easy, fun and offers tons of powerful features for free. Just type / in your page to get started!DaftpageCopyright © 2022 Daftpage, Inc.All rights reserved.ProductPricingTemplatesHelp & SupportHelp CenterGetting startedBlogCompanyAboutRoadmapTwitterAffiliate Program👾 Discord', metadata={'source': 'https:/daftpage.com/help/getting-started', 'score': 0.8697265}),
+ Document(page_content="✨ Made with DaftpageOpen main menuPricingTemplatesLoginSearchHelpGetting StartedFeaturesAffiliate ProgramHelp CenterWelcome to Daftpage’s help center—the one-stop shop for learning everything about building websites with Daftpage.Daftpage is the simplest way to create websites for all purposes in seconds. Without knowing how to code, and for free!Get StartedDaftpage is a new type of website builder that works like a doc.It makes website building easy, fun and offers tons of powerful features for free. Just type / in your page to get started!Start here✨ Create your first site🧱 Add blocks🚀 PublishGuides🔖 Add a custom domainFeatures🔥 Drops🎨 Drawings👻 Ghost mode💀 Skeleton modeCant find the answer you're looking for?mail us at support@daftpage.comJoin the awesome Daftpage community on: 👾 DiscordDaftpageCopyright © 2022 Daftpage, Inc.All rights reserved.ProductPricingTemplatesHelp & SupportHelp CenterGetting startedBlogCompanyAboutRoadmapTwitterAffiliate Program👾 Discord", metadata={'source': 'https:/daftpage.com/help', 'score': 0.86570895}),
+ Document(page_content=" is the simplest way to create websites for all purposes in seconds. Without knowing how to code, and for free!Get StartedDaftpage is a new type of website builder that works like a doc.It makes website building easy, fun and offers tons of powerful features for free. Just type / in your page to get started!Start here✨ Create your first site🧱 Add blocks🚀 PublishGuides🔖 Add a custom domainFeatures🔥 Drops🎨 Drawings👻 Ghost mode💀 Skeleton modeCant find the answer you're looking for?mail us at support@daftpage.comJoin the awesome Daftpage community on: 👾 DiscordDaftpageCopyright © 2022 Daftpage, Inc.All rights reserved.ProductPricingTemplatesHelp & SupportHelp CenterGetting startedBlogCompanyAboutRoadmapTwitterAffiliate Program👾 Discord", metadata={'source': 'https:/daftpage.com/help', 'score': 0.8645384})]
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\retrievers\chaindesk.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

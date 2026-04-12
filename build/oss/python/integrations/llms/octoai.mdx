@@ -1,0 +1,68 @@
+---
+title: "OctoAI 集成"
+description: "使用 LangChain Python 与 OctoAI LLM 进行集成。"
+---
+
+[OctoAI](https://docs.octoai.cloud/docs) 提供高效计算的便捷访问，并允许用户将选择的 AI 模型集成到应用程序中。`OctoAI` 计算服务帮助您轻松运行、调整和扩展 AI 应用程序。
+
+本示例介绍如何使用 LangChain 与 `OctoAI` [LLM 端点](https://octoai.cloud/templates) 进行交互
+
+## 设置
+
+要运行我们的示例应用，需要完成两个简单的步骤：
+
+1. 从 [您的 OctoAI 账户页面](https://octoai.cloud/settings) 获取 API Token。
+
+2. 将您的 API 密钥粘贴到下面的代码单元格中。
+
+注意：如果您想使用不同的 LLM 模型，您可以按照 [从 Python 构建容器](https://octo.ai/docs/bring-your-own-model/advanced-build-a-container-from-scratch-in-python) 和 [从容器创建自定义端点](https://octo.ai/docs/bring-your-own-model/create-custom-endpoints-from-a-container/create-custom-endpoints-from-a-container)，然后更新您的 `OCTOAI_API_BASE` 环境变量，自行对模型进行容器化并创建自定义 OctoAI 端点。
+
+```python
+import os
+
+os.environ["OCTOAI_API_TOKEN"] = "OCTOAI_API_TOKEN"
+```
+
+```python
+from langchain_classic.chains import LLMChain
+from langchain_community.llms.octoai_endpoint import OctoAIEndpoint
+from langchain_core.prompts import PromptTemplate
+```
+
+## 示例
+
+```python
+template = """Below is an instruction that describes a task. Write a response that appropriately completes the request.\n Instruction:\n{question}\n Response: """
+prompt = PromptTemplate.from_template(template)
+```
+
+```python
+llm = OctoAIEndpoint(
+    model_name="llama-2-13b-chat-fp16",
+    max_tokens=200,
+    presence_penalty=0,
+    temperature=0.1,
+    top_p=0.9,
+)
+```
+
+```python
+question = "Who was Leonardo da Vinci?"
+
+chain = prompt | llm
+
+print(chain.invoke(question))
+```
+
+列奥纳多·达·芬奇是一位真正的文艺复兴时期全才。他于 1452 年出生在意大利的芬奇，以其在艺术、科学、工程和数学等领域的作品而闻名。他被认为是历史上最伟大的画家之一，其最著名的作品包括《蒙娜丽莎》和《最后的晚餐》。除了艺术之外，达·芬奇在工程和人体解剖学方面也做出了重大贡献，他的机器和设计构想领先了时代数个世纪。他还以其广泛的日记和绘图而闻名，这些资料为了解他的思想和理念提供了宝贵的见解。达·芬奇的遗产至今仍在激励和影响世界各地的艺术家、科学家和思想家。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\octoai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

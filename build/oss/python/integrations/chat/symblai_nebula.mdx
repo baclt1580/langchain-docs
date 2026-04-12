@@ -1,0 +1,117 @@
+---
+title: "Nebula (Symbl.ai) 集成"
+description: "使用 LangChain Python 与 Nebula (Symbl.ai) 聊天模型集成。"
+---
+
+本笔记本介绍如何开始使用 [Nebula](https://docs.symbl.ai/docs/nebula-llm) —— Symbl.ai 的聊天模型。
+
+### 集成详情
+
+前往 [API 参考](https://docs.symbl.ai/reference/nebula-chat) 查看详细文档。
+
+### 模型特性：待补充
+
+## 设置
+
+### 凭证
+
+要开始使用，请申请一个 [Nebula API 密钥](https://platform.symbl.ai/#/login) 并设置 `NEBULA_API_KEY` 环境变量：
+
+```python
+import getpass
+import os
+
+os.environ["NEBULA_API_KEY"] = getpass.getpass()
+```
+
+### 安装
+
+集成功能在 `langchain-community` 包中提供。
+
+## 实例化
+
+```python
+from langchain_community.chat_models.symblai_nebula import ChatNebula
+from langchain.messages import AIMessage, HumanMessage, SystemMessage
+```
+
+```python
+chat = ChatNebula(max_tokens=1024, temperature=0.5)
+```
+
+## 调用
+
+```python
+messages = [
+    SystemMessage(
+        content="你是一个乐于助人的助手，回答一般知识问题。"
+    ),
+    HumanMessage(content="法国的首都是什么？"),
+]
+chat.invoke(messages)
+```
+
+```text
+AIMessage(content=[{'role': 'human', 'text': 'What is the capital of France?'}, {'role': 'assistant', 'text': 'The capital of France is Paris.'}])
+```
+
+### 异步调用
+
+```python
+await chat.ainvoke(messages)
+```
+
+```text
+AIMessage(content=[{'role': 'human', 'text': 'What is the capital of France?'}, {'role': 'assistant', 'text': 'The capital of France is Paris.'}])
+```
+
+### 流式调用
+
+```python
+for chunk in chat.stream(messages):
+    print(chunk.content, end="", flush=True)
+```
+
+```text
+ The capital of France is Paris.
+```
+
+### 批量调用
+
+```python
+chat.batch([messages])
+```
+
+```text
+[AIMessage(content=[{'role': 'human', 'text': 'What is the capital of France?'}, {'role': 'assistant', 'text': 'The capital of France is Paris.'}])]
+```
+
+## 链式调用
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_template("给我讲一个关于 {topic} 的笑话")
+chain = prompt | chat
+```
+
+```python
+chain.invoke({"topic": "cows"})
+```
+
+```text
+AIMessage(content=[{'role': 'human', 'text': 'Tell me a joke about cows'}, {'role': 'assistant', 'text': "Sure, here's a joke about cows:\n\nWhy did the cow cross the road?\n\nTo get to the udder side!"}])
+```
+
+---
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\chat\symblai_nebula.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

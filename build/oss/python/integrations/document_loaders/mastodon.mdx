@@ -1,0 +1,65 @@
+---
+title: "Mastodon 集成"
+description: "使用 LangChain Python 与 Mastodon 文档加载器集成。"
+---
+
+>[Mastodon](https://joinmastodon.org/) 是一个去中心化的社交媒体和社交网络服务。
+
+该加载器使用 `Mastodon.py` Python 包，从一系列 `Mastodon` 账户的“嘟文”中提取文本。
+
+默认情况下，无需任何认证即可查询公开账户。如果要查询非公开账户或实例，您需要为您的账户注册一个应用程序以获取访问令牌，并设置该令牌以及您账户的 API 基础 URL。
+
+然后，您需要传入要提取的 Mastodon 账户名称，格式为 `@账户@实例`。
+
+```python
+from langchain_community.document_loaders import MastodonTootsLoader
+```
+
+```python
+pip install -qU  Mastodon.py
+```
+
+```python
+loader = MastodonTootsLoader(
+    mastodon_accounts=["@Gargron@mastodon.social"],
+    number_toots=50,  # 默认值为 100
+)
+
+# 或者设置访问信息以使用 Mastodon 应用。
+# 注意，访问令牌可以传入构造函数，也可以设置环境变量 "MASTODON_ACCESS_TOKEN"。
+# loader = MastodonTootsLoader(
+#     access_token="<MASTODON 应用的访问令牌>",
+#     api_base_url="<MASTODON 应用实例的 API 基础 URL>",
+#     mastodon_accounts=["@Gargron@mastodon.social"],
+#     number_toots=50,  # 默认值为 100
+# )
+```
+
+```python
+documents = loader.load()
+for doc in documents[:3]:
+    print(doc.page_content)
+    print("=" * 80)
+```
+
+```text
+<p>离开这里回到现实真不容易。而且有些人就住在这里！我相信肯定有缺点，但现在听起来对我来说相当不错。</p>
+================================================================================
+<p>真希望我们能在这里多待一会儿，但该回家了 🥲</p>
+================================================================================
+<p>蜜月的最后一天。今天是 <a href="https://mastodon.social/tags/caturday" class="mention hashtag" rel="tag">#<span>caturday</span></a>！这只可爱的虎斑猫来餐厅讨食，得到了一些鸡肉。</p>
+================================================================================
+```
+
+嘟文文本（文档的 `page_content`）默认是 Mastodon API 返回的 HTML 格式。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\mastodon.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

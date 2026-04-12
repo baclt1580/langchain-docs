@@ -1,0 +1,345 @@
+---
+title: "LangChain 的 OCI 生成式 AI 集成"
+description: "使用 LangChain Python 集成 OCI 生成式 AI。"
+sidebarTitle: "OCI"
+---
+
+本页涵盖所有与 [Oracle Cloud Infrastructure (OCI)](https://www.oracle.com/cloud/) 的 LangChain 集成。
+
+## 安装与设置
+
+<CodeGroup>
+```bash pip
+pip install langchain-oci oci
+```
+
+```bash uv
+uv add langchain-oci oci
+```
+</CodeGroup>
+
+## 认证
+
+<Note>
+    初始化 [ChatOCIGenAI](#chatocigenai) 资源消耗较大。为了获得最佳性能，建议将此客户端视为单例，并在整个应用程序中重用该实例。
+</Note>
+
+OCI 服务支持四种认证方法。所有方法均遵循 [标准 OCI SDK 认证](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdk_authentication_methods.htm)。
+
+### API 密钥（默认）
+
+使用来自 `~/.oci/config` 的凭据：
+
+```python
+from langchain_oci import ChatOCIGenAI
+
+llm = ChatOCIGenAI(
+    model_id="meta.llama-3.3-70b-instruct",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..xxx",
+    auth_type="API_KEY",        # Default
+    auth_profile="DEFAULT",      # Profile name in ~/.oci/config
+)
+```
+
+### 安全令牌
+
+用于基于会话的认证：
+
+```bash
+oci session authenticate --profile-name MY_PROFILE
+```
+
+```python
+llm = ChatOCIGenAI(
+    model_id="meta.llama-3.3-70b-instruct",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..your-compartment-id",
+    auth_type="SECURITY_TOKEN",
+    auth_profile="MY_PROFILE",
+)
+```
+
+### 实例主体
+
+适用于在 OCI 计算实例上运行的应用程序：
+
+```python
+llm = ChatOCIGenAI(
+    model_id="meta.llama-3.3-70b-instruct",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..your-compartment-id",
+    auth_type="INSTANCE_PRINCIPAL",
+)
+```
+
+### 资源主体
+
+适用于 OCI 函数和其他资源：
+
+```python
+llm = ChatOCIGenAI(
+    model_id="meta.llama-3.3-70b-instruct",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..your-compartment-id",
+    auth_type="RESOURCE_PRINCIPAL",
+)
+```
+
+---
+
+## OCI 生成式 AI
+
+> 甲骨文云基础设施 (OCI) [生成式 AI](https://docs.oracle.com/en-us/iaas/Content/generative-ai/home.htm) 是一项完全托管的服务，提供一套最先进的、可定制的大型语言模型 (LLMs)，涵盖广泛的使用场景，并通过单一 API 提供。
+> 使用 OCI 生成式 AI 服务，您可以访问现成的预训练模型，或者基于您自己的数据在专用 AI 集群上创建并托管您自己的微调自定义模型。
+
+### 聊天模型
+
+#### ChatOCIGenAI
+
+OCI 生成式 AI 服务的主要聊天模型，具有完整的 LangChain 功能支持。
+
+参见 [使用示例](/oss/python/integrations/chat/oci_generative_ai)。
+
+```python
+from langchain_oci import ChatOCIGenAI
+
+llm = ChatOCIGenAI(
+    model_id="meta.llama-3.3-70b-instruct",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..xxx",
+)
+```
+
+**支持的功能：**
+- ✅ 工具调用（包括与 Llama 4+ 的并行工具）
+- ✅ 结构化输出（Pydantic、JSON 模式）
+- ✅ 视觉与多模态（13+ 个模型支持图像）
+- ✅ 流式传输（同步和异步）
+- ✅ 异步操作（ainvoke、astream、abatch）
+- ✅ PDF、视频、音频处理（Gemini 模型）
+
+#### ChatOCIOpenAI
+
+OCI 商业 OpenAI 模型的 OpenAI Responses API 兼容性。
+
+```python
+from langchain_oci import ChatOCIOpenAI
+
+llm = ChatOCIOpenAI(
+    model="openai.gpt-4.1",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..your-compartment-id",
+)
+```
+
+**功能：**
+- 兼容 OpenAI 的接口
+- 对话存储支持持久化记忆
+- 访问 GPT-4、GPT-5、o1、o3 模型（视情况而定）
+
+### 嵌入模型
+
+#### OCIGenAIEmbeddings
+
+文本和图像嵌入模型。
+
+参见 [使用示例](/oss/python/integrations/embeddings/oci_generative_ai)。
+
+```python
+from langchain_oci import OCIGenAIEmbeddings
+
+# Text embeddings
+embeddings = OCIGenAIEmbeddings(
+    model_id="cohere.embed-english-v3.0",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..xxx",
+)
+
+# Image embeddings (with multimodal models)
+vector = embeddings.embed_image("./architecture_diagram.png")
+```
+
+**可用模型：**
+- `cohere.embed-english-v3.0`（1024 维）
+- `cohere.embed-multilingual-v3.0`（1024 维）
+- `cohere.embed-v4.0`（文本 + 图像，256-1536 维）
+
+### 视觉与多模态
+
+跨 Meta Llama、Google Gemini、xAI Grok 和 Cohere 的 13+ 个具备视觉能力的模型：
+
+```python
+from langchain.messages import HumanMessage
+from langchain_oci import ChatOCIGenAI, load_image
+
+llm = ChatOCIGenAI(
+    model_id="meta.llama-3.2-90b-vision-instruct",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..xxx",
+)
+
+message = HumanMessage(content=[
+    {"type": "text", "text": "Identify all microservices, data flows, and external dependencies."},
+    load_image("./architecture_diagram.png"),
+])
+response = llm.invoke([message])
+```
+
+**Gemini 多模态**（PDF、视频、音频）：
+
+```python
+import base64
+from langchain.messages import HumanMessage
+from langchain_oci import ChatOCIGenAI
+
+llm = ChatOCIGenAI(
+    model_id="google.gemini-2.5-flash",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    compartment_id="ocid1.compartment.oc1..your-compartment-id",
+)
+
+# PDF processing - Extract structured data from contracts
+with open("vendor_contract.pdf", "rb") as f:
+    pdf_data = base64.b64encode(f.read()).decode()
+
+message = HumanMessage(content=[
+    {"type": "text", "text": "Extract: parties, effective date, payment terms. Return as JSON."},
+    {"type": "document_url", "document_url": {"url": f"data:application/pdf;base64,{pdf_data}"}}
+])
+response = llm.invoke([message])
+```
+
+### AI 代理
+
+使用 OCI 模型创建由 LangGraph 驱动的 ReAct 代理：
+
+```python
+from langchain.tools import tool
+from langchain_oci import create_oci_agent
+
+@tool
+def query_infrastructure(resource_type: str, region: str) -> dict:
+    """Query OCI infrastructure status and health metrics.
+
+    Args:
+        resource_type: Type of resource (compute, database, network)
+        region: OCI region to query
+    """
+    # Example: Call OCI monitoring API
+    return {
+        "status": "healthy",
+        "active_instances": 12,
+        "cpu_utilization": "45%",
+        "alerts": []
+    }
+
+agent = create_oci_agent(
+    model_id="meta.llama-4-scout-17b-16e-instruct",
+    tools=[query_infrastructure],
+    compartment_id="ocid1.compartment.oc1..xxx",
+    service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+    system_prompt="You are an infrastructure monitoring assistant.",
+)
+
+from langchain.messages import HumanMessage
+result = agent.invoke({
+    "messages": [HumanMessage(content="Check compute resource health in us-ashburn-1")]
+})
+```
+
+### 提供商覆盖范围
+
+| 提供商 | 示例模型 | 关键功能 |
+|----------|----------------|--------------|
+| **Meta** | Llama 3.2, 3.3, 4 (Scout, Maverick) | 视觉、并行工具调用 |
+| **Google** | Gemini 2.0/2.5 Flash, Flash Lite, Pro | PDF、视频、音频处理 |
+| **xAI** | Grok 3, 4 (Fast, Mini) | 视觉、推理模式 |
+| **Cohere** | Command R+, Command A | RAG 优化、V2 视觉 |
+| **OpenAI** | GPT-4.1, GPT-5, o1, o3 | 推理（通过 ChatOCIOpenAI） |
+
+> **注意：** 模型可用性因区域而异。请查看 [OCI 生成式 AI 文档](https://docs.oracle.com/en-us/iaas/Content/generative-ai/pretrained-models.htm) 以获取当前模型目录。
+
+---
+
+## OCI 数据科学模型部署
+
+> [OCI 数据科学](https://docs.oracle.com/en-us/iaas/data-science/using/home.htm) 是一个完全托管且无服务器的平台，专为数据科学团队设计。使用 [OCI 数据科学模型部署服务](https://docs.oracle.com/en-us/iaas/data-science/using/model-dep-about.htm) 将自定义模型部署为端点。
+
+### ChatOCIModelDeployment
+
+用于 OCI 数据科学模型部署的聊天模型。
+
+参见 [使用示例](/oss/python/integrations/chat/oci_data_science)。
+
+```python
+from langchain_oci import ChatOCIModelDeployment
+
+llm = ChatOCIModelDeployment(
+    endpoint="https://modeldeployment.us-ashburn-1.oci.customer-oci.com/ocid1.datasciencemodeldeployment.oc1.iad.xxx/predict",
+    model="odsc-llm",
+)
+```
+
+### ChatOCIModelDeploymentVLLM
+
+针对基于 vLLM 的部署进行了优化，支持流式传输：
+
+```python
+from langchain_oci import ChatOCIModelDeploymentVLLM
+
+llm = ChatOCIModelDeploymentVLLM(
+    endpoint="https://modeldeployment.us-ashburn-1.oci.customer-oci.com/ocid1.datasciencemodeldeployment.oc1.iad.xxx/predict",
+    model="meta-llama/Llama-2-7b-chat-hf",
+    streaming=True,
+)
+```
+
+### ChatOCIModelDeploymentTGI
+
+适用于文本生成推理 (TGI) 部署：
+
+```python
+from langchain_oci import ChatOCIModelDeploymentTGI
+
+llm = ChatOCIModelDeploymentTGI(
+    endpoint="https://modeldeployment.us-ashburn-1.oci.customer-oci.com/ocid1.datasciencemodeldeployment.oc1.iad.xxx/predict",
+)
+```
+
+---
+
+## 示例
+
+有关涵盖所有功能的综合指南，请参阅 [langchain-oci 示例](https://github.com/oracle/langchain-oracle/tree/main/samples)：
+
+| 示例 | 级别 | 主题 |
+|--------|-------|--------|
+| [01：入门指南](https://github.com/oracle/langchain-oracle/tree/main/samples/01-getting-started) | 初级 | 认证、基本聊天、提供商 |
+| [02：视觉与多模态](https://github.com/oracle/langchain-oracle/tree/main/samples/02-vision-and-multimodal) | 初级 | 图像分析、PDF、视频、音频 |
+| [03：构建 AI 代理](https://github.com/oracle/langchain-oracle/tree/main/samples/03-building-ai-agents) | 中级 | ReAct 代理、工具、记忆 |
+| [04：工具调用精通](https://github.com/oracle/langchain-oracle/tree/main/samples/04-tool-calling-mastery) | 中级 | 并行工具、工作流 |
+| [05：结构化输出](https://github.com/oracle/langchain-oracle/tree/main/samples/05-structured-output) | 中级 | Pydantic 架构、JSON 模式 |
+| [07：生产级异步](https://github.com/oracle/langchain-oracle/tree/main/samples/07-async-for-production) | 高级 | ainvoke、astream、FastAPI |
+| [09：提供商深度解析](https://github.com/oracle/langchain-oracle/tree/main/samples/09-provider-deep-dive) | 专业 | Meta、Gemini、Cohere、xAI 特定内容 |
+| [10：嵌入模型](https://github.com/oracle/langchain-oracle/tree/main/samples/10-embeddings) | 专业 | 文本与图像嵌入、RAG |
+
+---
+
+## 其他资源
+
+- [API 参考](https://github.com/oracle/langchain-oracle/tree/main/libs/oci)
+- [GitHub 仓库](https://github.com/oracle/langchain-oracle)
+- [OCI 生成式 AI 文档](https://docs.oracle.com/en-us/iaas/Content/generative-ai/home.htm)
+- [OCI 数据科学文档](https://docs.oracle.com/en-us/iaas/data-science/using/home.htm)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\oci.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

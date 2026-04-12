@@ -1,0 +1,119 @@
+---
+title: "DeepInfra 集成"
+description: "使用 LangChain Python 与 DeepInfra LLM 进行集成。"
+---
+
+[DeepInfra](https://deepinfra.com/?utm_source=langchain) 是一种无服务器推理即服务，提供访问 [variety of LLMs](https://deepinfra.com/models?utm_source=langchain) 和 [embeddings models](https://deepinfra.com/models?type=embeddings&utm_source=langchain)。本笔记本介绍如何使用 LangChain 配合 DeepInfra 进行语言模型操作。
+
+## 设置环境变量 API 密钥
+
+请确保从 DeepInfra 获取您的 API 密钥。您需要 [Login](https://deepinfra.com/login?from=%2Fdash) 并获取新令牌。
+
+您将获得 1 小时的免费无服务器 GPU 计算时间以测试不同的模型。更多信息，请参阅 [deepctl documentation](https://github.com/deepinfra/deepctl#deepctl)。
+您可以使用 `deepctl auth token` 打印您的令牌。
+
+```python
+# get a new token: https://deepinfra.com/login?from=%2Fdash
+
+from getpass import getpass
+
+DEEPINFRA_API_TOKEN = getpass()
+```
+
+```text
+ ········
+```
+
+```python
+import os
+
+os.environ["DEEPINFRA_API_TOKEN"] = DEEPINFRA_API_TOKEN
+```
+
+## 创建 DeepInfra 实例
+
+您还可以使用我们开源的 [deepctl tool](https://github.com/deepinfra/deepctl#deepctl) 来管理您的模型部署。您可以在 [DeepInfra model API page](https://deepinfra.com/databricks/dolly-v2-12b#API) 上查看可用参数列表。
+
+```python
+from langchain_community.llms import DeepInfra
+
+llm = DeepInfra(model_id="meta-llama/Llama-2-70b-chat-hf")
+llm.model_kwargs = {
+    "temperature": 0.7,
+    "repetition_penalty": 1.2,
+    "max_new_tokens": 250,
+    "top_p": 0.9,
+}
+```
+
+```python
+# run inferences directly via wrapper
+llm("Who let the dogs out?")
+```
+
+```text
+'This is a question that has puzzled many people'
+```
+
+```python
+# run streaming inference
+for chunk in llm.stream("Who let the dogs out?"):
+    print(chunk)
+```
+
+```text
+ Will
+ Smith
+.
+```
+
+## 创建提示模板
+
+我们将为问答创建一个提示模板。
+
+```python
+from langchain_core.prompts import PromptTemplate
+
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+prompt = PromptTemplate.from_template(template)
+```
+
+## 初始化 LLMChain
+
+```python
+from langchain_classic.chains import LLMChain
+
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+```
+
+## 运行 LLMChain
+
+提供一个问题并运行 LLMChain。
+
+```python
+question = "Can penguins reach the North pole?"
+
+llm_chain.run(question)
+```
+
+```text
+"Penguins are found in Antarctica and the surrounding islands, which are located at the southernmost tip of the planet. The North Pole is located at the northernmost tip of the planet, and it would be a long journey for penguins to get there. In fact, penguins don't have the ability to fly or migrate over such long distances. So, no, penguins cannot reach the North Pole. "
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\deepinfra.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

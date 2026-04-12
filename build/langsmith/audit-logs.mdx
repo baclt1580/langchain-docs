@@ -1,0 +1,156 @@
+---
+title: 审计日志
+sidebarTitle: 审计日志
+description: 跟踪和审查 LangSmith 组织内的管理操作，以满足安全、合规和运营可见性需求。
+---
+
+<Note>
+审计日志功能适用于 [**企业版** 计划](/langsmith/pricing-plans)。如果您有兴趣升级到企业版，请[联系我们的销售团队](https://www.langchain.com/contact-sales)。
+</Note>
+
+LangSmith 审计日志提供了组织内执行的管理和配置操作的防篡改记录。它们帮助您回答以下问题：
+
+- **谁**删除了 API 密钥、数据集或部署？
+- **何时**邀请了新成员、修改了角色或更新了示例？
+- **什么**计费、SSO 或数据保留配置被更改？
+- **哪些**数据集、追踪项目或提示 Webhook 被修改？
+
+审计日志对于安全审查、合规要求和一般运营可见性非常有用。
+
+## 前提条件
+
+- 您的组织必须处于 [**企业版** 计划](/langsmith/pricing-plans)。
+- 您必须拥有 **组织管理员** 或 **组织操作员** 角色（[`organization:manage` 权限](/langsmith/rbac#organization-admin)）才能查看审计日志。
+
+## 记录内容
+
+审计日志记录组织设置、成员资格、凭证、工作空间和其他资源的更改。每个事件都包括时间戳、执行者、操作名称、受影响的资源以及是否成功。有关操作名称的完整列表，请参阅[跟踪操作参考](#tracked-operations-reference)。
+
+## 保留期
+
+审计日志最多保留 **400 天**。超过 400 天的事件可能会被自动删除。
+
+## 为自托管部署启用审计日志
+
+审计日志适用于运行 Helm 图表 **0.12.33** 或更高版本（应用程序版本 **0.12.33**）的[自托管](/langsmith/self-hosted) LangSmith 实例。升级后，使用以下选项之一启用审计日志：
+
+- **为特定组织启用：** 针对您的 LangSmith PostgreSQL 数据库运行以下命令，将 `<organization_id>` 替换为从 UI 中组织设置页面复制的 ID：
+
+    ```sql
+    UPDATE organizations SET config = config || '{"can_use_audit_logs": true}' WHERE id = '<organization_id>' AND NOT is_personal;
+    ```
+
+- **为所有组织启用：** 在您的 `values.yaml` 文件的 `commonEnv` 中添加以下环境变量：
+
+    ```yaml
+    DEFAULT_ORG_FEATURE_CAN_USE_AUDIT_LOGS: "true"
+    ```
+
+    <Note>
+    此环境变量对个人组织无效。
+    </Note>
+
+有关自托管版本的更多详细信息，请参阅[自托管更新日志](/langsmith/self-hosted-changelog)。
+
+## 通过 API 查询审计日志
+
+使用 `GET /api/v1/audit-logs` 端点（[API 参考](https://api.smith.langchain.com/redoc#tag/audit-logs)）来检索审计日志事件。结果遵循 [OCSF API Activity](https://schema.ocsf.io/1.7.0/classes/api_activity) 模式。
+
+### 请求示例
+
+```bash
+curl -G \
+  'https://api.smith.langchain.com/api/v1/audit-logs' \
+  -H 'accept: application/json' \
+  -H 'X-API-Key: lsv2_sk_...' \
+  -H 'X-Organization-Id: abc123...' \
+  -d 'limit=2' \
+  --data-urlencode 'start_time=2026-01-01T18:35:16.232Z' \
+  --data-urlencode 'end_time=2026-01-13T18:35:16.232Z' \
+  --data-urlencode 'operations=create_api_key' \
+  --data-urlencode 'operations=delete_api_key'
+```
+
+## 响应格式
+
+审计日志事件以 [OCSF v1.7.0 API Activity (Class UID 6003)](https://schema.ocsf.io/1.7.0/classes/api_activity) 格式返回。关键字段：
+
+| 字段 | 描述 |
+|-----------|-------------|
+| `actor.user.uid` | 执行操作的用户 UUID。 |
+| `actor.user.credential_uid` | 用于验证请求的 API 密钥、PAT 或服务密钥的 UUID。如果用户通过会话（例如 UI）进行身份验证，则为 `null`。 |
+| `api.operation` | LangSmith 操作名称（例如 `create_api_key`、`delete_workspace`）。所有值请参阅[跟踪操作参考](#tracked-operations-reference)。 |
+| `status` | `Success`、`Failure` 或 `Unknown`。 |
+| `resources` | 受操作影响的资源 UUID 列表（例如，被更新的角色、被创建的工作空间）。 |
+| `metadata.uid` | 此审计日志事件的唯一标识符。 |
+| `unmapped.original_audit_log` | 完整的 LangSmith 原生审计日志记录，包括 `organization_id` 和 `workspace_id`。 |
+
+## 转发到外部系统
+
+要将审计日志事件转发到外部 SIEM 或日志平台，您可以运行一个计划函数，每小时拉取前一小时的事件。例如，使用 [AWS Lambda + EventBridge Scheduler](https://docs.aws.amazon.com/lambda/latest/dg/with-eventbridge-scheduler.html)，失败的事件会进入死信队列，以便您知道需要重试哪些时间窗口。
+
+## 跟踪操作参考
+
+| 类别 | 操作 (`api.operation`) |
+|----------|-----------|
+| **API 密钥和凭证** | `create_api_key`, `delete_api_key`, `create_personal_access_token`, `delete_personal_access_token`, `create_service_key`, `delete_service_key` |
+| **角色** | `create_role`, `update_role`, `delete_role` |
+| **组织成员** | `invite_user_to_org`, `invite_users_to_org_batch`, `update_org_member`, `delete_org_member`, `delete_org_pending_member`, `add_basic_auth_users_to_org`, `update_basic_auth_user` |
+| **SSO 和身份验证** | `create_sso_settings`, `update_sso_settings`, `delete_sso_settings`, `update_login_methods`, `update_default_sso_provision_organization` |
+| **SCIM 配置** | `create_scim_token`, `update_scim_token`, `delete_scim_token`, `create_scim_user`, `update_scim_user`, `delete_scim_user`, `create_scim_group`, `update_scim_group`, `delete_scim_group` |
+| **计费和业务信息** | `update_organization_info`, `update_business_info`, `update_payment_plan`, `update_payment_method`, `create_payment_setup_intent`, `create_payment_checkout_session`, `confirm_payment_checkout_session`, `create_payment_account_link` |
+| **工作空间** | `create_workspace`, `update_workspace`, `delete_workspace`, `add_member_to_workspace`, `add_members_to_workspace_batch`, `delete_workspace_member`, `update_workspace_member`, `delete_workspace_pending_member`, `update_workspace_secrets`, `unshare_entities`, `set_tenant_handle` |
+| **数据保留** | `update_ttl_settings`, `update_usage_limit`, `delete_usage_limit` |
+| **追踪项目** | `update_tracer_session`, `delete_tracer_session`, `delete_tracer_sessions` |
+| **数据集** | `create_dataset`, `create_csv_dataset`, `update_dataset`, `delete_dataset`, `delete_datasets`, `update_dataset_version`, `update_dataset_splits`, `share_dataset`, `unshare_dataset`, `clone_dataset`, `create_experiment_via_upload`, `create_playground_experiment`, `create_comparative_experiment`, `delete_comparative_experiment` |
+| **示例** | `create_example`, `create_examples`, `update_example`, `update_examples`, `delete_example`, `delete_examples` |
+| **部署** | `create_deployment`, `update_deployment`, `delete_deployment` |
+| **提示 Webhook** | `create_prompt_webhook`, `update_prompt_webhook`, `delete_prompt_webhook`, `test_prompt_webhook` |
+| **批量导出** | `create_bulk_export`, `cancel_bulk_export`, `read_bulk_export_destination`, `create_bulk_export_destination`, `update_bulk_export_destination` |
+| **资源标签** | `create_tag_key`, `update_tag_key`, `delete_tag_key`, `create_tag_value`, `update_tag_value`, `delete_tag_value`, `create_tagging`, `delete_tagging` |
+| **访问策略** | `create_access_policy`, `delete_access_policy`, `list_access_policies`, `read_access_policy`, `attach_access_policies`, `read_role_access_policies` |
+| **自定义图表** | `create_chart`, `update_chart`, `delete_chart`, `create_chart_section`, `update_chart_section`, `delete_chart_section`, `clone_chart_section`, `create_org_chart`, `update_org_chart`, `delete_org_chart`, `create_org_chart_section`, `update_org_chart_section`, `delete_org_chart_section` |
+| **模型定价** | `create_model_price_map`, `update_model_price_map`, `delete_model_price_map` |
+
+## 常见问题
+
+<AccordionGroup>
+<Accordion title="谁可以查看审计日志？">
+拥有 [**组织管理员**](/langsmith/rbac#organization-admin) 或 [**组织操作员**](/langsmith/rbac#organization-operator) 角色（授予 `organization:manage` 权限）的用户可以访问审计日志。工作空间级别的角色不提供审计日志访问权限。
+</Accordion>
+
+<Accordion title="Plus 或 Developer 计划是否提供审计日志？">
+不提供。审计日志是企业版功能。有关计划详情，请参阅[定价](https://www.langchain.com/pricing-langsmith)。
+</Accordion>
+
+<Accordion title="是否有用于查看审计日志的 UI？">
+目前没有。审计日志可通过 [API](#query-audit-logs-via-api) 获取。
+</Accordion>
+
+<Accordion title="读取操作是否会被记录？">
+审计日志目前主要关注写入操作。未来可能会添加对更多读取操作的支持。
+</Accordion>
+
+<Accordion title="未来是否会跟踪更多操作？">
+是的。我们计划随着时间的推移扩展跟踪的操作集。[跟踪操作参考](#tracked-operations-reference)始终反映当前支持的操作集。
+</Accordion>
+
+<Accordion title="我能否以 OCSF 以外的格式获取审计日志？">
+API 仅以 OCSF 格式返回事件。每个事件中的 `unmapped.original_audit_log` 字段包含原始的 LangSmith 审计日志记录，如果您需要不同格式的数据。
+</Accordion>
+
+<Accordion title="什么是 OCSF？">
+[开放网络安全架构框架 (OCSF)](https://schema.ocsf.io/) 是一个用于安全事件数据的开放标准。LangSmith 将审计日志事件作为 OCSF v1.7.0 API Activity (Class 6003) 对象返回。
+</Accordion>
+</AccordionGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\audit-logs.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

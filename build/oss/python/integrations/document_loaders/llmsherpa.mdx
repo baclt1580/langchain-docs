@@ -1,0 +1,167 @@
+---
+title: "LLM sherpa 集成"
+description: "使用 LangChain Python 集成 LLM sherpa 文档加载器。"
+---
+
+本笔记本介绍了如何使用 `LLM Sherpa` 来加载多种类型的文件。`LLM Sherpa` 支持不同的文件格式，包括 DOCX、PPTX、HTML、TXT 和 XML。
+
+`LLMSherpaFileLoader` 使用 LayoutPDFReader，它是 LLMSherpa 库的一部分。该工具旨在解析 PDF 文件，同时保留其布局信息，而大多数 PDF 转文本解析器通常会丢失这些信息。
+
+以下是 LayoutPDFReader 的一些关键特性：
+
+* 能够识别并提取章节和子章节及其层级。
+* 将多行文本合并为段落。
+* 能够识别章节与段落之间的链接关系。
+* 能够提取表格及其所在的章节。
+* 能够识别并提取列表和嵌套列表。
+* 能够合并跨页的内容。
+* 能够移除重复的页眉和页脚。
+* 能够移除水印。
+
+查看 [llmsherpa](https://llmsherpa.readthedocs.io/en/latest/) 文档。
+
+`注意：此库在处理某些 PDF 文件时可能会失败，请谨慎使用。`
+
+```python
+# 安装包
+# !pip install -qU llmsherpa
+```
+
+## LLMSherpaFileLoader
+
+在底层，LLMSherpaFileLoader 定义了一些策略来加载文件内容：["sections", "chunks", "html", "text"]，请设置 [nlm-ingestor](https://github.com/nlmatics/nlm-ingestor) 以获取 `llmsherpa_api_url` 或使用默认值。
+
+### sections 策略：将文件解析为章节返回
+
+```python
+from langchain_community.document_loaders.llmsherpa import LLMSherpaFileLoader
+
+loader = LLMSherpaFileLoader(
+    file_path="https://arxiv.org/pdf/2402.14207.pdf",
+    new_indent_parser=True,
+    apply_ocr=True,
+    strategy="sections",
+    llmsherpa_api_url="http://localhost:5010/api/parseDocument?renderFormat=all",
+)
+docs = loader.load()
+```
+
+```python
+docs[1]
+```
+
+```python
+Document(page_content='Abstract\n我们研究如何应用大语言模型从零开始撰写有依据且结构化的长篇文章，其广度和深度可与维基百科页面相媲美。\n这个尚未充分探索的问题在写作前阶段提出了新的挑战，包括如何研究主题并在写作前准备大纲。\n我们提出了 STORM，一个用于通过\n参考文献\n完整文章\n主题\n大纲\n2022年冬季奥运会\n开幕式\n通过提问进行研究\n检索与多视角提问。\nSTORM 通过\nLLM\n(1) 在研究给定主题时发现多样化的视角，(2) 模拟对话，其中持有不同视角的作者向基于可信互联网来源的主题专家提问，(3) 整理收集到的信息以创建大纲，来建模写作前阶段。\n为了评估，我们整理了 FreshWiki，一个近期高质量维基百科文章的数据集，并制定大纲评估来评估写作前阶段。\n我们还收集了经验丰富的维基百科编辑的反馈。\n与基于大纲驱动的检索增强基线生成的文章相比，STORM 生成的文章被认为更有组织性（绝对增加 25%）和覆盖范围更广（增加 10%）。\n专家反馈还帮助识别了生成有依据的长篇文章的新挑战，例如来源偏见转移和无关事实的过度关联。\n1. 您能提供有关开幕式交通安排的任何信息吗？\nLLM\n2. 您能提供有关 2022 年冬季奥运会开幕式预算的任何信息吗？…\nLLM- 角色1\nLLM- 角色2\nLLM- 角色1', metadata={'source': 'https://arxiv.org/pdf/2402.14207.pdf', 'section_number': 1, 'section_title': 'Abstract'})
+```
+
+```python
+len(docs)
+```
+
+```text
+79
+```
+
+### chunks 策略：将文件解析为块返回
+
+```python
+from langchain_community.document_loaders.llmsherpa import LLMSherpaFileLoader
+
+loader = LLMSherpaFileLoader(
+    file_path="https://arxiv.org/pdf/2402.14207.pdf",
+    new_indent_parser=True,
+    apply_ocr=True,
+    strategy="chunks",
+    llmsherpa_api_url="http://localhost:5010/api/parseDocument?renderFormat=all",
+)
+docs = loader.load()
+```
+
+```python
+docs[1]
+```
+
+```python
+Document(page_content='Assisting in Writing Wikipedia-like Articles From Scratch with Large Language Models\n斯坦福大学 {shaoyj, yuchengj, tkanell, peterxu, okhattab}@stanford.edu lam@cs.stanford.edu', metadata={'source': 'https://arxiv.org/pdf/2402.14207.pdf', 'chunk_number': 1, 'chunk_type': 'para'})
+```
+
+```python
+len(docs)
+```
+
+```text
+306
+```
+
+### html 策略：将文件作为一个 html 文档返回
+
+```python
+from langchain_community.document_loaders.llmsherpa import LLMSherpaFileLoader
+
+loader = LLMSherpaFileLoader(
+    file_path="https://arxiv.org/pdf/2402.14207.pdf",
+    new_indent_parser=True,
+    apply_ocr=True,
+    strategy="html",
+    llmsherpa_api_url="http://localhost:5010/api/parseDocument?renderFormat=all",
+)
+docs = loader.load()
+```
+
+```python
+docs[0].page_content[:400]
+```
+
+```text
+'<html><h1>Assisting in Writing Wikipedia-like Articles From Scratch with Large Language Models</h1><table><th><td colSpan=1>Yijia Shao</td><td colSpan=1>Yucheng Jiang</td><td colSpan=1>Theodore A. Kanell</td><td colSpan=1>Peter Xu</td></th><tr><td colSpan=1></td><td colSpan=1>Omar Khattab</td><td colSpan=1>Monica S. Lam</td><td colSpan=1></td></tr></table><p>Stanford University {shaoyj, yuchengj, '
+```
+
+```python
+len(docs)
+```
+
+```text
+1
+```
+
+### text 策略：将文件作为一个文本文档返回
+
+```python
+from langchain_community.document_loaders.llmsherpa import LLMSherpaFileLoader
+
+loader = LLMSherpaFileLoader(
+    file_path="https://arxiv.org/pdf/2402.14207.pdf",
+    new_indent_parser=True,
+    apply_ocr=True,
+    strategy="text",
+    llmsherpa_api_url="http://localhost:5010/api/parseDocument?renderFormat=all",
+)
+docs = loader.load()
+```
+
+```python
+docs[0].page_content[:400]
+```
+
+```text
+'Assisting in Writing Wikipedia-like Articles From Scratch with Large Language Models\n | Yijia Shao | Yucheng Jiang | Theodore A. Kanell | Peter Xu\n | --- | --- | --- | ---\n |  | Omar Khattab | Monica S. Lam | \n\nStanford University {shaoyj, yuchengj, tkanell, peterxu, okhattab}@stanford.edu lam@cs.stanford.edu\nAbstract\n我们研究如何应用大语言模型从零开始撰写有依据且结构化的长篇文章，其广度和深度可与维基百科页面相媲美。'
+```
+
+```python
+len(docs)
+```
+
+```text
+1
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\llmsherpa.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

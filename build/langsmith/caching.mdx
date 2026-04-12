@@ -1,0 +1,178 @@
+---
+title: 使用服务端缓存
+sidebarTitle: 缓存
+description: 在您的智能体部署中，通过 stale-while-revalidate 和键值缓存 API 实现服务端缓存。
+---
+
+[智能体服务器](/langsmith/agent-server) 内置了缓存功能，您可以在部署的图中使用。调用 `swr` 并传入一个键和一个加载函数，服务器将缓存结果、在后台重新验证过期的条目，并在每次读取时返回最新数据。
+
+所有缓存 API **仅限服务端使用**，需要 LangGraph 智能体服务器运行时环境。缓存值必须是 JSON 可序列化的。
+
+<Note>
+`swr` 需要智能体服务器运行时 **v0.7.79** 或更高版本，目前处于 **测试阶段**。
+`cache_get` 和 `cache_set` 需要 **v0.7.29** 或更高版本。
+</Note>
+
+## 快速开始
+
+传入一个键和一个异步加载函数。`swr` 会返回缓存值（如果可用），否则调用您的加载函数来获取：
+
+```python
+from langgraph_sdk.cache import swr
+
+result = await swr("config:global", load_config)
+config_data = result.value
+```
+
+首次调用时，`swr` 会等待 `load_config()` 并缓存结果。后续调用时，它会立即返回缓存值并在后台重新验证。
+
+## 配置新鲜度
+
+控制缓存值被视为新鲜的时间以及何时过期：
+
+```python
+from datetime import timedelta
+from langgraph_sdk.cache import swr
+
+result = await swr(
+    "config:global",
+    load_config,
+    fresh_for=timedelta(minutes=5),
+    max_age=timedelta(hours=1),
+)
+```
+
+| 参数 | 默认值 | 描述 |
+|---|---|---|
+| `fresh_for` | `timedelta(0)` | 将缓存值视为新鲜的持续时间。在此窗口期内，`swr` 直接返回缓存值，无需重新验证。 |
+| `max_age` | `timedelta(days=1)` | 缓存条目的最长生存时间。超过此时间后，`swr` 会等待加载函数完成后再返回。上限为 1 天。 |
+
+### 重新验证的工作原理
+
+| 缓存状态 | 条件 | 行为 |
+|---|---|---|
+| **未命中** | 键不在缓存中 | 等待 `loader()` 完成，存储结果并返回。 |
+| **新鲜** | `age < fresh_for` | 返回缓存值，不进行重新验证。 |
+| **过期** | `fresh_for <= age < max_age` | 立即返回缓存值，触发后台刷新。 |
+| **已失效** | `age >= max_age` | 等待 `loader()` 完成，存储结果并返回。 |
+
+## 与 Pydantic 模型结合使用
+
+传入 `model` 参数以自动序列化和反序列化 Pydantic 模型：
+
+```python
+from pydantic import BaseModel
+from langgraph_sdk.cache import swr
+
+class UserProfile(BaseModel):
+    name: str
+    email: str
+    role: str
+
+result = await swr(
+    f"profile:{user_id}",
+    lambda: fetch_profile(user_id),
+    model=UserProfile,
+)
+profile: UserProfile = result.value  # 自动反序列化
+```
+
+`swr` 在存储前调用 `model_dump(mode="json")`，在读取时调用 `model.model_validate()`。
+
+## 缓存认证凭据
+
+您可以在[自定义认证处理器](/langsmith/custom-auth)中缓存凭据验证，以避免每次请求都访问身份提供商：
+
+```python
+from datetime import timedelta
+from langgraph_sdk import Auth
+from langgraph_sdk.cache import swr
+
+auth = Auth()
+
+@auth.authenticate
+async def authenticate(headers: dict) -> Auth.types.MinimalUserDict:
+    token = (headers.get(b"authorization") or b"").decode()
+    if not token:
+        raise Auth.exceptions.HTTPException(status_code=401, detail="Missing token")
+
+    result = await swr(
+        f"auth:token:{token}",
+        lambda: validate_and_fetch_user(token),
+        fresh_for=timedelta(minutes=5),
+        max_age=timedelta(hours=1),
+    )
+    return result.value
+```
+
+通过此设置，服务器将在 5 分钟内直接返回缓存的用户信息而无需重新验证，之后在长达 1 小时内在后台重新验证。1 小时后，下一次请求将等待 `validate_and_fetch_user` 完成。
+
+## 检查缓存状态
+
+`swr` 返回一个 `SWRResult` 对象，包含值和缓存状态：
+
+```python
+result = await swr("my-key", my_loader)
+
+result.value   # 缓存的或新加载的值
+result.status  # "miss" | "fresh" | "stale" | "expired"
+```
+
+调用 `.mutate()` 来更新缓存值或强制重新验证：
+
+```python
+await result.mutate(new_value)  # 使用新值更新缓存
+await result.mutate()           # 通过调用加载函数强制重新验证
+```
+
+## 底层缓存 API
+
+对于无需重新验证的简单获取/设置缓存，可以直接使用 `cache_get` 和 `cache_set`：
+
+```python
+from datetime import timedelta
+from langgraph_sdk.cache import cache_get, cache_set
+
+value = await cache_get("my-key")
+
+if value is None:
+    value = await expensive_computation()
+    await cache_set("my-key", value, ttl=timedelta(hours=1))
+```
+
+### `cache_get`
+
+```python
+async def cache_get(key: str) -> Any | None
+```
+
+返回反序列化的值，如果键不存在或已过期则返回 `None`。
+
+### `cache_set`
+
+```python
+async def cache_set(key: str, value: Any, *, ttl: timedelta | None = None) -> None
+```
+
+| 参数 | 类型 | 默认值 | 描述 |
+|---|---|---|---|
+| `key` | `str` | 必需 | 缓存键 |
+| `value` | `Any` | 必需 | 要缓存的值。必须是 JSON 可序列化的 |
+| `ttl` | `timedelta \| None` | `None` | 生存时间。服务器将其上限设为 1 天。`None` 或零值默认为 1 天 |
+
+## 后续步骤
+
+- 为您的部署[添加自定义认证](/langsmith/custom-auth)。
+- [添加自定义生命周期事件](/langsmith/custom-lifespan)以在服务器启动时初始化资源。
+- 了解[智能体服务器架构](/langsmith/agent-server)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\caching.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,154 @@
+---
+title: "Azure Blob Storage 加载器集成"
+description: "使用 LangChain Python 集成 Azure Blob Storage 加载器文档加载器。"
+---
+
+>[Azure Blob Storage](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction) 是微软面向云的对象存储解决方案。Blob Storage 针对存储海量非结构化数据进行了优化。非结构化数据是指不遵循特定数据模型或定义的数据，例如文本或二进制数据。
+
+`Azure Blob Storage` 设计用于：
+
+- 直接向浏览器提供图像或文档。
+- 存储文件以供分布式访问。
+- 流式传输视频和音频。
+- 写入日志文件。
+- 存储用于备份和恢复、灾难恢复及归档的数据。
+- 存储用于本地或 Azure 托管服务分析的数据。
+
+本笔记本介绍如何从 `Azure Blob Storage` 上的容器加载文档对象。有关文档加载器的更详细文档，请参阅 [Azure Blob Storage 加载器 API 参考](https://reference.langchain.com/python/integrations/langchain_azure/storage/)。
+
+<Note>
+建议使用此新加载器替代先前来自 `langchain_community` 的 [`AzureBlobStorageFileLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/azure_blob_storage_file/AzureBlobStorageFileLoader) 和 [`AzureBlobStorageContainerLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/azure_blob_storage_container/AzureBlobStorageContainerLoader)。有关迁移到新加载器的详细说明，请参阅 [迁移指南](https://github.com/langchain-ai/langchain-azure/blob/main/libs/azure-storage/README.md#migrating-from-langchain-community-azure-storage-document-loaders)
+</Note>
+
+## 设置
+
+```python
+pip install -qU langchain-azure-storage
+```
+
+```python
+from langchain_azure_storage.document_loaders import AzureBlobStorageLoader
+```
+
+## 从容器加载
+
+`AzureBlobStorageLoader` 从 Azure Blob Storage 中的给定容器加载所有 Blob，需要 [账户 URL 和容器名称](https://learn.microsoft.com/en-us/rest/api/storageservices/Naming-and-Referencing-Containers--Blobs--and-Metadata#resource-uri-syntax)。加载器返回包含 Blob 内容（默认为 UTF-8 编码）和元数据（包括 Blob URL）的 [`Document`](https://reference.langchain.com/python/langchain_core/documents/#langchain_core.documents.base.Document) 对象，如下例所示。
+
+无需显式配置凭据，因为它使用 [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac#defaultazurecredential-overview)，该凭据会根据当前环境自动获取 [Microsoft Entra ID 令牌](https://learn.microsoft.com/en-us/azure/storage/blobs/authorize-access-azure-active-directory)。
+
+```python
+loader = AzureBlobStorageLoader(
+    "https://<storage-account-name>.blob.core.windows.net",
+    "<container-name>",
+)
+
+for doc in loader.load():
+    print(doc)
+```
+
+```python
+page_content='Lorem ipsum dolor sit amet.' metadata={'source': 'https://<storage-account-name>.blob.core.windows.net/<container-name>/<blob-name>'}
+```
+
+您还可以指定前缀，仅返回以该前缀开头的 Blob。
+
+```python
+loader = AzureBlobStorageLoader(
+    "https://<storage-account-name>.blob.core.windows.net",
+    "<container-name>",
+    prefix="<prefix>",
+)
+```
+
+## 按 Blob 名称从容器加载
+
+您可以从 Blob 名称列表中加载文档，这仅使用提供的 Blob，而无需调用 API 来列出 Blob。
+
+```python
+loader = AzureBlobStorageLoader(
+    "https://<storage-account-name>.blob.core.windows.net",
+    "<container-name>",
+    blob_names=["blob-1", "blob-2", "blob-3"],
+)
+```
+
+## 覆盖默认凭据
+
+默认情况下，文档加载器使用 [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac#defaultazurecredential-overview)。以下示例展示如何覆盖此设置：
+
+```python
+from azure.core.credentials import AzureSasCredential
+from azure.identity import ManagedIdentityCredential
+from langchain_azure_storage.document_loaders import AzureBlobStorageLoader
+
+# 使用 SAS 令牌覆盖
+loader = AzureBlobStorageLoader(
+    "https://<storage-account-name>.blob.core.windows.net",
+    "<container-name>",
+    credential=AzureSasCredential("<sas-token>")
+)
+
+# 使用比整个默认凭据链更具体的令牌凭据覆盖（例如，系统分配的托管标识）
+loader = AzureBlobStorageLoader(
+    "https://<storage-account-name>.blob.core.windows.net",
+    "<container-name>",
+    credential=ManagedIdentityCredential()
+)
+```
+
+## 自定义 Blob 内容解析
+
+目前，解析每个 Blob 时的默认行为是返回一个 [`Document`](https://reference.langchain.com/python/langchain-core/documents/base/Document) 对象，内容采用 UTF-8 编码，无论文件类型如何。对于需要特定解析的文件类型（例如 PDF、CSV 等），或者当您希望控制文档内容格式时，可以提供 `loader_factory` 参数，该参数接受现有的文档加载器（例如 PyPDFLoader、CSVLoader 等）或自定义加载器。
+
+此功能通过将 Blob 内容下载到临时文件来实现。然后，`loader_factory` 会接收文件路径，使用指定的文档加载器加载/解析文件并返回 [`Document`](https://reference.langchain.com/python/langchain-core/documents/base/Document) 对象。
+
+以下示例展示如何使用 [PyPDFLoader](https://reference.langchain.com/python/langchain-community/document_loaders/pdf/PyPDFLoader) 覆盖默认加载器，将 Blob 解析为 PDF：
+
+```python
+from langchain_azure_storage.document_loaders import AzureBlobStorageLoader
+from langchain_community.document_loaders import PyPDFLoader  # 此示例需要安装 `langchain-community` 和 `pypdf`
+
+loader = AzureBlobStorageLoader(
+    "https://<storage-account-name>.blob.core.windows.net",
+    "<container-name>",
+    blob_names="<pdf-file.pdf>",
+    loader_factory=PyPDFLoader,
+)
+
+for doc in loader.lazy_load():
+    print(doc.page_content)  # 将每页内容作为单独文档打印
+```
+
+要提供额外配置，您可以定义一个可调用对象，返回已实例化的文档加载器，如下所示：
+
+```python
+from langchain_azure_storage.document_loaders import AzureBlobStorageLoader
+from langchain_community.document_loaders import PyPDFLoader  # 此示例需要安装 `langchain-community` 和 `pypdf`
+
+def loader_factory(file_path: str) -> PyPDFLoader:
+    return PyPDFLoader(
+        file_path,
+        mode="single",  # 将 PDF 作为单个文档返回，而不是按页提取文档
+    )
+
+loader = AzureBlobStorageLoader(
+    "https://<storage-account-name>.blob.core.windows.net",
+    "<container-name>",
+    blob_names="<pdf-file.pdf>",
+    loader_factory=loader_factory,
+)
+
+for doc in loader.lazy_load():
+    print(doc.page_content)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\azure_blob_storage.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

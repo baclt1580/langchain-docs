@@ -1,0 +1,136 @@
+---
+title: "PGVecto.rs 集成"
+description: "使用 LangChain Python 与 PGVecto.rs 向量存储进行集成。"
+---
+
+本笔记本展示了如何使用与 Postgres 向量数据库 ([pgvecto.rs](https://github.com/tensorchord/pgvecto.rs)) 相关的功能。
+
+```python
+pip install "pgvecto_rs[sdk]" langchain-community
+```
+
+```python
+from typing import List
+
+from langchain_community.document_loaders import TextLoader
+from langchain_community.embeddings.fake import FakeEmbeddings
+from langchain_community.vectorstores.pgvecto_rs import PGVecto_rs
+from langchain_core.documents import Document
+from langchain_text_splitters import CharacterTextSplitter
+```
+
+```python
+loader = TextLoader("../../how_to/state_of_the_union.txt")
+documents = loader.load()
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
+
+embeddings = FakeEmbeddings(size=3)
+```
+
+使用 [官方演示 docker 镜像](https://github.com/tensorchord/pgvecto.rs#installation) 启动数据库。
+
+```python
+! docker run --name pgvecto-rs-demo -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d tensorchord/pgvecto-rs:latest
+```
+
+然后构建数据库 URL
+
+```python
+## PGVecto.rs needs the connection string to the database.
+## We will load it from the environment variables.
+import os
+
+PORT = os.getenv("DB_PORT", 5432)
+HOST = os.getenv("DB_HOST", "localhost")
+USER = os.getenv("DB_USER", "postgres")
+PASS = os.getenv("DB_PASS", "mysecretpassword")
+DB_NAME = os.getenv("DB_NAME", "postgres")
+
+# Run tests with shell:
+URL = "postgresql+psycopg://{username}:{password}@{host}:{port}/{db_name}".format(
+    port=PORT,
+    host=HOST,
+    username=USER,
+    password=PASS,
+    db_name=DB_NAME,
+)
+```
+
+最后，从文档创建 VectorStore：
+
+```python
+db1 = PGVecto_rs.from_documents(
+    documents=docs,
+    embedding=embeddings,
+    db_url=URL,
+    # The table name is f"collection_{collection_name}", so that it should be unique.
+    collection_name="state_of_the_union",
+)
+```
+
+稍后您可以使用以下方式连接到表：
+
+```python
+# Create new empty vectorstore with collection_name.
+# Or connect to an existing vectorstore in database if exists.
+# Arguments should be the same as when the vectorstore was created.
+db1 = PGVecto_rs.from_collection_name(
+    embedding=embeddings,
+    db_url=URL,
+    collection_name="state_of_the_union",
+)
+```
+
+请确保用户有权创建表。
+
+## 带分数的相似度搜索
+
+### 使用欧几里得距离的相似度搜索（默认）
+
+```python
+query = "What did the president say about Ketanji Brown Jackson"
+docs: List[Document] = db1.similarity_search(query, k=4)
+for doc in docs:
+    print(doc.page_content)
+    print("======================")
+```
+
+### 使用过滤器的相似度搜索
+
+```python
+from pgvecto_rs.sdk.filters import meta_contains
+
+query = "What did the president say about Ketanji Brown Jackson"
+docs: List[Document] = db1.similarity_search(
+    query, k=4, filter=meta_contains({"source": "../../how_to/state_of_the_union.txt"})
+)
+
+for doc in docs:
+    print(doc.page_content)
+    print("======================")
+```
+
+或者：
+
+```python
+query = "What did the president say about Ketanji Brown Jackson"
+docs: List[Document] = db1.similarity_search(
+    query, k=4, filter={"source": "../../how_to/state_of_the_union.txt"}
+)
+
+for doc in docs:
+    print(doc.page_content)
+    print("======================")
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\vectorstores\pgvecto_rs.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

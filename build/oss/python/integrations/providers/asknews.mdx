@@ -1,0 +1,50 @@
+---
+title: "Asknews 集成"
+description: "使用 LangChain Python 与 Asknews 进行集成。"
+---
+
+[AskNews](https://asknews.app/) 通过每日处理和索引超过 300,000 篇文章，利用低延迟端点提供提示优化的响应，并确保新闻覆盖的透明度和多样性，从而为语言模型提供最新的全球或历史新闻增强。
+
+## 安装和设置
+
+首先，您需要安装 `asknews` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install asknews
+```
+
+```bash uv
+uv add asknews
+```
+</CodeGroup>
+
+您还需要设置我们的 AskNews API 凭据，这些可以在 [AskNews 控制台](https://my.asknews.app/) 生成。
+
+
+## 检索器
+
+查看 [使用示例](/oss/python/integrations/retrievers/asknews)。
+
+```python
+from langchain_community.retrievers import AskNewsRetriever
+```
+
+## 工具
+
+查看 [使用示例](/oss/python/integrations/tools/asknews)。
+
+```python
+from langchain_community.tools.asknews import AskNewsSearch
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\asknews.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,98 @@
+---
+title: "ClickSend 集成"
+description: 通过 ClickSend 通信平台，从 LangChain 智能体发送短信、电子邮件和语音消息。
+---
+
+[ClickSend](https://www.clicksend.com/) 是一个基于云的通信平台，使开发者能够通过统一的 API 发送短信、电子邮件、语音、传真和邮政邮件。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 可序列化 | [Python 支持](/oss/javascript/integrations/tools/clicksend) | 版本 |
+|:---|:---|:---:|:---:|:---:|
+| `ClickSendTools` | [@clicksend/langchain-clicksend-mcp](https://www.npmjs.com/package/@clicksend/langchain-clicksend-mcp) | ❌ | ❌ | ![npm 版本](https://img.shields.io/npm/v/@clicksend/langchain-clicksend-mcp?style=flat-square&label=%20) |
+
+### 工具特性
+
+- **短信发送**：向全球手机号码发送文本消息
+- **电子邮件**：发送交易和营销邮件
+- **语音**：发送自动语音消息和拨打电话
+- **MCP 集成**：通过模型上下文协议连接，实现无缝的智能体集成
+
+## 设置
+
+该集成位于 `@clicksend/langchain-clicksend-mcp` 包中。
+
+```bash
+npm install @clicksend/langchain-clicksend-mcp
+```
+
+### 凭证
+
+您需要一个具有 API 凭证的 ClickSend 账户。请在 [clicksend.com](https://www.clicksend.com/) 注册以获取您的用户名和 API 密钥。
+
+```typescript 设置凭证
+import dotenv from 'dotenv';
+dotenv.config();
+```
+
+## 实例化
+
+通过连接到 ClickSend MCP 服务器来初始化 ClickSend 工具：
+
+```typescript 初始化 ClickSend
+import { ClickSendTools } from "@clicksend/langchain-clicksend-mcp";
+
+const tools = await ClickSendTools.fromHTTP({
+  url: "https://mcp.clicksend.com",
+  username: process.env.CLICKSEND_USERNAME,
+  apiKey: process.env.CLICKSEND_API_KEY,
+});
+
+console.log(`已加载 ${tools.length} 个 ClickSend 工具`);
+```
+
+## 调用
+
+在您的 LangChain 智能体中使用这些工具来发送通信：
+
+```typescript 与智能体一起使用
+import { ChatOpenAI } from "@langchain/openai";
+import { createAgent } from "langchain";
+
+// 使用工具创建智能体
+const agent = await createAgent({
+  model: new ChatOpenAI({ 
+    model: "gpt-4o-mini",
+    temperature: 0 
+  }),
+  tools,
+});
+
+// 使用智能体
+const result = await agent.invoke({
+  messages: [
+    { role: "user", content: "向 +1234567890 发送一条短信，内容为 '来自 LangChain 的问候！'" },
+  ],
+});
+
+console.log(result);
+```
+
+## API 参考
+
+有关所有功能和配置的详细文档，请参阅 [API 参考](https://www.npmjs.com/package/@clicksend/langchain-clicksend-mcp)。
+
+有关 ClickSend 服务和定价的更多信息，请访问 [clicksend.com](https://www.clicksend.com/)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\clicksend.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

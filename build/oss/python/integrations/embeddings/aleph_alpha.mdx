@@ -1,0 +1,66 @@
+---
+title: "Aleph Alpha 集成"
+description: "使用 LangChain Python 与 Aleph Alpha 嵌入模型集成。"
+---
+
+使用 Aleph Alpha 的语义嵌入有两种可能的方式。如果文本结构不相似（例如文档和查询），您会希望使用非对称嵌入。相反，对于结构可比较的文本，建议使用对称嵌入。
+
+## 非对称
+
+```python
+from langchain_community.embeddings import AlephAlphaAsymmetricSemanticEmbedding
+```
+
+```python
+document = "This is a content of the document"
+query = "What is the content of the document?"
+```
+
+```python
+embeddings = AlephAlphaAsymmetricSemanticEmbedding(normalize=True, compress_to_size=128)
+```
+
+```python
+doc_result = embeddings.embed_documents([document])
+```
+
+```python
+query_result = embeddings.embed_query(query)
+```
+
+## 对称
+
+```python
+from langchain_community.embeddings import AlephAlphaSymmetricSemanticEmbedding
+```
+
+```python
+text = "This is a test text"
+```
+
+```python
+embeddings = AlephAlphaSymmetricSemanticEmbedding(normalize=True, compress_to_size=128)
+```
+
+```python
+doc_result = embeddings.embed_documents([text])
+```
+
+```python
+query_result = embeddings.embed_query(text)
+```
+
+```python
+
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\embeddings\aleph_alpha.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

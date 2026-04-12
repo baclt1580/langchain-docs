@@ -1,0 +1,148 @@
+---
+title: "Databricks 集成"
+description: "使用 LangChain Python 与 Databricks LLM 进行集成。"
+---
+
+> [Databricks](https://www.databricks.com/) Lakehouse 平台在一个平台上统一了数据、分析和 AI。
+
+本指南提供了快速入门 Databricks [LLM 模型](https://python.langchain.com/docs/concepts/text_llms) 的概述。有关所有功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/llms/databricks/Databricks)。
+
+## 概述
+
+`Databricks` LLM 类封装了一个完成端点，该端点托管为以下两种端点类型之一：
+
+* [Databricks Model Serving](https://docs.databricks.com/en/machine-learning/model-serving/index.html)，推荐用于生产和开发，
+* 集群驱动程序代理应用，推荐用于交互式开发。
+
+此示例笔记本展示了如何包装您的 LLM 端点并将其用作 LangChain 应用程序中的 LLM。
+
+## 限制
+
+`Databricks` LLM 类是*遗留*实现，在功能兼容性方面存在若干限制。
+
+* 仅支持同步调用。不支持流式传输或异步 API。
+* `batch` API 不受支持。
+
+要使用这些功能，请使用新的 [ChatDatabricks](https://python.langchain.com/docs/integrations/chat/databricks) 类代替。`ChatDatabricks` 支持 `ChatModel` 的所有 API，包括流式传输、异步、批处理等。
+
+## 设置
+
+要访问 Databricks 模型，您需要创建一个 Databricks 账户，设置凭据（仅当您不在 Databricks 工作区内时），并安装所需的包。
+
+### 凭据（仅当您不在 databricks 中时）
+
+如果您在 Databricks 内部运行 LangChain 应用程序，可以跳过此步骤。
+
+否则，您需要手动将 Databricks 工作区主机名和个人访问令牌分别设置为 `DATABRICKS_HOST` 和 `DATABRICKS_TOKEN` 环境变量。请参阅 [认证文档](https://docs.databricks.com/en/dev-tools/auth/index.html#databricks-personal-access-tokens) 了解如何获取访问令牌。
+
+```python
+import getpass
+import os
+
+os.environ["DATABRICKS_HOST"] = "https://your-workspace.cloud.databricks.com"
+if "DATABRICKS_TOKEN" not in os.environ:
+    os.environ["DATABRICKS_TOKEN"] = getpass.getpass(
+        "Enter your Databricks access token: "
+    )
+```
+
+或者，您可以在初始化 `Databricks` 类时传递这些参数。
+
+```python
+from langchain_community.llms import Databricks
+
+databricks = Databricks(
+    host="https://your-workspace.cloud.databricks.com",
+    # We strongly recommend NOT to hardcode your access token in your code, instead use secret management tools
+    # or environment variables to store your access token securely. The following example uses Databricks Secrets
+    # to retrieve the access token that is available within the Databricks notebook.
+    token=dbutils.secrets.get(scope="YOUR_SECRET_SCOPE", key="databricks-token"),
+)
+```
+
+### 安装
+
+LangChain Databricks 集成位于 `langchain-community` 包中。此外，需要 `mlflow >= 2.9` 才能运行此笔记本中的代码。
+
+```python
+pip install -qU langchain-community mlflow>=2.9.0
+```
+
+## 包装模型服务端点
+
+### 先决条件
+
+* 已注册并将 LLM 部署到 [一个 Databricks 服务端点](https://docs.databricks.com/machine-learning/model-serving/index.html)。
+* 您拥有对该端点的 ["Can Query" 权限](https://docs.databricks.com/security/auth-authz/access-control/serving-endpoint-acl.html)。
+
+预期的 MLflow 模型签名如下：
+
+* 输入：`[{"name": "prompt", "type": "string"}, {"name": "stop", "type": "list[string]"}]`
+* 输出：`[{"type": "string"}]`
+
+### 调用
+
+```python
+from langchain_community.llms import Databricks
+
+llm = Databricks(endpoint_name="YOUR_ENDPOINT_NAME")
+llm.invoke("How are you?")
+```
+
+```text
+'I am happy to hear that you are in good health and as always, you are appreciated.'
+```
+
+```python
+llm.invoke("How are you?", stop=["."])
+```
+
+```text
+'Good'
+```
+
+### 转换输入和输出
+
+有时您可能希望包装具有不兼容模型签名的服务端点，或者想要插入额外的配置。您可以使用 `transform_input_fn` 和 `transform_output_fn` 参数来定义额外的预处理/后处理。
+
+```python
+# Use `transform_input_fn` and `transform_output_fn` if the serving endpoint
+# expects a different input schema and does not return a JSON string,
+# respectively, or you want to apply a prompt template on top.
+
+
+def transform_input(**request):
+    full_prompt = f"""{request["prompt"]}
+    Be Concise.
+    """
+    request["prompt"] = full_prompt
+    return request
+
+
+def transform_output(response):
+    return response.upper()
+
+
+llm = Databricks(
+    endpoint_name="YOUR_ENDPOINT_NAME",
+    transform_input_fn=transform_input,
+    transform_output_fn=transform_output,
+)
+
+llm.invoke("How are you?")
+```
+
+```text
+'I AM DOING GREAT THANK YOU.'
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\databricks.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

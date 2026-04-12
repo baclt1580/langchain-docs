@@ -1,0 +1,50 @@
+---
+title: "Airbyte 集成"
+description: "使用 LangChain Python 与 Airbyte 集成。"
+---
+
+>[Airbyte](https://github.com/airbytehq/airbyte) 是一个用于 ELT 管道（从 API、数据库和文件到数据仓库和数据湖）的数据集成平台。它拥有最大的面向数据仓库和数据库的 ELT 连接器目录。
+
+## 安装和设置
+
+<CodeGroup>
+```bash pip
+pip install -U langchain-airbyte
+```
+
+```bash uv
+uv add langchain-airbyte
+```
+</CodeGroup>
+
+<Note>
+**目前，`langchain-airbyte` 库不支持 Pydantic v2。**
+
+请降级到 Pydantic v1 以使用此包。
+
+此包目前还需要 Python 3.10+。
+
+</Note>
+
+集成包不需要设置任何全局环境变量，但某些集成（例如 `source-github`）可能需要传入凭据。
+
+## 文档加载器
+
+### AirbyteLoader
+
+查看 [使用示例](/oss/python/integrations/document_loaders/airbyte)。
+
+```python
+from langchain_airbyte import AirbyteLoader
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\airbyte.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

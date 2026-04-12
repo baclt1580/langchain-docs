@@ -1,0 +1,54 @@
+---
+title: "Activeloop Deep Lake 集成"
+description: "使用 LangChain Python 与 Activeloop Deep Lake 集成。"
+---
+
+>[Activeloop Deep Lake](https://docs.activeloop.ai/) 是用于深度学习应用的数据湖，允许您将其用作向量存储。
+
+## 为什么选择 Deep Lake？
+
+- 不仅仅是一个（多模态）向量存储。您可以稍后使用该数据集来微调您自己的 LLM 模型。
+- 不仅存储嵌入向量，还存储原始数据并支持自动版本控制。
+- 真正的无服务器架构。不需要其他服务，可与主要云提供商（`AWS S3`、`GCS` 等）配合使用。
+
+
+## 更多资源
+
+1. [LangChain & Deep Lake 终极指南：构建 ChatGPT 以回答您的财务数据问题](https://www.activeloop.ai/resources/ultimate-guide-to-lang-chain-deep-lake-build-chat-gpt-to-answer-questions-on-your-financial-data/)
+2. [使用 Deep Lake 分析 Twitter the-algorithm 代码库](https://github.com/langchain-ai/langchain/blob/v0.3/cookbook/twitter-the-algorithm-analysis-deeplake.ipynb)
+3. 这里是 Deep Lake 的 [白皮书](https://www.deeplake.ai/whitepaper) 和 [学术论文](https://arxiv.org/pdf/2209.10785.pdf)
+4. 这里有一组可供查阅的额外资源：[Deep Lake](https://github.com/activeloopai/deeplake)、[入门指南](https://docs.activeloop.ai/getting-started) 和 [教程](https://docs.activeloop.ai/hub-tutorials)
+
+## 安装和设置
+
+安装 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install deeplake
+```
+
+```bash uv
+uv add deeplake
+```
+</CodeGroup>
+
+
+## 向量存储
+
+```python
+from langchain_community.vectorstores import DeepLake
+```
+
+查看 [使用示例](/oss/python/integrations/vectorstores/activeloop_deeplake)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\activeloop_deeplake.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

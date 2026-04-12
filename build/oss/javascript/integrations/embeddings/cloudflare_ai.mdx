@@ -1,0 +1,144 @@
+---
+title: "CloudflareWorkersAIEmbeddings 集成"
+description: "使用 LangChain JavaScript 集成 CloudflareWorkersAIEmbeddings 嵌入模型。"
+---
+
+本文将帮助您开始使用 LangChain 结合 Cloudflare Workers AI 的[嵌入模型](/oss/javascript/integrations/embeddings)。有关 `CloudflareWorkersAIEmbeddings` 功能和配置选项的详细文档，请参阅 [API 参考](https://reference.langchain.com/javascript/langchain-cloudflare/CloudflareWorkersAIEmbeddings)。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | Py 支持 | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |  :---: | :---: |
+| [`CloudflareWorkersAIEmbeddings`](https://reference.langchain.com/javascript/langchain-cloudflare/CloudflareWorkersAIEmbeddings) | [`@langchain/cloudflare`](https://npmjs.com/@langchain/cloudflare) | ❌ | ❌ | ![NPM - Downloads](https://img.shields.io/npm/dm/@langchain/cloudflare?style=flat-square&label=%20&) | ![NPM - Version](https://img.shields.io/npm/v/@langchain/cloudflare?style=flat-square&label=%20&) |
+
+## 设置
+
+要访问 Cloudflare 的嵌入模型，您需要创建一个 Cloudflare 账户并安装 `@langchain/cloudflare` 集成包。此集成设计为在 Cloudflare Worker 中运行，并接受一个绑定。
+
+请按照[官方文档](https://developers.cloudflare.com/workers-ai/get-started/workers-wrangler/)设置您的 Worker。
+
+您的 `wrangler.toml` 文件应类似于以下内容：
+
+```toml
+name = "langchain-test"
+main = "worker.js"
+compatibility_date = "2024-01-10"
+
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "langchain-test"
+
+[ai]
+binding = "AI"
+```
+
+### 凭证
+
+如果您希望自动追踪模型调用，还可以通过取消注释以下内容来设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```bash
+# export LANGSMITH_TRACING="true"
+# export LANGSMITH_API_KEY="your-api-key"
+```
+
+### 安装
+
+LangChain CloudflareWorkersAIEmbeddings 集成位于 `@langchain/cloudflare` 包中：
+
+<CodeGroup>
+```bash npm
+npm install @langchain/cloudflare @langchain/core
+```
+```bash yarn
+yarn add @langchain/cloudflare @langchain/core
+```
+```bash pnpm
+pnpm add @langchain/cloudflare @langchain/core
+```
+</CodeGroup>
+
+## 使用示例
+
+以下是一个使用 Workers AI 嵌入与 [Cloudflare Vectorize 向量存储](/oss/javascript/integrations/vectorstores/cloudflare_vectorize/)的 Worker 示例。
+
+```typescript
+// @ts-nocheck
+
+import type {
+  VectorizeIndex,
+  Fetcher,
+  Request,
+} from "@cloudflare/workers-types";
+
+import {
+  CloudflareVectorizeStore,
+  CloudflareWorkersAIEmbeddings,
+} from "@langchain/cloudflare";
+
+export interface Env {
+  VECTORIZE_INDEX: VectorizeIndex;
+  AI: Fetcher;
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    const { pathname } = new URL(request.url);
+    const embeddings = new CloudflareWorkersAIEmbeddings({
+      binding: env.AI,
+      model: "@cf/baai/bge-small-en-v1.5",
+    });
+    const store = new CloudflareVectorizeStore(embeddings, {
+      index: env.VECTORIZE_INDEX,
+    });
+    if (pathname === "/") {
+      const results = await store.similaritySearch("hello", 5);
+      return Response.json(results);
+    } else if (pathname === "/load") {
+      // 支持按 ID 进行 Upsert 操作
+      await store.addDocuments(
+        [
+          {
+            pageContent: "hello",
+            metadata: {},
+          },
+          {
+            pageContent: "world",
+            metadata: {},
+          },
+          {
+            pageContent: "hi",
+            metadata: {},
+          },
+        ],
+        { ids: ["id1", "id2", "id3"] }
+      );
+
+      return Response.json({ success: true });
+    } else if (pathname === "/clear") {
+      await store.delete({ ids: ["id1", "id2", "id3"] });
+      return Response.json({ success: true });
+    }
+
+    return Response.json({ error: "Not Found" }, { status: 404 });
+  },
+};
+```
+
+---
+
+## API 参考
+
+有关 `CloudflareWorkersAIEmbeddings` 所有功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/javascript/langchain-cloudflare/CloudflareWorkersAIEmbeddings)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\embeddings\cloudflare_ai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

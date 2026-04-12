@@ -1,0 +1,597 @@
+---
+title: "OpenAI 集成"
+sidebarTitle: "工具"
+description: "使用 LangChain JavaScript 与 OpenAI 工具集成。"
+---
+
+`@langchain/openai` 包提供了与 LangChain 兼容的 OpenAI 内置工具封装器。这些工具可以使用 `bindTools()` 或 [`createAgent`](https://reference.langchain.com/javascript/langchain/index/createAgent) 绑定到 `ChatOpenAI`。
+
+### 网络搜索工具
+
+网络搜索工具允许 OpenAI 模型在生成响应前搜索网络以获取最新信息。网络搜索支持三种主要类型：
+
+1.  **非推理网络搜索**：快速查找，模型将查询直接传递给搜索工具
+2.  **带推理模型的代理搜索**：模型主动管理搜索过程，分析结果并决定是否继续搜索
+3.  **深度研究**：使用 `o3-deep-research` 或 `gpt-5` 等高推理能力模型进行的扩展调查
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+
+const model = new ChatOpenAI({
+  model: "gpt-4.1",
+});
+
+// 基本用法
+const response = await model.invoke(
+  "今天有什么积极的新闻故事吗？",
+  {
+    tools: [tools.webSearch()],
+  }
+);
+```
+
+**域名过滤** - 将搜索结果限制在特定域名（最多 100 个）：
+
+```typescript
+const response = await model.invoke("最新的 AI 研究新闻", {
+  tools: [
+    tools.webSearch({
+      filters: {
+        allowedDomains: ["arxiv.org", "nature.com", "science.org"],
+      },
+    }),
+  ],
+});
+```
+
+**用户位置** - 根据地理位置优化搜索结果：
+
+```typescript
+const response = await model.invoke("我附近最好的餐厅有哪些？", {
+  tools: [
+    tools.webSearch({
+      userLocation: {
+        type: "approximate",
+        country: "US",
+        city: "San Francisco",
+        region: "California",
+        timezone: "America/Los_Angeles",
+      },
+    }),
+  ],
+});
+```
+
+**仅缓存模式** - 禁用实时互联网访问：
+
+```typescript
+const response = await model.invoke("查找关于 OpenAI 的信息", {
+  tools: [
+    tools.webSearch({
+      externalWebAccess: false,
+    }),
+  ],
+});
+```
+
+更多信息，请参阅 [OpenAI 的网络搜索文档](https://platform.openai.com/docs/guides/tools-web-search)。
+
+### MCP 工具（模型上下文协议）
+
+MCP 工具允许 OpenAI 模型连接到远程 MCP 服务器和 OpenAI 维护的服务连接器，使模型能够访问外部工具和服务。
+
+有两种使用 MCP 工具的方式：
+
+1.  **远程 MCP 服务器**：通过 URL 连接到任何公共 MCP 服务器
+2.  **连接器**：使用 OpenAI 维护的流行服务封装器，如 Google Workspace 或 Dropbox
+
+**远程 MCP 服务器** - 连接到任何 MCP 兼容的服务器：
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+
+const model = new ChatOpenAI({ model: "gpt-4.1" });
+
+const response = await model.invoke("投掷 2d4+1", {
+  tools: [
+    tools.mcp({
+      serverLabel: "dmcp",
+      serverDescription: "一个用于掷骰子的 D&D MCP 服务器",
+      serverUrl: "https://dmcp-server.deno.dev/sse",
+      requireApproval: "never",
+    }),
+  ],
+});
+```
+
+**服务连接器** - 使用 OpenAI 维护的流行服务连接器：
+
+```typescript
+const response = await model.invoke("我今天日历上有什么安排？", {
+  tools: [
+    tools.mcp({
+      serverLabel: "google_calendar",
+      connectorId: "connector_googlecalendar",
+      authorization: "<oauth-access-token>",
+      requireApproval: "never",
+    }),
+  ],
+});
+```
+
+更多信息，请参阅 [OpenAI 的 MCP 文档](https://platform.openai.com/docs/guides/tools-remote-mcp)。
+
+### 代码解释器工具
+
+代码解释器工具允许模型在沙盒环境中编写和运行 Python 代码以解决复杂问题。
+
+使用代码解释器进行：
+
+-   **数据分析**：处理具有多样化数据和格式的文件
+-   **文件生成**：创建包含数据和图表图像的文件
+-   **迭代编码**：迭代编写和运行代码以解决问题
+-   **视觉智能**：裁剪、缩放、旋转和变换图像
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+
+const model = new ChatOpenAI({ model: "gpt-4.1" });
+
+// 基本用法，自动容器（默认 1GB 内存）
+const response = await model.invoke("解方程 3x + 11 = 14", {
+  tools: [tools.codeInterpreter()],
+});
+```
+
+**内存配置** - 从 1GB（默认）、4GB、16GB 或 64GB 中选择：
+
+```typescript
+const response = await model.invoke(
+  "分析这个大型数据集并创建可视化图表",
+  {
+    tools: [
+      tools.codeInterpreter({
+        container: { memoryLimit: "4g" },
+      }),
+    ],
+  }
+);
+```
+
+**使用文件** - 使上传的文件可供代码使用：
+
+```typescript
+const response = await model.invoke("处理上传的 CSV 文件", {
+  tools: [
+    tools.codeInterpreter({
+      container: {
+        memoryLimit: "4g",
+        fileIds: ["file-abc123", "file-def456"],
+      },
+    }),
+  ],
+});
+```
+
+**显式容器** - 使用预先创建的容器 ID：
+
+```typescript
+const response = await model.invoke("继续处理数据", {
+  tools: [
+    tools.codeInterpreter({
+      container: "cntr_abc123",
+    }),
+  ],
+});
+```
+
+> **注意**：容器在 20 分钟不活动后过期。虽然称为“代码解释器”，但模型知道它是“python 工具”——为了明确提示，请在提示中要求使用“python 工具”。
+
+更多信息，请参阅 [OpenAI 的代码解释器文档](https://platform.openai.com/docs/guides/tools-code-interpreter)。
+
+### 文件搜索工具
+
+文件搜索工具允许模型使用语义和关键词搜索从您的文件中查找相关信息。它支持从存储在向量存储中的先前上传文件的知识库中检索。
+
+**先决条件**：使用文件搜索前，您必须：
+
+1.  将文件上传到 File API，设置 `purpose: "assistants"`
+2.  创建向量存储
+3.  将文件添加到向量存储
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+
+const model = new ChatOpenAI({ model: "gpt-4.1" });
+
+const response = await model.invoke("OpenAI 的深度研究是什么？", {
+  tools: [
+    tools.fileSearch({
+      vectorStoreIds: ["vs_abc123"],
+      // maxNumResults: 5, // 限制结果数量以降低延迟
+      // filters: { type: "eq", key: "category", value: "blog" }, // 元数据过滤
+      // filters: { type: "and", filters: [                       // 复合过滤器 (AND/OR)
+      //   { type: "eq", key: "category", value: "technical" },
+      //   { type: "gte", key: "year", value: 2024 },
+      // ]},
+      // rankingOptions: { scoreThreshold: 0.8, ranker: "auto" }, // 自定义评分
+    }),
+  ],
+});
+```
+
+过滤器运算符：`eq`（等于）、`ne`（不等于）、`gt`（大于）、`gte`（大于或等于）、`lt`（小于）、`lte`（小于或等于）。
+
+更多信息，请参阅 [OpenAI 的文件搜索文档](https://platform.openai.com/docs/guides/tools-file-search)。
+
+### 图像生成工具
+
+图像生成工具允许模型使用文本提示和可选的图像输入来生成或编辑图像。它利用 GPT 图像模型，并自动优化文本输入以提高性能。
+
+使用图像生成进行：
+
+-   **从文本创建图像**：根据详细的文本描述生成图像
+-   **编辑现有图像**：根据文本指令修改图像
+-   **多轮图像编辑**：在对话轮次中迭代优化图像
+-   **多种输出格式**：支持 PNG、JPEG 和 WebP 格式
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+
+const model = new ChatOpenAI({ model: "gpt-4.1" });
+
+// 基本用法 - 生成图像
+const response = await model.invoke(
+  "生成一张灰色虎斑猫拥抱一只戴着橙色围巾的水獭的图像",
+  { tools: [tools.imageGeneration()] }
+);
+
+// 访问生成的图像（base64 编码）
+const imageOutput = response.additional_kwargs.tool_outputs?.find(
+  (output) => output.type === "image_generation_call"
+);
+if (imageOutput?.result) {
+  const fs = await import("fs");
+  fs.writeFileSync("output.png", Buffer.from(imageOutput.result, "base64"));
+}
+```
+
+**自定义尺寸和质量** - 配置输出尺寸和质量：
+
+```typescript
+const response = await model.invoke("绘制一幅美丽的山间日落图", {
+  tools: [
+    tools.imageGeneration({
+      size: "1536x1024", // 横向格式（也支持："1024x1024", "1024x1536", "auto"）
+      quality: "high", // 质量级别（也支持："low", "medium", "auto"）
+    }),
+  ],
+});
+```
+
+**输出格式和压缩** - 选择格式和压缩级别：
+
+```typescript
+const response = await model.invoke("创建一张产品照片", {
+  tools: [
+    tools.imageGeneration({
+      outputFormat: "jpeg", // 格式（也支持："png", "webp"）
+      outputCompression: 90, // 压缩级别 0-100（适用于 JPEG/WebP）
+    }),
+  ],
+});
+```
+
+**透明背景** - 生成具有透明背景的图像：
+
+```typescript
+const response = await model.invoke(
+  "创建一个带有透明背景的徽标",
+  {
+    tools: [
+      tools.imageGeneration({
+        background: "transparent", // 背景类型（也支持："opaque", "auto"）
+        outputFormat: "png",
+      }),
+    ],
+  }
+);
+```
+
+**带部分图像的流式传输** - 在生成过程中获取视觉反馈：
+
+```typescript
+const response = await model.invoke("绘制一座详细的奇幻城堡", {
+  tools: [
+    tools.imageGeneration({
+      partialImages: 2, // 部分图像数量 (0-3)
+    }),
+  ],
+});
+```
+
+**强制图像生成** - 确保模型使用图像生成工具：
+
+```typescript
+const response = await model.invoke("黎明时分宁静的湖泊", {
+  tools: [tools.imageGeneration()],
+  tool_choice: { type: "image_generation" },
+});
+```
+
+**多轮编辑** - 在对话轮次中优化图像：
+
+```typescript
+// 第一轮：生成初始图像
+const response1 = await model.invoke("画一辆红色的汽车", {
+  tools: [tools.imageGeneration()],
+});
+
+// 第二轮：编辑图像
+const response2 = await model.invoke(
+  [response1, new HumanMessage("现在把汽车颜色改成蓝色")],
+  { tools: [tools.imageGeneration()] }
+);
+```
+
+> **提示技巧**：使用“绘制”或“编辑”等术语以获得最佳效果。对于组合图像，请说“通过添加这个元素来编辑第一张图像”，而不是“组合”或“合并”。
+
+支持的模型：`gpt-4o`、`gpt-4o-mini`、`gpt-4.1`、`gpt-4.1-mini`、`gpt-4.1-nano`、`o3`
+
+更多信息，请参阅 [OpenAI 的图像生成文档](https://platform.openai.com/docs/guides/tools-image-generation)。
+
+### 计算机使用工具
+
+计算机使用工具允许模型通过模拟鼠标点击、键盘输入、滚动等来控制计算机界面。它使用 OpenAI 的计算机使用代理（CUA）模型来理解屏幕截图并建议操作。
+
+> **测试版**：计算机使用功能处于测试阶段。仅在沙盒环境中使用，不要用于高风险或需要身份验证的任务。对于重要决策，始终实施人在回路机制。
+
+**工作原理**：该工具在连续循环中运行：
+
+1.  模型发送计算机操作（点击、输入、滚动等）
+2.  您的代码在受控环境中执行这些操作
+3.  您捕获结果的屏幕截图
+4.  将屏幕截图发送回模型
+5.  重复直到任务完成
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+
+const model = new ChatOpenAI({ model: "computer-use-preview" });
+
+// 使用 execute 回调进行自动操作处理
+const computer = tools.computerUse({
+  displayWidth: 1024,
+  displayHeight: 768,
+  environment: "browser",
+  execute: async (action) => {
+    if (action.type === "screenshot") {
+      return captureScreenshot();
+    }
+    if (action.type === "click") {
+      await page.mouse.click(action.x, action.y, { button: action.button });
+      return captureScreenshot();
+    }
+    if (action.type === "type") {
+      await page.keyboard.type(action.text);
+      return captureScreenshot();
+    }
+    if (action.type === "scroll") {
+      await page.mouse.move(action.x, action.y);
+      await page.evaluate(
+        `window.scrollBy(${action.scroll_x}, ${action.scroll_y})`
+      );
+      return captureScreenshot();
+    }
+    // 处理其他操作...
+    return captureScreenshot();
+  },
+});
+
+const llmWithComputer = model.bindTools([computer]);
+const response = await llmWithComputer.invoke(
+  "查看 bing.com 上的最新新闻"
+);
+```
+
+更多信息，请参阅 [OpenAI 的计算机使用文档](https://platform.openai.com/docs/guides/tools-computer-use)。
+
+### 本地 Shell 工具
+
+本地 Shell 工具允许模型在您提供的机器上本地运行 shell 命令。命令在您自己的运行时内执行——API 仅返回指令。
+
+> **安全警告**：运行任意 shell 命令可能很危险。在将命令转发到系统 shell 之前，始终进行沙盒执行或添加严格的允许/拒绝列表。
+> **注意**：此工具设计用于 [Codex CLI](https://github.com/openai/codex) 和 `codex-mini-latest` 模型。
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
+const model = new ChatOpenAI({ model: "codex-mini-latest" });
+
+// 使用 execute 回调进行自动命令处理
+const shell = tools.localShell({
+  execute: async (action) => {
+    const { command, env, working_directory, timeout_ms } = action;
+    const result = await execAsync(command.join(" "), {
+      cwd: working_directory ?? process.cwd(),
+      env: { ...process.env, ...env },
+      timeout: timeout_ms ?? undefined,
+    });
+    return result.stdout + result.stderr;
+  },
+});
+
+const llmWithShell = model.bindTools([shell]);
+const response = await llmWithShell.invoke(
+  "列出当前目录中的文件"
+);
+```
+
+**操作属性**：模型返回具有以下属性的操作：
+
+-   `command` - 要执行的 argv 令牌数组
+-   `env` - 要设置的环境变量
+-   `working_directory` - 运行命令的目录
+-   `timeout_ms` - 建议的超时时间（请强制执行您自己的限制）
+-   `user` - 运行命令的可选用户
+
+更多信息，请参阅 [OpenAI 的本地 Shell 文档](https://platform.openai.com/docs/guides/tools-local-shell)。
+
+### Shell 工具
+
+Shell 工具允许模型通过您的集成运行 shell 命令。与本地 Shell 不同，此工具支持并发执行多个命令，并且设计用于 `gpt-5.1`。
+
+> **安全警告**：运行任意 shell 命令可能很危险。在将命令转发到系统 shell 之前，始终进行沙盒执行或添加严格的允许/拒绝列表。
+
+**使用场景**：
+
+-   **自动化文件系统或进程诊断** – 例如，“查找 ~/Documents 下最大的 PDF 文件”
+-   **扩展模型能力** – 使用内置的 UNIX 实用程序、Python 运行时和其他 CLI
+-   **运行多步骤构建和测试流程** – 链接命令，如 `pip install` 和 `pytest`
+-   **复杂的代理编码工作流** – 与 `apply_patch` 结合使用以进行文件操作
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+import { exec } from "node:child_process/promises";
+
+const model = new ChatOpenAI({ model: "gpt-5.1" });
+
+// 使用 execute 回调进行自动命令处理
+const shellTool = tools.shell({
+  execute: async (action) => {
+    const outputs = await Promise.all(
+      action.commands.map(async (cmd) => {
+        try {
+          const { stdout, stderr } = await exec(cmd, {
+            timeout: action.timeout_ms ?? undefined,
+          });
+          return {
+            stdout,
+            stderr,
+            outcome: { type: "exit" as const, exit_code: 0 },
+          };
+        } catch (error) {
+          const timedOut = error.killed && error.signal === "SIGTERM";
+          return {
+            stdout: error.stdout ?? "",
+            stderr: error.stderr ?? String(error),
+            outcome: timedOut
+              ? { type: "timeout" as const }
+              : { type: "exit" as const, exit_code: error.code ?? 1 },
+          };
+        }
+      })
+    );
+    return {
+      output: outputs,
+      maxOutputLength: action.max_output_length,
+    };
+  },
+});
+
+const llmWithShell = model.bindTools([shellTool]);
+const response = await llmWithShell.invoke(
+  "查找 ~/Documents 中最大的 PDF 文件"
+);
+```
+
+**操作属性**：模型返回具有以下属性的操作：
+
+-   `commands` - 要执行的 shell 命令数组（可以并发运行）
+-   `timeout_ms` - 可选的超时时间（毫秒）（请强制执行您自己的限制）
+-   `max_output_length` - 每个命令返回的最大字符数（可选）
+
+**返回格式**：您的 execute 函数应返回一个 `ShellResult`：
+
+```typescript
+interface ShellResult {
+  output: Array<{
+    stdout: string;
+    stderr: string;
+    outcome: { type: "exit"; exit_code: number } | { type: "timeout" };
+  }>;
+  maxOutputLength?: number | null; // 如果操作中提供了，则传回
+}
+```
+
+> **注意**：仅通过 Responses API 与 `gpt-5.1` 一起可用。模型提供的 `timeout_ms` 仅是一个提示——始终强制执行您自己的限制。
+
+更多信息，请参阅 [OpenAI 的 Shell 文档](https://platform.openai.com/docs/guides/tools-shell)。
+
+### 应用补丁工具
+
+应用补丁工具允许模型提出结构化的差异，由您的集成来应用。这使得模型能够在您的代码库中创建、更新和删除文件，从而实现迭代的、多步骤的代码编辑工作流。
+
+**何时使用**：
+
+-   **多文件重构** – 重命名符号、提取辅助函数或重新组织模块
+-   **错误修复** – 让模型既诊断问题又发出精确的补丁
+-   **测试和文档生成** – 创建新的测试文件、夹具和文档
+-   **迁移和机械编辑** – 应用重复的、结构化的更新
+
+> **安全警告**：应用补丁可能会修改您的代码库中的文件。始终验证路径、实施备份，并考虑沙盒化。
+> **注意**：此工具设计用于 `gpt-5.1` 模型。
+
+```typescript
+import { ChatOpenAI, tools } from "@langchain/openai";
+import { applyDiff } from "@openai/agents";
+import * as fs from "fs/promises";
+
+const model = new ChatOpenAI({ model: "gpt-5.1" });
+
+// 使用 execute 回调进行自动补丁处理
+const patchTool = tools.applyPatch({
+  execute: async (operation) => {
+    if (operation.type === "create_file") {
+      const content = applyDiff("", operation.diff, "create");
+      await fs.writeFile(operation.path, content);
+      return `已创建 ${operation.path}`;
+    }
+    if (operation.type === "update_file") {
+      const current = await fs.readFile(operation.path, "utf-8");
+      const newContent = applyDiff(current, operation.diff);
+      await fs.writeFile(operation.path, newContent);
+      return `已更新 ${operation.path}`;
+    }
+    if (operation.type === "delete_file") {
+      await fs.unlink(operation.path);
+      return `已删除 ${operation.path}`;
+    }
+    return "未知的操作类型";
+  },
+});
+
+const llmWithPatch = model.bindTools([patchTool]);
+const response = await llmWithPatch.invoke(
+  "将 lib/fib.py 中的 fib() 函数重命名为 fibonacci()"
+);
+```
+
+**操作类型**：模型返回具有以下属性的操作：
+
+-   `create_file` – 在 `path` 处创建新文件，内容来自 `diff`
+-   `update_file` – 使用 `diff` 中的 V4A 差异格式修改 `path` 处的现有文件
+-   `delete_file` – 删除 `path` 处的文件
+
+**最佳实践**：
+
+-   **路径验证**：防止目录遍历，并将编辑限制在允许的目录中
+-   **备份**：考虑在应用补丁前备份文件
+-   **错误处理**：返回描述性的错误消息，以便模型可以恢复
+-   **原子性**：决定是否要“全有或全无”的语义（如果任何补丁失败则回滚）
+
+更多信息，请参阅 [OpenAI 的应用补丁文档](https://platform.openai.com/docs/guides/tools-apply-patch)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\openai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

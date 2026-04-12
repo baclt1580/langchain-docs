@@ -1,0 +1,116 @@
+---
+title: "Upstash Redis Byte Store 集成"
+description: "使用 LangChain Python 与 Upstash Redis Byte Store 进行集成。"
+---
+
+这将帮助您开始使用 Upstash Redis [键值存储](/oss/python/integrations/stores)。有关所有 `UpstashRedisByteStore` 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/storage/upstash_redis/UpstashRedisByteStore)。
+
+## 概述
+
+`UpstashRedisStore` 是 `ByteStore` 的一种实现，它将所有内容存储在您托管在 [Upstash](https://upstash.com/) 上的 Redis 实例中。
+
+若要使用基础的 `RedisStore`，请参阅 [RedisStore](/oss/python/integrations/stores/redis/)。
+
+### 集成详情
+
+| 类 | 包 | 本地 | [JS 支持](https://js.langchain.com/docs/integrations/stores/upstash_redis_storage) | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |  :---: | :---: |
+| [`UpstashRedisByteStore`](https://reference.langchain.com/python/langchain-community/storage/upstash_redis/UpstashRedisByteStore) | [`langchain-community`](https://reference.langchain.com/python/langchain-community) | ❌ | ✅ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain_community?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain_community?style=flat-square&label=%20) |
+
+## 设置
+
+您首先需要 [注册 Upstash 账户](https://upstash.com/docs/redis/overall/getstarted)。接下来，您需要创建一个要连接的 Redis 数据库。
+
+### 凭据
+
+创建数据库后，获取您的数据库 URL（别忘了 `https://`！）和令牌：
+
+```python
+from getpass import getpass
+
+URL = getpass("Enter your Upstash URL")
+TOKEN = getpass("Enter your Upstash REST token")
+```
+
+### 安装
+
+LangChain Upstash 集成位于 `langchain-community` 包中。您还需要将 `upstash-redis` 包作为对等依赖项进行安装：
+
+```python
+pip install -qU langchain-community upstash-redis
+```
+
+## 实例化
+
+现在我们可以实例化我们的字节存储：
+
+```python
+from langchain_community.storage import UpstashRedisByteStore
+from upstash_redis import Redis
+
+redis_client = Redis(url=URL, token=TOKEN)
+kv_store = UpstashRedisByteStore(client=redis_client, ttl=None, namespace="test-ns")
+```
+
+## 用法
+
+您可以使用 `mset` 方法像这样在键下设置数据：
+
+```python
+kv_store.mset(
+    [
+        ["key1", b"value1"],
+        ["key2", b"value2"],
+    ]
+)
+
+kv_store.mget(
+    [
+        "key1",
+        "key2",
+    ]
+)
+```
+
+```text
+[b'value1', b'value2']
+```
+
+您还可以使用 `mdelete` 方法删除数据：
+
+```python
+kv_store.mdelete(
+    [
+        "key1",
+        "key2",
+    ]
+)
+
+kv_store.mget(
+    [
+        "key1",
+        "key2",
+    ]
+)
+```
+
+```text
+[None, None]
+```
+
+---
+
+## API 参考
+
+有关所有 `UpstashRedisByteStore` 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/langchain-community/storage/upstash_redis/UpstashRedisByteStore)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\stores\upstash_redis.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

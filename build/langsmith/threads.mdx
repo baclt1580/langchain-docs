@@ -1,0 +1,318 @@
+---
+title: 配置线程
+sidebarTitle: 线程
+---
+
+许多 LLM 应用具备类似聊天机器人的界面，用户与 LLM 应用之间会进行多轮对话。为了追踪这些对话，你可以在 LangSmith 中使用 **线程**。
+
+## 将追踪记录分组到线程中
+
+**线程** 是代表单次对话的一系列追踪记录。每次响应都表示为独立的追踪记录，但这些追踪记录通过属于同一线程而相互关联。
+
+要将追踪记录关联在一起，你需要传入一个特殊的 `metadata` 键，其值为该线程的唯一标识符。键名应为以下之一：
+
+- `session_id`
+- `thread_id`
+- `conversation_id`
+
+值可以是任意字符串，但我们建议使用 UUID，例如 `f47ac10b-58cc-4372-a567-0e02b2c3d479`。查看 [向追踪记录添加元数据和标签](/langsmith/add-metadata-tags) 获取操作指南。
+
+<Warning>
+**重要：** 为确保跨整个线程的筛选和令牌计数正常工作，你必须在 **所有运行**（包括追踪记录内的子运行）上设置线程元数据（`session_id`、`thread_id` 或 `conversation_id`）。
+
+如果子运行没有 thread_id 元数据，则在以下情况下它们将不会被包含：
+
+- 按线程筛选运行。
+- 计算线程的令牌使用量。
+- 跨线程聚合成本。
+
+创建子运行时（例如，对嵌套函数使用 `@traceable` 或创建子跨度），请确保将线程元数据传播到所有子运行。
+</Warning>
+
+### 示例
+
+此示例演示了如何使用结构化的消息格式来记录和检索对话历史，以维护长期运行的聊天。
+
+<CodeGroup>
+
+```python Python
+import os
+import json
+from dotenv import load_dotenv
+
+# 从 .env 文件加载环境变量
+load_dotenv()
+
+import openai
+from langsmith import traceable, Client
+from langsmith.wrappers import wrap_openai
+
+# 初始化客户端
+langsmith_client = Client()
+client = wrap_openai(openai.Client())
+
+# 配置
+THREAD_ID = "thread-id-1"
+
+# 使用本地目录存储线程历史。生产环境中请使用持久化存储方案。
+THREADS_DIR = os.path.join(os.path.dirname(__file__), "threads")
+
+# 获取线程中所有 LLM 调用的历史以构建对话历史
+def get_thread_history(thread_id: str) -> list:
+    path = os.path.join(THREADS_DIR, f"{thread_id}.json")
+    if not os.path.exists(path):
+        return []
+    with open(path, "r") as f:
+        return json.load(f)
+
+def save_thread_history(thread_id: str, messages: list):
+    os.makedirs(THREADS_DIR, exist_ok=True)
+    with open(os.path.join(THREADS_DIR, f"{thread_id}.json"), "w") as f:
+        json.dump(messages, f, indent=2, default=str)
+
+
+@traceable(name="Chat Bot", metadata={"thread_id": THREAD_ID})
+def chat_pipeline(messages: list, get_chat_history: bool = False):
+    # 是继续现有线程还是开始新线程
+    if get_chat_history:
+        history_messages = get_thread_history(THREAD_ID)
+        # 获取现有对话历史并追加新消息
+        all_messages = history_messages + messages
+    else:
+        all_messages = messages
+
+    # 调用模型
+    chat_completion = client.chat.completions.create(
+        model="gpt-4.1-mini", messages=all_messages
+    )
+
+    response_message = chat_completion.choices[0].message
+    print("模型响应：", response_message)
+
+    full_conversation = all_messages + [{"role": response_message.role, "content": response_message.content}]
+    save_thread_history(THREAD_ID, full_conversation)
+
+    return {"messages": full_conversation}
+
+
+# 格式化消息
+messages = [
+    {
+        "content": "你好，我叫 Sally",
+        "role": "user"
+    }
+]
+
+# 调用聊天流程
+result = chat_pipeline(messages, get_chat_history=False)
+```
+
+```typescript TypeScript
+import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "url";
+import * as dotenv from "dotenv";
+import OpenAI from "openai";
+import { traceable } from "langsmith/traceable";
+import { wrapOpenAI } from "langsmith/wrappers";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// 从 .env 文件加载环境变量
+dotenv.config();
+
+// 初始化客户端
+const client = wrapOpenAI(new OpenAI());
+
+// 配置
+const THREAD_ID = "thread-id-1";
+
+// 使用本地目录存储线程历史。生产环境中请使用持久化存储方案。
+const THREADS_DIR = path.join(__dirname, "threads");
+
+type Message = { role: string; content: string };
+
+// 获取线程中所有 LLM 调用的历史以构建对话历史
+function getThreadHistory(threadId: string): Message[] {
+  const filePath = path.join(THREADS_DIR, `${threadId}.json`);
+  if (!fs.existsSync(filePath)) return [];
+  return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+}
+
+function saveThreadHistory(threadId: string, messages: Message[]): void {
+  fs.mkdirSync(THREADS_DIR, { recursive: true });
+  fs.writeFileSync(
+    path.join(THREADS_DIR, `${threadId}.json`),
+    JSON.stringify(messages, null, 2)
+  );
+}
+
+const chatPipeline = traceable(
+  async function chatPipeline({ messages, get_chat_history = false }: { messages: Message[]; get_chat_history?: boolean }) {
+    // 是继续现有线程还是开始新线程
+    if (get_chat_history) {
+      const historyMessages = getThreadHistory(THREAD_ID);
+      // 获取现有对话历史并追加新消息
+      messages = [...historyMessages, ...messages];
+    }
+
+    // 调用模型
+    const chatCompletion = await client.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages,
+    });
+
+    const responseMessage = chatCompletion.choices[0].message;
+    console.log("模型响应：", responseMessage);
+
+    const fullConversation: Message[] = [
+      ...messages,
+      { role: responseMessage.role, content: responseMessage.content ?? "" },
+    ];
+    saveThreadHistory(THREAD_ID, fullConversation);
+
+    return { messages: fullConversation };
+  },
+  { name: "Chat Bot", metadata: { thread_id: THREAD_ID } }
+);
+
+// 格式化消息
+const messages: Message[] = [{ role: "user", content: "你好！我叫 Sally" }];
+
+// 调用聊天流程
+await chatPipeline({ messages, get_chat_history: false });
+```
+
+</CodeGroup>
+
+进行以下调用来继续对话。通过传递 `get_chat_history=True`/`getChatHistory: true`，你可以从上次中断的地方继续对话。这意味着 LLM 将接收整个消息历史并据此响应，而不仅仅是响应最新消息。
+
+<CodeGroup>
+
+```python Python
+# 格式化消息
+messages = [
+    {
+        "content": "我叫什么名字",
+        "role": "user"
+    }
+]
+
+# 调用聊天流程
+result = chat_pipeline(messages, get_chat_history=True)
+```
+
+```typescript TypeScript
+// 继续对话。
+const messages: Message[] = [{ role: "user", content: "我叫什么名字" }];
+
+await chatPipeline(messages, true);
+```
+</CodeGroup>
+
+继续对话。由于包含了过往消息，LLM 会记住对话内容。
+
+<CodeGroup>
+
+```python Python
+# 继续对话。
+messages = [
+    {
+        "content": "我发给你的第一条消息是什么？",
+        "role": "user"
+    }
+]
+
+chat_pipeline(messages, get_chat_history=True)
+```
+
+```typescript TypeScript
+// 继续对话。
+const messages: Message[] = [{ role: "user", content: "我发给你的第一条消息是什么？" }];
+
+await chatPipeline(messages, true);
+```
+
+</CodeGroup>
+
+## 查看线程
+
+你可以在任何项目详情页中点击 **Threads** 标签页来查看线程。然后你将看到所有线程的列表，按最近活动排序。
+
+<div style={{ textAlign: 'center' }}>
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/threads-tab-light.png"
+    alt="LangSmith UI 显示线程表格。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/threads-tab-dark.png"
+    alt="LangSmith UI 显示线程表格。"
+/>
+</div>
+
+<Callout type="info" icon="feather">
+在线程视图中使用 **[Polly](/langsmith/polly)** 来分析对话线程、理解用户情绪、识别痛点并跟踪问题是否得到解决。
+</Callout>
+
+### 查看单个线程
+
+你可以点击进入特定线程。这将打开该特定线程的历史记录。
+
+<div style={{ textAlign: 'center' }}>
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/thread-overview-light.png"
+    alt="LangSmith UI 显示线程表格。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/thread-overview-dark.png"
+    alt="LangSmith UI 显示线程表格。"
+/>
+</div>
+
+线程可以通过两种不同方式查看：
+
+- [线程概览](/langsmith/threads#thread-overview)
+- [追踪视图](/langsmith/threads#trace-view)
+
+你可以使用页面顶部的按钮在两种视图之间切换，或使用键盘快捷键 `T` 在两种视图之间切换。
+
+#### 线程概览
+
+线程概览页面显示类似聊天机器人的界面，你可以看到对话每一轮的输入和输出。你可以配置在概览中显示输入和输出的哪些字段，或通过点击 **Configure** 按钮显示多个字段。
+
+输入和输出的 JSON 路径支持负索引，因此你可以使用 `-1` 来访问数组的最后一个元素。例如，`inputs.messages[-1].content` 将访问 `messages` 数组中的最后一条消息。
+
+#### 追踪视图
+
+这里的追踪视图类似于查看单个运行时的追踪视图，不同之处在于你可以轻松访问线程中每一轮的所有运行。
+
+### 查看反馈
+
+查看线程时，在页面顶部你会看到一个名为 `Feedback` 的部分。在这里你可以看到构成线程的每个运行的反馈。这些反馈是聚合的，因此如果你对线程的每个运行评估相同的标准，你将看到所有运行的平均分数。你也可以在这里看到留下的 [线程级别反馈](/langsmith/online-evaluations-multi-turn)。
+
+### 保存线程级别筛选器
+
+<Note>
+线程筛选器会检查所有运行，如果至少有一个运行匹配筛选条件，就会显示该线程。
+</Note>
+
+与在项目级别保存筛选器类似，你也可以在线程级别保存常用筛选器。要在 **Threads** 表格上保存筛选器，请使用 **Add filter** 按钮 [设置筛选器](/langsmith/filter-traces-in-application#create-and-apply-filters)，然后点击 **Save view** 按钮。
+
+你可以通过分别点击 **Annotate** 和 **Open trace**，在侧面板中打开追踪记录或对其进行标注。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\threads.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

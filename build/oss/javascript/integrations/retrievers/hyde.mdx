@@ -1,0 +1,61 @@
+---
+title: "Hyde 集成"
+description: "使用 LangChain JavaScript 与 Hyde 检索器集成。"
+---
+
+本示例展示了如何使用 HyDE 检索器，它实现了假设文档嵌入（Hypothetical Document Embeddings，HyDE）技术，具体描述见[这篇论文](https://arxiv.org/abs/2212.10496)。
+
+从高层次来看，HyDE 是一种嵌入技术，它接收查询，生成一个假设答案，然后嵌入该生成的文档，并将其用作最终示例。
+
+因此，为了使用 HyDE，我们需要提供一个基础嵌入模型，以及一个用于生成这些文档的 LLM。默认情况下，HyDE 类附带了一些默认提示词（详见论文），但我们也可以创建自己的提示词，其中应包含一个单独的输入变量 `{question}`。
+
+## 使用方法
+
+```typescript
+import { OpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
+import { HydeRetriever } from "@langchain/classic/retrievers/hyde";
+import { Document } from "@langchain/core/documents";
+
+const embeddings = new OpenAIEmbeddings();
+const vectorStore = new MemoryVectorStore(embeddings);
+const llm = new OpenAI();
+const retriever = new HydeRetriever({
+  vectorStore,
+  llm,
+  k: 1,
+});
+
+await vectorStore.addDocuments(
+  [
+    "My name is John.",
+    "My name is Bob.",
+    "My favourite food is pizza.",
+    "My favourite food is pasta.",
+  ].map((pageContent) => new Document({ pageContent }))
+);
+
+const results = await retriever.invoke("What is my favourite food?");
+
+console.log(results);
+/*
+[
+  Document { pageContent: 'My favourite food is pasta.', metadata: {} }
+]
+*/
+```
+
+## 相关链接
+
+- [检索指南](/oss/javascript/langchain/retrieval)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\hyde.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,129 @@
+---
+title: "Supabase 混合搜索集成"
+description: "使用 LangChain JavaScript 集成 Supabase 混合搜索检索器。"
+---
+
+LangChain 支持与 Supabase Postgres 数据库进行混合搜索。混合搜索结合了 postgres 的 `pgvector` 扩展（相似性搜索）和全文搜索（关键词搜索）来检索文档。您可以通过 SupabaseVectorStore 的 `addDocuments` 函数添加文档。SupabaseHybridKeyWordSearch 接受嵌入向量、supabase 客户端、相似性搜索的结果数量以及关键词搜索的结果数量作为参数。`getRelevantDocuments` 函数会生成一个已去重并按相关性分数排序的文档列表。
+
+## 设置
+
+### 安装库
+
+```bash npm
+npm install -S @supabase/supabase-js
+```
+
+### 在数据库中创建表和搜索函数
+
+在您的数据库中运行以下命令：
+
+```sql
+-- 启用 pgvector 扩展以处理嵌入向量
+create extension vector;
+
+-- 创建表来存储文档
+create table documents (
+  id bigserial primary key,
+  content text, -- 对应 Document.pageContent
+  metadata jsonb, -- 对应 Document.metadata
+  embedding vector(1536) -- 1536 适用于 OpenAI 嵌入向量，如需可更改
+);
+
+-- 创建函数进行文档相似性搜索
+create function match_documents (
+  query_embedding vector(1536),
+  match_count int DEFAULT null,
+  filter jsonb DEFAULT '{}'
+) returns table (
+  id bigint,
+  content text,
+  metadata jsonb,
+  similarity float
+)
+language plpgsql
+as $$
+#variable_conflict use_column
+begin
+  return query
+  select
+    id,
+    content,
+    metadata,
+    1 - (documents.embedding <=> query_embedding) as similarity
+  from documents
+  where metadata @> filter
+  order by documents.embedding <=> query_embedding
+  limit match_count;
+end;
+$$;
+
+-- 创建函数进行文档关键词搜索
+create function kw_match_documents(query_text text, match_count int)
+returns table (id bigint, content text, metadata jsonb, similarity real)
+as $$
+
+begin
+return query execute
+format('select id, content, metadata, ts_rank(to_tsvector(content), plainto_tsquery($1)) as similarity
+from documents
+where to_tsvector(content) @@ plainto_tsquery($1)
+order by similarity desc
+limit $2')
+using query_text, match_count;
+end;
+$$ language plpgsql;
+```
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { createClient } from "@supabase/supabase-js";
+import { SupabaseHybridSearch } from "@langchain/community/retrievers/supabase";
+
+export const run = async () => {
+  const client = createClient(
+    process.env.SUPABASE_URL || "",
+    process.env.SUPABASE_PRIVATE_KEY || ""
+  );
+
+  const embeddings = new OpenAIEmbeddings();
+
+  const retriever = new SupabaseHybridSearch(embeddings, {
+    client,
+    // 以下是默认值，假设您已按照上述指南设置了 supabase 表和函数。如有必要，请更改。
+    similarityK: 2,
+    keywordK: 2,
+    tableName: "documents",
+    similarityQueryName: "match_documents",
+    keywordQueryName: "kw_match_documents",
+  });
+
+  const results = await retriever.invoke("hello bye");
+
+  console.log(results);
+};
+```
+
+## 相关链接
+
+- [检索指南](/oss/javascript/langchain/retrieval)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\supabase-hybrid.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

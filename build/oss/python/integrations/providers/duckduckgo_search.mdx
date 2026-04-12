@@ -1,0 +1,42 @@
+---
+title: "DuckDuckGo 搜索集成"
+description: "使用 LangChain Python 与 DuckDuckGo 搜索进行集成。"
+---
+
+>[DuckDuckGo 搜索](https://github.com/deedy5/ddgs) 是一个使用 `DuckDuckGo.com` 搜索引擎搜索单词、文档、图片、视频、新闻、地图和文本翻译的包。它会将文件和图片下载到本地硬盘。
+
+## 安装和设置
+
+你需要安装一个 Python 包：
+
+<CodeGroup>
+```bash pip
+pip install ddgs
+```
+
+```bash uv
+uv add ddgs
+```
+</CodeGroup>
+
+## 工具
+
+查看 [使用示例](/oss/python/integrations/tools/ddg)。
+
+有两个工具可用：
+
+```python
+from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_community.tools import DuckDuckGoSearchResults
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\duckduckgo_search.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

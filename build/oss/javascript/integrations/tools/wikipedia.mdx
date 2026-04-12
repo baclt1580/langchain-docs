@@ -1,0 +1,37 @@
+---
+title: "维基百科集成"
+description: "使用 LangChain JavaScript 与维基百科工具集成。"
+---
+
+`WikipediaQueryRun` 工具可将您的智能体和链连接至维基百科。
+
+## 使用方法
+
+```typescript
+import { WikipediaQueryRun } from "@langchain/community/tools/wikipedia_query_run";
+
+const tool = new WikipediaQueryRun({
+  topKResults: 3,
+  maxDocContentLength: 4000,
+});
+
+const res = await tool.invoke("LangChain");
+
+console.log(res);
+```
+
+## 相关链接
+
+- 工具 [概念指南](/oss/javascript/langchain/tools)
+- 工具 [操作指南](/oss/javascript/langchain/tools)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\tools\wikipedia.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

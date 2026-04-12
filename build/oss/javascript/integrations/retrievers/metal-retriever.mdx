@@ -1,0 +1,54 @@
+---
+title: "Metal 集成"
+description: "使用 LangChain JavaScript 与 Metal 检索器进行集成。"
+---
+
+本示例展示了如何在检索链中使用 Metal 检索器，从 Metal 索引中检索文档。
+
+## 安装设置
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm i @getmetal/metal-sdk @langchain/community @langchain/core
+```
+
+## 使用方式
+
+```typescript
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import Metal from "@getmetal/metal-sdk";
+import { MetalRetriever } from "@langchain/community/retrievers/metal";
+
+export const run = async () => {
+  const MetalSDK = Metal;
+
+  const client = new MetalSDK(
+    process.env.METAL_API_KEY!,
+    process.env.METAL_CLIENT_ID!,
+    process.env.METAL_INDEX_ID
+  );
+  const retriever = new MetalRetriever({ client });
+
+  const docs = await retriever.invoke("hello");
+
+  console.log(docs);
+};
+```
+
+## 相关链接
+
+- [检索指南](/oss/javascript/langchain/retrieval)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\retrievers\metal-retriever.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

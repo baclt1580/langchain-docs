@@ -1,0 +1,197 @@
+---
+title: "递归 URL 集成"
+description: "使用 LangChain Python 与递归 URL 文档加载器集成。"
+---
+
+`RecursiveUrlLoader` 允许您从根 URL 递归抓取所有子链接，并将其解析为文档。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/document_loaders/web_loaders/recursive_url_loader/) |
+| :--- | :--- | :---: | :---: | :---: |
+| [`RecursiveUrlLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/recursive_url_loader/RecursiveUrlLoader) | [`langchain-community`](https://reference.langchain.com/python/langchain-community) | ✅ | ❌ | ✅ |
+
+### 加载器特性
+
+| 来源 | 文档惰性加载 | 原生异步支持 |
+| :---: | :---: | :---: |
+| `RecursiveUrlLoader` | ✅ | ❌ |
+
+## 设置
+
+### 凭证
+
+使用 `RecursiveUrlLoader` 无需任何凭证。
+
+### 安装
+
+`RecursiveUrlLoader` 位于 `langchain-community` 包中。虽然没有其他必需的包，但如果您同时安装了 `beautifulsoup4`，您将获得更丰富的默认文档元数据。
+
+```python
+pip install -qU langchain-community beautifulsoup4 lxml
+```
+
+## 实例化
+
+现在我们可以实例化文档加载器对象并加载文档：
+
+```python
+from langchain_community.document_loaders import RecursiveUrlLoader
+
+loader = RecursiveUrlLoader(
+    "https://docs.python.org/3.9/",
+    # max_depth=2,
+    # use_async=False,
+    # extractor=None,
+    # metadata_extractor=None,
+    # exclude_dirs=(),
+    # timeout=10,
+    # check_response_status=True,
+    # continue_on_failure=True,
+    # prevent_outside=True,
+    # base_url=None,
+    # ...
+)
+```
+
+## 加载
+
+使用 `.load()` 同步将所有文档加载到内存中，每个访问的 URL 对应一个文档。从初始 URL 开始，我们递归遍历所有链接的 URL，直到达到指定的最大深度。
+
+让我们通过一个基本示例来了解如何在 [Python 3.9 文档](https://docs.python.org/3.9/) 上使用 `RecursiveUrlLoader`。
+
+```python
+docs = loader.load()
+docs[0].metadata
+```
+
+```text
+/Users/bagatur/.pyenv/versions/3.9.1/lib/python3.9/html/parser.py:170: XMLParsedAsHTMLWarning: It looks like you're parsing an XML document using an HTML parser. If this really is an HTML document (maybe it's XHTML?), you can ignore or filter this warning. If it's XML, you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the lxml package installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+  k = self.parse_starttag(i)
+```
+
+```text
+{'source': 'https://docs.python.org/3.9/',
+ 'content_type': 'text/html',
+ 'title': '3.9.19 Documentation',
+ 'language': None}
+```
+
+很好！第一个文档看起来像是我们开始的根页面。让我们查看下一个文档的元数据：
+
+```python
+docs[1].metadata
+```
+
+```text
+{'source': 'https://docs.python.org/3.9/using/index.html',
+ 'content_type': 'text/html',
+ 'title': 'Python Setup and Usage — Python 3.9.19 documentation',
+ 'language': None}
+```
+
+这个 URL 看起来是我们根页面的子页面，这很棒！让我们从元数据转向检查其中一个文档的内容：
+
+```python
+print(docs[0].page_content[:300])
+```
+
+```text
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" /><title>3.9.19 Documentation</title><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
+    <link rel=
+```
+
+这看起来确实像是来自 URL [docs.python.org/3.9/](https://docs.python.org/3.9/) 的 HTML，符合我们的预期。现在让我们看看可以对基本示例进行的一些变体，这些变体在不同情况下可能会有所帮助。
+
+## 惰性加载
+
+如果我们正在加载大量文档，并且我们的下游操作可以在所有加载文档的子集上完成，我们可以惰性地逐个加载文档，以最小化内存占用：
+
+```python
+pages = []
+for doc in loader.lazy_load():
+    pages.append(doc)
+    if len(pages) >= 10:
+        # 执行一些分页操作，例如：
+        # index.upsert(page)
+
+        pages = []
+```
+
+```text
+/var/folders/4j/2rz3865x6qg07tx43146py8h0000gn/T/ipykernel_73962/2110507528.py:6: XMLParsedAsHTMLWarning: It looks like you're parsing an XML document using an HTML parser. If this really is an HTML document (maybe it's XHTML?), you can ignore or filter this warning. If it's XML, you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the lxml package installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+  soup = BeautifulSoup(html, "lxml")
+```
+
+在这个例子中，我们一次最多只将 10 个文档加载到内存中。
+
+## 添加提取器
+
+默认情况下，加载器将每个链接的原始 HTML 设置为文档页面内容。要将此 HTML 解析为更人性化/LLM 友好的格式，您可以传入自定义的 `extractor` 方法：
+
+```python
+import re
+
+from bs4 import BeautifulSoup
+
+
+def bs4_extractor(html: str) -> str:
+    soup = BeautifulSoup(html, "lxml")
+    return re.sub(r"\n\n+", "\n\n", soup.text).strip()
+
+
+loader = RecursiveUrlLoader("https://docs.python.org/3.9/", extractor=bs4_extractor)
+docs = loader.load()
+print(docs[0].page_content[:200])
+```
+
+```text
+/var/folders/td/vzm913rx77x21csd90g63_7c0000gn/T/ipykernel_10935/1083427287.py:6: XMLParsedAsHTMLWarning: It looks like you're parsing an XML document using an HTML parser. If this really is an HTML document (maybe it's XHTML?), you can ignore or filter this warning. If it's XML, you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the lxml package installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+  soup = BeautifulSoup(html, "lxml")
+/Users/isaachershenson/.pyenv/versions/3.11.9/lib/python3.11/html/parser.py:170: XMLParsedAsHTMLWarning: It looks like you're parsing an XML document using an HTML parser. If this really is an HTML document (maybe it's XHTML?), you can ignore or filter this warning. If it's XML, you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the lxml package installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor.
+  k = self.parse_starttag(i)
+```
+```text
+3.9.19 Documentation
+
+Download
+Download these documents
+Docs by version
+
+Python 3.13 (in development)
+Python 3.12 (stable)
+Python 3.11 (security-fixes)
+Python 3.10 (security-fixes)
+Python 3.9 (securit
+```
+
+这看起来好多了！
+
+类似地，您可以传入 `metadata_extractor` 来自定义如何从 HTTP 响应中提取文档元数据。有关此内容的更多信息，请参阅 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/recursive_url_loader/RecursiveUrlLoader)。
+
+---
+
+## API 参考
+
+这些示例仅展示了修改默认 `RecursiveUrlLoader` 的几种方式，但还有许多其他修改可以根据您的用例进行最佳调整。使用参数 `link_regex` 和 `exclude_dirs` 可以帮助您过滤掉不需要的 URL，`aload()` 和 `alazy_load()` 可用于异步加载，等等。
+
+有关配置和调用 `RecursiveUrlLoader` 的详细信息，请参阅 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/recursive_url_loader/RecursiveUrlLoader)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\recursive_url.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

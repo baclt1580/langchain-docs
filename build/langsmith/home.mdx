@@ -1,0 +1,146 @@
+---
+title: LangSmith 文档
+sidebarTitle: 概述
+mode: wide
+---
+
+**LangSmith 是一个框架无关的平台，用于构建、调试和部署 AI 智能体与 LLM 应用。** 在一个地方，与您的智能体技术栈一起，追踪请求、评估输出、测试提示词并管理部署。
+
+## 开始使用
+
+<Steps>
+    <Step title="创建账户" icon="user-plus">
+        在 [smith.langchain.com](https://smith.langchain.com) 注册（无需信用卡）。
+        您可以使用 **Google**、**GitHub** 或 **邮箱** 登录。
+    </Step>
+    <Step title="创建 API 密钥" icon="key">
+        前往您的 [设置页面](https://smith.langchain.com/settings) → **API 密钥** → **创建 API 密钥**。
+        复制密钥并安全保存。
+    </Step>
+    <Step title="选择集成方式" icon="plug">
+        LangSmith 可与多种框架和提供商协同工作。浏览 [可用集成](/langsmith/integrations) 以连接您的技术栈。
+    </Step>
+</Steps>
+
+准备好您的账户和 API 密钥后，选择一个快速入门指南开始使用 LangSmith 进行构建：
+
+<Columns cols={3}>
+    <Card
+        title="可观测性"
+        icon="/images/brand/observability-icon-dark.png"
+        href="/langsmith/observability-quickstart"
+        arrow="true"
+        cta="开始追踪"
+    >
+        洞察应用程序的每一步，以更快地调试并提高可靠性。
+    </Card>
+
+    <Card
+        title="评估"
+        icon="/images/brand/evaluation-icon-dark.png"
+        href="/langsmith/evaluation-quickstart"
+        arrow="true"
+        cta="评估您的应用"
+    >
+        随时间推移测量和跟踪质量，确保您的 AI 应用保持一致性和可信度。
+    </Card>
+
+    <Card
+        title="部署"
+        icon="/images/brand/deployment-icon-dark.png"
+        href="/langsmith/deployment"
+        arrow="true"
+        cta="部署您的智能体"
+        >
+        将您的智能体部署为 Agent Server，为生产环境扩展做好准备。
+    </Card>
+</Columns>
+
+## 更多构建方式
+
+<Columns cols={4}>
+    <Card
+        title="Fleet"
+        icon="/images/brand/fleet-icon-dark.png"
+        href="/langsmith/fleet/index"
+        arrow="true"
+        cta="构建智能体"
+    >
+        无需编写代码，通过可视化方式设计和部署 AI 智能体。
+    </Card>
+
+    <Card
+        title="提示词工程"
+        icon="/images/brand/prompt-engineering-icon.png"
+        href="/langsmith/prompt-engineering-quickstart"
+        arrow="true"
+        cta="测试您的提示词"
+    >
+        利用内置的版本控制和协作功能迭代提示词，更快地交付改进。
+    </Card>
+
+    <Card
+        title="LangSmith CLI"
+        icon="terminal-2"
+        href="/langsmith/langsmith-cli"
+        arrow="true"
+        cta="使用 CLI"
+    >
+        从终端查询和管理追踪记录、数据集、实验等。
+    </Card>
+
+    <Card
+        title="Studio"
+        icon="window"
+        href="/langsmith/quick-start-studio"
+        arrow="true"
+        cta="使用 Studio 开发"
+    >
+        使用可视化界面端到端地设计、测试和完善应用程序。
+    </Card>
+</Columns>
+
+## 基础设施
+
+<Columns cols={2}>
+    <Card
+        title="平台设置"
+        href="/langsmith/platform-setup"
+        icon="server-2"
+        arrow="true"
+        cta="选择 LangSmith 设置方式"
+    >
+        根据您的基础设施和合规需求，在托管云、自托管环境或混合模式中使用 LangSmith。
+    </Card>
+
+    <Card icon="shield-lock" title="安全与合规" href="https://trust.langchain.com/" arrow="true" cta="访问信任中心">
+        LangSmith 符合 HIPAA、SOC 2 Type 2 和 GDPR 标准，满足最高的数据安全和隐私要求。
+    </Card>
+</Columns>
+
+## 工作流
+
+LangSmith 将可观测性、评估、部署和平台设置整合到一个集成的工作流中——从本地开发到生产环境。
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/overview-light.svg"
+    alt="图表展示了 LangSmith 如何将可观测性、评估、部署和平台设置集成到从开发到生产的单一工作流中。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/overview-dark.svg"
+    alt="图表展示了 LangSmith 如何将可观测性、评估、部署和平台设置集成到从开发到生产的单一工作流中。"
+/>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\home.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

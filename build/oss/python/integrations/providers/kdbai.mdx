@@ -1,0 +1,41 @@
+---
+title: "KDB.AI 集成"
+description: "使用 LangChain Python 与 KDB.AI 集成。"
+---
+
+>[KDB.AI](https://kdb.ai) 是一个强大的基于知识的向量数据库和搜索引擎，它通过提供高级搜索、推荐和个性化功能，允许您利用实时数据构建可扩展、可靠的 AI 应用程序。
+
+
+## 安装和设置
+
+安装 Python SDK：
+
+<CodeGroup>
+```bash pip
+pip install kdbai-client
+```
+
+```bash uv
+uv add kdbai-client
+```
+</CodeGroup>
+
+
+## 向量存储
+
+KDB.AI 索引有一个包装器，允许您将其用作向量存储，无论是用于语义搜索还是示例选择。
+
+```python
+from langchain_community.vectorstores import KDBAI
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\kdbai.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

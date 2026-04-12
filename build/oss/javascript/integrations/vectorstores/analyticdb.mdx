@@ -1,0 +1,115 @@
+---
+title: "AnalyticDB 集成"
+description: "使用 LangChain JavaScript 与 AnalyticDB 向量存储进行集成。"
+---
+
+[AnalyticDB for PostgreSQL](https://www.alibabacloud.com/help/en/analyticdb-for-postgresql/latest/product-introduction-overview) 是一种大规模并行处理（MPP）数据仓库服务，专为在线分析海量数据而设计。
+
+`AnalyticDB for PostgreSQL` 基于开源 `Greenplum Database` 项目开发，并由 `阿里云` 进行了深度扩展增强。AnalyticDB for PostgreSQL 兼容 ANSI SQL 2003 语法以及 PostgreSQL 和 Oracle 数据库生态系统。AnalyticDB for PostgreSQL 同时支持行存储和列存储。AnalyticDB for PostgreSQL 能够高性能地处理 PB 级离线数据，并支持高并发的在线查询。
+
+本笔记本展示了如何使用与 `AnalyticDB` 向量数据库相关的功能。
+
+运行前，您需要确保已启动并运行一个 [AnalyticDB](https://www.alibabacloud.com/help/en/analyticdb-for-postgresql/latest/product-introduction-overview) 实例：
+
+- 使用 [AnalyticDB 云向量数据库](https://www.alibabacloud.com/product/hybriddb-postgresql)。
+
+<Tip>
+**兼容性**
+
+仅在 Node.js 环境下可用。
+</Tip>
+
+## 设置
+
+LangChain.js 接受使用 [node-postgres](https://node-postgres.com/) 作为 AnalyticDB 向量存储的连接池。
+
+```bash npm
+npm install -S pg
+```
+同时我们需要 [pg-copy-streams](https://github.com/brianc/node-pg-copy-streams) 来快速批量添加向量。
+
+```bash npm
+npm install -S pg-copy-streams
+```
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅 [此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+## 使用
+
+<Warning>
+**安全提示**
+
+请勿将用户生成的数据（如用户名）用作集合名称的输入。
+**这可能导致 SQL 注入攻击！**
+</Warning>
+
+```typescript
+import { AnalyticDBVectorStore } from "@langchain/community/vectorstores/analyticdb";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const connectionOptions = {
+  host: process.env.ANALYTICDB_HOST || "localhost",
+  port: Number(process.env.ANALYTICDB_PORT) || 5432,
+  database: process.env.ANALYTICDB_DATABASE || "your_database",
+  user: process.env.ANALYTICDB_USERNAME || "username",
+  password: process.env.ANALYTICDB_PASSWORD || "password",
+};
+
+const vectorStore = await AnalyticDBVectorStore.fromTexts(
+  ["foo", "bar", "baz"],
+  [{ page: 1 }, { page: 2 }, { page: 3 }],
+  new OpenAIEmbeddings(),
+  { connectionOptions }
+);
+const result = await vectorStore.similaritySearch("foo", 1);
+console.log(JSON.stringify(result));
+// [{"pageContent":"foo","metadata":{"page":1}}]
+
+await vectorStore.addDocuments([{ pageContent: "foo", metadata: { page: 4 } }]);
+
+const filterResult = await vectorStore.similaritySearch("foo", 1, {
+  page: 4,
+});
+console.log(JSON.stringify(filterResult));
+// [{"pageContent":"foo","metadata":{"page":4}}]
+
+const filterWithScoreResult = await vectorStore.similaritySearchWithScore(
+  "foo",
+  1,
+  { page: 3 }
+);
+console.log(JSON.stringify(filterWithScoreResult));
+// [[{"pageContent":"baz","metadata":{"page":3}},0.26075905561447144]]
+
+const filterNoMatchResult = await vectorStore.similaritySearchWithScore(
+  "foo",
+  1,
+  { page: 5 }
+);
+console.log(JSON.stringify(filterNoMatchResult));
+// []
+
+// 需要手动关闭连接池
+await vectorStore.end();
+```
+
+## 相关链接
+
+- 向量存储 [概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储 [操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\analyticdb.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

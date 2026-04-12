@@ -1,0 +1,43 @@
+---
+title: "Llamafile 集成"
+description: "使用 LangChain Python 与 Llamafile 集成。"
+---
+
+>[llamafile](https://github.com/Mozilla-Ocho/llamafile) 允许您分发和运行大语言模型
+>
+>`llamafile` 使开源大语言模型对开发者和最终用户都更加易于访问。
+> `llamafile` 通过将 [llama.cpp](https://github.com/ggerganov/llama.cpp) 与
+> [Cosmopolitan Libc](https://github.com/jart/cosmopolitan) 整合到一个框架中，该框架将
+> 大语言模型的所有复杂性简化为单个可执行文件（称为“llamafile”）
+> 在大多数计算机上本地运行，无需安装。
+
+
+## 安装和设置
+
+请参阅 [安装说明](https://github.com/Mozilla-Ocho/llamafile?tab=readme-ov-file#quickstart)。
+
+## 大语言模型
+
+查看 [使用示例](/oss/python/integrations/llms/llamafile)。
+
+```python
+from langchain_community.llms.llamafile import Llamafile
+```
+
+## 嵌入模型
+
+
+```python
+from langchain_community.embeddings import LlamafileEmbeddings
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\llamafile.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

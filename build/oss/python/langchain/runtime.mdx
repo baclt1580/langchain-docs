@@ -1,0 +1,150 @@
+---
+title: 运行时
+---
+
+## 概述
+
+LangChain 的 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 底层运行在 LangGraph 的运行时之上。
+
+
+LangGraph 暴露了一个 [`Runtime`](https://reference.langchain.com/python/langgraph/runtime/Runtime) 对象，包含以下信息：
+
+1.  **上下文**：静态信息，如用户 ID、数据库连接或代理调用所需的其他依赖项
+2.  **存储**：一个 [BaseStore](https://reference.langchain.com/python/langchain-core/stores/BaseStore) 实例，用于[长期记忆](/oss/python/langchain/long-term-memory)
+3.  **流写入器**：一个对象，用于通过 `"custom"` 流模式流式传输信息
+
+<Tip>
+运行时上下文为你的工具和中间件提供了**依赖注入**。你可以在调用代理时注入运行时依赖（如数据库连接、用户 ID 或配置），而不是硬编码值或使用全局状态。这使得你的工具更易于测试、可重用且灵活。
+</Tip>
+
+
+
+
+你可以在[工具内部](#inside-tools)和[中间件内部](#inside-middleware)访问运行时信息。
+
+## 访问
+
+使用 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 创建代理时，你可以指定 `context_schema` 来定义存储在代理 [`Runtime`](https://reference.langchain.com/python/langgraph/runtime/Runtime) 中的 `context` 的结构。
+
+
+
+调用代理时，传递包含运行相关配置的 `context` 参数：
+
+```python
+from dataclasses import dataclass
+
+from langchain.agents import create_agent
+
+
+@dataclass
+class Context:
+    user_name: str
+
+agent = create_agent(
+    model="gpt-5-nano",
+    tools=[...],
+    context_schema=Context  # [!code highlight]
+)
+
+agent.invoke(
+    {"messages": [{"role": "user", "content": "What's my name?"}]},
+    context=Context(user_name="John Smith")  # [!code highlight]
+)
+```
+
+
+
+### 在工具内部
+
+你可以在工具内部访问运行时信息，以：
+
+*   访问上下文
+*   读取或写入长期记忆
+*   写入[自定义流](/oss/python/langchain/streaming#custom-updates)（例如，工具进度/更新）
+
+使用 `ToolRuntime` 参数在工具内部访问 [`Runtime`](https://reference.langchain.com/python/langgraph/runtime/Runtime) 对象。
+
+```python
+from dataclasses import dataclass
+from langchain.tools import tool, ToolRuntime  # [!code highlight]
+
+@dataclass
+class Context:
+    user_id: str
+
+@tool
+def fetch_user_email_preferences(runtime: ToolRuntime[Context]) -> str:  # [!code highlight]
+    """从存储中获取用户的电子邮件偏好。"""
+    user_id = runtime.context.user_id  # [!code highlight]
+
+    preferences: str = "用户希望你写一封简短而有礼貌的电子邮件。"
+    if runtime.store:  # [!code highlight]
+        if memory := runtime.store.get(("users",), user_id):  # [!code highlight]
+            preferences = memory.value["preferences"]
+
+    return preferences
+```
+
+
+
+### 在中间件内部
+
+你可以在中间件中访问运行时信息，以创建动态提示、修改消息或根据用户上下文控制代理行为。
+
+使用 `Runtime` 参数在[节点风格钩子](/oss/python/langchain/middleware/custom#node-style-hooks)内部访问 [`Runtime`](https://reference.langchain.com/python/langgraph/runtime/Runtime) 对象。对于[包装风格钩子](/oss/python/langchain/middleware/custom#wrap-style-hooks)，[`ModelRequest`](https://reference.langchain.com/python/langchain/agents/middleware/types/ModelRequest) 参数内部提供了 `Runtime` 对象。
+
+```python
+from dataclasses import dataclass
+
+from langchain.messages import AnyMessage
+from langchain.agents import create_agent, AgentState
+from langchain.agents.middleware import dynamic_prompt, ModelRequest, before_model, after_model
+from langgraph.runtime import Runtime
+
+
+@dataclass
+class Context:
+    user_name: str
+
+# 动态提示
+@dynamic_prompt
+def dynamic_system_prompt(request: ModelRequest) -> str:
+    user_name = request.runtime.context.user_name  # [!code highlight]
+    system_prompt = f"你是一个乐于助人的助手。请称呼用户为 {user_name}。"
+    return system_prompt
+
+# 模型前钩子
+@before_model
+def log_before_model(state: AgentState, runtime: Runtime[Context]) -> dict | None:  # [!code highlight]
+    print(f"正在处理用户请求: {runtime.context.user_name}")  # [!code highlight]
+    return None
+
+# 模型后钩子
+@after_model
+def log_after_model(state: AgentState, runtime: Runtime[Context]) -> dict | None:  # [!code highlight]
+    print(f"已完成用户请求: {runtime.context.user_name}")  # [!code highlight]
+    return None
+
+agent = create_agent(
+    model="gpt-5-nano",
+    tools=[...],
+    middleware=[dynamic_system_prompt, log_before_model, log_after_model],  # [!code highlight]
+    context_schema=Context
+)
+
+agent.invoke(
+    {"messages": [{"role": "user", "content": "What's my name?"}]},
+    context=Context(user_name="John Smith")
+)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\runtime.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

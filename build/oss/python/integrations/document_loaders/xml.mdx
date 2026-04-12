@@ -1,0 +1,104 @@
+---
+title: "UnstructuredXMLLoader 集成"
+description: "使用 LangChain Python 集成 UnstructuredXMLLoader 文档加载器。"
+---
+
+本指南提供了快速入门 `UnstructuredXMLLoader` [文档加载器](/oss/python/integrations/document_loaders) 的概述。`UnstructuredXMLLoader` 用于加载 `XML` 文件。该加载器适用于 `.xml` 文件。页面内容将是从 XML 标签中提取的文本。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [JS 支持](https://js.langchain.com/docs/integrations/document_loaders/file_loaders/unstructured/) |
+| :--- | :--- | :---: | :---: | :---: |
+| [`UnstructuredXMLLoader`](https://reference.langchain.com/python/langchain-community/document_loaders/xml/UnstructuredXMLLoader) | [`langchain_community`](https://reference.langchain.com/python/langchain-community) | ✅ | ❌ | ✅ |
+
+### 加载器特性
+
+| 来源 | 文档延迟加载 | 原生异步支持 |
+| :---: | :---: | :---: |
+| `UnstructuredXMLLoader` | ✅ | ❌ |
+
+## 设置
+
+要使用 UnstructuredXMLLoader 文档加载器，您需要安装 `langchain-community` 集成包。
+
+### 凭证
+
+使用 UnstructuredXMLLoader 无需凭证。
+
+要启用模型调用的自动追踪，请设置您的 [LangSmith](/langsmith/home) API 密钥：
+
+```python
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("输入您的 LangSmith API 密钥：")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### 安装
+
+安装 **langchain_community**。
+
+```python
+pip install -qU langchain_community
+```
+
+## 初始化
+
+现在我们可以实例化模型对象并加载文档：
+
+```python
+from langchain_community.document_loaders import UnstructuredXMLLoader
+
+loader = UnstructuredXMLLoader(
+    "./example_data/factbook.xml",
+)
+```
+
+## 加载
+
+```python
+docs = loader.load()
+docs[0]
+```
+
+```text
+Document(metadata={'source': './example_data/factbook.xml'}, page_content='美国\n\n华盛顿特区\n\n乔·拜登\n\n棒球\n\n加拿大\n\n渥太华\n\n贾斯汀·特鲁多\n\n冰球\n\n法国\n\n巴黎\n\n埃马纽埃尔·马克龙\n\n足球\n\n特立尼达和多巴哥\n\n西班牙港\n\n基思·罗利\n\n田径')
+```
+
+```python
+print(docs[0].metadata)
+```
+
+```python
+{'source': './example_data/factbook.xml'}
+```
+
+## 延迟加载
+
+```python
+page = []
+for doc in loader.lazy_load():
+    page.append(doc)
+    if len(page) >= 10:
+        # 执行一些分页操作，例如
+        # index.upsert(page)
+
+        page = []
+```
+
+---
+
+## API 参考
+
+有关 `UnstructuredXMLLoader` 所有功能和配置的详细文档，请访问 [API 参考](https://reference.langchain.com/python/langchain-community/document_loaders/xml/UnstructuredXMLLoader)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\xml.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

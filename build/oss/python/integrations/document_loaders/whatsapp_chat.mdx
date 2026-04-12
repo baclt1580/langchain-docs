@@ -1,0 +1,31 @@
+---
+title: "WhatsApp 集成"
+description: "使用 LangChain Python 与 WhatsApp 文档加载器集成。"
+---
+
+>[WhatsApp](https://www.whatsapp.com/)（也称为 `WhatsApp Messenger`）是一款免费、跨平台、集中式的即时通讯（IM）和互联网语音协议（VoIP）服务。它允许用户发送文本和语音消息，进行语音和视频通话，并分享图片、文档、用户位置及其他内容。
+
+本笔记本介绍了如何将 `WhatsApp 聊天记录` 中的数据加载为可供 LangChain 处理的格式。
+
+```python
+from langchain_community.document_loaders import WhatsAppChatLoader
+```
+
+```python
+loader = WhatsAppChatLoader("example_data/whatsapp_chat.txt")
+```
+
+```python
+loader.load()
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\whatsapp_chat.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

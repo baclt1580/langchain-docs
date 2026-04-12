@@ -1,0 +1,159 @@
+---
+title: "Fireworks 集成"
+description: "使用 LangChain Python 与 Fireworks LLM 进行集成。"
+---
+
+<Warning>
+**您当前所在的页面是关于将 Fireworks 模型用作文本补全模型的文档。** 许多流行的 Fireworks 模型是 [聊天完成模型](/oss/python/langchain/models)。
+
+您可能正在寻找 [此页面](/oss/python/integrations/chat/fireworks/)。
+</Warning>
+
+>[Fireworks](https://app.fireworks.ai/) 通过创建创新的 AI 实验和生产平台，加速生成式 AI 的产品开发。
+
+本示例介绍如何使用 LangChain 与 `Fireworks` 模型进行交互。
+
+## 概述
+
+### 集成详情
+
+| 类 | 包 | 本地 | 可序列化 | [JS 支持](https://js.langchain.com/v0.1/docs/integrations/llms/fireworks/) | 下载量 | 版本 |
+| :--- | :--- | :---: | :---: |  :---: | :---: | :---: |
+| [`Fireworks`](https://reference.langchain.com/python/langchain-fireworks/llms/Fireworks) | [`langchain-fireworks`](https://pypi.org/project/langchain-fireworks/) | ❌ | ❌ | ✅ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain_fireworks?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/langchain_fireworks?style=flat-square&label=%20) |
+
+## 设置
+
+### 凭据
+
+登录 [Fireworks AI](http://fireworks.ai) 获取访问我们模型的 API Key，并确保将其设置为 `FIREWORKS_API_KEY` 环境变量。
+3. 使用模型 ID 设置您的模型。如果未设置模型，默认模型为 fireworks-llama-v2-7b-chat。有关完整且最新的模型列表，请参见 [fireworks.ai](https://app.fireworks.ai/models)。
+
+```python
+import getpass
+import os
+
+if "FIREWORKS_API_KEY" not in os.environ:
+    os.environ["FIREWORKS_API_KEY"] = getpass.getpass("Fireworks API Key:")
+```
+
+### 安装
+
+您需要安装 `langchain-fireworks` Python 包，以便笔记本中的其余部分能够正常工作。
+
+```python
+pip install -qU langchain-fireworks
+```
+
+## 实例化
+
+```python
+from langchain_fireworks import Fireworks
+
+# Initialize a Fireworks model
+llm = Fireworks(
+    model="accounts/fireworks/models/llama-v3p1-8b-instruct", # Model library in: https://app.fireworks.ai/models
+    base_url="https://api.fireworks.ai/inference/v1/completions",
+)
+```
+
+## 调用
+
+您可以直接使用字符串提示词调用模型以获取补全内容。
+
+```python
+output = llm.invoke("Who's the best quarterback in the NFL?")
+print(output)
+```
+
+```text
+  That's an easy one. It's Aaron Rodgers. Rodgers has consistently been one
+```
+
+### 使用多个提示词调用
+
+```python
+# Calling multiple prompts
+output = llm.generate(
+    [
+        "Who's the best cricket player in 2016?",
+        "Who's the best basketball player in the league?",
+    ]
+)
+print(output.generations)
+```
+
+```text
+[[Generation(text=' You could choose one of the top performers in 2016, such as Vir')], [Generation(text=' -- Keith Jackson\nA: LeBron James, Chris Paul and Kobe Bryant are the')]]
+```
+
+### 使用其他参数调用
+
+```python
+# Setting additional parameters: temperature, max_tokens, top_p
+llm = Fireworks(
+    model="accounts/fireworks/models/llama-v3p1-8b-instruct",
+    temperature=0.7,
+    max_tokens=15,
+    top_p=1.0,
+)
+print(llm.invoke("What's the weather like in Kansas City in December?"))
+```
+
+```text
+December is a cold month in Kansas City, with temperatures of
+```
+
+## 链式调用
+
+您可以使用 LangChain 表达式语言为非聊天模型创建简单的链。
+
+```python
+from langchain_core.prompts import PromptTemplate
+from langchain_fireworks import Fireworks
+
+llm = Fireworks(
+    model="accounts/fireworks/models/llama-v3p1-8b-instruct",
+    temperature=0.7,
+    max_tokens=15,
+    top_p=1.0,
+)
+prompt = PromptTemplate.from_template("Tell me a joke about {topic}?")
+chain = prompt | llm
+
+print(chain.invoke({"topic": "bears"}))
+```
+
+```text
+ What do you call a bear with no teeth? A gummy bear!
+```
+
+## 流式传输
+
+如果您愿意，可以流式输出结果。
+
+```python
+for token in chain.stream({"topic": "bears"}):
+    print(token, end="", flush=True)
+```
+
+```text
+ Why do bears hate shoes so much? They like to run around in their
+```
+
+---
+
+## API 参考
+
+有关所有 `Fireworks` LLM 功能和配置的详细文档，请前往 [API 参考](https://reference.langchain.com/python/integrations/langchain_fireworks/)
+---
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\llms\fireworks.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

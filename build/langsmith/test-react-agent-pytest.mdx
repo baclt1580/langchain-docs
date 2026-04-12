@@ -1,0 +1,1214 @@
+---
+title: 使用 Pytest/Vitest 和 LangSmith 测试 ReAct 智能体
+sidebarTitle: 使用 Pytest/Vitest 和 LangSmith 测试 ReAct 智能体
+---
+
+本教程将向您展示如何使用 LangSmith 与流行测试工具（Pytest、Vitest 和 Jest）的集成来评估您的 LLM 应用。我们将创建一个能回答公开交易股票相关问题的 ReAct 智能体，并为其编写一套全面的测试套件。
+
+## 环境准备
+
+本教程使用 [LangGraph](https://langchain-ai.github.io/langgraph/tutorials/introduction/) 进行智能体编排，使用 [OpenAI 的 GPT-4o](https://platform.openai.com/docs/models#gpt-4o)，使用 [Tavily](https://tavily.com/) 进行搜索，使用 [E2B](https://e2b.dev/) 的代码解释器，并使用 [Polygon](https://polygon.io/stocks) 获取股票数据。但只需稍作修改，即可适配其他框架、模型和工具。Tavily、E2B 和 Polygon 均可免费注册。
+
+### 安装
+
+首先，安装创建智能体所需的包：
+
+<CodeGroup>
+
+```bash Python
+pip install -U langgraph langchain[openai] langchain-community e2b-code-interpreter
+```
+
+```bash TypeScript
+yarn add @langchain/openai @langchain/community @langchain/langgraph @langchain/core @e2b/code-interpreter @polygon.io/client-js openai zod
+```
+
+</CodeGroup>
+
+接下来，安装测试框架：
+
+<CodeGroup>
+
+```bash Pytest
+# 确保您的 langsmith 版本 >= 0.3.1
+pip install -U "langsmith[pytest]"
+```
+
+```bash Vitest
+yarn add -D langsmith vitest
+```
+
+```bash Jest
+yarn add -D langsmith jest
+```
+
+</CodeGroup>
+
+### 环境变量
+
+设置以下环境变量：
+
+```bash
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=<YOUR_LANGSMITH_API_KEY>
+export OPENAI_API_KEY=<YOUR_OPENAI_API_KEY>
+export TAVILY_API_KEY=<YOUR_TAVILY_API_KEY>
+export E2B_API_KEY=<YOUR_E2B_API_KEY>
+export POLYGON_API_KEY=<YOUR_POLYGON_API_KEY>
+```
+
+## 创建您的应用
+
+为了定义我们的 React 智能体，我们将使用 LangGraph/LangGraph.js 进行编排，并使用 LangChain 处理 LLM 和工具。
+
+### 定义工具
+
+首先，我们将定义要在智能体中使用的工具。共有 3 个工具：
+
+* 使用 Tavily 的搜索工具
+* 使用 E2B 的代码解释器工具
+* 使用 Polygon 的股票信息工具
+
+<CodeGroup>
+
+```python Python
+from langchain_community.tools import TavilySearchResults
+from e2b_code_interpreter import Sandbox
+from langchain_community.tools.polygon.aggregates import PolygonAggregates
+from langchain_community.utilities.polygon import PolygonAPIWrapper
+from typing_extensions import Annotated, TypedDict, Optional, Literal
+
+# 定义搜索工具
+search_tool = TavilySearchResults(
+  max_results=5,
+  include_raw_content=True,
+)
+
+# 定义代码工具
+def code_tool(code: str) -> str:
+  """执行 Python 代码并返回结果。"""
+  sbx = Sandbox()
+  execution = sbx.run_code(code)
+
+  if execution.error:
+      return f"错误：{execution.error}"
+  return f"结果：{execution.results}，日志：{execution.logs}"
+
+# 定义股票代码工具输入模式
+class TickerToolInput(TypedDict):
+  """股票代码工具的输入格式。
+    该工具将拉取从 from_date 到 to_date 的聚合数据块（timespan_multiplier * timespan）
+  """
+  ticker: Annotated[str, ..., "股票的代码符号"]
+  timespan: Annotated[Literal["minute", "hour", "day", "week", "month", "quarter", "year"], ..., "时间窗口的大小。"]
+  timespan_multiplier: Annotated[int, ..., "时间窗口的乘数"]
+  from_date: Annotated[str, ..., "开始拉取数据的日期，格式为 YYYY-MM-DD - 仅包含年月日"]
+  to_date: Annotated[str, ..., "停止拉取数据的日期，格式为 YYYY-MM-DD - 仅包含年月日"]
+
+api_wrapper = PolygonAPIWrapper()
+polygon_aggregate = PolygonAggregates(api_wrapper=api_wrapper)
+
+# 定义股票代码工具
+def ticker_tool(query: TickerToolInput) -> str:
+  """拉取股票代码的数据。"""
+  return polygon_aggregate.invoke(query)
+```
+
+```typescript TypeScript
+import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
+import { Sandbox } from "@e2b/code-interpreter";
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import { restClient } from "@polygon.io/client-js";
+
+// 定义搜索工具
+const searchTool = new TavilySearchResults({
+  maxResults: 5,
+});
+
+// 定义代码工具
+const codeTool = tool(async (input) => {
+  const sbx = await Sandbox.create();
+  const execution = await sbx.runCode(input.code);
+  if (execution.error) {
+    return `错误：${execution.error}`;
+  }
+  return `结果：${execution.results}，日志：${execution.logs}`;
+}, {
+  name: "code",
+  description: "执行 Python 代码并返回结果。",
+  schema: z.object({
+    code: z.string().describe("要执行的 Python 代码"),
+  }),
+});
+
+// 定义股票代码工具输入模式
+const TickerToolInputSchema = z.object({
+  ticker: z.string().describe("股票的代码符号"),
+  timespan: z.enum(["minute", "hour", "day", "week", "month", "quarter", "year"]).describe("时间窗口的大小。"),
+  timespan_multiplier: z.number().describe("时间窗口的乘数"),
+  from_date: z
+    .string()
+    .describe("开始拉取数据的日期，格式为 YYYY-MM-DD - 仅包含年月日"),
+  to_date: z
+    .string()
+    .describe("停止拉取数据的日期，格式为 YYYY-MM-DD - 仅包含年月日"),
+});
+
+const rest = restClient(process.env.POLYGON_API_KEY);
+
+// 定义股票代码工具
+const tickerTool = tool(async (query) => {
+  const parsed = TickerToolInputSchema.parse(query);
+  const result = await rest.stocks.aggregates(
+      parsed.ticker,
+      parsed.timespan_multiplier,
+      parsed.timespan,
+      parsed.from_date,
+      parsed.to_date
+  );
+  return JSON.stringify(result);
+}, {
+  name: "ticker",
+  description: "拉取股票代码的数据",
+  schema: TickerToolInputSchema,
+});
+```
+
+</CodeGroup>
+
+### 定义智能体
+
+现在我们已经定义了所有工具，可以使用 [`create_agent`](https://reference.langchain.com/python/langchain/agents/factory/create_agent) 来创建我们的智能体。
+
+<CodeGroup>
+
+```python Python
+from typing_extensions import Annotated, TypedDict
+from langchain.agents import create_agent
+
+
+class AgentOutputFormat(TypedDict):
+    numeric_answer: Annotated[float | None, ..., "数值答案，如果用户要求提供"]
+    text_answer: Annotated[str | None, ..., "文本答案，如果用户要求提供"]
+    reasoning: Annotated[str, ..., "答案背后的推理过程"]
+
+agent = create_agent(
+    model="gpt-4.1-mini",
+    tools=[code_tool, search_tool, polygon_aggregates],
+    response_format=AgentOutputFormat,
+    system_prompt="您是一位金融专家。请准确回应用户的查询",
+)
+```
+
+```typescript TypeScript
+import { z } from "zod";
+import { ChatOpenAI } from "@langchain/openai";
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
+
+const AgentOutputFormatSchema = z.object({
+  numeric_answer: z.number().optional().describe("数值答案，如果用户要求提供"),
+  text_answer: z.string().optional().describe("文本答案，如果用户要求提供"),
+  reasoning: z.string().describe("答案背后的推理过程"),
+})
+
+const tools = [codeTool, searchTool, tickerTool];
+
+const agent = createReactAgent({
+  llm: new ChatOpenAI({ model: "gpt-4.1" }),
+  tools: tools,
+  responseFormat: AgentOutputFormatSchema,
+  stateModifier: "您是一位金融专家。请准确回应用户的查询",
+});
+
+export default agent;
+```
+
+</CodeGroup>
+
+## 编写测试
+
+现在我们已经定义了智能体，让我们编写一些测试来确保其基本功能。在本教程中，我们将测试智能体的工具调用能力是否正常工作，智能体是否知道忽略不相关的问题，以及它是否能够回答需要用到所有工具的复杂问题。
+
+我们首先需要创建一个测试文件，并在文件顶部添加所需的导入。
+
+<CodeGroup>
+
+```python Pytest
+创建一个 `tests/test_agent.py` 文件。
+
+from app import agent, polygon_aggregates, search_tool # 从定义智能体的任何位置导入
+import pytest
+from langsmith import testing as t
+```
+
+```typescript Vitest
+将您的测试文件命名为 `agent.vitest.eval.ts`
+
+import { expect } from "vitest";
+import * as ls from "langsmith/vitest";
+import agent from "../agent"; // 从定义智能体的任何位置导入
+
+// 可选，但建议将测试分组在一起
+ls.describe("智能体测试", () => {
+  // 在此处放置测试
+});
+```
+
+```typescript Jest
+将您的测试文件命名为 `agent.jest.eval.ts`
+
+import { expect } from "@jest/globals";
+import * as ls from "langsmith/jest";
+import agent from "../agent"; // 从定义智能体的任何位置导入
+
+// 可选，但建议将测试分组在一起
+ls.describe("智能体测试", () => {
+  // 在此处放置测试
+});
+```
+
+</CodeGroup>
+
+### 测试 1：处理不相关的问题
+
+第一个测试将简单地检查智能体在不相关的查询上是否不会使用工具。
+
+<CodeGroup>
+
+```python Pytest
+@pytest.mark.langsmith
+@pytest.mark.parametrize(
+  # <-- 仍然可以使用所有正常的 pytest 标记
+  "query",
+  ["你好！", "你怎么样？"],
+)
+def test_no_tools_on_offtopic_query(query: str) -> None:
+  """测试智能体在不相关的查询上不会使用工具。"""
+  # 记录测试示例
+  t.log_inputs({"query": query})
+  expected = []
+  t.log_reference_outputs({"tool_calls": expected})
+  # 直接调用智能体的模型节点，而不是运行 ReACT 循环。
+  result = agent.nodes["agent"].invoke(
+      {"messages": [{"role": "user", "content": query}]}
+  )
+  actual = result["messages"][0].tool_calls
+  t.log_outputs({"tool_calls": actual})
+  # 检查是否没有进行任何工具调用。
+  assert actual == expected
+```
+
+```typescript Vitest
+ls.test.each([
+  { inputs: { query: "你好！" }, expected: { numMessages: 2 } },
+  { inputs: { query: "你怎么样？" }, expected: { numMessages: 2 } },
+])(
+  "在不相关的查询上不应使用工具：%s",
+  async ({ inputs: { query }, expected: { numMessages } }) => {
+    const result = await agent.invoke({ messages: [{ role: "user", content: query }] });
+    ls.logOutputs(result);
+
+    // 检查流程是否为 人类 -> AI 最终响应（未调用工具）
+    expect(result.messages).toHaveLength(numMessages);
+  }
+);
+```
+
+```typescript Jest
+ls.test.each([
+  { inputs: { query: "你好！" }, expected: { numMessages: 2 } },
+  { inputs: { query: "你怎么样？" }, expected: { numMessages: 2 } },
+])(
+  "在不相关的查询上不应使用工具：%s",
+  async ({ inputs: { query }, expected: { numMessages } }) => {
+    const result = await agent.invoke({ messages: [{ role: "user", content: query }] });
+    ls.logOutputs(result);
+
+    // 检查流程是否为 人类 -> AI 最终响应（未调用工具）
+    expect(result.messages).toHaveLength(numMessages);
+  }
+);
+```
+
+</CodeGroup>
+
+### 测试 2：简单的工具调用
+
+对于工具调用，我们将验证智能体是否使用正确的参数调用了正确的工具。
+
+<CodeGroup>
+
+```python Pytest
+@pytest.mark.langsmith
+def test_searches_for_correct_ticker() -> None:
+  """测试模型在简单查询中是否查找了正确的股票代码。"""
+  # 记录测试示例
+  query = "苹果的价格是多少？"
+  t.log_inputs({"query": query})
+  expected = "AAPL"
+  t.log_reference_outputs({"ticker": expected})
+  # 直接调用智能体的模型节点，而不是运行完整的 ReACT 循环。
+  result = agent.nodes["agent"].invoke(
+      {"messages": [{"role": "user", "content": query}]}
+  )
+  tool_calls = result["messages"][0].tool_calls
+  if tool_calls[0]["name"] == polygon_aggregates.name:
+      actual = tool_calls[0]["args"]["ticker"]
+  else:
+      actual = None
+  t.log_outputs({"ticker": actual})
+  # 检查是否查询了正确的股票代码
+  assert actual == expected
+```
+
+```typescript Vitest
+ls.test(
+  "应该搜索正确的股票代码",
+  {
+    inputs: { query: "苹果的价格是多少？" },
+    expected: { numMessages: 4 },
+  },
+  async ({ inputs: { query }, expected: { numMessages } }) => {
+    const result = await agent.invoke({
+      messages: [{ role: "user", content: query }],
+    });
+
+    ls.logOutputs(result);
+
+    // 智能体应该对股票代码工具进行一次工具调用
+    const toolCalls = (result.messages[1] as AIMessage).tool_calls || [];
+    const tickerQuery = JSON.parse(toolCalls[0].function.arguments).query.ticker;
+    // 检查是否查询了正确的股票代码
+    expect(tickerQuery).toBe("AAPL");
+
+    // 检查流程是否为 人类 -> AI -> 工具 -> AI 最终响应
+    expect(result.messages).toHaveLength(numMessages);
+  }
+);
+```
+
+```typescript Jest
+ls.test(
+  "应该搜索正确的股票代码",
+  {
+    inputs: { query: "苹果的价格是多少？" },
+    expected: { numMessages: 4 },
+  },
+  async ({ inputs: { query }, expected: { numMessages } }) => {
+    const result = await agent.invoke({
+      messages: [{ role: "user", content: query }],
+    });
+
+    ls.logOutputs(result);
+
+    // 智能体应该对股票代码工具进行一次工具调用
+    const toolCalls = (result.messages[1] as AIMessage).tool_calls || [];
+    const tickerQuery = JSON.parse(toolCalls[0].function.arguments).query.ticker;
+    // 检查是否查询了正确的股票代码
+    expect(tickerQuery).toBe("AAPL");
+
+    // 检查流程是否为 人类 -> AI -> 工具 -> AI 最终响应
+    expect(result.messages).toHaveLength(numMessages);
+  }
+);
+```
+
+</CodeGroup>
+
+### 测试 3：复杂的工具调用
+
+有些工具调用比其他工具调用更容易测试。对于股票代码查找，我们可以断言搜索了正确的代码。对于编码工具，工具的输入和输出约束少得多，并且有很多方法可以得到正确答案。在这种情况下，通过运行完整的智能体并断言它既调用了编码工具又最终得到了正确答案，来测试工具是否被正确使用会更简单。
+
+<CodeGroup>
+
+```python Pytest
+@pytest.mark.langsmith
+def test_executes_code_when_needed() -> None:
+  query = (
+      "过去一年中，Facebook 股票上涨了 66.76%，"
+      "苹果上涨了 25.24%，谷歌上涨了 37.11%，亚马逊上涨了 47.52%，"
+      "Netflix 上涨了 78.31%。FAANG 股票过去一年的平均回报率是多少，"
+      "以百分比表示？"
+  )
+  t.log_inputs({"query": query})
+  expected = 50.988
+  t.log_reference_outputs({"response": expected})
+  # 测试智能体在需要时是否执行代码
+  result = agent.invoke({"messages": [{"role": "user", "content": query}]})
+  t.log_outputs({"result": result["structured_response"].get("numeric_answer")})
+  # 获取 LLM 进行的所有工具调用
+  tool_calls = [
+      tc["name"]
+      for msg in result["messages"]
+      for tc in getattr(msg, "tool_calls", [])
+  ]
+  # 这将记录智能体执行的步骤数，有助于确定智能体得到答案的效率。
+  t.log_feedback(key="num_steps", score=len(result["messages"]) - 1)
+  # 断言使用了代码工具
+  assert "code_tool" in tool_calls
+  # 断言提供了数值答案：
+  assert result["structured_response"].get("numeric_answer") is not None
+  # 断言答案正确
+  assert abs(result["structured_response"]["numeric_answer"] - expected) <= 0.01
+```
+
+```typescript Vitest
+ls.test(
+  "应在需要时执行代码",
+  {
+    inputs: { query: "2024 年 FAANG 股票的平均回报率是多少？" },
+    expected: { answer: 53 },
+  },
+  async ({ inputs: { query }, expected: { answer } }) => {
+    const result = await agent.invoke({
+      messages: [{ role: "user", content: query }],
+    });
+
+    ls.logOutputs(result);
+
+    // 获取 LLM 进行的所有工具调用
+    const toolCalls = result.messages
+      .filter(m => (m as AIMessage).tool_calls)
+      .flatMap(m => (m as AIMessage).tool_calls?.map(tc => tc.name));
+    // 这将记录 LLM 执行的步骤数，我们可以随时间跟踪以衡量性能
+    ls.logFeedback({
+      key: "num_steps",
+      score: result.messages.length - 1, // 第一条消息是用户消息
+    });
+    // 断言工具调用包含 "code_tool" 函数
+    expect(toolCalls).toContain("code_tool");
+    // 断言答案与预期答案的差值在 1 以内
+    expect(Math.abs(result.structured_response.numeric_answer - answer)).toBeLessThanOrEqual(1);
+  }
+);
+```
+
+```typescript Jest
+ls.test(
+  "应在需要时执行代码",
+  {
+    inputs: { query: "2024 年 FAANG 股票的平均回报率是多少？" },
+    expected: { answer: 53 },
+  },
+  async ({ inputs: { query }, expected: { answer } }) => {
+    const result = await agent.invoke({
+      messages: [{ role: "user", content: query }],
+    });
+
+    ls.logOutputs(result);
+    // 获取 LLM 进行的所有工具调用
+    const toolCalls = result.messages
+      .filter(m => (m as AIMessage).tool_calls)
+      .flatMap(m => (m as AIMessage).tool_calls?.map(tc => tc.name));
+    // 这将记录 LLM 执行的步骤数，我们可以随时间跟踪以衡量性能
+    ls.logFeedback({
+      key: "num_steps",
+      score: result.messages.length - 1, // 第一条消息是用户消息
+    });
+    // 断言工具调用包含 "code_tool" 函数
+    expect(toolCalls).toContain("code_tool");
+    // 断言答案与预期答案的差值在 1 以内
+    expect(Math.abs(result.structured_response.numeric_answer - answer)).toBeLessThanOrEqual(1);
+  }
+);
+```
+
+</CodeGroup>
+
+### 测试 4：LLM 即评判者
+
+我们将通过运行 LLM 即评判者评估，来确保智能体的答案基于搜索结果。为了将 LLM 即评判者的调用与我们的智能体分开追踪，我们将在 Python 中使用 LangSmith 提供的 `trace_feedback` 上下文管理器，在 JS/TS 中使用 `wrapEvaluator` 函数。
+
+<CodeGroup>
+
+```python Pytest
+from typing_extensions import Annotated, TypedDict
+from langchain.chat_models import init_chat_model
+
+class Grade(TypedDict):
+  """评估答案在源文档中的 grounded 程度。"""
+  score: Annotated[
+      bool,
+      ...,
+      "如果答案完全基于源文档，则返回 True，否则返回 False。",
+  ]
+
+judge_llm = init_chat_model("gpt-4.1").with_structured_output(Grade)
+
+@pytest.mark.langsmith
+def test_grounded_in_source_info() -> None:
+  """测试响应是否基于工具输出。"""
+  query = "根据分析师的说法，英伟达股票在 2024 年的表现如何？"
+  t.log_inputs({"query": query})
+  result = agent.invoke({"messages": [{"role": "user", "content": query}]})
+  # 获取 LLM 进行的所有搜索调用
+  search_results = "\n\n".join(
+      msg.content
+      for msg in result["messages"]
+      if msg.type == "tool" and msg.name == search_tool.name
+  )
+  t.log_outputs(
+      {
+          "response": result["structured_response"].get("text_answer"),
+          "search_results": search_results,
+      }
+  )
+  # 将反馈 LLM 的运行与部署运行分开追踪。
+  with t.trace_feedback():
+      # 给 LLM 评判者的指令
+      instructions = (
+          "对以下答案进行评分。"
+          "答案应完全基于（即由）源文档支持。"
+          "如果答案完全基于文档，则返回 True。"
+          "如果答案不基于文档，则返回 False。"
+      )
+      answer_and_docs = (
+          f"答案：{result['structured_response'].get('text_answer', '')}\n"
+          f"文档：\n{search_results}"
+      )
+      # 运行评判者 LLM
+      grade = judge_llm.invoke(
+          [
+              {"role": "system", "content": instructions},
+              {"role": "user", "content": answer_and_docs},
+          ]
+      )
+      t.log_feedback(key="groundedness", score=grade["score"])
+  assert grade['score']
+```
+
+```typescript Vitest
+// 此代码放在测试外部 - 它只是一个辅助函数
+const judgeLLM = new ChatOpenAI({ model: "gpt-4.1" });
+const groundedEvaluator = async (params: {
+  answer: string;
+  referenceDocuments: string,
+}) => {
+  // 给 LLM 评判者的指令
+  const instructions = [
+    "如果答案基于文档，则返回 1",
+    "如果答案不基于文档，则返回 0",
+  ].join("\n");
+
+  // 运行评判者 LLM
+  const grade = await judgeLLM.invoke([
+    { role: "system", content: instructions },
+    { role: "user", content: `答案：${params.answer}\n文档：${params.referenceDocuments}` },
+  ]);
+  const score = parseInt(grade.content.toString());
+  return { key: "groundedness", score };
+};
+
+// 此代码放在测试内部
+ls.test(
+  "基于源信息",
+  {
+    inputs: { query: "根据分析师的说法，英伟达股票在 2024 年的表现如何？" },
+  },
+  async ({ inputs: { query } }) => {
+    const result = await agent.invoke({
+      messages: [{ role: "user", content: query }],
+    });
+    const wrappedEvaluator = ls.wrapEvaluator(groundedEvaluator);
+    await wrappedEvaluator({
+      answer: result.structuredResponse.text_answer ?? "",
+      referenceDocuments: result.structuredResponse.reasoning,
+    })
+    ls.logOutputs(result);
+  }
+);
+```
+
+```typescript Jest
+// 此代码放在测试外部 - 它只是一个辅助函数
+const judgeLLM = new ChatOpenAI({ model: "gpt-4.1" });
+const groundedEvaluator = async (params: {
+  answer: string;
+  referenceDocuments: string,
+}) => {
+  // 给 LLM 评判者的指令
+  const instructions = [
+    "如果答案基于文档，则返回 1",
+    "如果答案不基于文档，则返回 0",
+  ].join("\n");
+
+  // 运行评判者 LLM
+  const grade = await judgeLLM.invoke([
+    { role: "system", content: instructions },
+    { role: "user", content: `答案：${params.answer}\n文档：${params.referenceDocuments}` },
+  ]);
+  const score = parseInt(grade.content.toString());
+  return { key: "groundedness", score };
+};
+
+// 此代码放在测试内部
+ls.test(
+  "基于源信息",
+  {
+    inputs: { query: "根据分析师的说法，英伟达股票在 2024 年的表现如何？" },
+  },
+  async ({ inputs: { query } }) => {
+    const result = await agent.invoke({
+      messages: [{ role: "user", content: query }],
+    });
+    const wrappedEvaluator = ls.wrapEvaluator(groundedEvaluator);
+    await wrappedEvaluator({
+      answer: result.structuredResponse.text_answer ?? "",
+      referenceDocuments: result.structuredResponse.reasoning,
+    })
+    ls.logOutputs(result);
+  }
+);
+```
+
+</CodeGroup>
+
+## 运行测试
+
+一旦您设置好了配置文件（如果您使用 Vitest 或 Jest），您就可以使用以下命令运行测试：
+
+<Accordion title="Vitest/Jest 的配置文件">
+    <CodeGroup>
+
+  ```typescript Vitest
+  创建一个 `ls.vitest.config.ts` 文件：
+
+  import { defineConfig } from "vitest/config";
+
+  export default defineConfig({
+    test: {
+      include: ["**/*.eval.?(c|m)[jt]s"],
+      reporters: ["langsmith/vitest/reporter"],
+      setupFiles: ["dotenv/config"],
+      testTimeout: 30000,
+    },
+  });
+  ```
+
+  ```javascript Jest
+  创建一个 `ls.jest.config.ts` 文件：
+
+  require('dotenv').config();
+
+  module.exports = {
+    preset: 'ts-jest',
+    testEnvironment: 'node',
+    testMatch: [
+      '<rootDir>/tests/jest/**/*.jest.eval.ts'
+    ],
+    testPathIgnorePatterns: [
+      '<rootDir>/tests/vitest/.*.vitest.eval.ts$'
+    ],
+    reporters: ["langsmith/jest/reporter"],
+    testTimeout: 30000,
+  };
+  ```
+
+    </CodeGroup>
+</Accordion>
+
+<CodeGroup>
+
+```bash Pytest
+pytest --langsmith-output tests
+```
+
+```bash Vitest
+yarn vitest --config ls.vitest.config.ts
+```
+
+```bash Jest
+yarn jest --config ls.jest.config.ts
+```
+
+</CodeGroup>
+
+## 参考代码
+
+请记住同时将 Vitest 和 Jest 的配置文件添加到您的项目中。
+
+### 智能体
+
+<Accordion title="智能体代码">
+    <CodeGroup>
+
+    ```python Python
+    from e2b_code_interpreter import Sandbox
+    from langchain_community.tools import PolygonAggregates, TavilySearchResults
+    from langchain_community.utilities.polygon import PolygonAPIWrapper
+    from langchain.agents import create_agent
+    from typing_extensions import Annotated, TypedDict
+
+
+    search_tool = TavilySearchResults(
+        max_results=5,
+        include_raw_content=True,
+    )
+
+    def code_tool(code: str) -> str:
+        """执行 Python 代码并返回结果。"""
+        sbx = Sandbox()
+        execution = sbx.run_code(code)
+
+        if execution.error:
+            return f"错误：{execution.error}"
+        return f"结果：{execution.results}，日志：{execution.logs}"
+
+    polygon_aggregates = PolygonAggregates(api_wrapper=PolygonAPIWrapper())
+
+    class AgentOutputFormat(TypedDict):
+        numeric_answer: Annotated[
+            float | None, ..., "数值答案，如果用户要求提供"
+        ]
+        text_answer: Annotated[
+            str | None, ..., "文本答案，如果用户要求提供"
+        ]
+        reasoning: Annotated[str, ..., "答案背后的推理过程"]
+
+    agent = create_agent(
+        model="gpt-4.1-mini",
+        tools=[code_tool, search_tool, polygon_aggregates],
+        response_format=AgentOutputFormat,
+        system_prompt="您是一位金融专家。请准确回应用户的查询",
+    )
+    ```
+
+    ```typescript TypeScript
+    import { ChatOpenAI } from "@langchain/openai";
+    import { createReactAgent } from "@langchain/langgraph/prebuilt";
+    import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
+    import { Sandbox } from '@e2b/code-interpreter'
+    import { restClient } from '@polygon.io/client-js';
+    import { tool } from "@langchain/core/tools";
+    import { z } from "zod";
+
+    const codeTool = tool(async (input) => {
+        const sbx = await Sandbox.create();
+        const execution = await sbx.runCode(input.code);
+        if (execution.error) {
+        return `错误：${execution.error}`;
+        }
+        return `结果：${execution.results}，日志：${execution.logs}`;
+    }, {
+        name: "code",
+        description: "执行 Python 代码并返回结果。",
+        schema: z.object({
+        code: z.string().describe("要执行的 Python 代码"),
+        }),
+    });
+
+    const TickerToolInputSchema = z.object({
+        ticker: z.string().describe("股票的代码符号"),
+        timespan: z.enum(["minute", "hour", "day", "week", "month", "quarter", "year"]).describe("时间窗口的大小。"),
+        timespan_multiplier: z.number().describe("时间窗口的乘数"),
+        from_date: z
+        .string()
+        .describe("开始拉取数据的日期，格式为 YYYY-MM-DD - 仅包含年月日"),
+        to_date: z
+        .string()
+        .describe("停止拉取数据的日期，格式为 YYYY-MM-DD - 仅包含年月日"),
+    });
+
+    const rest = restClient(process.env.POLYGON_API_KEY);
+
+    const tickerTool = tool(async (query) => {
+        const parsed = TickerToolInputSchema.parse(query);
+        const result = await rest.stocks.aggregates(
+        parsed.ticker,
+        parsed.timespan_multiplier,
+        parsed.timespan,
+        parsed.from_date,
+        parsed.to_date
+        );
+        return JSON.stringify(result);
+    }, {
+        name: "ticker",
+        description: "拉取股票代码的数据",
+        schema: TickerToolInputSchema,
+    });
+
+    const searchTool = new TavilySearchResults({
+        maxResults: 5,
+    });
+
+    const AgentOutputFormatSchema = z.object({
+        numeric_answer: z.number().optional().describe("数值答案，如果用户要求提供"),
+        text_answer: z.string().optional().describe("文本答案，如果用户要求提供"),
+        reasoning: z.string().describe("答案背后的推理过程"),
+    })
+
+    const tools = [codeTool, searchTool, tickerTool];
+
+    const agent = createReactAgent({
+        llm: new ChatOpenAI({ model: "gpt-4.1" }),
+        tools: tools,
+        responseFormat: AgentOutputFormatSchema,
+        stateModifier: "您是一位金融专家。请准确回应用户的查询",
+    });
+
+    export default agent;
+    ```
+
+    </CodeGroup>
+</Accordion>
+
+### 测试
+
+<Accordion title="测试代码">
+    <CodeGroup>
+
+  ```python Pytest
+  # from app import agent, polygon_aggregates, search_tool # 从你定义 agent 的位置导入
+  import pytest
+  from langchain.chat_models import init_chat_model
+  from langsmith import testing as t
+  from typing_extensions import Annotated, TypedDict
+
+  @pytest.mark.langsmith
+  @pytest.mark.parametrize(
+    # <-- 仍可使用所有常规 pytest 标记
+    "query",
+    ["你好！", "你最近怎么样？"],
+  )
+  def test_no_tools_on_offtopic_query(query: str) -> None:
+    """测试 agent 在无关查询上不使用工具。"""
+    # 记录测试示例
+    t.log_inputs({"query": query})
+    expected = []
+    t.log_reference_outputs({"tool_calls": expected})
+    # 直接调用 agent 的模型节点，而不是运行 ReACT 循环。
+    result = agent.nodes["agent"].invoke(
+        {"messages": [{"role": "user", "content": query}]}
+    )
+    actual = result["messages"][0].tool_calls
+    t.log_outputs({"tool_calls": actual})
+    # 检查未进行任何工具调用。
+    assert actual == expected
+
+  @pytest.mark.langsmith
+  def test_searches_for_correct_ticker() -> None:
+    """测试模型在简单查询中查找正确的股票代码。"""
+    # 记录测试示例
+    query = "苹果公司的价格是多少？"
+    t.log_inputs({"query": query})
+    expected = "AAPL"
+    t.log_reference_outputs({"ticker": expected})
+    # 直接调用 agent 的模型节点，而不是运行完整的 ReACT 循环。
+    result = agent.nodes["agent"].invoke(
+        {"messages": [{"role": "user", "content": query}]}
+    )
+    tool_calls = result["messages"][0].tool_calls
+    if tool_calls[0]["name"] == polygon_aggregates.name:
+        actual = tool_calls[0]["args"]["ticker"]
+    else:
+        actual = None
+    t.log_outputs({"ticker": actual})
+    # 检查查询的股票代码是否正确
+    assert actual == expected
+
+  @pytest.mark.langsmith
+  def test_executes_code_when_needed() -> None:
+    query = (
+        "过去一年中，Facebook 股票上涨了 66.76%，"
+        "苹果上涨了 25.24%，谷歌上涨了 37.11%，亚马逊上涨了 47.52%，"
+        "奈飞上涨了 78.31%。FAANG 股票过去一年的平均回报率是多少，"
+        "以百分比表示？"
+    )
+    t.log_inputs({"query": query})
+    expected = 50.988
+    t.log_reference_outputs({"response": expected})
+    # 测试 agent 在需要时是否执行代码
+    result = agent.invoke({"messages": [{"role": "user", "content": query}]})
+    t.log_outputs({"result": result["structured_response"].get("numeric_answer")})
+    # 获取 LLM 进行的所有工具调用
+    tool_calls = [
+        tc["name"]
+        for msg in result["messages"]
+        for tc in getattr(msg, "tool_calls", [])
+    ]
+    # 这将记录 agent 执行的步数，有助于判断 agent 获取答案的效率。
+    t.log_feedback(key="num_steps", score=len(result["messages"]) - 1)
+    # 断言使用了代码工具
+    assert "code_tool" in tool_calls
+    # 断言提供了数值答案：
+    assert result["structured_response"].get("numeric_answer") is not None
+    # 断言答案正确
+    assert abs(result["structured_response"]["numeric_answer"] - expected) <= 0.01
+
+  class Grade(TypedDict):
+    """评估答案在源文档中的 groundedness（是否有据可循）。"""
+    score: Annotated[
+        bool,
+        ...,
+        "如果答案完全基于源文档则返回 True，否则返回 False。",
+    ]
+
+  judge_llm = init_chat_model("gpt-4.1").with_structured_output(Grade)
+
+  @pytest.mark.langsmith
+  def test_grounded_in_source_info() -> None:
+    """测试响应是否基于工具输出。"""
+    query = "根据分析师的说法，英伟达股票在 2024 年的表现如何？"
+    t.log_inputs({"query": query})
+    result = agent.invoke({"messages": [{"role": "user", "content": query}]})
+    # 获取 LLM 进行的所有搜索调用
+    search_results = "\n\n".join(
+        msg.content
+        for msg in result["messages"]
+        if msg.type == "tool" and msg.name == search_tool.name
+    )
+    t.log_outputs(
+        {
+            "response": result["structured_response"].get("text_answer"),
+            "search_results": search_results,
+        }
+    )
+    # 将反馈 LLM 的运行与部署运行分开追踪。
+    with t.trace_feedback():
+        # 给 LLM 评判器的指令
+        instructions = (
+            "请对以下答案进行评分。"
+            "答案应完全基于（即由）源文档支撑。"
+            "如果答案完全基于文档，返回 True。"
+            "如果答案不基于文档，返回 False。"
+        )
+        answer_and_docs = (
+            f"答案：{result['structured_response'].get('text_answer', '')}\n"
+            f"文档：\n{search_results}"
+        )
+        # 运行评判 LLM
+        grade = judge_llm.invoke(
+            [
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": answer_and_docs},
+            ]
+        )
+        t.log_feedback(key="groundedness", score=grade["score"])
+    assert grade["score"]
+  ```
+
+  ```typescript Vitest
+  import { expect } from "vitest";
+  import * as ls from "langsmith/vitest";
+  import agent from "../agent";
+  import { AIMessage, ToolMessage } from "@langchain/core/messages";
+  import { ChatOpenAI } from "@langchain/openai";
+
+  const judgeLLM = new ChatOpenAI({ model: "gpt-4.1" });
+
+  const groundedEvaluator = async (params: {
+    answer: string;
+    referenceDocuments: string,
+  }) => {
+    const instructions = [
+      "如果答案基于文档，返回 1",
+      "如果答案不基于文档，返回 0",
+    ].join("\n");
+
+    const grade = await judgeLLM.invoke([
+      { role: "system", content: instructions },
+      { role: "user", content: `答案：${params.answer}\n文档：${params.referenceDocuments}` },
+    ]);
+    const score = parseInt(grade.content.toString());
+    return { key: "groundedness", score };
+  };
+
+  ls.describe("Agent 测试", () => {
+    ls.test.each([
+      { inputs: { query: "你好！" }, referenceOutputs: { numMessages: 2 } },
+      { inputs: { query: "你最近怎么样？" }, referenceOutputs: { numMessages: 2 } },
+    ])(
+      "在无关查询上不应使用工具：%s",
+      async ({ inputs: { query }, referenceOutputs: { numMessages } }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+        ls.logOutputs(result);
+        expect(result.messages).toHaveLength(numMessages);
+      }
+    );
+
+    ls.test(
+      "应搜索正确的股票代码",
+      {
+        inputs: { query: "苹果公司的价格是多少？" },
+        referenceOutputs: { numMessages: 4 },
+      },
+      async ({ inputs: { query }, referenceOutputs: { numMessages } }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+        const toolCalls = (result.messages[1] as AIMessage).tool_calls || [];
+        const tickerQuery = toolCalls[0].args.ticker;
+        ls.logOutputs(result);
+        expect(tickerQuery).toBe("AAPL");
+        expect(result.messages).toHaveLength(numMessages);
+      }
+    );
+
+    ls.test(
+      "应在需要时执行代码",
+      {
+        inputs: { query: "2024 年 FAANG 股票的平均回报率是多少？" },
+        referenceOutputs: { answer: 53 },
+      },
+      async ({ inputs: { query }, referenceOutputs: { answer } }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+
+        const toolCalls = result.messages
+          .filter(m => (m as AIMessage).tool_calls)
+          .flatMap(m => (m as AIMessage).tool_calls?.map(tc => tc.name));
+        ls.logFeedback({
+          key: "num_steps",
+          score: result.messages.length - 1,
+        });
+        ls.logOutputs(result);
+        expect(toolCalls).toContain("code_tool");
+        expect(Math.abs((result.structuredResponse.numeric_answer ?? 0) - answer)).toBeLessThanOrEqual(1);
+      }
+    );
+
+    ls.test(
+      "基于源文档",
+      {
+        inputs: { query: "英伟达股票在 2024 年的表现如何？" },
+        referenceOutputs: {},
+      },
+      async ({ inputs: { query }, referenceOutputs: {} }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+        const referenceDocuments = result.messages
+          .filter((m): m is ToolMessage => m.name?.includes('tavily_search_results_json') ?? false)
+          .map(m => m.content)
+          .join('\n');
+        const wrappedEvaluator = ls.wrapEvaluator(groundedEvaluator);
+        await wrappedEvaluator({
+          answer: result.structuredResponse.text_answer ?? "",
+          referenceDocuments: referenceDocuments,
+        })
+        ls.logOutputs(result);
+      }
+    );
+  });
+  ```
+
+  ```typescript Jest
+  import { expect } from "@jest/globals";
+  import * as ls from "langsmith/jest";
+  import agent from "../agent";
+  import { AIMessage } from "@langchain/core/messages";
+  import { ChatOpenAI } from "@langchain/openai";
+
+  const judgeLLM = new ChatOpenAI({ model: "gpt-4.1" });
+
+  const groundedEvaluator = async (params: {
+    answer: string;
+    referenceDocuments: string,
+  }) => {
+    const instructions = [
+      "如果答案基于文档，返回 1",
+      "如果答案不基于文档，返回 0",
+    ].join("\n");
+
+    const grade = await judgeLLM.invoke([
+      { role: "system", content: instructions },
+      { role: "user", content: `答案：${params.answer}\n文档：${params.referenceDocuments}` },
+    ]);
+    const score = parseInt(grade.content.toString());
+    return { key: "groundedness", score };
+  };
+
+  ls.describe("Agent 测试", () => {
+    ls.test.each([
+      { inputs: { query: "你好！" }, referenceOutputs: { numMessages: 2 } },
+      { inputs: { query: "你最近怎么样？" }, referenceOutputs: { numMessages: 2 } },
+    ])(
+      "在无关查询上不应使用工具：%s",
+      async ({ inputs: { query }, referenceOutputs: { numMessages } }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+        ls.logOutputs(result);
+        expect(result.messages).toHaveLength(numMessages);
+      }
+    );
+
+    ls.test(
+      "应搜索正确的股票代码",
+      {
+        inputs: { query: "苹果公司的价格是多少？" },
+        referenceOutputs: { numMessages: 4 },
+      },
+      async ({ inputs: { query }, referenceOutputs: { numMessages } }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+        const toolCalls = (result.messages[1] as AIMessage).tool_calls || [];
+        const tickerQuery = toolCalls[0].args.ticker;
+        ls.logOutputs(result);
+        expect(tickerQuery).toBe("AAPL");
+        expect(result.messages).toHaveLength(numMessages);
+      }
+    );
+
+    ls.test(
+      "应在需要时执行代码",
+      {
+        inputs: { query: "2024 年 FAANG 股票的平均回报率是多少？" },
+        referenceOutputs: { answer: 53 },
+      },
+      async ({ inputs: { query }, referenceOutputs: { answer } }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+        const toolCalls = result.messages
+          .filter(m => (m as AIMessage).tool_calls)
+          .flatMap(m => (m as AIMessage).tool_calls?.map(tc => tc.name));
+        ls.logFeedback({
+          key: "num_steps",
+          score: result.messages.length - 1,
+        });
+        ls.logOutputs(result);
+        expect(toolCalls).toContain("code_tool");
+        expect(Math.abs((result.structuredResponse.numeric_answer ?? 0) - answer)).toBeLessThanOrEqual(1);
+      }
+    );
+
+    ls.test(
+      "基于源文档",
+      {
+        inputs: { query: "根据分析师的说法，英伟达股票在 2024 年的表现如何？" },
+        referenceOutputs: {},
+      },
+      async ({ inputs: { query }, referenceOutputs: {} }) => {
+        const result = await agent.invoke({
+          messages: [{ role: "user", content: query }],
+        });
+        const wrappedEvaluator = ls.wrapEvaluator(groundedEvaluator);
+        await wrappedEvaluator({
+          answer: result.structuredResponse.text_answer ?? "",
+          referenceDocuments: result.structuredResponse.reasoning,
+        })
+        ls.logOutputs(result);
+      }
+    );
+  });
+  ```
+
+    </CodeGroup>
+</Accordion>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\test-react-agent-pytest.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,217 @@
+---
+title: "Outlines 集成"
+description: "使用 LangChain Python 与 Outlines 集成。"
+---
+
+>[Outlines](https://github.com/dottxt-ai/outlines) 是一个用于受限语言生成的 Python 库。它提供了各种语言模型的统一接口，并允许使用正则表达式匹配、类型约束、JSON 模式和上下文无关文法等技术进行结构化生成。
+
+Outlines 支持多种后端，包括：
+- Hugging Face Transformers
+- llama.cpp
+- vLLM
+- MLX
+
+此集成允许您在 LangChain 中使用 Outlines 模型，提供 LLM 和聊天模型接口。
+
+## 安装和设置
+
+要在 LangChain 中使用 Outlines，您需要安装 Outlines 库：
+
+<CodeGroup>
+```bash pip
+pip install outlines
+```
+
+```bash uv
+uv add outlines
+```
+</CodeGroup>
+
+根据您选择的后端，您可能需要安装额外的依赖项：
+
+- 对于 Transformers：`pip install transformers torch datasets`
+- 对于 llama.cpp：`pip install llama-cpp-python`
+- 对于 vLLM：`pip install vllm`
+- 对于 MLX：`pip install mlx`
+
+## LLM
+
+要在 LangChain 中将 Outlines 用作 LLM，您可以使用 `Outlines` 类：
+
+```python
+from langchain_community.llms import Outlines
+```
+
+## 聊天模型
+
+要在 LangChain 中将 Outlines 用作聊天模型，您可以使用 `ChatOutlines` 类：
+
+```python
+from langchain_community.chat_models import ChatOutlines
+```
+
+## 模型配置
+
+`Outlines` 和 `ChatOutlines` 类共享类似的配置选项：
+
+```python
+model = Outlines(
+    model="meta-llama/Llama-2-7b-chat-hf",  # Model identifier
+    backend="transformers",  # Backend to use (transformers, llamacpp, vllm, or mlxlm)
+    max_tokens=256,  # Maximum number of tokens to generate
+    stop=["\n"],  # Optional list of stop strings
+    streaming=True,  # Whether to stream the output
+    # Additional parameters for structured generation:
+    regex=None,
+    type_constraints=None,
+    json_schema=None,
+    grammar=None,
+    # Additional model parameters:
+    model_kwargs={"temperature": 0.7}
+)
+```
+
+### 模型标识符
+
+`model` 参数可以是：
+- Hugging Face 模型名称（例如："meta-llama/Llama-2-7b-chat-hf"）
+- 模型的本地路径
+- 对于 GGUF 模型，格式为 "repo_id/file_name"（例如："TheBloke/Llama-2-7B-Chat-GGUF/llama-2-7b-chat.Q4_K_M.gguf"）
+
+### 后端选项
+
+`backend` 参数指定要使用哪个后端：
+- `"transformers"`：用于 Hugging Face Transformers 模型（默认）
+- `"llamacpp"`：用于使用 llama.cpp 的 GGUF 模型
+- `"transformers_vision"`：用于视觉 - 语言模型（例如：LLaVA）
+- `"vllm"`：用于使用 vLLM 库的模型
+- `"mlxlm"`：用于使用 MLX 框架的模型
+
+### 结构化生成
+
+Outlines 提供了几种结构化生成的方法：
+
+1. **正则表达式匹配**：
+   ```python
+   model = Outlines(
+       model="meta-llama/Llama-2-7b-chat-hf",
+       regex=r"((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)"
+   )
+   ```
+   这将确保生成的文本符合指定的正则表达式模式（在本例中为有效的 IP 地址）。
+
+2. **类型约束**：
+   ```python
+   model = Outlines(
+       model="meta-llama/Llama-2-7b-chat-hf",
+       type_constraints=int
+   )
+   ```
+   这将限制输出为有效的 Python 类型（int, float, bool, datetime.date, datetime.time, datetime.datetime）。
+
+3. **JSON 模式**：
+   ```python
+   from pydantic import BaseModel
+
+   class Person(BaseModel):
+       name: str
+       age: int
+
+   model = Outlines(
+       model="meta-llama/Llama-2-7b-chat-hf",
+       json_schema=Person
+   )
+   ```
+   这将确保生成的输出符合指定的 JSON 模式或 Pydantic 模型。
+
+4. **上下文无关文法**：
+   ```python
+   model = Outlines(
+       model="meta-llama/Llama-2-7b-chat-hf",
+       grammar="""
+           ?start: expression
+           ?expression: term (("+" | "-") term)*
+           ?term: factor (("*" | "/") factor)*
+           ?factor: NUMBER | "-" factor | "(" expression ")"
+           %import common.NUMBER
+       """
+   )
+   ```
+   这将生成符合指定 EBNF 格式上下文无关文法的文本。
+
+## 使用示例
+
+### LLM 示例
+
+```python
+from langchain_community.llms import Outlines
+
+llm = Outlines(model="meta-llama/Llama-2-7b-chat-hf", max_tokens=100)
+result = llm.invoke("Tell me a short story about a robot.")
+print(result)
+```
+### 聊天模型示例
+
+```python
+from langchain_community.chat_models import ChatOutlines
+from langchain.messages import HumanMessage, SystemMessage
+
+chat = ChatOutlines(model="meta-llama/Llama-2-7b-chat-hf", max_tokens=100)
+messages = [
+    SystemMessage(content="You are a helpful AI assistant."),
+    HumanMessage(content="What's the capital of France?")
+]
+result = chat.invoke(messages)
+print(result.content)
+```
+### 流式传输示例
+
+```python
+from langchain_community.chat_models import ChatOutlines
+from langchain.messages import HumanMessage
+
+chat = ChatOutlines(model="meta-llama/Llama-2-7b-chat-hf", streaming=True)
+for chunk in chat.stream("Tell me a joke about programming."):
+    print(chunk.content, end="", flush=True)
+print()
+```
+### 结构化输出示例
+
+```python
+from langchain_community.llms import Outlines
+from pydantic import BaseModel
+
+class MovieReview(BaseModel):
+    title: str
+    rating: int
+    summary: str
+
+llm = Outlines(
+    model="meta-llama/Llama-2-7b-chat-hf",
+    json_schema=MovieReview
+)
+result = llm.invoke("Write a short review for the movie 'Inception'.")
+print(result)
+```
+## 其他功能
+
+### 分词器访问
+
+您可以访问模型底层的分词器：
+
+```python
+tokenizer = llm.tokenizer
+encoded = tokenizer.encode("Hello, world!")
+decoded = tokenizer.decode(encoded)
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\outlines.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

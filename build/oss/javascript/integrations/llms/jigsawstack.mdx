@@ -1,0 +1,53 @@
+---
+title: "Jigsawstack 提示引擎集成"
+description: "使用 LangChain JavaScript 集成 JigsawStack 提示引擎 LLM。"
+---
+
+LangChain.js 支持调用 JigsawStack [提示引擎](https://docs.jigsawstack.com/api-reference/prompt-engine/run-direct) LLM。
+
+## 设置
+
+- 设置一个[账户](https://jigsawstack.com/dashboard)（免费开始使用）
+- 创建并获取您的 [API 密钥](https://jigsawstack.com/dashboard)
+
+## 凭据
+
+```bash
+export JIGSAWSTACK_API_KEY="your-api-key"
+```
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅[此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/jigsawstack
+```
+```ts
+import { JigsawStackPromptEngine } from "@langchain/jigsawstack";
+
+export const run = async () => {
+  const model = new JigsawStackPromptEngine();
+  const res = await model.invoke(
+    "告诉我关于比萨斜塔的信息？\n回答："
+  );
+  console.log({ res });
+};
+```
+
+## 相关
+
+- [模型指南](/oss/javascript/langchain/models)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\llms\jigsawstack.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

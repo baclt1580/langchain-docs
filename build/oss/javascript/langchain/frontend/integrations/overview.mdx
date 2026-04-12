@@ -1,0 +1,46 @@
+---
+title: 概述
+description: 将 useStream 连接到任何 React UI 组件库或生成式 UI 框架
+---
+
+[`useStream`](https://reference.langchain.com/javascript/langchain-react/index/useStream) 是与 UI 无关的。它返回包含消息、工具调用、加载状态和线程历史的普通响应式状态，你可以将其连接到任何你选择的视觉层。这些页面展示了三个不同的库如何与 [`useStream`](https://reference.langchain.com/javascript/langchain-react/index/useStream) 集成，每个库都遵循不同的理念来构建 AI 聊天和生成式 UI。
+
+## 集成方案
+
+<CardGroup cols={3}>
+  <Card title="AI Elements" icon="package" href="/oss/javascript/langchain/frontend/integrations/ai-elements">
+    基于 shadcn/ui 的可组合 AI 聊天组件。直接引入 `Conversation`、`Message`、`Tool` 和 `Reasoning`，并将它们直接连接到 `stream.messages`。
+  </Card>
+  <Card title="assistant-ui" icon="package" href="/oss/javascript/langchain/frontend/integrations/assistant-ui">
+    具有完整运行时层的无头 React 框架。通过 `useExternalStoreRuntime` 适配器将 `useStream` 桥接到 `AssistantRuntimeProvider`。
+  </Card>
+  <Card title="OpenUI" icon="package" href="/oss/javascript/langchain/frontend/integrations/openui">
+    生成式 UI 库，允许智能体以声明式组件 DSL 生成完整的交互式仪表板。专为数据丰富、报告风格的 UI 而构建。
+  </Card>
+</CardGroup>
+
+## 选择库
+
+三者都以相同的方式连接到 [`useStream`](https://reference.langchain.com/javascript/langchain-react/index/useStream)。选择取决于你正在构建的 UI 类型：
+
+| | AI Elements | assistant-ui | OpenUI |
+| --- | --- | --- | --- |
+| **最适合** | 具有丰富消息类型的聊天 | 功能齐全、设置极简的聊天 | 生成的仪表板和报告 |
+| **UI 风格** | 可组合的 shadcn/ui 组件 | 无头插槽 + 默认主题 | 具有声明式 DSL 的预构建组件库 |
+| **自定义** | 直接编辑源文件 | 覆盖组件插槽 | 通过 CSS 自定义属性进行主题定制 |
+| **流式 UX** | 组件级渐进式渲染 | 内置线程管理 | 提升式——外壳立即出现，数据随后填充 |
+| **工具调用** | `Tool` / `ToolHeader` / `ToolOutput` | 通过消息插槽自定义 | 内嵌于生成的 UI 中 |
+| **智能体格式** | 任何 `stream.messages` | 任何 `stream.messages` | 智能体输出 openui-lang 文本 |
+
+三者都与任何兼容 `@langchain/react` 的智能体配合使用：[`createAgent`](https://reference.langchain.com/javascript/langchain/index/createAgent)、[`createDeepAgent`](https://reference.langchain.com/javascript/deepagents/agent/createDeepAgent) 或自定义的 [LangGraph](/oss/javascript/langgraph/overview) 图。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\langchain\frontend\integrations\overview.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

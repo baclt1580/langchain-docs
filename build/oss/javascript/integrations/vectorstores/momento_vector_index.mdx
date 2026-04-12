@@ -1,0 +1,203 @@
+---
+title: "Momento 向量索引 (MVI) 集成"
+sidebarTitle: "Momento 向量索引 (MVI)"
+description: "使用 LangChain JavaScript 与 Momento 向量索引 (MVI) 向量存储集成。"
+---
+
+[MVI](https://gomomento.com)：为您的数据提供最高效、最易用、无服务器的向量索引。要开始使用 MVI，只需注册一个账户。无需处理基础设施、管理服务器或担心扩展问题。MVI 是一项能自动扩展以满足您需求的服务。无论是在 Node.js、浏览器还是边缘环境中，Momento 都能为您提供支持。
+
+要注册并访问 MVI，请访问 [Momento 控制台](https://console.gomomento.com)。
+
+## 设置
+
+1. 在 [Momento 控制台](https://console.gomomento.com/) 注册获取 API 密钥。
+2. 为您的环境安装 SDK。
+
+   2.1. 对于 **Node.js**：
+
+   ```bash npm
+   npm install @gomomento/sdk
+   ```
+   2.2. 对于 **浏览器或边缘环境**：
+
+   ```bash npm
+   npm install @gomomento/sdk-web
+   ```
+
+3. 在运行代码前设置 Momento 的环境变量
+
+   3.1 OpenAI
+
+   ```bash
+   export OPENAI_API_KEY=YOUR_OPENAI_API_KEY_HERE
+   ```
+
+   3.2 Momento
+
+   ```bash
+   export MOMENTO_API_KEY=YOUR_MOMENTO_API_KEY_HERE # https://console.gomomento.com
+   ```
+
+## 使用
+
+<Tip>
+有关安装 LangChain 包的通用说明，请参阅 [此部分](/oss/javascript/langchain/install)。
+</Tip>
+
+```bash npm
+npm install @langchain/openai @langchain/community @langchain/core
+```
+
+### 使用 `fromTexts` 索引文档并进行搜索
+
+此示例演示了使用 `fromTexts` 方法实例化向量存储并索引文档。
+如果索引不存在，则会创建它。如果索引已存在，则文档将被添加到现有索引中。
+
+`ids` 是可选的；如果省略，Momento 将为您生成 UUID。
+
+```typescript
+import { MomentoVectorIndex } from "@langchain/community/vectorstores/momento_vector_index";
+// 对于浏览器/边缘环境，请调整为从 "@gomomento/sdk-web" 导入；
+import {
+  PreviewVectorIndexClient,
+  VectorIndexConfigurations,
+  CredentialProvider,
+} from "@gomomento/sdk";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { sleep } from "@langchain/classic/util/time";
+
+const vectorStore = await MomentoVectorIndex.fromTexts(
+  ["hello world", "goodbye world", "salutations world", "farewell world"],
+  {},
+  new OpenAIEmbeddings(),
+  {
+    client: new PreviewVectorIndexClient({
+      configuration: VectorIndexConfigurations.Laptop.latest(),
+      credentialProvider: CredentialProvider.fromEnvironmentVariable({
+        environmentVariableName: "MOMENTO_API_KEY",
+      }),
+    }),
+    indexName: "langchain-example-index",
+  },
+  { ids: ["1", "2", "3", "4"] }
+);
+
+// 因为索引是异步的，等待其完成以便之后直接搜索
+await sleep();
+
+const response = await vectorStore.similaritySearch("hello", 2);
+
+console.log(response);
+
+/*
+[
+  Document { pageContent: 'hello world', metadata: {} },
+  Document { pageContent: 'salutations world', metadata: {} }
+]
+*/
+```
+
+### 使用 `fromDocuments` 索引文档并进行搜索
+
+与上述类似，此示例演示了使用 `fromDocuments` 方法实例化向量存储并索引文档。
+如果索引不存在，则会创建它。如果索引已存在，则文档将被添加到现有索引中。
+
+使用 `fromDocuments` 可以让您将各种文档加载器与索引无缝链接。
+
+```typescript
+import { MomentoVectorIndex } from "@langchain/community/vectorstores/momento_vector_index";
+// 对于浏览器/边缘环境，请调整为从 "@gomomento/sdk-web" 导入；
+import {
+  PreviewVectorIndexClient,
+  VectorIndexConfigurations,
+  CredentialProvider,
+} from "@gomomento/sdk";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
+import { sleep } from "@langchain/classic/util/time";
+
+// 使用加载器创建文档
+const loader = new TextLoader("src/document_loaders/example_data/example.txt");
+const docs = await loader.load();
+
+const vectorStore = await MomentoVectorIndex.fromDocuments(
+  docs,
+  new OpenAIEmbeddings(),
+  {
+    client: new PreviewVectorIndexClient({
+      configuration: VectorIndexConfigurations.Laptop.latest(),
+      credentialProvider: CredentialProvider.fromEnvironmentVariable({
+        environmentVariableName: "MOMENTO_API_KEY",
+      }),
+    }),
+    indexName: "langchain-example-index",
+  }
+);
+
+// 因为索引是异步的，等待其完成以便之后直接搜索
+await sleep();
+
+// 搜索最相似的文档
+const response = await vectorStore.similaritySearch("hello", 1);
+
+console.log(response);
+/*
+[
+  Document {
+    pageContent: 'Foo\nBar\nBaz\n\n',
+    metadata: { source: 'src/document_loaders/example_data/example.txt' }
+  }
+]
+*/
+```
+
+### 从现有集合中搜索
+
+```typescript
+import { MomentoVectorIndex } from "@langchain/community/vectorstores/momento_vector_index";
+// 对于浏览器/边缘环境，请调整为从 "@gomomento/sdk-web" 导入；
+import {
+  PreviewVectorIndexClient,
+  VectorIndexConfigurations,
+  CredentialProvider,
+} from "@gomomento/sdk";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const vectorStore = new MomentoVectorIndex(new OpenAIEmbeddings(), {
+  client: new PreviewVectorIndexClient({
+    configuration: VectorIndexConfigurations.Laptop.latest(),
+    credentialProvider: CredentialProvider.fromEnvironmentVariable({
+      environmentVariableName: "MOMENTO_API_KEY",
+    }),
+  }),
+  indexName: "langchain-example-index",
+});
+
+const response = await vectorStore.similaritySearch("hello", 1);
+
+console.log(response);
+/*
+[
+  Document {
+    pageContent: 'Foo\nBar\nBaz\n\n',
+    metadata: { source: 'src/document_loaders/example_data/example.txt' }
+  }
+]
+*/
+```
+
+## 相关
+
+- 向量存储 [概念指南](/oss/javascript/integrations/vectorstores)
+- 向量存储 [操作指南](/oss/javascript/integrations/vectorstores)
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\javascript\integrations\vectorstores\momento_vector_index.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

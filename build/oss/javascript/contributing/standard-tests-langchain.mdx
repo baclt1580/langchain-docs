@@ -1,0 +1,149 @@
+---
+title: 使用标准测试
+sidebarTitle: 标准测试
+---
+
+**标准测试确保您的集成按预期工作。**
+
+无论是为自己创建自定义类，还是发布到 LangChain 集成中，都需要添加测试以确保其按预期工作。LangChain 为每种集成类型提供了全面的[测试套件](https://pypi.org/project/langchain-tests/)。本指南将展示如何为每种集成类型添加 LangChain 的标准测试套件。
+
+## 设置
+
+首先，安装所需的依赖项：
+
+
+<CardGroup cols={2}>
+    <Card title="langchain-core" icon="cube" href="https://github.com/langchain-ai/langchainjs/tree/main/langchain-core#readme" arrow>
+        定义了我们要导入以定义自定义组件的接口
+    </Card>
+
+    <Card title="langchain-tests" icon="flask" href="https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-standard-tests#readme" arrow>
+        提供标准测试以及运行它们所需的插件
+    </Card>
+</CardGroup>
+
+
+
+
+
+
+<CodeGroup>
+    ```bash npm
+    npm install @langchain/core
+    npm install @langchain/standard-tests
+    ```
+
+    ```bash pnpm
+    pnpm add @langchain/core
+    pnpm add @langchain/standard-tests
+    ```
+
+    ```bash yarn
+    yarn add @langchain/core
+    yarn add @langchain/standard-tests
+    ```
+
+    ```bash bun
+    bun add @langchain/core
+    bun add @langchain/standard-tests
+    ```
+</CodeGroup>
+
+
+`langchain-tests` 包中有 2 个命名空间：
+
+<AccordionGroup>
+    <Accordion title="单元测试" icon="settings">
+
+        **位置**: `src.unit_tests`
+
+
+        旨在隔离测试组件，无需访问外部服务
+
+        [查看 API 参考](https://reference.langchain.com/python/langchain_tests/unit_tests)
+    </Accordion>
+
+    <Accordion title="集成测试" icon="network">
+
+        **位置**: `src.integration_tests`
+
+
+        旨在测试组件与外部服务（特别是组件设计与之交互的外部服务）的交互
+
+        [查看 API 参考](https://reference.langchain.com/python/langchain_tests/integration_tests)
+    </Accordion>
+</AccordionGroup>
+
+
+
+## 实现标准测试
+
+根据您的集成类型，您需要实现单元测试、集成测试或两者。
+
+通过子类化适用于您集成类型的标准测试套件，您将获得该类型的完整标准测试集合。测试运行成功时，只有当模型支持被测试的功能时，特定测试才应通过。否则，测试应被跳过。
+
+由于不同的集成提供独特的功能集，LangChain 提供的大多数标准测试**默认是选择加入的**，以防止误报。因此，您需要覆盖属性以指示您的集成支持哪些功能 - 请参阅以下示例说明。
+
+
+```javascript tests/chat_models.standard.int.test.ts
+// 指示聊天模型支持并行工具调用
+
+class ChatParrotLinkStandardIntegrationTests extends ChatModelIntegrationTests<
+    ChatParrotLinkCallOptions,
+    AIMessageChunk
+> {
+    constructor() {
+        // ... 其他必需属性
+
+        super({
+            // ... 其他必需属性
+            supportsParallelToolCalls: true,  // (默认值为 False)
+            // ...
+        });
+    }
+```
+
+
+<Note>
+    您应该将这些测试组织在相对于包根目录的以下子目录中：
+    - `tests/unit_tests` 用于单元测试
+    - `tests/integration_tests` 用于集成测试
+</Note>
+
+
+
+要查看可配置功能的完整列表及其默认值，请参阅[实现标准测试](/oss/javascript/javascript/contributing/standard-tests-langchain#implementing-standard-tests)。
+
+
+
+
+## 沙盒集成
+
+
+
+Deep Agents 沙盒集成使用 `@langchain/sandbox-standard-tests` 中的 `sandboxStandardTests`。
+使用包含 `createSandbox`、`resolvePath` 和 `closeSandbox` 的配置对象调用它。
+使用 [Daytona 集成测试](https://github.com/langchain-ai/deepagentsjs/blob/main/libs/providers/daytona/src/sandbox.int.test.ts) 作为参考实现。
+有关发布指南，请参阅[贡献沙盒集成](/oss/javascript/contributing/integrations-langchain)。
+
+
+
+---
+
+
+
+## 故障排除
+
+
+有关可用标准测试套件的完整列表，以及包含哪些测试以及如何解决常见问题的信息，请参阅[使用标准测试](/oss/javascript/javascript/contributing/standard-tests-langchain#using-standard-tests)。
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\contributing\standard-tests-langchain.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

@@ -1,0 +1,64 @@
+---
+title: 启用 Insights
+sidebarTitle: Insights
+---
+
+[Insights](/langsmith/insights) 为 LangSmith 内的追踪数据和应用数据提供 AI 驱动的分析。本页说明如何在[自托管 LangSmith 实例](/langsmith/self-hosted)上启用 Insights。
+
+<Info>
+自托管 LangSmith 是企业版计划的附加功能。更多详情请参阅[定价](https://www.langchain.com/pricing)。如需获取许可证密钥以在您的环境中试用 LangSmith，请[联系我们的销售团队](https://www.langchain.com/contact-sales)。
+</Info>
+
+## 前提条件
+
+启用 Insights 前，必须完成以下设置步骤：
+
+1. 安装基础 LangSmith 平台：
+   - [在 Kubernetes 上安装](/langsmith/kubernetes)。
+   - [在 Docker 上安装](/langsmith/docker)。
+1. [启用 LangSmith Deployment](/langsmith/deploy-self-hosted-full-platform)（代理部署功能）。
+
+## 组件
+
+Insights 包含两个主要组件：
+
+- `agentBootstrap`：部署 Insights 所需的 LangSmith Deployment（代理）的作业。
+- `insightsAgent`：处理洞察生成的主代理。
+
+## 启用 Insights
+
+要启用 Insights，请在您的 `values.yaml` 中添加以下配置：
+
+```yaml
+backend:
+  agentBootstrap:
+    enabled: true
+
+config:
+  insights:
+    enabled: true
+    encryptionKey: "<your-encryption-key>"
+```
+
+### 生成加密密钥
+
+Insights 需要一个 Fernet 加密密钥来安全存储密钥。使用 Python 生成密钥：
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+<Note>
+您可以使用 `insights_encryption_key` 参数将加密密钥存储在预定义的 Kubernetes 密钥中。详情请参阅[使用现有密钥](/langsmith/self-host-using-an-existing-secret#parameters)。
+</Note>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\insights-self-hosted.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

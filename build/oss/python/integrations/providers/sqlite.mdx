@@ -1,0 +1,40 @@
+---
+title: "SQLite 集成"
+description: "使用 LangChain Python 与 SQLite 集成。"
+---
+
+>[SQLite](https://en.wikipedia.org/wiki/SQLite) 是一个用 C 编程语言编写的数据库引擎。它不是独立的应用程序；相反，它是一个库，软件开发者将其嵌入到他们的应用中。因此，它属于嵌入式数据库家族。它是最广泛部署的数据库引擎，因为它被许多顶级网页浏览器、操作系统、手机和其他嵌入式系统所使用。
+
+## 安装和设置
+
+我们需要安装 `SQLAlchemy` Python 包。
+
+<CodeGroup>
+```bash pip
+pip install SQLAlchemy
+```
+
+```bash uv
+uv add SQLAlchemy
+```
+</CodeGroup>
+
+## 向量存储
+
+查看 [使用示例](/oss/python/integrations/vectorstores/sqlitevec)。
+
+```python
+from langchain_community.vectorstores import SQLiteVec
+from langchain_community.vectorstores import SQLiteVSS # legacy
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\providers\sqlite.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

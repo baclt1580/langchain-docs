@@ -1,0 +1,39 @@
+---
+title: "MHTML 集成"
+description: "使用 LangChain Python 与 MHTML 文档加载器集成。"
+---
+
+MHTML 既用于电子邮件，也用于网页存档。MHTML，有时也称为 MHT，代表 MIME HTML，它是一个将整个网页存档的单一文件。当以 MHTML 格式保存网页时，该文件扩展名将包含 HTML 代码、图像、音频文件、Flash 动画等。
+
+```python
+from langchain_community.document_loaders import MHTMLLoader
+```
+
+```python
+# 为 MHTML 文件创建一个新的加载器对象
+loader = MHTMLLoader(
+    file_path="../../../../../../tests/integration_tests/examples/example.mht"
+)
+
+# 从文件中加载文档
+documents = loader.load()
+
+# 打印文档以查看结果
+for doc in documents:
+    print(doc)
+```
+
+```python
+page_content='LangChain\nLANG CHAIN 🦜️🔗官方主页\xa0\n\n\n\n\n\n\n\n集成\n\n\n\n功能\n\n\n\n\n博客\n\n\n\n概念指南\n\n\n\n\nPython 仓库\n\n\nJavaScript 仓库\n\n\n\nPython 文档 \n\n\nJavaScript 文档\n\n\n\n\nPython ChatLangChain \n\n\nJavaScript ChatLangChain\n\n\n\n\nDiscord \n\n\nTwitter\n\n\n\n\n如果您对我们的网页有任何意见，可以按上述地址写信给我们。然而，由于公司办公室人员有限，我们无法直接回复。\n\n版权所有 © 2023-2023 LangChain Inc.\n\n\n' metadata={'source': '../../../../../../tests/integration_tests/examples/example.mht', 'title': 'LangChain'}
+```
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\oss\python\integrations\document_loaders\mhtml.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

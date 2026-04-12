@@ -1,0 +1,204 @@
+---
+title: 如何比较实验效果
+sidebarTitle: 比较实验效果
+---
+
+当你对 LLM 应用进行迭代（例如更换模型或调整提示词）时，可能需要比较不同[_实验_](/langsmith/evaluation-concepts#experiment)的结果。
+
+LangSmith 提供了对比视图，帮助你识别不同实验之间的关键差异、性能退步和改进之处。
+
+## 打开对比视图
+
+1. 要访问实验对比视图，请导航至 **数据集与实验** 页面。
+1. 选择一个数据集，这将打开 **实验** 标签页。
+1. 选择两个或更多实验，然后点击 **比较**。
+
+<div style={{ textAlign: 'center' }}>
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/compare-select-light.png"
+    alt="UI 中的实验视图，选中了 3 个实验，并高亮显示了“比较”按钮，浅色模式。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/compare-select-dark.png"
+    alt="UI 中的实验视图，选中了 3 个实验，并高亮显示了“比较”按钮，深色模式。"
+/>
+</div>
+
+## 调整表格显示
+
+你可以在对比视图的右上角切换不同的显示选项。
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/comparison-table-display-options-light.png"
+    alt="表格显示选项，浅色模式。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/comparison-table-display-options-dark.png"
+    alt="表格显示选项，深色模式。"
+/>
+
+### 筛选器
+
+点击 <Icon icon="filter-2"/> 图标，可对对比视图应用筛选器，以缩小到特定的示例。常见的筛选器示例包括：
+
+- 包含特定 `input` / `output` 的示例。
+- 状态为 `success` 或 `error` 的运行。
+- `latency` 超过 x 秒的运行。
+- 特定的 `metadata`、`tag` 或 `feedback`。
+
+除了对整个实验视图应用筛选器外，你也可以对单个列应用筛选器。选择任意列顶部的 <Icon icon="dots-vertical"/> 图标，即可查看该列数据的可用筛选器。
+
+### 列
+
+点击 <Icon icon="columns-3"/> 图标，可在对比视图中显示或隐藏单个反馈键或指标。
+
+### 表格视图
+
+在对比视图的右上角选择三个表格视图图标之一：
+
+- **紧凑**：显示每个示例的实验结果预览。
+- **完整**：显示每次运行的输入、输出和参考输出的完整文本。如果输出过长无法在表格中显示，可以点击 **展开** 查看完整内容。
+- **差异**：显示每次运行中实验输出之间的文本差异。此功能一次仅支持比较 2 个实验。更多详情请参阅 [查看并排差异](#view-side-by-side-diffs)。
+
+### 显示类型
+
+有三种内置的实验视图，涵盖多种显示类型：**默认**、**YAML**、**JSON**。
+
+## 查看性能退步与改进
+
+在对比视图中，红色高亮表示在任何反馈键上相对于源实验出现*性能退步*的运行，而绿色高亮表示*有所改进*的运行。在每个反馈列的顶部，你可以看到有多少运行比源实验表现更好或更差。
+
+点击每列顶部的退步或改进按钮，可以仅显示在该实验中退步或改进的运行。
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/regression-view-light.png"
+    alt="对比视图，比较了 4 个实验，退步和改进分别用红色和绿色高亮显示。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/regression-view-dark.png"
+    alt="对比视图，比较了 4 个实验，退步和改进分别用红色和绿色高亮显示。"
+/>
+
+## 查看并排差异
+
+当比较两个实验时，对于 JSON 和 YAML 显示样式，你可以切换开启实验差异模式来比较实验输出。差异模式会高亮显示输出之间的修改，对于结构化输出的比较尤其有用。
+
+<div style={{ textAlign: 'center' }}>
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/comparison-diff-view-light.png"
+    alt="对比差异模式，浅色模式。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/comparison-diff-view-dark.png"
+    alt="对比差异模式，深色模式。"
+/>
+</div>
+
+## 更新源实验和指标
+
+要跟踪跨实验的性能退步，你可以：
+
+1. 在对比视图顶部，将鼠标悬停在一个实验图标上，然后从下拉菜单中选择 **设为源实验**。你也可以从此下拉菜单中添加或移除实验。默认情况下，第一个选中的实验被设为源实验。
+
+    <img
+        className="block dark:hidden"
+        src="/langsmith/images/set-source-experiment-light.png"
+        alt="在对比视图顶部的实验图标处设置源实验。"
+    />
+
+    <img
+        className="hidden dark:block"
+        src="/langsmith/images/set-source-experiment-dark.png"
+        alt="在对比视图顶部的实验图标处设置源实验。"
+    />
+
+1. 在 **反馈** 列中，你可以为每个反馈键配置更高的分数是否代表更好。此偏好将被保存。默认情况下，假定更高的分数更好。
+
+    <img
+        className="block dark:hidden"
+        src="/langsmith/images/comparison-feedback-score-light.png"
+        alt="反馈指标列的下拉菜单，配置更高的分数是否更好，浅色模式。"
+    />
+
+    <img
+        className="hidden dark:block"
+        src="/langsmith/images/comparison-feedback-score-dark.png"
+        alt="反馈指标列的下拉菜单，配置更高的分数是否更好，深色模式。"
+    />
+
+## 展开详情面板
+
+点击任意行，即可打开该示例在对比实验中的详情面板。
+
+使用面板右上角的切换按钮可在两种模式间切换：
+
+- **详情**：显示反馈键和分数，以及该示例的指标摘要，还有每个实验的输入、输出、参考输出和属性。
+
+    <img
+        className="block dark:hidden"
+        src="/langsmith/images/expanded-view-details-light.png"
+        alt="展开的实验对比视图中的一个示例，浅色模式。"
+    />
+
+    <img
+        className="hidden dark:block"
+        src="/langsmith/images/expanded-view-details-dark.png"
+        alt="展开的实验对比视图中的一个示例，深色模式。"
+    />
+
+- **轨迹**：并排显示每个实验的轨迹。
+
+    <img
+        className="block dark:hidden"
+        src="/langsmith/images/expanded-view-traces-light.png"
+        alt="展开的实验对比视图中的一个示例，浅色模式。"
+    />
+
+    <img
+        className="hidden dark:block"
+        src="/langsmith/images/expanded-view-traces-dark.png"
+        alt="展开的实验对比视图中的一个示例，深色模式。"
+    />
+
+当比较超过两个实验时，面板一次显示两个实验。使用面板标题可以切换与哪个实验进行比较。
+
+## 使用实验元数据作为图表标签
+
+你可以基于[实验元数据](/langsmith/filter-experiments-ui#background-add-metadata-to-your-experiments)配置图表的 x 轴标签。
+
+在对比视图右上角的 **图表** 下拉菜单中选择一个元数据键，即可更改 x 轴标签。
+
+<img
+    className="block dark:hidden"
+    src="/langsmith/images/metadata-in-charts-light.png"
+    alt="高亮显示的 x 轴下拉菜单，列出了附加到实验的元数据，浅色模式。"
+/>
+
+<img
+    className="hidden dark:block"
+    src="/langsmith/images/metadata-in-charts-dark.png"
+    alt="高亮显示的 x 轴下拉菜单，列出了附加到实验的元数据，深色模式。"
+/>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\compare-experiment-results.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>

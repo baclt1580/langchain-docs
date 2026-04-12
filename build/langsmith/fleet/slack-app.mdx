@@ -1,0 +1,212 @@
+---
+title: 将 Slack 与智能体集成
+description: 将 LangSmith Fleet 连接到您的 Slack 工作区，让您的智能体能够在 Slack 中与用户交流。
+sidebarTitle: Slack
+---
+
+通过 LangSmith Fleet，您可以安全地将您的智能体连接到 Slack 工作区，让智能体能够在 Slack 中与用户交流。
+
+集成后，您的智能体将能够：
+
+- 直接从您的 Slack 机器人接收消息，并以消息内容启动新的运行。
+- 处理消息后，向您的 Slack 工作区回复消息。
+- 通过读取线程消息和对话历史记录，从 Slack 获取相关上下文。
+
+LangSmith Fleet 提供了两种将智能体连接到 Slack 的方式：**自定义 Slack 机器人**（推荐）和**默认 Slack 机器人**。
+
+## 自定义机器人与默认机器人对比
+
+| | [自定义 Slack 机器人](#设置自定义-slack-机器人) | [默认 Slack 机器人](#设置默认-slack-机器人) |
+|---|---|---|
+| **Slack 应用** | 您自己的应用，通过 LangSmith 创建 | LangSmith 的 Slack 账户 |
+| **触发方式** | 直接用 `@机器人名称` 提及机器人 | 频道中的每条消息 |
+| **私信** | ✅ | ❌ |
+| **最适合** | 来自 Slack 的直接双向交流。 | 每当特定频道中发送消息时启动运行 |
+
+<Info>
+Fleet 的 Slack 集成本身不直接收费。但是，智能体运行和追踪会根据您组织的套餐计划，通过 [LangSmith 平台](https://smith.langchain.com)计费。
+
+有关当前定价信息，请参阅 [LangSmith 定价页面](https://www.langchain.com/pricing)。
+</Info>
+
+## 设置自定义 Slack 机器人
+
+自定义 Slack 机器人可实现您的智能体与 Slack 之间的完全双向通信。
+
+### 先决条件
+
+- Fleet 中已有的智能体（请参阅[快速入门](/langsmith/fleet/quickstart)以创建一个）
+- 对 Slack 工作区的管理员访问权限或安装应用的权限
+
+### 创建 Slack 应用
+
+<Steps>
+  <Step title="创建新的 Slack 应用">
+    1. 在 Fleet 中导航到 **集成** 页面，进入 **应用** 部分。
+    1. 点击 **添加 Slack 应用**。
+    1. 输入机器人的名称。
+    1. 点击 **创建 Slack 应用**。您将被重定向到 Slack API 网站，并弹出一个要求您选择工作区的窗口。
+
+    <Warning>
+    请勿在此流程之外单独创建 Slack 应用。必须通过此弹窗创建应用。
+    </Warning>
+  </Step>
+
+  <Step title="选择您的工作区">
+    1. 选择您要安装机器人的工作区。
+    1. 点击 **下一步**。
+    1. 点击 **创建机器人**。
+  </Step>
+
+  <Step title="输入您的应用凭据">
+    创建机器人后，您将收到您的应用凭据。在 Fleet 中输入以下凭据：
+    - 应用 ID
+    - 客户端 ID
+    - 客户端密钥
+    - 签名密钥
+
+    <Note>
+    请仔细复制完整的客户端密钥和签名密钥，以确保连接成功。
+    </Note>
+  </Step>
+
+  <Step title="连接 OAuth">
+    1. 点击 **连接 OAuth**。
+    1. 点击 **允许** 以授予 Fleet 对您应用的访问权限。
+  </Step>
+
+  <Step title="完成设置">
+    将您的 Slack 机器人链接到现有智能体，或点击 **完成** 稍后链接。
+  </Step>
+</Steps>
+
+### 将 Slack 机器人链接到智能体
+
+您可以从集成页面或智能体编辑器链接 Slack 机器人和智能体。每个智能体只能有一个 Slack 应用，每个 Slack 应用也只能链接到一个智能体。
+<Tabs>
+  <Tab title="从集成页面">
+    1. 在 Fleet 的 **集成** 页面，导航到 **Slack 应用** 部分。
+    1. 选择您要链接的机器人。
+    1. 从下拉菜单中，选择您要链接到的智能体。
+    1. 验证机器人名称旁边是否显示 **\<智能体名称\>**。
+
+  </Tab>
+  <Tab title="从智能体编辑器">
+    1. 在左侧导航栏的 **我的智能体** 中选择您的智能体。
+    1. 点击 <Icon icon="pencil"/> **编辑智能体**。
+    1. 滚动到 **频道** 部分。
+
+       <Note>
+       您可能需要先设置智能体身份。点击右上角的 **设置身份**。
+       </Note>
+
+    1. 点击 **Slack**。
+    1. 从下拉菜单中，选择您要链接的 Slack 应用。
+
+  </Tab>
+</Tabs>
+
+### 邀请机器人到您的频道
+
+1. 在 Slack 中，进入您想要使用机器人的频道。
+1. 输入 `/invite @您的Slack机器人名称` 来邀请机器人。
+1. 发送一条提及机器人的消息以验证其是否响应。
+
+### 配置智能体行为（可选）
+
+您的智能体需要知道如何处理传入的 Slack 消息。通过在智能体聊天中直接提示来更新其指令：
+
+```
+更新您的指令以处理 Slack 触发器和 Slack 工具
+以实现双向通信
+```
+
+根据您的用例调整指令——例如，您可能希望智能体仅响应特定类型的问题，或者在回复前从特定来源提取信息。
+
+## 设置默认 Slack 机器人
+
+默认 Slack 机器人使用 LangSmith 的 Slack 账户，并在连接的频道中每次发布消息时触发您的智能体。它无法接收私信。
+
+<Steps>
+  <Step title="使用 Slack 验证并获取频道 ID">
+    1. 在 [Fleet > 集成页面](https://smith.langchain.com/agents/tools) 上，使用 Slack 进行身份验证。
+    1. 在 Slack 中，邀请默认应用 (`@LangSmith Fleet`) 加入一个频道。
+    1. 复制频道 ID。
+  </Step>
+  <Step title="打开智能体编辑器">
+    在 [Fleet](https://smith.langchain.com/agents) 中，选择您的智能体并点击 <Icon icon="pencil"/> **编辑智能体** 图标。
+  </Step>
+  <Step title="添加 Slack 频道">
+    1. 在 **频道** 部分，点击 **Slack**。
+    1. 导航到 **LangSmith 机器人** 并点击 **添加频道**。
+    1. 粘贴频道 ID 和频道名称。
+  </Step>
+  <Step title="启动运行">
+    在频道中发送任意消息以启动运行。
+  </Step>
+</Steps>
+
+## 添加 Slack 工具
+
+Slack 工具让您的智能体能够发送消息、在主题中回复以及读取频道历史记录。无论智能体是通过 Slack、Fleet UI、计划任务还是 webhook 触发的，这些工具都能工作。
+
+例如，您可以在 Fleet 聊天 UI 中启动一个长时间运行的研究任务，并指示智能体在完成后向您发送 Slack 消息。
+
+<Tip>
+您也可以要求您的智能体自行添加这些工具。在智能体聊天中，尝试："添加 Slack 工具，以便您能回复消息。"
+</Tip>
+
+1. 在智能体编辑器中，滚动到 **工具** 部分。
+1. 点击 **+ 添加**。
+1. 搜索 "Slack" 并添加您需要的工具（如果尚未添加）：
+   - **slack_send_channel_message** — 向频道发布消息
+   - **slack_reply_to_message** — 在主题中回复
+   - **slack_write_private_message** — 发送私信
+   - **slack_read_channel_history** — 读取最近消息
+   - **slack_read_thread_messages** — 读取主题回复
+1. 如果提示，点击 **连接** 以授权 Slack 工具。
+1. 点击 **保存更改**。
+
+## 故障排除
+
+### 智能体无响应
+
+如果您的智能体没有响应，可以尝试以下方法：
+
+- 在 Fleet 中检查线程，查看是否有需要人工输入的审批。
+- 验证机器人是否已被邀请到频道。
+- 检查 **动态** 选项卡是否有错误。
+- 确保频道在 **频道** 部分未被暂停。
+- 尝试重新使用 Slack 进行身份验证，以确保 Fleet 存储了您最新的 Slack 用户 ID。
+
+### 不允许提及机器人
+
+如果您收到一条私信，说您不允许提及该机器人，则您的 Slack ID 未获得该智能体的授权。智能体的所有者需要与您共享该智能体——要么与整个工作区共享运行访问权限，要么与您个人共享。
+
+## 后续步骤
+
+<CardGroup cols={3}>
+
+  <Card title="添加更多工具" icon="puzzle" href="/langsmith/fleet/tools">
+    为您的智能体连接更多服务
+  </Card>
+
+  <Card title="添加更多频道" icon="bolt" href="/langsmith/fleet/channels">
+    设置电子邮件、计划任务或 webhook 频道
+  </Card>
+
+  <Card title="使用模板" icon="layout-grid" href="/langsmith/fleet/templates">
+    从预构建的智能体模板开始
+  </Card>
+</CardGroup>
+
+---
+
+<div className="source-links">
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/i18n\zh-CN\langsmith\fleet\slack-app.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+</div>
